@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -53,19 +54,25 @@ func main() {
 				return err
 			}
 
-			listener, err := core.Init(db, api_address)
+			srv, err := core.Init(db, api_address)
 			if err != nil {
 				return err
 			}
 
-			ch := make(chan os.Signal)
-			signal.Notify(ch, unix.SIGINT)
-			signal.Notify(ch, unix.SIGQUIT)
-			signal.Notify(ch, unix.SIGTERM)
+			quit := make(chan os.Signal)
+			signal.Notify(quit, unix.SIGINT)
+			signal.Notify(quit, unix.SIGQUIT)
+			signal.Notify(quit, unix.SIGTERM)
 
-			<-ch
+			<-quit
 
-			listener.Close()
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := srv.Shutdown(ctx); err != nil {
+				log.Fatal("Server forced to shutdown:", err)
+			}
+
+			log.Println("Server exiting")
 			db.Close()
 
 			app.Handover(context.Background())
