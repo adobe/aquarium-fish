@@ -1,4 +1,4 @@
-# Aquarium Fish
+# Aquarium: Fish
 
 Distributed p2p system to manage resources. Primarily was developed in order to manage the dynamic
 Jenkins CI and simplify the infrastructure management, but can be used in various applications to
@@ -7,6 +7,9 @@ have self-management resources and simple REST API to manage p2p cluster.
 ## Requirements
 
 ## Usage
+
+In order to use with Jenkins - you can use `Aquarium: Rod Jenkins` cloud plugin to dynamically
+allocate the required resources.
 
 ## Implementation
 

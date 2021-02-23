@@ -16,6 +16,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/adobe/aquarium-fish/lib/core"
+	"github.com/adobe/aquarium-fish/lib/fish"
 )
 
 func main() {
@@ -54,7 +55,12 @@ func main() {
 				return err
 			}
 
-			srv, err := core.Init(db, api_address)
+			fish, err := fish.New(db)
+			if err != nil {
+				return err
+			}
+
+			srv, err := core.Init(fish, api_address)
 			if err != nil {
 				return err
 			}

@@ -3,44 +3,46 @@ package api
 import (
 	"net/http"
 	"github.com/gin-gonic/gin"
+
+	"github.com/adobe/aquarium-fish/lib/fish"
 )
 
-type User struct {
-	Login       string
-	Password    string
+type APIv1Processor struct {
+	app *fish.App
 }
-func UserGetList(c *gin.Context) {
+
+func (e *APIv1Processor) UserGetList(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Get users list"})
 }
 
-func UserGet(c *gin.Context) {
+func (e *APIv1Processor) UserGet(c *gin.Context) {
 	//id := c.Param("id")
 	c.JSON(http.StatusNotFound, gin.H{"message": "User not found"})
 }
 
-func UserPost(c *gin.Context) {
+func (e *APIv1Processor) UserPost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "User stored"})
 }
 
-func UserDelete(c *gin.Context) {
+func (e *APIv1Processor) UserDelete(c *gin.Context) {
 	//id := c.Param("id")
 	c.JSON(http.StatusOK, gin.H{"message": "User removed"})
 }
 
-func ResourceGetList(c *gin.Context) {
+func (e *APIv1Processor) ResourceGetList(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Get resources list"})
 }
 
-func ResourceGet(c *gin.Context) {
+func (e *APIv1Processor) ResourceGet(c *gin.Context) {
 	//id := c.Param("id")
 	c.JSON(http.StatusNotFound, gin.H{"message": "Resource not found"})
 }
 
-func ResourcePost(c *gin.Context) {
+func (e *APIv1Processor) ResourcePost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Resource stored"})
 }
 
-func ResourceDelete(c *gin.Context) {
+func (e *APIv1Processor) ResourceDelete(c *gin.Context) {
 	//id := c.Param("id")
 	c.JSON(http.StatusOK, gin.H{"message": "Resource removed"})
 }
