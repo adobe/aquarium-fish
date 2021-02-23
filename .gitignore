@@ -2,3 +2,4 @@
 
 /deps/*
 !/deps/*.patch
+!/deps/build-deps.sh
