@@ -1,0 +1,32 @@
+diff --git a/app/proxy.go b/app/proxy.go
+index 21d8ff4..9bfb7e8 100644
+--- a/app/proxy.go
++++ b/app/proxy.go
+@@ -11,6 +11,12 @@ import (
+ 	"time"
+ )
+ 
++// from netinet/tcp.h (OS X 10.9.4)
++const (
++	_TCP_KEEPINTVL = 0x101 /* interval between keepalives */
++	_TCP_KEEPCNT   = 0x102 /* number of keepalives before close */
++)
++
+ // Copies data between a remote TCP network connection (possibly with TLS) and
+ // a local unix socket.
+ //
+@@ -108,12 +114,12 @@ func setKeepalive(conn *net.TCPConn) error {
+ 		func(ptr uintptr) {
+ 			fd := int(ptr)
+ 			// Number of probes.
+-			err = syscall.SetsockoptInt(fd, syscall.IPPROTO_TCP, syscall.TCP_KEEPCNT, 3)
++			err = syscall.SetsockoptInt(fd, syscall.IPPROTO_TCP, _TCP_KEEPCNT, 3)
+ 			if err != nil {
+ 				return
+ 			}
+ 			// Wait time after an unsuccessful probe.
+-			err = syscall.SetsockoptInt(fd, syscall.IPPROTO_TCP, syscall.TCP_KEEPINTVL, 3)
++			err = syscall.SetsockoptInt(fd, syscall.IPPROTO_TCP, _TCP_KEEPINTVL, 3)
+ 			if err != nil {
+ 				return
+ 			}

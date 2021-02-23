@@ -1,0 +1,4 @@
+/aquarium-fish.*
+
+/deps/*
+!/deps/*.patch
