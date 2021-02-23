@@ -551,7 +551,7 @@ index 17393e1..febb2a9 100644
  #include "array.h"
  #include "assert.h"
 diff --git a/src/uv_writer.c b/src/uv_writer.c
-index 698c70f..c746127 100644
+index 698c70f..2fc8a42 100644
 --- a/src/uv_writer.c
 +++ b/src/uv_writer.c
 @@ -7,6 +7,18 @@
@@ -635,25 +635,7 @@ index 698c70f..c746127 100644
  int UvWriterSubmit(struct UvWriter *w,
                     struct UvWriterReq *req,
                     const uv_buf_t bufs[],
-@@ -519,6 +542,17 @@ int UvWriterSubmit(struct UvWriter *w,
-         goto err;
-     }
- 
-+/* Return the total lengths of the given buffers. */
-+static size_t lenOfBufs(const uv_buf_t bufs[], unsigned n)
-+{
-+    size_t len = 0;
-+    unsigned i;
-+    for (i = 0; i < n; i++) {
-+        len += bufs[i].len;
-+    }
-+    return len;
-+}
-+
- #if defined(RWF_NOWAIT)
- done:
- #endif /* RWF_NOWAIT */
-@@ -528,3 +562,63 @@ err:
+@@ -528,3 +551,63 @@ err:
      assert(rv != 0);
      return rv;
  }
