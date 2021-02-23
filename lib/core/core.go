@@ -2,26 +2,19 @@ package core
 
 import (
 	"log"
-	"database/sql"
 	"net/http"
 	"github.com/gin-gonic/gin"
+	"git.corp.adobe.com/CI/aquarium-fish/lib/fish"
 	"git.corp.adobe.com/CI/aquarium-fish/lib/api"
 )
 
-const (
-	schema = "CREATE TABLE IF NOT EXISTS user (id TEXT, password TEXT, UNIQUE(id))"
-)
 
-func Init(db *sql.DB, api_address string) (*http.Server, error) {
-	if _, err := db.Exec(schema); err != nil {
-		return nil, err
-	}
-
+func Init(fish *fish.App, api_address string) (*http.Server, error) {
 	router := gin.Default()
 	router.RedirectTrailingSlash = false
 	router.RedirectFixedPath = false
 
-	api.InitV1(router)
+	api.InitV1(router, fish)
 
 	srv := &http.Server{
 		Addr:    api_address,
