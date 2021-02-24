@@ -2,6 +2,9 @@ package api
 
 import (
 	"net/http"
+	"strconv"
+	"strings"
+	"encoding/base64"
 	"github.com/gin-gonic/gin"
 
 	"github.com/adobe/aquarium-fish/lib/fish"
@@ -9,6 +12,31 @@ import (
 
 type APIv1Processor struct {
 	app *fish.App
+}
+
+func (e *APIv1Processor) BasicAuth() gin.HandlerFunc {
+	realm := "Basic realm=" + strconv.Quote("Authorization Required")
+	return func(c *gin.Context) {
+		split := strings.SplitN(c.GetHeader("Authorization"), " ", 2)
+		data, err := base64.StdEncoding.DecodeString(split[len(split)-1])
+		if err != nil {
+			// Unable to b64decode creds
+			c.Header("WWW-Authenticate", realm)
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+		user := e.app.AuthBasicUser(string(data))
+		if user == "" {
+			// Credentials doesn't match, we return 401 and abort handlers chain.
+			c.Header("WWW-Authenticate", realm)
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+
+		// Clean Auth header and set the user
+		c.Request.Header.Del("Authorization")
+		c.Set("user", user)
+	}
 }
 
 func (e *APIv1Processor) UserGetList(c *gin.Context) {
