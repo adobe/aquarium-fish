@@ -7,7 +7,7 @@ import (
 )
 
 func InitV1(router *gin.Engine, fish *fish.App) {
-	proc := &APIv1Processor{ app: fish }
+	proc := &APIv1Processor{app: fish}
 
 	v1 := router.Group("/api/v1")
 	v1.Use(

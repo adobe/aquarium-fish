@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"time"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"time"
 
 	"github.com/canonical/go-dqlite/app"
 	"github.com/canonical/go-dqlite/client"
@@ -29,7 +29,7 @@ func main() {
 	cmd := &cobra.Command{
 		Use:   "aquarium-fish",
 		Short: "Aquarium fish",
-		Long: `Part of the Aquarium suite - a distributed resources manager`,
+		Long:  `Part of the Aquarium suite - a distributed resources manager`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir := filepath.Join(dir, db_address)
 			if err := os.MkdirAll(dir, 0755); err != nil {

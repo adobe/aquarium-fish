@@ -3,11 +3,12 @@ package core
 import (
 	"log"
 	"net/http"
-	"github.com/gin-gonic/gin"
-	"git.corp.adobe.com/CI/aquarium-fish/lib/fish"
-	"git.corp.adobe.com/CI/aquarium-fish/lib/api"
-)
 
+	"github.com/gin-gonic/gin"
+
+	"git.corp.adobe.com/CI/aquarium-fish/lib/api"
+	"git.corp.adobe.com/CI/aquarium-fish/lib/fish"
+)
 
 func Init(fish *fish.App, api_address string) (*http.Server, error) {
 	router := gin.Default()
