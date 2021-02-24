@@ -17,3 +17,6 @@ fi
 
 echo "--- BUILD AQUARIUM-FISH ---"
 go build -ldflags="-s -w" -a -o "aquarium-fish.$suffix" ./cmd/fish
+
+# Remove debug symbols
+strip "aquarium-fish.$suffix"

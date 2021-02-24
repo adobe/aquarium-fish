@@ -7,9 +7,14 @@ import (
 )
 
 func InitV1(router *gin.Engine, fish *fish.App) {
+	proc := &APIv1Processor{ app: fish }
+
 	v1 := router.Group("/api/v1")
+	v1.Use(
+		// Regular basic auth
+		proc.BasicAuth(),
+	)
 	{
-		proc := &APIv1Processor{ app: fish }
 		user := v1.Group("/user")
 		{
 			user.GET("/", proc.UserGetList)
