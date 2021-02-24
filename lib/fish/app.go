@@ -1,9 +1,9 @@
 package fish
 
 import (
+	"database/sql"
 	"log"
 	"strings"
-	"database/sql"
 
 	"github.com/adobe/aquarium-fish/lib/crypt"
 )
@@ -16,16 +16,15 @@ const (
 	schema = "CREATE TABLE IF NOT EXISTS user (id TEXT, algo TEXT, salt BLOB, hash BLOB, UNIQUE(id))"
 )
 
-
 func New(db *sql.DB) (*App, error) {
-	fish := &App{ db: db }
+	fish := &App{db: db}
 	if err := fish.InitDB(); err != nil {
 		return nil, err
 	}
 	return fish, nil
 }
 
-func (e *App) InitDB() (error) {
+func (e *App) InitDB() error {
 	// TODO: improve schema apply process
 	if _, err := e.db.Exec(schema); err != nil {
 		return err

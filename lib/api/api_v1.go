@@ -1,10 +1,11 @@
 package api
 
 import (
+	"encoding/base64"
 	"net/http"
 	"strconv"
 	"strings"
-	"encoding/base64"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/adobe/aquarium-fish/lib/fish"

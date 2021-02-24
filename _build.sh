@@ -15,6 +15,9 @@ else
     echo "--- WARNING: build DEBUG mode ---"
 fi
 
+reformat=$(gofmt -l .)
+[ -z "${reformat}" ] || (echo "Please run 'go fmt ...': \n${reformat}"; exit 1)
+
 echo "--- BUILD AQUARIUM-FISH ---"
 go build -ldflags="-s -w" -a -o "aquarium-fish.$suffix" ./cmd/fish
 
