@@ -59,7 +59,16 @@ func (e *APIv1Processor) UserDelete(c *gin.Context) {
 }
 
 func (e *APIv1Processor) ResourceGetList(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "Get resources list"})
+	// TODO: demo logic
+	drivers := e.app.DriversGet()
+	for _, drv := range drivers {
+		if drv.Name() == "vmx" {
+			list := drv.Status(nil)
+			c.JSON(http.StatusOK, gin.H{"message": "Get resources list", "data": list})
+			return
+		}
+	}
+	c.JSON(http.StatusNotFound, gin.H{"message": "Get resources list"})
 }
 
 func (e *APIv1Processor) ResourceGet(c *gin.Context) {
@@ -68,10 +77,34 @@ func (e *APIv1Processor) ResourceGet(c *gin.Context) {
 }
 
 func (e *APIv1Processor) ResourcePost(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "Resource stored"})
+	// TODO: demo logic
+	drivers := e.app.DriversGet()
+	for _, drv := range drivers {
+		if drv.Name() == "vmx" {
+			if err := drv.Allocate(nil); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"message": "Resource store error"})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"message": "Resource stored"})
+			return
+		}
+	}
+	c.JSON(http.StatusNotFound, gin.H{"message": "Resource stored"})
 }
 
 func (e *APIv1Processor) ResourceDelete(c *gin.Context) {
 	//id := c.Param("id")
-	c.JSON(http.StatusOK, gin.H{"message": "Resource removed"})
+	// TODO: demo logic
+	drivers := e.app.DriversGet()
+	for _, drv := range drivers {
+		if drv.Name() == "vmx" {
+			if err := drv.Deallocate(nil); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"message": "Resource remove error"})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"message": "Resource removed"})
+			return
+		}
+	}
+	c.JSON(http.StatusNotFound, gin.H{"message": "Resource removed"})
 }
