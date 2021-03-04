@@ -3,49 +3,67 @@ package fish
 import (
 	"log"
 	"strings"
+	"time"
 
 	"github.com/adobe/aquarium-fish/lib/crypt"
 )
 
-func (e *App) AuthBasicUser(basic string) string {
+type User struct {
+	ID        uint `gorm:"primaryKey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	// Unable to use SoftDelete due to error during Save https://gorm.io/docs/delete.html#Soft-Delete
+
+	Name string     `gorm:"unique"`
+	Hash crypt.Hash `gorm:"embedded"`
+}
+
+func (e *App) UserCreate(user *User) error {
+	return e.db.Create(user).Error
+}
+
+func (e *App) UserSave(user *User) error {
+	return e.db.Save(user).Error
+}
+
+func (e *App) UserGet(name string) (user *User, err error) {
+	user = &User{}
+	err = e.db.Where("name = ?", name).First(user).Error
+	return user, err
+}
+
+func (e *App) UserAuthBasic(basic string) string {
 	if basic == "" {
 		return ""
 	}
 	split := strings.SplitN(basic, ":", 2)
-	return e.AuthUser(split[0], split[len(split)-1])
+	return e.UserAuth(split[0], split[len(split)-1])
 }
 
-func (e *App) AuthUser(id string, password string) (user_id string) {
-	row := e.db.QueryRow("SELECT id, algo, salt, hash FROM user WHERE id = ?", id)
-
-	var hash crypt.Hash
-	if err := row.Scan(&user_id, &hash.Algo, &hash.Salt, &hash.Hash); err != nil {
-		log.Printf("Unable to parse SQL row data for user: %s, %w", id, err)
-		return
+func (e *App) UserAuth(name string, password string) string {
+	user, err := e.UserGet(name)
+	if err != nil {
+		log.Printf("Fish: User not exists: %s", name)
+		return ""
 	}
 
-	if !hash.IsEqual(password) {
-		log.Printf("Incorrect user password: %s", id)
-		user_id = ""
+	if !user.Hash.IsEqual(password) {
+		log.Printf("Fish: Incorrect user password: %s", name)
+		return ""
 	}
-	return
+
+	return user.Name
 }
 
-func (e *App) UserNew(id string, password string) (pass string, err error) {
+func (e *App) UserNew(name string, password string) (string, error) {
 	if password == "" {
 		password = crypt.RandString(64)
 	}
 
-	hash := crypt.Generate(password, nil)
+	user := &User{Name: name, Hash: crypt.Generate(password, nil)}
 
-	st, err := e.db.Prepare("INSERT INTO user(id, algo, salt, hash) VALUES (?, ?, ?, ?)")
-	if err != nil {
-		log.Printf("Unable to create new user: %s, %w", id, err)
-		return "", err
-	}
-	_, err = st.Exec(id, hash.Algo, hash.Salt, hash.Hash)
-	if err != nil {
-		log.Printf("Unable to create new user: %s, %w", id, err)
+	if err := e.UserCreate(user); err != nil {
+		log.Printf("Fish: Unable to create new user: %s, %w", name, err)
 		return "", err
 	}
 

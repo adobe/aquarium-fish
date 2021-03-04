@@ -14,6 +14,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/unix"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 
 	"github.com/adobe/aquarium-fish/lib/core"
 	"github.com/adobe/aquarium-fish/lib/fish"
@@ -52,7 +55,14 @@ func main() {
 				return err
 			}
 
-			db, err := dqlite.Open(context.Background(), "aquarium-fish")
+			dqlite_db, err := dqlite.Open(context.Background(), "aquarium-fish")
+			if err != nil {
+				return err
+			}
+
+			db, err := gorm.Open(&sqlite.Dialector{Conn: dqlite_db}, &gorm.Config{
+				Logger: logger.Default.LogMode(logger.Warn),
+			})
 			if err != nil {
 				return err
 			}
@@ -81,7 +91,7 @@ func main() {
 			}
 
 			log.Println("Server exiting")
-			db.Close()
+			dqlite_db.Close()
 
 			dqlite.Handover(context.Background())
 			dqlite.Close()
