@@ -15,6 +15,7 @@ func Init(fish *fish.App, api_address string) (*http.Server, error) {
 	router.RedirectTrailingSlash = false
 	router.RedirectFixedPath = false
 
+	api.InitMetaV1(router, fish)
 	api.InitV1(router, fish)
 
 	srv := &http.Server{

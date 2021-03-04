@@ -2,12 +2,14 @@ package fish
 
 import (
 	"io/ioutil"
+	"os"
 
 	"github.com/ghodss/yaml"
 )
 
 type Config struct {
-	Drivers []ConfigDriver `yaml:"drivers"`
+	NodeName string
+	Drivers  []ConfigDriver `yaml:"drivers"`
 }
 
 type ConfigDriver struct {
@@ -20,6 +22,8 @@ type ConfigDriverCfg struct {
 }
 
 func (c *Config) ReadConfigFile(cfg_path string) error {
+	c.initDefaults()
+
 	if cfg_path == "" {
 		return nil
 	}
@@ -37,7 +41,12 @@ func (c *Config) ReadConfigFile(cfg_path string) error {
 	return nil
 }
 
+func (c *Config) initDefaults() {
+	c.NodeName, _ = os.Hostname()
+}
+
 func (r *ConfigDriverCfg) UnmarshalJSON(b []byte) error {
+	// Store json as string in the variable to parse in the driver later
 	r.Json = string(b)
 	return nil
 }

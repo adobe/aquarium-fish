@@ -26,7 +26,7 @@ func (e *APIv1Processor) BasicAuth() gin.HandlerFunc {
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
-		user := e.app.AuthBasicUser(string(data))
+		user := e.app.UserAuthBasic(string(data))
 		if user == "" {
 			// Credentials doesn't match, we return 401 and abort handlers chain.
 			c.Header("WWW-Authenticate", realm)

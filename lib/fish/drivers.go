@@ -31,7 +31,7 @@ func (e *App) DriversSet(drvs []string) error {
 			}
 		}
 		if en {
-			log.Println("Resource driver enabled:", drv.Name())
+			log.Println("Fish: Resource driver enabled:", drv.Name())
 			list = append(list, drv)
 		}
 	}
@@ -59,7 +59,7 @@ func (e *App) DriversPrepare(configs []ConfigDriver) (errs []error) {
 		if err := drv.Prepare(json_cfg); err != nil {
 			errs = append(errs, err)
 		} else {
-			log.Println("Resource driver prepared:", drv.Name())
+			log.Println("Fish: Resource driver prepared:", drv.Name())
 		}
 	}
 	return errs
