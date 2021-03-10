@@ -10,7 +10,7 @@ import (
 	"git.corp.adobe.com/CI/aquarium-fish/lib/fish"
 )
 
-func Init(fish *fish.App, api_address string) (*http.Server, error) {
+func Init(fish *fish.Fish, api_address string) (*http.Server, error) {
 	router := gin.Default()
 	router.RedirectTrailingSlash = false
 	router.RedirectFixedPath = false

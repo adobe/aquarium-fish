@@ -14,7 +14,7 @@ import (
 )
 
 type MetaV1Processor struct {
-	app *fish.App
+	fish *fish.Fish
 }
 
 func checkIPv4Address(network *net.IPNet, ip net.IP) bool {
@@ -74,7 +74,7 @@ func (e *MetaV1Processor) AddressAuth() gin.HandlerFunc {
 		}
 
 		// Only the existing local resource
-		res, err := e.app.ResourceGetByIP(c.ClientIP())
+		res, err := e.fish.ResourceGetByIP(c.ClientIP())
 		if err != nil {
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
@@ -95,18 +95,13 @@ func (e *MetaV1Processor) DataGetList(c *gin.Context) {
 		return
 	}
 
-	if res.Metadata != "" {
-		err := json.Unmarshal([]byte(res.Metadata), metadata)
-		if err != nil {
-			log.Println("Fish API Meta: Unable to parse metadata of resource", res.ID, res.Metadata)
-			c.JSON(http.StatusNotFound, gin.H{"message": "Unable to parse metadata json"})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"message": "MetaData list", "data": metadata})
+	err := json.Unmarshal([]byte(res.Metadata), metadata)
+	if err != nil {
+		log.Println("Fish API Meta: Unable to parse metadata of resource", res.ID, res.Metadata)
+		c.JSON(http.StatusNotFound, gin.H{"message": "Unable to parse metadata json"})
 		return
 	}
-
-	c.JSON(http.StatusNotFound, gin.H{"message": "No data found", "data": metadata})
+	c.JSON(http.StatusOK, gin.H{"message": "MetaData list", "data": metadata})
 }
 
 func (e *MetaV1Processor) DataGet(c *gin.Context) {

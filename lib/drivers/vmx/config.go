@@ -15,9 +15,9 @@ type Config struct {
 	WorkspacePath string `json:"workspace_path"` // Where to place the cloned VM
 }
 
-func (c *Config) ApplyConfig(config string) error {
-	if config != "" {
-		if err := json.Unmarshal([]byte(config), c); err != nil {
+func (c *Config) ApplyConfig(config []byte) error {
+	if len(config) > 0 {
+		if err := json.Unmarshal(config, c); err != nil {
 			log.Println("VMX: Unable to apply the driver config", err)
 			return err
 		}

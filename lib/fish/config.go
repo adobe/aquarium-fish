@@ -17,9 +17,7 @@ type ConfigDriver struct {
 	Cfg  ConfigDriverCfg `yaml:"cfg"`
 }
 
-type ConfigDriverCfg struct {
-	Json string // Will be parsed in the driver
-}
+type ConfigDriverCfg []byte
 
 func (c *Config) ReadConfigFile(cfg_path string) error {
 	c.initDefaults()
@@ -46,7 +44,7 @@ func (c *Config) initDefaults() {
 }
 
 func (r *ConfigDriverCfg) UnmarshalJSON(b []byte) error {
-	// Store json as string in the variable to parse in the driver later
-	r.Json = string(b)
+	// Store json as bytes in the variable to parse in the driver later
+	*r = b
 	return nil
 }

@@ -11,11 +11,11 @@ import (
 
 var enabled_list []drivers.ResourceDriver
 
-func (e *App) DriversGet() []drivers.ResourceDriver {
+func (f *Fish) DriversGet() []drivers.ResourceDriver {
 	return enabled_list
 }
 
-func (e *App) DriversSet(drvs []string) error {
+func (f *Fish) DriversSet(drvs []string) error {
 	var list []drivers.ResourceDriver
 
 	for _, drv := range drivers.DriversList {
@@ -45,13 +45,13 @@ func (e *App) DriversSet(drvs []string) error {
 	return nil
 }
 
-func (e *App) DriversPrepare(configs []ConfigDriver) (errs []error) {
+func (f *Fish) DriversPrepare(configs []ConfigDriver) (errs []error) {
 	for _, drv := range enabled_list {
 		// Looking for the driver config
-		var json_cfg string
+		var json_cfg []byte
 		for _, cfg := range configs {
 			if drv.Name() == cfg.Name {
-				json_cfg = cfg.Cfg.Json
+				json_cfg = cfg.Cfg
 				break
 			}
 		}

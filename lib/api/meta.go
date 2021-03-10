@@ -6,8 +6,8 @@ import (
 	"git.corp.adobe.com/CI/aquarium-fish/lib/fish"
 )
 
-func InitMetaV1(router *gin.Engine, fish *fish.App) {
-	proc := &MetaV1Processor{app: fish}
+func InitMetaV1(router *gin.Engine, fish *fish.Fish) {
+	proc := &MetaV1Processor{fish: fish}
 
 	v1 := router.Group("/meta/v1")
 	v1.Use(

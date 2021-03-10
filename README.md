@@ -12,6 +12,17 @@ In order to use with Jenkins - you can install [Aquarium Net Jenkins](https://gi
 cloud plugin to dynamically allocate the required resources. Don't forget to add the served labels
 to the cloud and you will be ready to go.
 
+In order to use the resources manager manually - check the `API` section and follow the next general
+directions:
+
+1. Get your user and it's token
+2. Check the available labels on the cluster
+3. Create Application with description of what kind of resource you need
+4. Check the Status of your application and wait for "ALLOCATED" status
+5. Now resource is allocated, it's all yours and, probably, already pinged you
+6. When you're done - request Application to deallocate the resource
+7. Make sure the Application status is "DEALLOCATED"
+
 ## Implementation
 
 Go was choosen due to it's go-dqlite, simple one-binary executable resources management with
@@ -24,7 +35,7 @@ installed on my machine - I can run Fish and it's VMX driver will automatically 
 run VMX images. In case I have docker installed too - I can use both for different workloads or
 select the ones I actually want to use by `--drivers` option or via the API.
 
-## Internal DB structure
+### Internal DB structure
 
 The cluster supports the internal SQL database, which provides a common storage for the cluster
 info.
@@ -35,9 +46,49 @@ first cluster start and prints it to stderr.
 * **Labels** - this one filled by the cluster admin, depends on the needs. Labels could be
 implemented in different drivers, but it's not recommended to keep the label stable. Version could
 be used during request, but by default it's the latest.
+* **Applications** - is a resource request created by the user. Each node votes for the availability
+to allocate the resource and the cluster choose which one node will actually do the work.
+* **Votes** - when Application becomes available for the node it starts to vote to notify the
+cluster about its availability. Votes are basically "yes" or "no" and could take a number of rounds
+depends on the cluster voting and election rules.
 * **Resources** - list of the active resources to be able to properly restore the state during the
 cluster node restart. Also contains additional info about the resource, for example user requested
 metadata, which is available for the resource through the `Meta API`.
+
+### How the cluster choose node for resource allocation
+
+The cluster can't force any node to follow the majority decision, so the rules are providing full
+consensus.
+
+For now the rule is simple - when all the nodes are voted each node can find the first node in the
+vote table that answered "yes". There is a couple of protection mechanisms like "CreateAt" to find
+the actual first one and "Rand" field as last resort (if the other params are identical).
+
+In the future to allow to update cluster with the new rules the Rules table will be created and the
+different versions of the Aquarium Fish could find the common rules and switch them depends on
+Application request. Rules will be able to lay on top of any information about the node.
+
+The election process:
+* Once per 5 seconds the node checks the voting process
+* If there is Application with status NEW:
+   * If no Node Vote for the Application exists
+      * Fish creates Vote depends on the current status of the Node and round of the election
+   * If all the active cluster Nodes are voted
+      * If there is "Yes" Votes
+         * Application Election Rule applied to the votes
+         * If the current Node is elected
+            * If current Node is not executing Application already
+               * Set Application status to ELECTED
+               * Run the allocate process
+         * Else if the current Node is not elected
+            * If Application has no NEW status
+               * Remove Vote and forget about the Application
+            * Else if Vote round timeout is passed
+               * Decide the elected node was not took the Application
+               * execute next round vote
+      * If there is no "Yes" Votes
+         * If Vote round delay is passed
+            * Increment Vote round and vote again on the current Node status
 
 ## UI
 
@@ -75,17 +126,38 @@ Route: `/api/v1/node/`
 Allows to get info about the cluster nodes and allows to manipulate each node of the cluster
 personally.
 
+#### Applications
+
+Route: `/api/v1/application/`
+
+Resource application in order to allocate resources. Can be created and listed, but not updated or
+deleted.
+
+* `/api/v1/application/:id/status` - Current status of the application
+* `/api/v1/application/:id/resource` - Linked resource when some node took it in execution
+* `/api/v1/application/:id/deallocate` - Execute it to deallocate the application resource
+
 #### Resources
 
 Route: `/api/v1/resource/`
 
-Allow to get info about the cluster resources, request the new and delete the existing ones.
+Allow to get info about the allocated cluster resources.
 
 #### Labels
 
 Route: `/api/v1/label/`
 
 Allow to get info about the cluster labels, create the new and delete the existing ones.
+
+Label - is one of the most important part of the system, because it makes the resources reproducible
+in time. It contains the driver name and configuration, so can be started again and again as much
+times we need. Versions make possible to update the labels and store the old ones in case we need to
+run the same environment 10y from now and rebuild the old code revision for example.
+
+Labels can't be updated. Once they are stored - they are here to keep the history of environements
+and make possible to mark build with the specified label version in order to be able to reproduce it
+later. Also labels can be implemented just by one driver. If you want to use another one - you will
+need to create another label version and the resource requests that uses latest will swith to it.
 
 ### Meta API
 

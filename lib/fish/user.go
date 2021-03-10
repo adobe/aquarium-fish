@@ -1,6 +1,7 @@
 package fish
 
 import (
+	"errors"
 	"log"
 	"strings"
 	"time"
@@ -9,60 +10,66 @@ import (
 )
 
 type User struct {
-	ID        uint `gorm:"primaryKey"`
+	ID        int64 `gorm:"primaryKey"`
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	// Unable to use SoftDelete due to error during Save https://gorm.io/docs/delete.html#Soft-Delete
 
-	Name string     `gorm:"unique"`
+	Name string     `json:"name" gorm:"unique"`
 	Hash crypt.Hash `gorm:"embedded"`
 }
 
-func (e *App) UserCreate(user *User) error {
-	return e.db.Create(user).Error
+func (f *Fish) UserCreate(u *User) error {
+	if u.Name == "" {
+		return errors.New("Fish: Name can't be empty")
+	}
+	if u.Hash.IsEmpty() {
+		return errors.New("Fish: Hash can't be empty")
+	}
+
+	return f.db.Create(u).Error
 }
 
-func (e *App) UserSave(user *User) error {
-	return e.db.Save(user).Error
+func (f *Fish) UserSave(user *User) error {
+	return f.db.Save(user).Error
 }
 
-func (e *App) UserGet(name string) (user *User, err error) {
+func (f *Fish) UserGet(name string) (user *User, err error) {
 	user = &User{}
-	err = e.db.Where("name = ?", name).First(user).Error
+	err = f.db.Where("name = ?", name).First(user).Error
 	return user, err
 }
 
-func (e *App) UserAuthBasic(basic string) string {
+func (f *Fish) UserAuthBasic(basic string) *User {
 	if basic == "" {
-		return ""
+		return nil
 	}
 	split := strings.SplitN(basic, ":", 2)
-	return e.UserAuth(split[0], split[len(split)-1])
+	return f.UserAuth(split[0], split[len(split)-1])
 }
 
-func (e *App) UserAuth(name string, password string) string {
-	user, err := e.UserGet(name)
+func (f *Fish) UserAuth(name string, password string) *User {
+	user, err := f.UserGet(name)
 	if err != nil {
 		log.Printf("Fish: User not exists: %s", name)
-		return ""
+		return nil
 	}
 
 	if !user.Hash.IsEqual(password) {
 		log.Printf("Fish: Incorrect user password: %s", name)
-		return ""
+		return nil
 	}
 
-	return user.Name
+	return user
 }
 
-func (e *App) UserNew(name string, password string) (string, error) {
+func (f *Fish) UserNew(name string, password string) (string, error) {
 	if password == "" {
 		password = crypt.RandString(64)
 	}
 
 	user := &User{Name: name, Hash: crypt.Generate(password, nil)}
 
-	if err := e.UserCreate(user); err != nil {
+	if err := f.UserCreate(user); err != nil {
 		log.Printf("Fish: Unable to create new user: %s, %w", name, err)
 		return "", err
 	}
