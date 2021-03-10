@@ -7,7 +7,7 @@ type ResourceDriver interface {
 	Name() string
 
 	// Give driver configs and check if it's ok
-	Prepare(config string) error
+	Prepare(config []byte) error
 
 	// Allocate the resource with provided labels
 	Allocate(labels []string) error

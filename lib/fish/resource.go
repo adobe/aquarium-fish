@@ -1,6 +1,7 @@
 package fish
 
 import (
+	"errors"
 	"log"
 	"time"
 
@@ -10,38 +11,64 @@ import (
 )
 
 type Resource struct {
-	ID        uint `gorm:"primaryKey"`
+	ID        int64 `gorm:"primaryKey"`
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	// Unable to use SoftDelete due to error during Save https://gorm.io/docs/delete.html#Soft-Delete
 
-	Name     string // Used to identify resource by the requestor
-	Node     Node   // Node that owns the resource
-	NodeID   uint
-	Label    Label // Label configuration which is defines the resource
-	LabelID  uint
-	IpAddr   string // IP Address of the resource to identify by the node
-	HwAddr   string // MAC or any other network hardware address to identify incoming request
-	Metadata string // Requestor metadata in JSON format
+	ApplicationID int64        `json:"application_id"`
+	Application   *Application `json:"-"` // Resource request from the user
+
+	NodeID int64 `json:"node_id"`
+	Node   *Node `json:"-"` // Node that owns the resource
+
+	IpAddr   string           `json:"ip_addr"`  // IP Address of the resource to identify by the node
+	HwAddr   string           `json:"hw_addr"`  // MAC or any other network hardware address to identify incoming request
+	Metadata ResourceMetadata `json:"metadata"` // Combined metadata (Request + Driver)
 }
 
-func (e *App) ResourceCreate(res *Resource) error {
-	return e.db.Create(res).Error
+type ResourceMetadata string
+
+func (r *ResourceMetadata) MarshalJSON() ([]byte, error) {
+	return []byte(*r), nil
 }
 
-func (e *App) ResourceSave(res *Resource) error {
-	return e.db.Save(res).Error
+func (r *ResourceMetadata) UnmarshalJSON(b []byte) error {
+	// Store json as string
+	*r = ResourceMetadata(b)
+	return nil
 }
 
-func (e *App) ResourceGet(id int64) (res *Resource, err error) {
+func (f *Fish) ResourceList() (resources []Resource, err error) {
+	err = f.db.Find(&resources).Error
+	return resources, err
+}
+
+func (f *Fish) ResourceCreate(r *Resource) error {
+	if len(r.HwAddr) == 0 {
+		return errors.New("Fish: HwAddr can't be empty")
+	}
+	// TODO: check JSON
+	if len(r.Metadata) < 2 {
+		return errors.New("Fish: Metadata can't be empty")
+	}
+	return f.db.Create(r).Error
+}
+
+func (f *Fish) ResourceSave(res *Resource) error {
+	return f.db.Save(res).Error
+}
+
+func (f *Fish) ResourceGet(id int64) (res *Resource, err error) {
 	res = &Resource{}
-	err = e.db.First(res, id).Error
+	err = f.db.First(res, id).Error
 	return res, err
 }
 
-func (e *App) ResourceGetByIP(ip string) (res *Resource, err error) {
+func (f *Fish) ResourceGetByIP(ip string) (res *Resource, err error) {
+	res = &Resource{}
+
 	// Check by IP first
-	err = e.db.Where("node_id = ?", e.GetNodeID()).Where("ip_addr = ?", ip).First(res).Error
+	err = f.db.Where("node_id = ?", f.GetNodeID()).Where("ip_addr = ?", ip).First(res).Error
 	if err == nil {
 		return res, nil
 	}
@@ -51,14 +78,20 @@ func (e *App) ResourceGetByIP(ip string) (res *Resource, err error) {
 	if hw_addr == "" {
 		return nil, gorm.ErrRecordNotFound
 	}
-	err = e.db.Where("node_id = ?", e.GetNodeID()).Where("hw_addr = ?", hw_addr).First(res).Error
+	err = f.db.Where("node_id = ?", f.GetNodeID()).Where("hw_addr = ?", hw_addr).First(res).Error
 	if err != nil {
 		return nil, err
 	}
 
 	log.Println("Fish: Update IP address for the Resource", res.ID, ip)
 	res.IpAddr = ip
-	err = e.ResourceSave(res)
+	err = f.ResourceSave(res)
 
+	return res, err
+}
+
+func (f *Fish) ResourceGetByApplication(app_id int64) (res *Resource, err error) {
+	res = &Resource{}
+	err = f.db.Where("application_id = ?", app_id).First(res).Error
 	return res, err
 }

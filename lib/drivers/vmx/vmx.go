@@ -28,7 +28,7 @@ func (d *Driver) Name() string {
 	return "vmx"
 }
 
-func (d *Driver) Prepare(config string) error {
+func (d *Driver) Prepare(config []byte) error {
 	if err := d.cfg.ApplyConfig(config); err != nil {
 		return err
 	}

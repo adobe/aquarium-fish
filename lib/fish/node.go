@@ -2,6 +2,7 @@ package fish
 
 import (
 	"errors"
+	"log"
 	"time"
 )
 
@@ -11,30 +12,39 @@ var NodePingDuplicationErr = errors.New("Fish Node: Unable to join the Aquarium 
 	"the node with the same name are pinged the cluster less then 2xNODE_PING_DELAY time ago")
 
 type Node struct {
-	ID        uint `gorm:"primaryKey"`
+	ID        int64 `gorm:"primaryKey"`
 	CreatedAt time.Time
 	UpdatedAt time.Time // Updates every 30s, protects connecting node with the same name in 60s interval
 	// Unable to use SoftDelete due to error during Save https://gorm.io/docs/delete.html#Soft-Delete
 
-	Name       string         `gorm:"unique"` // Unique name of the node
-	Definition NodeDefinition // Verbose information about the node
+	Name       string         `json:"name" gorm:"unique"` // Unique name of the node
+	Definition NodeDefinition `json:"definition"`         // Verbose information about the node
 }
 
-func (e *App) NodeCreate(node *Node) error {
-	return e.db.Create(node).Error
+func (f *Fish) NodeList() (ns []Node, err error) {
+	err = f.db.Find(&ns).Error
+	return ns, err
 }
 
-func (e *App) NodeSave(node *Node) error {
-	return e.db.Save(node).Error
+func (f *Fish) NodeCreate(n *Node) error {
+	if n.Name == "" {
+		return errors.New("Fish: Name can't be empty")
+	}
+
+	return f.db.Create(n).Error
 }
 
-func (e *App) NodePing(node *Node) error {
-	return e.db.Model(node).Update("name", node.Name).Error
+func (f *Fish) NodeSave(node *Node) error {
+	return f.db.Save(node).Error
 }
 
-func (e *App) NodeGet(name string) (node *Node, err error) {
+func (f *Fish) NodePing(node *Node) error {
+	return f.db.Model(node).Update("name", node.Name).Error
+}
+
+func (f *Fish) NodeGet(name string) (node *Node, err error) {
 	node = &Node{}
-	err = e.db.Where("name = ?", name).First(node).Error
+	err = f.db.Where("name = ?", name).First(node).Error
 	return node, err
 }
 
@@ -53,13 +63,14 @@ func (n *Node) Init() error {
 	return nil
 }
 
-func (e *App) ping() error {
+func (f *Fish) pingProcess() error {
 	// In order to optimize network & database - update just UpdatedAt field
 	ping_ticker := time.NewTicker(NODE_PING_DELAY * time.Second)
 	for {
 		select {
 		case <-ping_ticker.C:
-			e.NodePing(e.node)
+			log.Println("Fish Node: ping")
+			f.NodePing(f.node)
 		}
 	}
 	return nil
