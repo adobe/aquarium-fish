@@ -171,7 +171,7 @@ func (e *APIv1Processor) ApplicationDeallocateGet(c *gin.Context) {
 
 	user, _ := c.Get("user")
 	as := &fish.ApplicationStatus{ApplicationID: id, Status: fish.ApplicationStatusDeallocate,
-		Description: fmt.Sprintf("Requested by user %s", user),
+		Description: fmt.Sprintf("Requested by user %s", user.(*fish.User).Name),
 	}
 	err = e.fish.ApplicationStatusCreate(as)
 	if err != nil {

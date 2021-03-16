@@ -106,7 +106,7 @@ func main() {
 	join = flags.StringSliceP("join", "j", nil, "database addresses of existing nodes, comma separated")
 	drivers = flags.StringSliceP("drivers", "r", nil, "enabled resource drivers, comma separated")
 	flags.StringVarP(&cfg, "cfg", "c", "", "yaml configuration file")
-	flags.StringVarP(&dir, "dir", "D", "aquarium_fish_db", "database directory")
+	flags.StringVarP(&dir, "dir", "D", "fish_db", "database directory")
 	flags.BoolVarP(&verbose, "verbose", "v", false, "verbose logging")
 
 	cmd.MarkFlagRequired("api")

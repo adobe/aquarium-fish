@@ -38,9 +38,14 @@ func (r *ResourceMetadata) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func (f *Fish) ResourceList() (resources []Resource, err error) {
-	err = f.db.Find(&resources).Error
-	return resources, err
+func (f *Fish) ResourceList() (rs []Resource, err error) {
+	err = f.db.Find(&rs).Error
+	return rs, err
+}
+
+func (f *Fish) ResourceListNode(node_id int64) (rs []Resource, err error) {
+	err = f.db.Where("node_id = ?", node_id).Find(&rs).Error
+	return rs, err
 }
 
 func (f *Fish) ResourceCreate(r *Resource) error {
@@ -52,6 +57,10 @@ func (f *Fish) ResourceCreate(r *Resource) error {
 		return errors.New("Fish: Metadata can't be empty")
 	}
 	return f.db.Create(r).Error
+}
+
+func (f *Fish) ResourceDelete(id int64) error {
+	return f.db.Delete(&Resource{}, id).Error
 }
 
 func (f *Fish) ResourceSave(res *Resource) error {
