@@ -1,12 +1,15 @@
 package fish
 
 import (
+	"fmt"
 	"log"
 	"math/rand"
 	"sync"
 	"time"
 
 	"gorm.io/gorm"
+
+	"git.corp.adobe.com/CI/aquarium-fish/lib/drivers"
 )
 
 const ELECTION_ROUND_TIME = 30
@@ -18,8 +21,8 @@ type Fish struct {
 
 	active_votes_mutex sync.Mutex
 	active_votes       []*Vote
-	application_mutex  sync.Mutex
-	application        *Application
+	applications_mutex sync.Mutex
+	applications       []int64
 }
 
 func New(db *gorm.DB, cfg_path string, drvs []string) (*Fish, error) {
@@ -104,6 +107,16 @@ func (f *Fish) Init() error {
 		}
 	}
 
+	// Continue to execute the assigned applications
+	resources, err := f.ResourceListNode(f.node.ID)
+	if err != nil {
+		log.Println("Fish: Unable to get the node resources:", err)
+		return err
+	}
+	for _, res := range resources {
+		go f.executeApplication(res.ApplicationID)
+	}
+
 	// Run node ping timer
 	go f.pingProcess()
 
@@ -162,7 +175,7 @@ func (f *Fish) voteProcessRound(vote *Vote) error {
 		log.Println("Fish: Starting election round", vote.Round)
 
 		// Determine answer for this round
-		vote.Available = f.application == nil
+		vote.Available = f.isNodeAvailableForApplication(vote.ApplicationID)
 
 		// Create vote if it's required
 		if vote.NodeID == 0 || vote.ApplicationID == 0 {
@@ -242,51 +255,199 @@ func (f *Fish) voteProcessRound(vote *Vote) error {
 	return nil
 }
 
-func (f *Fish) executeApplication(app_id int64) error {
-	f.application_mutex.Lock()
+func (f *Fish) isNodeAvailableForApplication(app_id int64) bool {
+	// Is node executing the application right now
+	f.applications_mutex.Lock()
 	{
-		if f.application != nil {
-			// Seems some application is already executing
-			f.application_mutex.Unlock()
+		// TODO: Potentially a number of applications could be executed
+		// but keep it simple for now
+		if len(f.applications) > 0 {
+			log.Println("Fish: Node already busy with the application", app_id)
+			f.applications_mutex.Unlock()
+			return false
+		}
+	}
+	f.applications_mutex.Unlock()
+
+	app, err := f.ApplicationGet(app_id)
+	if err != nil {
+		log.Println("Fish: Unable to find application", app_id, err)
+		return false
+	}
+	label, err := f.LabelGet(app.LabelID)
+	if err != nil {
+		log.Println("Fish: Unable to find label", app.LabelID)
+		return false
+	}
+
+	// Is node supports the required label driver
+	drivers := f.DriversGet()
+	supports_driver := false
+	for _, drv := range drivers {
+		if drv.Name() == label.Driver {
+			supports_driver = true
+			break
+		}
+	}
+	if !supports_driver {
+		return false
+	}
+
+	return true
+}
+
+func (f *Fish) executeApplication(app_id int64) error {
+	f.applications_mutex.Lock()
+	{
+		// TODO: Allow to execute more than one application
+		if len(f.applications) > 0 {
+			log.Println("Fish: Node already busy with the application", app_id)
+			f.applications_mutex.Unlock()
 			return nil
 		}
-		f.application, _ = f.ApplicationGet(app_id)
+		// Check the application is not executed already
+		for _, id := range f.applications {
+			if id == app_id {
+				// Seems the application is already executing
+				f.applications_mutex.Unlock()
+				return nil
+			}
+		}
+		f.applications = append(f.applications, app_id)
 	}
-	f.application_mutex.Unlock()
+	f.applications_mutex.Unlock()
 
-	// Set Application status as ELECTED
-	err := f.ApplicationStatusCreate(&ApplicationStatus{
-		ApplicationID: f.application.ID,
-		Status:        ApplicationStatusElected,
-		Description:   "Elected node: " + f.node.Name,
-	})
+	app, _ := f.ApplicationGet(app_id)
+
+	// Check current application status
+	app_status, err := f.ApplicationStatusGetByApplication(app.ID)
 	if err != nil {
-		log.Println("Fish: Unable to set application status:", f.application.ID, err)
+		log.Println("Fish: Unable to get the Application status:", err)
 		return err
 	}
 
-	// TODO: Execute application
-	log.Println("Fish: Start executing Application", f.application)
-	time.Sleep(30 * time.Second)
-	log.Println("Fish: Done executing Application", f.application)
+	log.Println("Fish: Start executing Application", app.ID, app_status.Status)
 
-	// Set Application status as DEALLOCATED
-	err = f.ApplicationStatusCreate(&ApplicationStatus{
-		ApplicationID: f.application.ID,
-		Status:        ApplicationStatusDeallocated,
-		Description:   "Deallocated by: " + f.node.Name,
-	})
+	if app_status.Status == ApplicationStatusNew {
+		// Set Application status as ELECTED
+		app_status = &ApplicationStatus{ApplicationID: app.ID, Status: ApplicationStatusElected,
+			Description: "Elected node: " + f.node.Name,
+		}
+		err := f.ApplicationStatusCreate(app_status)
+		if err != nil {
+			log.Println("Fish: Unable to set application status:", app.ID, err)
+			return err
+		}
+	}
+
+	// Get label with the definition
+	label, err := f.LabelGet(app.LabelID)
 	if err != nil {
-		log.Println("Fish: Unable to set application status:", f.application.ID, err)
+		log.Println("Fish: Unable to find label", app.LabelID)
 		return err
 	}
 
-	// Clean current executing application
-	f.application_mutex.Lock()
+	// Get or create the new resource object
+	res := &Resource{
+		Application: app,
+		Node:        f.node,
+		// TODO: Just copy metadata for now
+		Metadata: ResourceMetadata(app.Metadata),
+	}
+	if app_status.Status == ApplicationStatusAllocated {
+		res, err = f.ResourceGetByApplication(app.ID)
+		if err != nil {
+			log.Println("Fish: Unable to get the allocated resource for Application:", app.ID, err)
+			app_status = &ApplicationStatus{ApplicationID: app.ID, Status: ApplicationStatusError,
+				Description: fmt.Sprintf("Unable to find the allocated resource: %w", err),
+			}
+			f.ApplicationStatusCreate(app_status)
+		}
+	}
+
+	// Locate the required driver
+	var driver drivers.ResourceDriver
+	drivers := f.DriversGet()
+	for i, drv := range drivers {
+		if drv.Name() == label.Driver {
+			driver = drivers[i]
+			break
+		}
+	}
+	if driver == nil {
+		log.Println("Fish: Unable to locate driver for the Application", app.ID)
+		app_status = &ApplicationStatus{ApplicationID: app.ID, Status: ApplicationStatusError,
+			Description: fmt.Sprintf("No driver found"),
+		}
+		f.ApplicationStatusCreate(app_status)
+	}
+
+	// Allocate the resource
+	if app_status.Status == ApplicationStatusElected {
+		// Run the allocation
+		log.Println("Fish: Allocate the resource using the driver", driver.Name())
+		res.HwAddr, err = driver.Allocate(string(label.Definition))
+		if err != nil {
+			log.Println("Fish: Unable to allocate resource for the Application:", app.ID, err)
+			app_status = &ApplicationStatus{ApplicationID: app.ID, Status: ApplicationStatusError,
+				Description: fmt.Sprintf("Driver allocate resource error: %w", err),
+			}
+		} else {
+			err := f.ResourceCreate(res)
+			if err != nil {
+				log.Println("Fish: Unable to store resource for Application:", app.ID, err)
+			}
+			app_status = &ApplicationStatus{ApplicationID: app.ID, Status: ApplicationStatusAllocated,
+				Description: fmt.Sprintf("Driver allocated the resource"),
+			}
+		}
+		f.ApplicationStatusCreate(app_status)
+	}
+
+	// Run the loop to wait for deallocate request
+	for app_status.Status == ApplicationStatusAllocated {
+		app_status, err := f.ApplicationStatusGetByApplication(app.ID)
+		if err != nil {
+			log.Println("Fish: Unable to get status for Application:", app.ID, err)
+		}
+		if app_status.Status == ApplicationStatusDeallocate {
+			// Deallocating and destroy the resource
+			err = driver.Deallocate(res.HwAddr)
+			if err != nil {
+				log.Println("Fish: Unable to get status for Application:", app.ID, err)
+				app_status = &ApplicationStatus{ApplicationID: app.ID, Status: ApplicationStatusError,
+					Description: fmt.Sprintf("Driver deallocate resource error: %w", err),
+				}
+			} else {
+				err := f.ResourceDelete(res.ID)
+				if err != nil {
+					log.Println("Fish: Unable to store resource for Application:", app.ID, err)
+				}
+				app_status = &ApplicationStatus{ApplicationID: app.ID, Status: ApplicationStatusAllocated,
+					Description: fmt.Sprintf("Driver allocated the resource"),
+				}
+			}
+			f.ApplicationStatusCreate(app_status)
+		} else {
+			time.Sleep(5 * time.Second)
+		}
+	}
+
+	// Clean the executing application
+	f.applications_mutex.Lock()
 	{
-		f.application = nil
+		for i, v := range f.applications {
+			if v != app_id {
+				continue
+			}
+			f.applications[i] = f.applications[len(f.applications)-1]
+			f.applications = f.applications[:len(f.applications)-1]
+			break
+		}
 	}
-	f.application_mutex.Unlock()
+	f.applications_mutex.Unlock()
+
+	log.Println("Fish: Done executing Application", app.ID, app_status.Status)
 
 	return nil
 }

@@ -1,5 +1,10 @@
 package drivers
 
+const (
+	StatusNone      = "NONE"
+	StatusAllocated = "ALLOCATED"
+)
+
 var DriversList []ResourceDriver
 
 type ResourceDriver interface {
@@ -9,12 +14,15 @@ type ResourceDriver interface {
 	// Give driver configs and check if it's ok
 	Prepare(config []byte) error
 
-	// Allocate the resource with provided labels
-	Allocate(labels []string) error
+	// Make sure the allocate definition is appropriate
+	ValidateDefinition(definition string) error
 
-	// Get the status of the resources with given labeles
-	Status(labels []string) string
+	// Allocate the resource by definition and returns hw address
+	Allocate(definition string) (string, error)
 
-	// Deallocate resource with provided labels
-	Deallocate(labels []string) error
+	// Get the status of the resource with given hw address
+	Status(hwaddr string) string
+
+	// Deallocate resource with provided hw addr
+	Deallocate(hwaddr string) error
 }

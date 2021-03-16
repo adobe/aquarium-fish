@@ -44,7 +44,7 @@ func InitV1(router *gin.Engine, fish *fish.Fish) {
 			// application.DELETE - application is staying here until retention time is reached
 
 			application.GET("/:id/status", proc.ApplicationStatusGet)
-			application.GET("/:id/request", proc.ApplicationResourceGet)
+			application.GET("/:id/resource", proc.ApplicationResourceGet)
 			application.GET("/:id/deallocate", proc.ApplicationDeallocateGet)
 		}
 	}

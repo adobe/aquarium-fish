@@ -6,14 +6,12 @@ import (
 )
 
 const (
-	ApplicationStatusNew          = "NEW"          // The application just created
-	ApplicationStatusElected      = "ELECTED"      // Node is elected during the voting process
-	ApplicationStatusAllocating   = "ALLOCATING"   // Node working on allocation of the resource
-	ApplicationStatusAllocated    = "ALLOCATED"    // The resource allocated
-	ApplicationStatusDeallocate   = "DEALLOCATE"   // User requested the application deallocate
-	ApplicationStatusDeallocating = "DEALLOCATING" // The resource deallocating
-	ApplicationStatusDeallocated  = "DEALLOCATED"  // The resource is deallocated
-	ApplicationStatusError        = "ERROR"        // The error happened
+	ApplicationStatusNew         = "NEW"         // The application just created
+	ApplicationStatusElected     = "ELECTED"     // Node is elected during the voting process
+	ApplicationStatusAllocated   = "ALLOCATED"   // The resource is allocated and starting up
+	ApplicationStatusDeallocate  = "DEALLOCATE"  // User requested the application deallocate
+	ApplicationStatusDeallocated = "DEALLOCATED" // The resource is deallocated
+	ApplicationStatusError       = "ERROR"       // The error happened
 )
 
 type ApplicationStatus struct {

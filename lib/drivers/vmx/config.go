@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 )
 
 type Config struct {
@@ -15,7 +16,7 @@ type Config struct {
 	WorkspacePath string `json:"workspace_path"` // Where to place the cloned VM
 }
 
-func (c *Config) ApplyConfig(config []byte) error {
+func (c *Config) Apply(config []byte) error {
 	if len(config) > 0 {
 		if err := json.Unmarshal(config, c); err != nil {
 			log.Println("VMX: Unable to apply the driver config", err)
@@ -25,7 +26,7 @@ func (c *Config) ApplyConfig(config []byte) error {
 	return nil
 }
 
-func (c *Config) ValidateConfig() (err error) {
+func (c *Config) Validate() (err error) {
 	// Check that values of the config is filled at least with defaults
 	if c.VmrunPath == "" {
 		// Look in the PATH
@@ -48,6 +49,14 @@ func (c *Config) ValidateConfig() (err error) {
 	}
 	if c.WorkspacePath == "" {
 		c.WorkspacePath = "fish_vmx_workspace"
+	}
+
+	// Making paths absolute
+	if c.ImagesPath, err = filepath.Abs(c.ImagesPath); err != nil {
+		return err
+	}
+	if c.WorkspacePath, err = filepath.Abs(c.WorkspacePath); err != nil {
+		return err
 	}
 
 	log.Println("VMX: Creating working directories:", c.ImagesPath, c.WorkspacePath)
