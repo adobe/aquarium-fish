@@ -105,6 +105,8 @@ func (d *Driver) Allocate(definition string) (string, error) {
 		return vm_hwaddr, err
 	}
 
+	log.Println("VMX: Allocate of VM", vm_hwaddr, vmx_path, "completed")
+
 	return vm_hwaddr, nil
 }
 
@@ -267,6 +269,8 @@ func (d *Driver) Deallocate(hwaddr string) error {
 		return err
 	}
 
+	log.Println("VMX: Deallocate of VM", hwaddr, vmx_path, "completed")
+
 	return nil
 }
 
@@ -291,8 +295,12 @@ func runAndLog(cmd *exec.Cmd) (string, string, error) {
 		err = fmt.Errorf("VMware error: %s", message)
 	}
 
-	log.Printf("VMX: stdout: %s", stdoutString)
-	log.Printf("VMX: stderr: %s", stderrString)
+	if len(stdoutString) > 0 {
+		log.Printf("VMX: stdout: %s", stdoutString)
+	}
+	if len(stderrString) > 0 {
+		log.Printf("VMX: stderr: %s", stderrString)
+	}
 
 	// Replace these for Windows, we only want to deal with Unix style line endings.
 	returnStdout := strings.Replace(stdout.String(), "\r\n", "\n", -1)
