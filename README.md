@@ -168,6 +168,13 @@ available for the controlled networks. If the request is coming from such networ
 the resource table trying to locate the required resource by IP or HW address and gives the
 requestor required information based on this data.
 
+Common params:
+* `format=` - can be used to format the output:
+   * json - default format
+   * yaml - in case someone need yaml
+   * env - useful for shell scripts to get the quoted key=value env variables
+      * `prefix=` - allows to set a custom prefix for the env variables
+
 #### Data
 
 Route: `/meta/v1/data/`

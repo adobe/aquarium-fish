@@ -15,7 +15,6 @@ func InitMetaV1(router *gin.Engine, fish *fish.Fish) {
 		proc.AddressAuth(),
 	)
 	{
-		// TODO: make ip address filtering based on existing interfaces
 		instance := v1.Group("/data")
 		{
 			instance.GET("/", proc.DataGetList)

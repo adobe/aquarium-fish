@@ -1,16 +1,18 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
+	"strings"
 
+	"github.com/alessio/shellescape"
 	"github.com/gin-gonic/gin"
 
 	"github.com/adobe/aquarium-fish/lib/fish"
+	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 type MetaV1Processor struct {
@@ -18,20 +20,17 @@ type MetaV1Processor struct {
 }
 
 func checkIPv4Address(network *net.IPNet, ip net.IP) bool {
-	fmt.Println("DEBUG: check network ip:", network.IP, len(network.IP))
 	// Processing only networks we controlling (IPv4)
 	// TODO: not 100% ensurance over the network control, but good enough for now
-	if !bytes.HasSuffix(bytes.TrimRight(network.IP, " "), []byte(".1")) {
+	if !strings.HasSuffix(network.IP.String(), ".1") {
 		return false
 	}
-	fmt.Println("DEBUG: passed suffix:", network)
 
 	// Make sure checked IP is in the network
 	if !network.Contains(ip) {
 		return false
 	}
 
-	fmt.Println("DEBUG: passed address:", ip)
 	return true
 }
 
@@ -84,6 +83,49 @@ func (e *MetaV1Processor) AddressAuth() gin.HandlerFunc {
 	}
 }
 
+func cleanShellKey(in string) []byte {
+	s := []byte(in)
+	j := 0
+	for _, b := range s {
+		if j == 0 && ('0' <= b && b <= '9') {
+			// Skip first numeric symbols
+			continue
+		}
+		if ('a' <= b && b <= 'z') || ('A' <= b && b <= 'Z') || ('0' <= b && b <= '9') || b == '_' {
+			s[j] = b
+			j++
+		}
+	}
+	return s[:j]
+}
+
+func (e *MetaV1Processor) Return(c *gin.Context, code int, obj gin.H) {
+	format := c.Request.URL.Query().Get("format")
+	if len(format) == 0 {
+		format = "json"
+	}
+	switch format {
+	case "json": // Default json
+		c.JSON(code, obj)
+	case "yaml": // Regular yaml
+		c.YAML(code, obj)
+	case "env": // Plain format suitable to use in shell
+		prefix := c.Request.URL.Query().Get("prefix")
+		m := util.DotSerialize(prefix, obj)
+		c.String(code, "")
+		for key, val := range m {
+			line := cleanShellKey(strings.Replace(shellescape.StripUnsafe(key), ".", "_", -1))
+			if len(line) == 0 {
+				continue
+			}
+			value := []byte("=" + shellescape.Quote(val) + "\n")
+			c.Writer.Write(append(line, value...))
+		}
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Incorrect `format` query param provided: " + format})
+	}
+}
+
 func (e *MetaV1Processor) DataGetList(c *gin.Context) {
 	var metadata map[string]interface{}
 
@@ -91,20 +133,20 @@ func (e *MetaV1Processor) DataGetList(c *gin.Context) {
 	res, ok := res_int.(*fish.Resource)
 	if !ok {
 		log.Println("Fish API Meta: Unable to get resource from context")
-		c.JSON(http.StatusNotFound, gin.H{"message": "No data found", "data": metadata})
+		e.Return(c, http.StatusNotFound, gin.H{"message": "No data found", "data": metadata})
 		return
 	}
 
-	err := json.Unmarshal([]byte(res.Metadata), metadata)
+	err := json.Unmarshal([]byte(res.Metadata), &metadata)
 	if err != nil {
-		log.Println("Fish API Meta: Unable to parse metadata of resource", res.ID, res.Metadata)
-		c.JSON(http.StatusNotFound, gin.H{"message": "Unable to parse metadata json"})
+		log.Println("Fish API Meta: Unable to parse metadata of resource", res.ID, res.Metadata, err)
+		e.Return(c, http.StatusNotFound, gin.H{"message": "Unable to parse metadata json"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "MetaData list", "data": metadata})
+	e.Return(c, http.StatusOK, gin.H{"message": "MetaData list", "data": metadata})
 }
 
 func (e *MetaV1Processor) DataGet(c *gin.Context) {
 	//id := c.Param("key")
-	c.JSON(http.StatusNotFound, gin.H{"message": "No data found"})
+	e.Return(c, http.StatusNotFound, gin.H{"message": "No data found"})
 }
