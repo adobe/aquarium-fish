@@ -3,6 +3,7 @@ module git.corp.adobe.com/CI/aquarium-fish
 go 1.16
 
 require (
+	github.com/alessio/shellescape v1.4.1
 	github.com/canonical/go-dqlite v1.8.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/gin-gonic/gin v1.6.3
