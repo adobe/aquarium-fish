@@ -169,13 +169,23 @@ func (e *APIv1Processor) ApplicationDeallocateGet(c *gin.Context) {
 		return
 	}
 
+	out, err := e.fish.ApplicationStatusGetByApplication(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Unable to find status for the application: %s", id)})
+		return
+	}
+	if out.Status != fish.ApplicationStatusAllocated {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Unable to deallocate the application with status: %s", out.Status)})
+		return
+	}
+
 	user, _ := c.Get("user")
 	as := &fish.ApplicationStatus{ApplicationID: id, Status: fish.ApplicationStatusDeallocate,
 		Description: fmt.Sprintf("Requested by user %s", user.(*fish.User).Name),
 	}
 	err = e.fish.ApplicationStatusCreate(as)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Unable to deallocate the application: %v", err)})
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Unable to deallocate the application: %s", id)})
 		return
 	}
 
