@@ -2,7 +2,9 @@ package fish
 
 import (
 	"errors"
+	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -73,6 +75,19 @@ func (f *Fish) ResourceGet(id int64) (res *Resource, err error) {
 	return res, err
 }
 
+func fixHwAddr(hwaddr string) string {
+	split := strings.Split(hwaddr, ":")
+	if len(split) == 6 {
+		// MAC address fix
+		for i, v := range split {
+			split[i] = fmt.Sprintf("%02s", v)
+		}
+		hwaddr = strings.Join(split, ":")
+	}
+
+	return hwaddr
+}
+
 func (f *Fish) ResourceGetByIP(ip string) (res *Resource, err error) {
 	res = &Resource{}
 
@@ -83,7 +98,8 @@ func (f *Fish) ResourceGetByIP(ip string) (res *Resource, err error) {
 	}
 
 	// Check by MAC and update IP if found
-	hw_addr := arp.Search(ip)
+	// need to fix due to on mac arp can return just one digit
+	hw_addr := fixHwAddr(arp.Search(ip))
 	if hw_addr == "" {
 		return nil, gorm.ErrRecordNotFound
 	}
