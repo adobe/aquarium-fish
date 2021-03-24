@@ -36,6 +36,7 @@ func main() {
 		Short: "Aquarium fish",
 		Long:  `Part of the Aquarium suite - a distributed resources manager`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			log.Println("Fish running...")
 			dir := filepath.Join(dir, db_address)
 			if err := os.MkdirAll(dir, 0755); err != nil {
 				return errors.Wrapf(err, "can't create %s", dir)
@@ -46,6 +47,8 @@ func main() {
 				}
 				log.Printf(fmt.Sprintf("%s: %s: %s\n", api_address, l.String(), format), a...)
 			}
+
+			log.Println("Fish starting dqlite...")
 			dqlite, err := dqlite_app.New(dir, dqlite_app.WithAddress(db_address), dqlite_app.WithCluster(*join), dqlite_app.WithLogFunc(logFunc))
 			if err != nil {
 				return err
@@ -60,6 +63,7 @@ func main() {
 				return err
 			}
 
+			log.Println("Fish starting orm...")
 			db, err := gorm.Open(&sqlite.Dialector{Conn: dqlite_db}, &gorm.Config{
 				Logger: logger.Default.LogMode(logger.Warn),
 			})
@@ -67,6 +71,7 @@ func main() {
 				return err
 			}
 
+			log.Println("Fish starting server...")
 			fish, err := fish.New(db, cfg, *drivers)
 			if err != nil {
 				return err
@@ -77,6 +82,7 @@ func main() {
 				return err
 			}
 
+			log.Println("Fish initialized")
 			quit := make(chan os.Signal)
 			signal.Notify(quit, unix.SIGINT)
 			signal.Notify(quit, unix.SIGQUIT)
@@ -87,10 +93,12 @@ func main() {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			if err := srv.Shutdown(ctx); err != nil {
-				log.Fatal("Server forced to shutdown:", err)
+				log.Fatal("Fish forced to shutdown:", err)
 			}
 
-			log.Println("Server exiting")
+			fish.Close()
+
+			log.Println("Fish exiting...")
 			dqlite_db.Close()
 
 			dqlite.Handover(context.Background())

@@ -8,13 +8,13 @@ import (
 )
 
 type Config struct {
-	NodeName string
-	Drivers  []ConfigDriver `yaml:"drivers"`
+	NodeName string         `json:"node_name"` // Last resort to override the default host node name
+	Drivers  []ConfigDriver `json:"drivers"`
 }
 
 type ConfigDriver struct {
-	Name string          `yaml:"name"`
-	Cfg  ConfigDriverCfg `yaml:"cfg"`
+	Name string          `json:"name"`
+	Cfg  ConfigDriverCfg `json:"cfg"`
 }
 
 type ConfigDriverCfg []byte
@@ -32,7 +32,7 @@ func (c *Config) ReadConfigFile(cfg_path string) error {
 		return err
 	}
 
-	if err := yaml.Unmarshal(data, &c); err != nil {
+	if err := yaml.Unmarshal(data, c); err != nil {
 		return err
 	}
 

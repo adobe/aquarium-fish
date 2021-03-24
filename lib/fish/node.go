@@ -67,6 +67,9 @@ func (f *Fish) pingProcess() error {
 	// In order to optimize network & database - update just UpdatedAt field
 	ping_ticker := time.NewTicker(NODE_PING_DELAY * time.Second)
 	for {
+		if !f.running {
+			break
+		}
 		select {
 		case <-ping_ticker.C:
 			log.Println("Fish Node: ping")

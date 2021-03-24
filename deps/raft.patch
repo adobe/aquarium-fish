@@ -149,18 +149,53 @@ index 3a856d4..861942e 100644
      defined(BIT_ZERO_ON_RIGHT) || defined(__alpha__) || defined(__alpha)
  #define BYTE_ORDER LITTLE_ENDIAN
  #endif
-diff --git a/src/fixture.c b/src/fixture.c
-index bab0a5f..a34da1a 100644
---- a/src/fixture.c
-+++ b/src/fixture.c
-@@ -1027,6 +1027,7 @@ int raft_fixture_bootstrap(struct raft_fixture *f,
-             return rv;
-         }
-     }
+diff --git a/src/client.c b/src/client.c
+index 986bc4b..801fdc8 100644
+--- a/src/client.c
++++ b/src/client.c
+@@ -198,20 +198,21 @@ int raft_add(struct raft *r,
+ 
+     req->cb = cb;
+ 
++    assert(r->leader_state.change == NULL);
++    r->leader_state.change = req;
 +
+     rv = clientChangeConfiguration(r, req, &configuration);
+     if (rv != 0) {
+         goto err_after_configuration_copy;
+     }
+ 
+-    assert(r->leader_state.change == NULL);
+-    r->leader_state.change = req;
+-
      return 0;
+ 
+ err_after_configuration_copy:
+     raft_configuration_close(&configuration);
+ err:
+     assert(rv != 0);
++
+     return rv;
  }
  
+@@ -352,14 +353,14 @@ int raft_remove(struct raft *r,
+ 
+     req->cb = cb;
+ 
++    assert(r->leader_state.change == NULL);
++    r->leader_state.change = req;
++
+     rv = clientChangeConfiguration(r, req, &configuration);
+     if (rv != 0) {
+         goto err_after_configuration_copy;
+     }
+ 
+-    assert(r->leader_state.change == NULL);
+-    r->leader_state.change = req;
+-
+     return 0;
+ 
+ err_after_configuration_copy:
 diff --git a/src/heap.c b/src/heap.c
 index 64b2a86..e0defb2 100644
 --- a/src/heap.c
@@ -219,10 +254,18 @@ index 17127a7..1935646 100644
      }
  
 diff --git a/src/uv.c b/src/uv.c
-index 59ffc44..e9fb3ae 100644
+index 59ffc44..f8ddae4 100644
 --- a/src/uv.c
 +++ b/src/uv.c
-@@ -478,12 +478,14 @@ static int uvBootstrap(struct raft_io *io,
+@@ -102,6 +102,7 @@ static int uvStart(struct raft_io *io,
+     }
+     rv = uv_timer_start(&uv->timer, uvTickTimerCb, msecs, msecs);
+     assert(rv == 0);
++
+     return 0;
+ }
+ 
+@@ -478,12 +479,14 @@ static int uvBootstrap(struct raft_io *io,
      /* Write the term */
      rv = uvSetTerm(io, 1);
      if (rv != 0) {
@@ -238,7 +281,7 @@ index 59ffc44..e9fb3ae 100644
      }
  
 diff --git a/src/uv_fs.c b/src/uv_fs.c
-index 970bb84..eeb64a8 100644
+index 970bb84..25dd5a5 100644
 --- a/src/uv_fs.c
 +++ b/src/uv_fs.c
 @@ -2,7 +2,9 @@
@@ -255,10 +298,10 @@ index 970bb84..eeb64a8 100644
  
  int UvFsSyncDir(const char *dir, char *errmsg)
  {
-+    #ifdef _WIN32
++#ifdef _WIN32
 +    // Windows doesn't really support sync on folders.
 +    return 0;
-+    #endif
++#endif
      uv_file fd;
      int rv;
      rv = UvOsOpen(dir, UV_FS_O_RDONLY | UV_FS_O_DIRECTORY, 0, &fd);
@@ -273,7 +316,7 @@ index 970bb84..eeb64a8 100644
  
      rv = uvFsOpenFile(dir, filename, flags, S_IRUSR | S_IWUSR, fd, errmsg);
      if (rv != 0) {
-@@ -201,6 +209,12 @@ int UvFsAllocateFile(const char *dir,
+@@ -201,6 +209,11 @@ int UvFsAllocateFile(const char *dir,
          }
          goto err_after_open;
      }
@@ -282,28 +325,23 @@ index 970bb84..eeb64a8 100644
 +        UvOsErrMsg(errmsg, "fsync", rv);
 +        goto err_after_open;
 +    }
-+
  
      return 0;
  
-@@ -223,15 +237,33 @@ static int uvFsWriteFile(const char *dir,
+@@ -223,6 +236,9 @@ static int uvFsWriteFile(const char *dir,
      int rv;
      size_t size;
      unsigned i;
 +#ifdef _WIN32
 +    uv_buf_t convBufArr[n_bufs];
 +#endif
-+
      size = 0;
      for (i = 0; i < n_bufs; i++) {
          size += bufs[i].len;
-     }
-+
-     rv = uvFsOpenFile(dir, filename, flags, S_IRUSR | S_IWUSR, &fd, errmsg);
+@@ -231,7 +247,18 @@ static int uvFsWriteFile(const char *dir,
      if (rv != 0) {
          goto err;
      }
-+
 +#ifdef _WIN32
 +    // casting raft_buffer to uv_buf_t changes the value of the len field.
 +    // uv_buf_t for Windows is ULONG, while for linux it's size_t. Copying
@@ -316,11 +354,10 @@ index 970bb84..eeb64a8 100644
 +#else
      rv = UvOsWrite(fd, (const uv_buf_t *)bufs, n_bufs, 0);
 +#endif
-+
      if (rv != (int)(size)) {
          if (rv < 0) {
              UvOsErrMsg(errmsg, "write", rv);
-@@ -294,7 +326,16 @@ open:
+@@ -294,7 +321,16 @@ open:
          goto err;
      }
  
@@ -337,7 +374,7 @@ index 970bb84..eeb64a8 100644
      if (rv != (int)(buf->len)) {
          if (rv < 0) {
              UvOsErrMsg(errmsg, "write", rv);
-@@ -559,6 +600,7 @@ err:
+@@ -559,6 +595,7 @@ err:
      return RAFT_IOERR;
  }
  
@@ -345,7 +382,7 @@ index 970bb84..eeb64a8 100644
  /* Check if direct I/O is possible on the given fd. */
  static int probeDirectIO(int fd, size_t *size, char *errmsg)
  {
-@@ -637,6 +679,7 @@ static int probeDirectIO(int fd, size_t *size, char *errmsg)
+@@ -637,6 +674,7 @@ static int probeDirectIO(int fd, size_t *size, char *errmsg)
      *size = 0;
      return 0;
  }
@@ -353,18 +390,18 @@ index 970bb84..eeb64a8 100644
  
  #if defined(RWF_NOWAIT)
  /* Check if fully non-blocking async I/O is possible on the given fd. */
-@@ -729,6 +772,10 @@ int UvFsProbeCapabilities(const char *dir,
+@@ -729,6 +767,10 @@ int UvFsProbeCapabilities(const char *dir,
                            bool *async,
                            char *errmsg)
  {
-+#if defined(_WIN32)
++#ifndef __linux__
 +    *direct = 0;
 +#endif
 +
      int fd; /* File descriptor of the probe file */
      int rv;
      char ignored[RAFT_ERRMSG_BUF_SIZE];
-@@ -743,11 +790,13 @@ int UvFsProbeCapabilities(const char *dir,
+@@ -743,11 +785,13 @@ int UvFsProbeCapabilities(const char *dir,
      }
      UvFsRemoveFile(dir, UV__FS_PROBE_FILE, ignored);
  
@@ -378,7 +415,7 @@ index 970bb84..eeb64a8 100644
  
  #if !defined(RWF_NOWAIT)
      /* We can't have fully async I/O, since io_submit might potentially block.
-@@ -772,8 +821,10 @@ out:
+@@ -772,8 +816,10 @@ out:
      close(fd);
      return 0;
  
@@ -406,7 +443,7 @@ index bada8b4..b718db1 100644
  /* Split @address into @host and @port and populate @addr accordingly. */
  int uvIpParse(const char *address, struct sockaddr_in *addr);
 diff --git a/src/uv_os.c b/src/uv_os.c
-index 0debca0..999acb0 100644
+index 0debca0..91a8f81 100644
 --- a/src/uv_os.c
 +++ b/src/uv_os.c
 @@ -5,16 +5,21 @@
@@ -463,7 +500,7 @@ index 0debca0..999acb0 100644
  int UvOsFallocate(uv_file fd, off_t offset, off_t len)
  {
      int rv;
-+#if __linux__
++#ifdef __linux__
      rv = posix_fallocate(fd, offset, len);
      if (rv != 0) {
          /* From the manual page:
@@ -479,7 +516,7 @@ index 0debca0..999acb0 100644
          if (rv != 0) {
              return -EOPNOTSUPP;
          }
-+#if __linux__
++#ifdef __linux__
      }
 +#endif
      return 0;
@@ -492,11 +529,11 @@ index 0debca0..999acb0 100644
      assert(UV__DIR_HAS_VALID_LEN(dir));
      assert(UV__FILENAME_HAS_VALID_LEN(filename));
      strcpy(path, dir);
-+    #ifdef _WIN32
++#ifdef _WIN32
 +    strcat(path, "\\");
-+    #else
++#else
      strcat(path, "/");
-+    #endif
++#endif
      strcat(path, filename);
  }
  
@@ -510,15 +547,16 @@ index 0debca0..999acb0 100644
  }
 +#endif
 diff --git a/src/uv_os.h b/src/uv_os.h
-index bceb913..fb54da7 100644
+index bceb913..e490e6c 100644
 --- a/src/uv_os.h
 +++ b/src/uv_os.h
 @@ -4,7 +4,9 @@
  #define UV_OS_H_
  
  #include <fcntl.h>
-+#if defined(__linux__)
- #include <linux/aio_abi.h>
+-#include <linux/aio_abi.h>
++#ifdef __linux__
++#    include <linux/aio_abi.h>
 +#endif
  #include <sys/stat.h>
  #include <sys/types.h>
@@ -527,7 +565,7 @@ index bceb913..fb54da7 100644
  void UvOsJoin(const char *dir, const char *filename, char *path);
  
  /* TODO: figure a portable abstraction. */
-+#if defined(__linux__)
++#ifdef __linux__
  int UvOsIoSetup(unsigned nr, aio_context_t *ctxp);
  int UvOsIoDestroy(aio_context_t ctx);
  int UvOsIoSubmit(aio_context_t ctx, long nr, struct iocb **iocbpp);
@@ -551,7 +589,7 @@ index 17393e1..febb2a9 100644
  #include "array.h"
  #include "assert.h"
 diff --git a/src/uv_writer.c b/src/uv_writer.c
-index 698c70f..2fc8a42 100644
+index 698c70f..3ea2c90 100644
 --- a/src/uv_writer.c
 +++ b/src/uv_writer.c
 @@ -7,6 +7,18 @@
@@ -569,58 +607,75 @@ index 698c70f..2fc8a42 100644
 +    return len;
 +}
 +
-+#if defined(__linux__)
++#ifdef __linux__
  /* Copy the error message from the request object to the writer object. */
  static void uvWriterReqTransferErrMsg(struct UvWriterReq *req)
  {
-@@ -132,6 +144,8 @@ static void uvWriterAfterWorkCb(uv_work_t *work, int status)
-     uvWriterReqFinish(req);
+@@ -204,6 +216,7 @@ static void uvWriterPollCb(uv_poll_t *poller, int status, int events)
+         uvWriterReqFinish(req);
+     }
  }
++#endif /* __linux__ */
  
+ int UvWriterInit(struct UvWriter *w,
+                  struct uv_loop_s *loop,
+@@ -219,6 +232,13 @@ int UvWriterInit(struct UvWriter *w,
+     w->data = data;
+     w->loop = loop;
+     w->fd = fd;
 +
-+#if defined(__linux__)
- /* Callback fired when the event fd associated with AIO write requests should be
-  * ready for reading (i.e. when a write has completed). */
- static void uvWriterPollCb(uv_poll_t *poller, int status, int events)
-@@ -308,14 +322,34 @@ err:
++#ifndef __linux__
++    (void)direct;
++    (void)async;
++    (void)max_concurrent_writes;
++    (void)errmsg;
++#else
+     w->async = async;
+     w->ctx = 0;
+     w->events = NULL;
+@@ -306,9 +326,12 @@ err_after_io_setup:
+     UvOsIoDestroy(w->ctx);
+ err:
      assert(rv != 0);
++#endif /* __linux__ */
++
      return rv;
  }
-+#else
-+int UvWriterInit(struct UvWriter *w,
-+                 struct uv_loop_s *loop,
-+                 uv_file fd,
-+                 bool direct /* Whether to use direct I/O */,
-+                 bool async /* Whether async I/O is available */,
-+                 unsigned max_concurrent_writes,
-+                 char *errmsg)
-+{
-+    void *data = w->data;
-+    int rv = 0;
-+    memset(w, 0, sizeof *w);
-+    w->data = data;
-+    w->loop = loop;
-+    w->fd = fd;
-+    return rv;
-+}
-+#endif // defined(__linux__)
  
++#ifdef __linux__
  static void uvWriterCleanUpAndFireCloseCb(struct UvWriter *w)
  {
      assert(w->closing);
- 
-     UvOsClose(w->fd);
-+#if defined(__linux__)
-     HeapFree(w->events);
-     UvOsIoDestroy(w->ctx);
+@@ -363,20 +386,21 @@ static void uvWriterCheckCb(struct uv_check_s *check)
+     }
+     uv_close((struct uv_handle_s *)&w->check, uvWriterCheckCloseCb);
+ }
 +#endif
  
-     if (w->close_cb != NULL) {
-         w->close_cb(w);
-@@ -390,17 +424,6 @@ void UvWriterClose(struct UvWriter *w, UvWriterCloseCb cb)
-     }
- }
+ void UvWriterClose(struct UvWriter *w, UvWriterCloseCb cb)
+ {
+-    int rv;
+     assert(!w->closing);
+     w->closing = true;
+     w->close_cb = cb;
  
++#ifdef __linux__
+     /* We can close the event file descriptor right away, but we shoudln't close
+      * the main file descriptor or destroy the AIO context since there might be
+      * threadpool requests in flight. */
+     UvOsClose(w->event_fd);
+ 
+-    rv = uv_poll_stop(&w->event_poller);
++    int rv = uv_poll_stop(&w->event_poller);
+     assert(rv == 0); /* Can this ever fail? */
+ 
+     uv_close((struct uv_handle_s *)&w->event_poller, uvWriterPollerCloseCb);
+@@ -388,17 +412,10 @@ void UvWriterClose(struct UvWriter *w, UvWriterCloseCb cb)
+     } else {
+         uv_close((struct uv_handle_s *)&w->check, uvWriterCheckCloseCb);
+     }
+-}
+-
 -/* Return the total lengths of the given buffers. */
 -static size_t lenOfBufs(const uv_buf_t bufs[], unsigned n)
 -{
@@ -630,84 +685,108 @@ index 698c70f..2fc8a42 100644
 -        len += bufs[i].len;
 -    }
 -    return len;
--}
--
- int UvWriterSubmit(struct UvWriter *w,
-                    struct UvWriterReq *req,
-                    const uv_buf_t bufs[],
-@@ -528,3 +551,63 @@ err:
-     assert(rv != 0);
-     return rv;
- }
 +#else
-+
-+int UvWriterInit(struct UvWriter *w,
-+                 struct uv_loop_s *loop,
-+                 uv_file fd,
-+                 bool direct /* Whether to use direct I/O */,
-+                 bool async /* Whether async I/O is available */,
-+                 unsigned max_concurrent_writes,
-+                 char *errmsg)
-+{
-+    void *data = w->data;
-+    int rv = 0;
-+    memset(w, 0, sizeof *w);
-+    w->data = data;
-+    w->loop = loop;
-+    w->fd = fd;
-+    return rv;
-+}
-+
-+int UvWriterSubmit(struct UvWriter *w,
-+                   struct UvWriterReq *req,
-+                   const uv_buf_t bufs[],
-+                   unsigned int n,
-+                   size_t offset,
-+                   UvWriterReqCb cb)
-+{
++    uv_fs_close(w->loop, NULL, w->fd, NULL); //TODO: NULL for callback and request?
++    cb(w);
++#endif /* __linux__ */
+ }
+ 
+ int UvWriterSubmit(struct UvWriter *w,
+@@ -408,35 +425,55 @@ int UvWriterSubmit(struct UvWriter *w,
+                    size_t offset,
+                    UvWriterReqCb cb)
+ {
+-    int rv = 0;
+-#if defined(RWF_NOWAIT)
+-    struct iocb *iocbs = &req->iocb;
+-#endif /* RWF_NOWAIT */
+     assert(!w->closing);
+-
+-    /* TODO: at the moment we are not leveraging the support for concurrent
+-     *       writes, so ensure that we're getting write requests
+-     *       sequentially. */
+-    if (w->n_events == 1) {
+-        assert(QUEUE_IS_EMPTY(&w->poll_queue));
+-        assert(QUEUE_IS_EMPTY(&w->work_queue));
+-    }
+-
+     assert(w->fd >= 0);
++#ifdef __linux__
+     assert(w->event_fd >= 0);
+     assert(w->ctx != 0);
+     assert(req != NULL);
+     assert(bufs != NULL);
+     assert(n > 0);
++#endif
+ 
+     req->writer = w;
+     req->len = lenOfBufs(bufs, n);
+     req->status = -1;
+     req->work.data = NULL;
+     req->cb = cb;
+-    memset(&req->iocb, 0, sizeof req->iocb);
+     memset(req->errmsg, 0, sizeof req->errmsg);
+ 
++#ifndef __linux__
 +    uv_fs_t write_req;
-+
-+    assert(!w->closing);
-+    assert(w->fd >= 0);
-+    req->writer = w;
-+    req->len = lenOfBufs(bufs, n);
-+    req->status = -1;
-+    req->work.data = req;
-+    req->cb = cb;
 +
 +    uv_fs_write(w->loop, &write_req, w->fd, bufs, n, (int64_t)offset, NULL);
 +
-+    int result = write_req.result;
++    int result = (int)write_req.result;
 +    // TODO: should probably check that write_req.result == n?
 +    if (result == -1) {
 +        req->status = RAFT_IOERR;
-+    }else{
++    } else {
 +        req->status = 0;
 +    }
 +
 +    cb(req, req->status);
++
 +    return req->status;
-+}
++#else
++    int rv = 0;
++    memset(&req->iocb, 0, sizeof req->iocb);
 +
-+void UvWriterClose(struct UvWriter *w, UvWriterCloseCb cb)
-+{
-+    assert(!w->closing);
-+    w->closing = true;
-+    w->close_cb = cb;
++#if defined(RWF_NOWAIT)
++    struct iocb *iocbs = &req->iocb;
++#endif /* RWF_NOWAIT */
 +
-+    uv_fs_close(w->loop, NULL, w->fd, NULL); //TODO: NULL for callback and request?
-+    cb(w);
-+}
-+#endif /* linux */
++    /* TODO: at the moment we are not leveraging the support for concurrent
++     *       writes, so ensure that we're getting write requests
++     *       sequentially. */
++    if (w->n_events == 1) {
++        assert(QUEUE_IS_EMPTY(&w->poll_queue));
++        assert(QUEUE_IS_EMPTY(&w->work_queue));
++    }
++
+     req->iocb.aio_fildes = (uint32_t)w->fd;
+     req->iocb.aio_lio_opcode = IOCB_CMD_PWRITEV;
+     req->iocb.aio_reqprio = 0;
+@@ -508,8 +545,7 @@ int UvWriterSubmit(struct UvWriter *w,
+     /* If we got here it means we need to run io_submit in the threadpool. */
+     QUEUE_PUSH(&w->work_queue, &req->queue);
+     req->work.data = req;
+-    rv =
+-        uv_queue_work(w->loop, &req->work, uvWriterWorkCb, uvWriterAfterWorkCb);
++    rv = uv_queue_work(w->loop, &req->work, uvWriterWorkCb, uvWriterAfterWorkCb);
+     if (rv != 0) {
+         /* UNTESTED: with the current libuv implementation this can't fail. */
+         req->work.data = NULL;
+@@ -527,4 +563,5 @@ done:
+ err:
+     assert(rv != 0);
+     return rv;
++#endif /* __linux__ */
+ }
 diff --git a/src/uv_writer.h b/src/uv_writer.h
-index bae95b7..094dff1 100644
+index bae95b7..d2e6d5f 100644
 --- a/src/uv_writer.h
 +++ b/src/uv_writer.h
 @@ -22,10 +22,12 @@ struct UvWriter
      struct uv_loop_s *loop;        /* Event loop */
      uv_file fd;                    /* File handle */
      bool async;                    /* Whether fully async I/O is supported */
-+#if defined(__linux__)
++#ifdef __linux__
      aio_context_t ctx;             /* KAIO handle */
      struct io_event *events;       /* Array of KAIO response objects */
      unsigned n_events;             /* Length of the events array */
@@ -720,7 +799,7 @@ index bae95b7..094dff1 100644
      int status;              /* Request result code */
      struct uv_work_s work;   /* To execute logic in the threadpool */
      UvWriterReqCb cb;        /* Callback to invoke upon request completion */
-+#if defined(__linux__)
++#ifdef __linux__
      struct iocb iocb;        /* KAIO request (for writing) */
 +#endif
      char errmsg[256];        /* Error description (for thread-safety) */
