@@ -122,7 +122,6 @@ func (e *APIv1Processor) ApplicationCreatePost(c *gin.Context) {
 	user, _ := c.Get("user")
 	data.User = user.(*fish.User)
 
-	fmt.Println("Create Application:", data)
 	if err := e.fish.ApplicationCreate(&data); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Unable to create application: %v", err)})
 		return

@@ -1,3 +1,71 @@
+diff --git a/src/gateway.c b/src/gateway.c
+index 40944f9..216fb93 100644
+--- a/src/gateway.c
++++ b/src/gateway.c
+@@ -581,6 +581,7 @@ static int handle_add(struct handle *req, struct cursor *cursor)
+ 	}
+ 	r->gateway = g;
+ 	r->req.data = r;
++	g->req = req;
+ 
+ 	rv = raft_add(g->raft, &r->req, request.id, request.address,
+ 		      raftChangeCb);
+@@ -589,7 +590,6 @@ static int handle_add(struct handle *req, struct cursor *cursor)
+ 		failure(req, translateRaftErrCode(rv), raft_strerror(rv));
+ 		return 0;
+ 	}
+-	g->req = req;
+ 
+ 	return 0;
+ }
+@@ -637,6 +637,7 @@ static int handle_assign(struct handle *req, struct cursor *cursor)
+ 	}
+ 	r->gateway = g;
+ 	r->req.data = r;
++	g->req = req;
+ 
+ 	rv = raft_assign(g->raft, &r->req, request.id,
+ 			 translateDqliteRole((int)role), raftChangeCb);
+@@ -645,7 +646,6 @@ static int handle_assign(struct handle *req, struct cursor *cursor)
+ 		failure(req, translateRaftErrCode(rv), raft_strerror(rv));
+ 		return 0;
+ 	}
+-	g->req = req;
+ 
+ 	return 0;
+ }
+@@ -666,6 +666,7 @@ static int handle_remove(struct handle *req, struct cursor *cursor)
+ 	}
+ 	r->gateway = g;
+ 	r->req.data = r;
++	g->req = req;
+ 
+ 	rv = raft_remove(g->raft, &r->req, request.id, raftChangeCb);
+ 	if (rv != 0) {
+@@ -673,7 +674,6 @@ static int handle_remove(struct handle *req, struct cursor *cursor)
+ 		failure(req, translateRaftErrCode(rv), raft_strerror(rv));
+ 		return 0;
+ 	}
+-	g->req = req;
+ 
+ 	return 0;
+ }
+@@ -902,6 +902,7 @@ static int handle_transfer(struct handle *req, struct cursor *cursor)
+ 		return DQLITE_NOMEM;
+ 	}
+ 	r->data = g;
++	g->req = req;
+ 
+ 	rv = raft_transfer(g->raft, r, request.id, raftTransferCb);
+ 	if (rv != 0) {
+@@ -909,7 +910,6 @@ static int handle_transfer(struct handle *req, struct cursor *cursor)
+ 		failure(req, translateRaftErrCode(rv), raft_strerror(rv));
+ 		return 0;
+ 	}
+-	g->req = req;
+ 
+ 	return 0;
+ }
 diff --git a/src/server.c b/src/server.c
 index 990ba75..c1f03d0 100644
 --- a/src/server.c

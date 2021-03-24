@@ -19,6 +19,8 @@ type Fish struct {
 	cfg  *Config
 	node *Node
 
+	running bool
+
 	active_votes_mutex sync.Mutex
 	active_votes       []*Vote
 	applications_mutex sync.Mutex
@@ -107,6 +109,9 @@ func (f *Fish) Init() error {
 		}
 	}
 
+	// Fish is running now
+	f.running = true
+
 	// Continue to execute the assigned applications
 	resources, err := f.ResourceListNode(f.node.ID)
 	if err != nil {
@@ -126,6 +131,10 @@ func (f *Fish) Init() error {
 	return nil
 }
 
+func (f *Fish) Close() {
+	f.running = false
+}
+
 func (f *Fish) GetNodeID() int64 {
 	return f.node.ID
 }
@@ -133,6 +142,9 @@ func (f *Fish) GetNodeID() int64 {
 func (f *Fish) checkNewApplicationProcess() error {
 	check_ticker := time.NewTicker(5 * time.Second)
 	for {
+		if !f.running {
+			break
+		}
 		select {
 		case <-check_ticker.C:
 			new_apps, err := f.ApplicationListGetStatusNew()
@@ -145,7 +157,7 @@ func (f *Fish) checkNewApplicationProcess() error {
 				if f.voteActive(app.ID) {
 					continue
 				}
-				log.Println("Fish: NEW Application with no vote:", app)
+				log.Println("Fish: NEW Application with no vote:", app.ID)
 
 				// Vote not exists in the active votes - running the process
 				f.active_votes_mutex.Lock()
@@ -406,6 +418,10 @@ func (f *Fish) executeApplication(app_id int64) error {
 
 	// Run the loop to wait for deallocate request
 	for app_status.Status == ApplicationStatusAllocated {
+		if !f.running {
+			log.Println("Fish: Stopping the Application execution:", app.ID)
+			return nil
+		}
 		app_status, err := f.ApplicationStatusGetByApplication(app.ID)
 		if err != nil {
 			log.Println("Fish: Unable to get status for Application:", app.ID, err)

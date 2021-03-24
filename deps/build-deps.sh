@@ -24,68 +24,84 @@ echo "--- DOWNLOAD DEPS ---"
 
 echo "--- BUILD LIBUV ---"
 
-dir="libuv-${UV_VERSION}-$suffix"
-export UV_CFLAGS="-I${deps_dir}/$dir/include"
-export UV_LIBS="-L${deps_dir}/$dir/.libs/ -luv"
-export UV_LIB="${deps_dir}/$dir/.libs/libuv.a"
+srcdir="${deps_dir}/libuv-${UV_VERSION}"
+builddir="$srcdir-$suffix"
+export UV_CFLAGS="-I$builddir/include"
+export UV_LIBS="-L$builddir/.libs/ -luv"
+export UV_LIB="$builddir/.libs/libuv.a"
+if [ ! -d "$srcdir" ]; then
+    mkdir -p "$srcdir"
+    tar --strip-components=1 -C "$srcdir" -xf libuv-${UV_VERSION}.tar.gz
+fi
+mkdir -p "$builddir"
+cp -au "$srcdir"/* "$builddir"
+cd $builddir
 if [ ! -f ${UV_LIB} ]; then
-    mkdir -p $dir
-    tar --strip-components=1 -C $dir -xf libuv-${UV_VERSION}.tar.gz
-    cd $dir
-
     sh autogen.sh
     ./configure
-    make -j8
 fi
+make -j8
 
 cd "${deps_dir}"
 echo "--- BUILD RAFT ---"
 
-dir="raft-${RAFT_VERSION}-$suffix"
-export RAFT_CFLAGS="-I${deps_dir}/$dir/include"
-export RAFT_LIBS="-L${deps_dir}/$dir/.libs -lraft"
-export RAFT_LIB="${deps_dir}/$dir/.libs/libraft.a"
+srcdir="${deps_dir}/raft-${RAFT_VERSION}"
+builddir="$srcdir-$suffix"
+export RAFT_CFLAGS="-I$builddir/include"
+export RAFT_LIBS="-L$builddir/.libs -lraft"
+export RAFT_LIB="$builddir/.libs/libraft.a"
+if [ ! -d "$srcdir" ]; then
+    mkdir -p "$srcdir"
+    tar --strip-components=1 -C "$srcdir" -xf raft-${RAFT_VERSION}.tar.gz
+    patch -p1 -d "$srcdir" < "${deps_dir}/raft.patch"
+fi
+mkdir -p "$builddir"
+cp -au "$srcdir"/* "$builddir"
+cd $builddir
 if [ ! -f ${RAFT_LIB} ]; then
-    mkdir -p $dir
-    tar --strip-components=1 -C $dir -xf raft-${RAFT_VERSION}.tar.gz
-    cd $dir
-    patch -p1 < ../raft.patch
-
     autoreconf -i
     ./configure
-    make -j8
 fi
+make -j8
 
 cd "${deps_dir}"
 echo "--- BUILD SQLITE ---"
 
-dir="sqlite-${SQLITE_VERSION}-$suffix"
-export SQLITE_CFLAGS="-I${deps_dir}/$dir"
-export SQLITE_LIBS="-L${deps_dir}/$dir/.libs -lsqlite3"
-export SQLITE_LIB="${deps_dir}/$dir/.libs/libsqlite3.a"
-if [ ! -f ${SQLITE_LIB} ]; then
-    mkdir -p $dir
-    tar --strip-components=1 -C $dir -xf sqlite-${SQLITE_VERSION}.tar.gz
-    cd $dir
-
-    ./configure
-    make -j8
+srcdir="${deps_dir}/sqlite-${SQLITE_VERSION}"
+builddir="$srcdir-$suffix"
+export SQLITE_CFLAGS="-I$builddir"
+export SQLITE_LIBS="-L$builddir/.libs -lsqlite3"
+export SQLITE_LIB="$builddir/.libs/libsqlite3.a"
+if [ ! -d "$srcdir" ]; then
+    mkdir -p "$srcdir"
+    tar --strip-components=1 -C "$srcdir" -xf sqlite-${SQLITE_VERSION}.tar.gz
 fi
+mkdir -p "$builddir"
+cp -au "$srcdir"/* "$builddir"
+cd $builddir
+if [ ! -f ${SQLITE_LIB} ]; then
+    ./configure
+fi
+make -j8
 
 cd "${deps_dir}"
 echo "--- BUILD DQLITE ---"
 
-dir="dqlite-${DQLITE_VERSION}-$suffix"
-export DQLITE_CFLAGS="-I${deps_dir}/$dir/include"
-export DQLITE_LIBS="-L${deps_dir}/$dir/.libs -ldqlite"
-export DQLITE_LIB="${deps_dir}/$dir/.libs/libdqlite.a"
+srcdir="${deps_dir}/dqlite-${DQLITE_VERSION}"
+builddir="$srcdir-$suffix"
+export DQLITE_CFLAGS="-I$builddir/include"
+export DQLITE_LIBS="-L$builddir/.libs -ldqlite"
+export DQLITE_LIB="$builddir/.libs/libdqlite.a"
+if [ ! -d "$srcdir" ]; then
+    mkdir -p "$srcdir"
+    tar --strip-components=1 -C "$srcdir" -xf dqlite-${DQLITE_VERSION}.tar.gz
+    patch -p1 -d "$srcdir" < "${deps_dir}/dqlite.patch"
+fi
+mkdir -p "$builddir"
+cp -au "$srcdir"/* "$builddir"
+cd $builddir
 if [ ! -f ${DQLITE_LIB} ]; then
-    mkdir -p $dir
-    tar --strip-components=1 -C $dir -xf dqlite-${DQLITE_VERSION}.tar.gz
-    cd $dir
-    patch -p1 < ../dqlite.patch
-
     autoreconf -i
     ./configure
-    make -j8
 fi
+make -j8
