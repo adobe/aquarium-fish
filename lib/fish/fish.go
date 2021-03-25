@@ -1,6 +1,7 @@
 package fish
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"math/rand"
@@ -10,6 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
+	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 const ELECTION_ROUND_TIME = 30
@@ -359,12 +361,36 @@ func (f *Fish) executeApplication(app_id int64) error {
 		return err
 	}
 
+	// Merge application and label metadata, in this exact order
+	var merged_metadata []byte
+	var metadata map[string]interface{}
+	if err := json.Unmarshal([]byte(app.Metadata), &metadata); err != nil {
+		log.Println("Fish: Unable to parse the app metadata:", app.ID, err)
+		app_status = &ApplicationStatus{ApplicationID: app.ID, Status: ApplicationStatusError,
+			Description: fmt.Sprintf("Unable to parse the app metadata: %w", err),
+		}
+		f.ApplicationStatusCreate(app_status)
+	}
+	if err := json.Unmarshal([]byte(label.Metadata), &metadata); err != nil {
+		log.Println("Fish: Unable to parse the label metadata:", label.ID, err)
+		app_status = &ApplicationStatus{ApplicationID: app.ID, Status: ApplicationStatusError,
+			Description: fmt.Sprintf("Unable to parse the label metadata: %w", err),
+		}
+		f.ApplicationStatusCreate(app_status)
+	}
+	if merged_metadata, err = json.Marshal(metadata); err != nil {
+		log.Println("Fish: Unable to merge metadata:", label.ID, err)
+		app_status = &ApplicationStatus{ApplicationID: app.ID, Status: ApplicationStatusError,
+			Description: fmt.Sprintf("Unable to merge metadata: %w", err),
+		}
+		f.ApplicationStatusCreate(app_status)
+	}
+
 	// Get or create the new resource object
 	res := &Resource{
 		Application: app,
 		Node:        f.node,
-		// TODO: Just copy metadata for now
-		Metadata: ResourceMetadata(app.Metadata),
+		Metadata:    util.UnparsedJson(merged_metadata),
 	}
 	if app_status.Status == ApplicationStatusAllocated {
 		res, err = f.ResourceGetByApplication(app.ID)

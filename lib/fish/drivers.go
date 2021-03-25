@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
-	// Load all the required drivers
+	// Load all the drivers
 	_ "github.com/adobe/aquarium-fish/lib/drivers/vmx"
 )
 
@@ -51,7 +51,7 @@ func (f *Fish) DriversPrepare(configs []ConfigDriver) (errs []error) {
 		var json_cfg []byte
 		for _, cfg := range configs {
 			if drv.Name() == cfg.Name {
-				json_cfg = cfg.Cfg
+				json_cfg = []byte(cfg.Cfg)
 				break
 			}
 		}

@@ -2,6 +2,8 @@ package fish
 
 import (
 	"time"
+
+	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 type Application struct {
@@ -14,19 +16,7 @@ type Application struct {
 	LabelID int64  `json:"label_id"`
 	Label   *Label `json:"-"` // Label configuration which defines the resource
 
-	Metadata ApplicationMetadata `json:"metadata"` // Requestor metadata in JSON format
-}
-
-type ApplicationMetadata string
-
-func (r *ApplicationMetadata) MarshalJSON() ([]byte, error) {
-	return []byte(*r), nil
-}
-
-func (r *ApplicationMetadata) UnmarshalJSON(b []byte) error {
-	// Store json as string
-	*r = ApplicationMetadata(b)
-	return nil
+	Metadata util.UnparsedJson `json:"metadata"` // Requestor metadata in JSON format
 }
 
 func (f *Fish) ApplicationList() (apps []Application, err error) {
