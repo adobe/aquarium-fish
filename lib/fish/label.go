@@ -3,28 +3,19 @@ package fish
 import (
 	"errors"
 	"time"
+
+	"git.corp.adobe.com/CI/aquarium-fish/lib/util"
 )
 
 type Label struct {
 	ID        int64 `gorm:"primaryKey"`
 	CreatedAt time.Time
 
-	Name       string          `json:"name" gorm:"uniqueIndex:idx_label_uniq"`    // Label name to find the proper one
-	Version    int             `json:"version" gorm:"uniqueIndex:idx_label_uniq"` // Revision of the label
-	Driver     string          `json:"driver"`                                    // Driver implements the label definition configuration
-	Definition LabelDefinition `json:"definition"`                                // JSON-encoded definition for the driver
-}
-
-type LabelDefinition string
-
-func (r *LabelDefinition) MarshalJSON() ([]byte, error) {
-	return []byte(*r), nil
-}
-
-func (r *LabelDefinition) UnmarshalJSON(b []byte) error {
-	// Store json as string
-	*r = LabelDefinition(b)
-	return nil
+	Name       string            `json:"name" gorm:"uniqueIndex:idx_label_uniq"`    // Label name to find the proper one
+	Version    int               `json:"version" gorm:"uniqueIndex:idx_label_uniq"` // Revision of the label
+	Driver     string            `json:"driver"`                                    // Driver implements the label definition configuration
+	Definition util.UnparsedJson `json:"definition"`                                // JSON-encoded definition for the driver
+	Metadata   util.UnparsedJson `json:"metadata"`                                  // Additional metadata to the resource
 }
 
 func (f *Fish) LabelList() (labels []Label, err error) {

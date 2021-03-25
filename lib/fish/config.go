@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"os"
 
+	"git.corp.adobe.com/CI/aquarium-fish/lib/util"
 	"github.com/ghodss/yaml"
 )
 
@@ -13,11 +14,9 @@ type Config struct {
 }
 
 type ConfigDriver struct {
-	Name string          `json:"name"`
-	Cfg  ConfigDriverCfg `json:"cfg"`
+	Name string            `json:"name"`
+	Cfg  util.UnparsedJson `json:"cfg"`
 }
-
-type ConfigDriverCfg []byte
 
 func (c *Config) ReadConfigFile(cfg_path string) error {
 	c.initDefaults()
@@ -41,10 +40,4 @@ func (c *Config) ReadConfigFile(cfg_path string) error {
 
 func (c *Config) initDefaults() {
 	c.NodeName, _ = os.Hostname()
-}
-
-func (r *ConfigDriverCfg) UnmarshalJSON(b []byte) error {
-	// Store json as bytes in the variable to parse in the driver later
-	*r = b
-	return nil
 }

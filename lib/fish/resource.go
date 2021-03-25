@@ -7,9 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mostlygeek/arp"
 	"gorm.io/gorm"
 
-	"github.com/mostlygeek/arp"
+	"git.corp.adobe.com/CI/aquarium-fish/lib/util"
 )
 
 type Resource struct {
@@ -23,21 +24,9 @@ type Resource struct {
 	NodeID int64 `json:"node_id"`
 	Node   *Node `json:"-"` // Node that owns the resource
 
-	IpAddr   string           `json:"ip_addr"`  // IP Address of the resource to identify by the node
-	HwAddr   string           `json:"hw_addr"`  // MAC or any other network hardware address to identify incoming request
-	Metadata ResourceMetadata `json:"metadata"` // Combined metadata (Request + Driver)
-}
-
-type ResourceMetadata string
-
-func (r *ResourceMetadata) MarshalJSON() ([]byte, error) {
-	return []byte(*r), nil
-}
-
-func (r *ResourceMetadata) UnmarshalJSON(b []byte) error {
-	// Store json as string
-	*r = ResourceMetadata(b)
-	return nil
+	IpAddr   string            `json:"ip_addr"`  // IP Address of the resource to identify by the node
+	HwAddr   string            `json:"hw_addr"`  // MAC or any other network hardware address to identify incoming request
+	Metadata util.UnparsedJson `json:"metadata"` // Combined metadata (Request + Driver)
 }
 
 func (f *Fish) ResourceList() (rs []Resource, err error) {
