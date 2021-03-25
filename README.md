@@ -4,24 +4,55 @@ Distributed p2p system to manage resources. Primarily was developed in order to 
 Jenkins CI and simplify the infrastructure management, but can be used in various applications to
 have self-management resources and simple REST API to manage p2p cluster.
 
-## Requirements
-
 ## Usage
 
-In order to use with Jenkins - you can install [Aquarium Net Jenkins](https://git.corp.adobe.com/CI/aquarium-net-jenkins)
-cloud plugin to dynamically allocate the required resources. Don't forget to add the served labels
-to the cloud and you will be ready to go.
+### To run locally
 
+In order to test the Fish locally with just one node or multiple local nodes:
+```
+$ ./aquarium-fish --api 0.0.0.0:8001 --db 127.0.0.1:9001
+```
+
+* `--api` - is where the Fish API will listen, usually it's `0.0.0.0:8001` (it also is used for meta
+so your VMs will be able to ask for the metadata)
+* `--db` - is the listen interface for database sync. Exactly this address will be used by the other
+nodes.
+
+If you want to use the secondary node on the same host - provide a simple config with overridden
+node name, because the first will use hostname as node name:
+* test.yml
+   ```yaml
+   ---
+   node_name: test-node-1
+   ```
+
+```
+$ ./aquarium-fish --api 0.0.0.0:8002 --db 127.0.0.1:9002 --cfg test.yml --join 127.0.0.1:9001
+```
+
+### To run in the real cluster
+
+Quite the same as running locally, but `--db` should be the actual ip/name endpoint of the host,
+since it will be used to connect by the other nodes (so 0.0.0.0 will not work here). For example if
+you can connect from outside to the host via `10.0.4.35` - you need to use `10.0.4.35:9001` here.
+
+### Cluster usage
+
+To initialize cluster you need to create users with admin account and create labels you want to use.
 In order to use the resources manager manually - check the `API` section and follow the next general
 directions:
 
 1. Get your user and it's token
-2. Check the available labels on the cluster
+2. Check the available labels on the cluster (and create some if you need them)
 3. Create Application with description of what kind of resource you need
 4. Check the Status of your application and wait for "ALLOCATED" status
 5. Now resource is allocated, it's all yours and, probably, already pinged you
 6. When you're done - request Application to deallocate the resource
 7. Make sure the Application status is "DEALLOCATED"
+
+To use with Jenkins - you can install [Aquarium Net Jenkins](https://git.corp.adobe.com/CI/aquarium-net-jenkins)
+cloud plugin to dynamically allocate the required resources. Don't forget to add the served labels
+to the cloud and you will be ready to go.
 
 ## Implementation
 
