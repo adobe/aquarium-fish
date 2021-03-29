@@ -30,6 +30,12 @@ func (f *Fish) LabelCreate(l *Label) error {
 	if l.Driver == "" {
 		return errors.New("Fish: Driver can't be empty")
 	}
+	if l.Definition == "" {
+		return errors.New("Fish: Definition can't be empty")
+	}
+	if l.Metadata == "" {
+		l.Metadata = "{}"
+	}
 
 	return f.db.Create(l).Error
 }

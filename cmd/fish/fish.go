@@ -38,7 +38,7 @@ func main() {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			log.Println("Fish running...")
 			dir := filepath.Join(dir, db_address)
-			if err := os.MkdirAll(dir, 0755); err != nil {
+			if err := os.MkdirAll(dir, 0o755); err != nil {
 				return errors.Wrapf(err, "can't create %s", dir)
 			}
 			logFunc := func(l dqlite_client.LogLevel, format string, a ...interface{}) {
