@@ -15,6 +15,10 @@ func InitV1(router *gin.Engine, fish *fish.Fish) {
 		proc.BasicAuth(),
 	)
 	{
+		me := v1.Group("/me")
+		{
+			me.GET("/", proc.MeGet)
+		}
 		user := v1.Group("/user")
 		{
 			user.GET("/", proc.UserListGet)

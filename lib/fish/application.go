@@ -24,11 +24,14 @@ func (f *Fish) ApplicationList() (apps []Application, err error) {
 	return apps, err
 }
 
-func (f *Fish) ApplicationCreate(app *Application) error {
-	err := f.db.Create(app).Error
+func (f *Fish) ApplicationCreate(a *Application) error {
+	if a.Metadata == "" {
+		a.Metadata = "{}"
+	}
+	err := f.db.Create(a).Error
 	// Create ApplicationStatus NEW too
 	f.ApplicationStatusCreate(&ApplicationStatus{
-		Application: app, Status: ApplicationStatusNew,
+		Application: a, Status: ApplicationStatusNew,
 		Description: "Just created by Fish " + f.node.Name,
 	})
 	return err

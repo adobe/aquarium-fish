@@ -4,6 +4,77 @@ Distributed p2p system to manage resources. Primarily was developed in order to 
 Jenkins CI and simplify the infrastructure management, but can be used in various applications to
 have self-management resources and simple REST API to manage p2p cluster.
 
+## Issues
+
+There is a couple of issues still needed to be fixed:
+
+### GUI VMs are not destroyed correctly
+
+It says like "nope, not enough permissions":
+```
+2021/03/27 18:17:22 VMX: Executing: /Applications/VMware Fusion.app/Contents/Public/vmrun -T fusion deleteVM /Users/parshev/git/aquarium-fish/tmp/fish_vmx_workspace/26694c600ba7/26694c600ba7.vmx
+2021/03/27 18:17:26 VMX: stdout: Error: Insufficient permissions
+2021/03/27 18:17:26 VMX: Unable to delete VM: /Users/parshev/git/aquarium-fish/tmp/fish_vmx_workspace/26694c600ba7/26694c600ba7.vmx
+2021/03/27 18:17:26 Fish: Unable to get status for Application: 1 VMware error: Error: Insufficient permissions
+```
+So what is needed - is to wait until the disk lock files will not be cleaned.
+
+### Connection again with cleaned db
+
+If the same node was connected, then stopped and get cleaned database, it can't connect again:
+
+```
+2021/03/27 16:39:02 Fish running...
+2021/03/27 16:39:02 Fish starting dqlite...
+<freeze here>
+```
+
+### Weird "database locked" error
+
+I saw once on the leader that the database stays locked for some reason:
+
+```
+...
+2021/03/27 19:38:24 Fish: NEW Application with no vote: 1
+
+2021/03/27 19:38:24 /go/src/git.corp.adobe.com/CI/aquarium-fish/lib/fish/vote.go:67 record not found
+[0.373ms] [rows:0] SELECT * FROM `votes` WHERE application_id = 1 AND node_id = 1 ORDER BY round DESC,`votes`.`id` LIMIT 1
+2021/03/27 19:38:24 Fish: Starting election round 0
+
+2021/03/27 19:38:24 /go/src/git.corp.adobe.com/CI/aquarium-fish/lib/fish/vote.go:31 database is locked
+[0.186ms] [rows:0] INSERT INTO `nodes` (`created_at`,`updated_at`,`name`,`definition`,`id`) ...
+
+2021/03/27 19:38:24 /go/src/git.corp.adobe.com/CI/aquarium-fish/lib/fish/vote.go:31 database is locked
+[0.469ms] [rows:0]
+2021/03/27 19:38:24 Fish: Unable to create vote: &{0 0001-01-01 00:00:00 +0000 UTC 1 <nil> 1 0xc0003cc120 0 true 1012441418} database is locked
+2021/03/27 19:38:54 Fish Node: ping
+```
+
+### Unable to allocate second VM
+
+First one is ok, but second one for some reason voting weird...
+
+### VMWare not starting the MacOS VM sometimes
+
+It's just hangs with 0% boot load bar
+
+### What's block production
+
+There is still a number of features need to be implemented for proper usage on prod:
+
+* TLS protection (for api & db)
+* DNS/NAT for the local VMs - to implement simple access restriction. For now only host connection
+available. Could be solved by the host-level firewall and network prefs for now.
+* iSCSI - in order to provide limitless access to HDD resource.
+* Users restrictions - for now only admin is available, but need labels & resources restriction.
+* Resources control & clean - need to make sure that HDD will not be overloaded.
+* User packer with a simple password on the image - need to change dynamically on run
+
+### Optimizations
+
+* Proactively check the instance got IP (macos for some reason doesn't connect immediaely to host)
+* Allow to limit node to specific labels
+
 ## Usage
 
 ### To run locally

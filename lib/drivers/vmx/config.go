@@ -9,8 +9,9 @@ import (
 )
 
 type Config struct {
-	VmrunPath        string `json:"vmrun_path"`        // '/Applications/VMware Fusion.app/Contents/Library/vmrun'
-	VdiskmanagerPath string `json:"vdiskmanager_path"` // '/Applications/VMware Fusion.app/Contents/Library/vmware-vdiskmanager'
+	VmrunPath          string `json:"vmrun_path"`          // '/Applications/VMware Fusion.app/Contents/Library/vmrun'
+	RawdiskCreatorPath string `json:"rawdiskcreator_path"` // '/Applications/VMware Fusion.app/Contents/Library/vmware-rawdiskCreator'
+	VdiskmanagerPath   string `json:"vdiskmanager_path"`   // '/Applications/VMware Fusion.app/Contents/Library/vmware-vdiskmanager'
 
 	ImagesPath    string `json:"images_path"`    // Where to look/store VM images
 	WorkspacePath string `json:"workspace_path"` // Where to place the cloned VM
@@ -35,15 +36,22 @@ func (c *Config) Validate() (err error) {
 			return err
 		}
 	}
-	/*if c.VdiskmanagerPath == "" {
-		// Look in the PATH
-		if c.VdiskmanagerPath, err = exec.LookPath("vmware-vdiskmanager"); err != nil {
-			log.Println("VMX: Unable to locate `vmware-vdiskmanager` path", e)
+	if c.RawdiskCreatorPath == "" {
+		// Use VmrunPath to get the path
+		c.RawdiskCreatorPath = filepath.Join(filepath.Dir(filepath.Dir(c.VmrunPath)), "Library", "vmware-rawdiskCreator")
+		if _, err := os.Stat(c.RawdiskCreatorPath); os.IsNotExist(err) {
+			log.Println("VMX: Unable to locate `vmware-rawdiskCreator` path", err)
 			return err
 		}
-		// If not located in the PATH - check the known directories
-		// TODO
-	}*/
+	}
+	if c.VdiskmanagerPath == "" {
+		// Use VmrunPath to get the path
+		c.VdiskmanagerPath = filepath.Join(filepath.Dir(filepath.Dir(c.VmrunPath)), "Library", "vmware-vdiskmanager")
+		if _, err := os.Stat(c.RawdiskCreatorPath); os.IsNotExist(err) {
+			log.Println("VMX: Unable to locate `vmware-vdiskmanager` path", err)
+			return err
+		}
+	}
 	if c.ImagesPath == "" {
 		c.ImagesPath = "fish_vmx_images"
 	}

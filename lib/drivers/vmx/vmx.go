@@ -81,20 +81,22 @@ func (d *Driver) Allocate(definition string) (string, error) {
 		return vm_hwaddr, err
 	}
 
-	// Change type of the mac address
+	// Change cloned vm configuration
 	if err := util.FileReplaceToken(vmx_path,
-		"ethernet0.addresstype =", `ethernet0.addressType = "static"`,
-		true, true,
+		true, true, true,
+		"ethernet0.addressType =", `ethernet0.addressType = "static"`,
+		"ethernet0.address =", fmt.Sprintf("ethernet0.address = %q", vm_hwaddr),
+		"numvcpus =", fmt.Sprintf(`numvcpus = "%d"`, def.Requirements.Cpu),
+		"cpuid.corespersocket =", fmt.Sprintf(`cpuid.corespersocket = "%d"`, def.Requirements.Cpu),
+		"memsize =", fmt.Sprintf(`memsize = "%d"`, def.Requirements.Ram*1024),
 	); err != nil {
-		log.Println("VMX: Unable to set mac address type in", vmx_path)
+		log.Println("VMX: Unable to change cloned VM configuration", vmx_path)
 		return vm_hwaddr, err
 	}
-	// Replace the MAC address for VM
-	if err := util.FileReplaceToken(vmx_path,
-		"ethernet0.address =", `ethernet0.address = "`+vm_hwaddr+`"`,
-		true, true,
-	); err != nil {
-		log.Println("VMX: Unable to replace mac address in", vmx_path)
+
+	// Create and connect disks to vmx
+	if err := d.disksCreate(vmx_path, def.Requirements.Disks); err != nil {
+		log.Println("VMX: Unable to change cloned VM configuration", vmx_path)
 		return vm_hwaddr, err
 	}
 
@@ -102,6 +104,7 @@ func (d *Driver) Allocate(definition string) (string, error) {
 	cmd = exec.Command(d.cfg.VmrunPath, "-T", "fusion", "start", vmx_path, "nogui")
 	if _, _, err := runAndLog(cmd); err != nil {
 		log.Println("VMX: Unable to run VM", vmx_path, err)
+		log.Println("VMX: Check the log info:", filepath.Join(filepath.Dir(vmx_path), "vmware.log"))
 		return vm_hwaddr, err
 	}
 
@@ -111,7 +114,7 @@ func (d *Driver) Allocate(definition string) (string, error) {
 }
 
 func (d *Driver) loadImages(def *Definition, vm_images_dir string) error {
-	if err := os.MkdirAll(vm_images_dir, 0755); err != nil {
+	if err := os.MkdirAll(vm_images_dir, 0o755); err != nil {
 		log.Println("VMX: Unable to create the vm images dir:", vm_images_dir)
 		return err
 	}
@@ -133,7 +136,7 @@ func (d *Driver) loadImages(def *Definition, vm_images_dir string) error {
 			defer os.Remove(image_archive)
 
 			// Unpack archive
-			if err := os.MkdirAll(image_unpacked, 0755); err != nil {
+			if err := os.MkdirAll(image_unpacked, 0o755); err != nil {
 				log.Println("VMX: Unable to create the image dir:", name, url)
 				return err
 			}
@@ -153,7 +156,7 @@ func (d *Driver) loadImages(def *Definition, vm_images_dir string) error {
 		// and copy the vmsd file with path to the workspace images dir
 		root_dir := filepath.Join(image_unpacked, name)
 		out_dir := filepath.Join(vm_images_dir, name)
-		if err := os.MkdirAll(out_dir, 0755); err != nil {
+		if err := os.MkdirAll(out_dir, 0o755); err != nil {
 			log.Println("VMX: Unable to create the vm image dir:", out_dir)
 			return err
 		}
@@ -168,28 +171,30 @@ func (d *Driver) loadImages(def *Definition, vm_images_dir string) error {
 			in_path := filepath.Join(root_dir, entry.Name())
 			out_path := filepath.Join(out_dir, entry.Name())
 
-			// Check if the file is not special
-			if !strings.HasSuffix(entry.Name(), ".vmsd") {
-				// Just link image file/dir to the vm image dir
+			// Check if the file is not the disk file
+			if strings.HasSuffix(entry.Name(), ".vmdk") {
+				// Just link the disk image to the vm image dir
 				if err := os.Symlink(in_path, out_path); err != nil {
 					return err
 				}
 				continue
 			}
 
-			// Copy special file
+			// Copy VM file in order to prevent the image modification
 			if err := util.FileCopy(in_path, out_path); err != nil {
 				log.Println("VMX: Unable to copy image file", in_path, out_path)
 				return err
 			}
 
-			// Replace absolute path token
-			if err := util.FileReplaceToken(out_path,
-				"<REPLACE_PARENT_VM_FULL_PATH>", vm_images_dir,
-				false, false,
-			); err != nil {
-				log.Println("VMX: Unable to replace full path token in vmsd", name)
-				return err
+			// Modify the vmsd file to replace token - it's require absolute path
+			if strings.HasSuffix(entry.Name(), ".vmsd") {
+				if err := util.FileReplaceToken(out_path,
+					false, false, false,
+					"<REPLACE_PARENT_VM_FULL_PATH>", vm_images_dir,
+				); err != nil {
+					log.Println("VMX: Unable to replace full path token in vmsd", name)
+					return err
+				}
 			}
 		}
 	}
@@ -212,7 +217,7 @@ func (d *Driver) getAllocatedVMX(hwaddr string) string {
 		}
 
 		// Read vmx file and filter by ethernet0.address = "${hwaddr}"
-		f, err := os.OpenFile(line, os.O_RDONLY, 0644)
+		f, err := os.OpenFile(line, os.O_RDONLY, 0o644)
 		if err != nil {
 			log.Println("VMX: Unable to open .vmx file to check status:", line)
 			continue
@@ -224,7 +229,7 @@ func (d *Driver) getAllocatedVMX(hwaddr string) string {
 			if !strings.HasPrefix(scanner.Text(), "ethernet0.address =") {
 				continue
 			}
-			if !strings.HasSuffix(scanner.Text(), `= "`+hwaddr+`"`) {
+			if !strings.HasSuffix(strings.ToLower(scanner.Text()), `= "`+hwaddr+`"`) {
 				break
 			}
 			return line
@@ -235,6 +240,145 @@ func (d *Driver) getAllocatedVMX(hwaddr string) string {
 		}
 	}
 	return ""
+}
+
+func (d *Driver) disksCreate(vmx_path string, disks map[string]drivers.Disk) error {
+	// Create disk files
+	var disk_paths []string
+	for name, disk := range disks {
+		disk_path := filepath.Join(filepath.Dir(vmx_path), name)
+		if disk.Reuse {
+			disk_path = filepath.Join(d.cfg.WorkspacePath, "disk-"+name, name)
+			if err := os.MkdirAll(filepath.Dir(disk_path), 0o755); err != nil {
+				return err
+			}
+		}
+
+		rel_path, err := filepath.Rel(filepath.Dir(vmx_path), disk_path+".vmdk")
+		if err == nil {
+			disk_paths = append(disk_paths, rel_path)
+		} else {
+			log.Println("VMX: Unable to get relative path for disk:", disk_path+".vmdk")
+			disk_paths = append(disk_paths, disk_path)
+		}
+
+		if _, err := os.Stat(disk_path + ".vmdk"); !os.IsNotExist(err) {
+			continue
+		}
+
+		// Create disk
+		// TODO: support other operating systems & filesystems
+		// TODO: Ensure failures doesn't leave the changes behind (like mounted disks or files)
+
+		// Create virtual disk
+		dmg_path := disk_path + ".dmg"
+		cmd := exec.Command("/usr/bin/hdiutil", "create", dmg_path, "-fs", "HFS+",
+			"-volname", name,
+			"-size", fmt.Sprintf("%dm", disk.Size*1024),
+		)
+		if _, _, err := runAndLog(cmd); err != nil {
+			log.Println("VMX: Unable to create dmg disk", dmg_path, err)
+			return err
+		}
+
+		// Attach & mount disk
+		cmd = exec.Command("/usr/bin/hdiutil", "attach", dmg_path)
+		stdout, _, err := runAndLog(cmd)
+		if err != nil {
+			log.Println("VMX: Unable to attach dmg disk", err)
+			return err
+		}
+
+		// Get attached disk device
+		dev_path := strings.SplitN(stdout, " ", 2)[0]
+		mount_point := filepath.Join("/Volumes", name)
+
+		// Allow anyone to modify the disk content
+		if err := os.Chmod(mount_point, 0o777); err != nil {
+			log.Println("VMX: Unable to change the disk access rights", err)
+			return err
+		}
+
+		// Umount disk (use diskutil to umount for sure)
+		cmd = exec.Command("/usr/sbin/diskutil", "umount", mount_point)
+		stdout, _, err = runAndLog(cmd)
+		if err != nil {
+			log.Println("VMX: Unable to umount dmg disk", err)
+			return err
+		}
+
+		// Create linked to device vmdk
+		// It's the simpliest way I found to prepare the automount vmdk on macos
+		cmd = exec.Command(d.cfg.RawdiskCreatorPath, "create", dev_path, "1", disk_path+"_tmp", "lsilogic")
+		if _, _, err := runAndLog(cmd); err != nil {
+			log.Println("VMX: Unable to create vmdk disk", err)
+			return err
+		}
+
+		// Detach disk
+		cmd = exec.Command("/usr/bin/hdiutil", "detach", dev_path)
+		if _, _, err := runAndLog(cmd); err != nil {
+			log.Println("VMX: Unable to detach dmg disk", err)
+			return err
+		}
+
+		// Move vmdk from disk to image file
+		// Format is here: http://sanbarrow.com/vmdk/disktypes.html
+		// <access type> <size> <vmdk-type> <path to datachunk> <offset>
+		// size, offset - number in amount of sectors
+		if err := util.FileReplaceBlock(disk_path+"_tmp.vmdk",
+			`createType="partitionedDevice"`, "# The Disk Data Base",
+			`createType="monolithicFlat"`,
+			"",
+			"# Extent description",
+			fmt.Sprintf(`RW %d FLAT %q 0`, disk.Size*1024*1024*2, dmg_path),
+			"",
+			"# The Disk Data Base",
+		); err != nil {
+			log.Println("VMX: Unable to replace extent description in vmdk file", disk_path+"_tmp.vmdk")
+			return err
+		}
+
+		// Convert linked vmdk to standalone vmdk
+		cmd = exec.Command(d.cfg.VdiskmanagerPath, "-r", disk_path+"_tmp.vmdk", "-t", "0", disk_path+".vmdk")
+		if _, _, err := runAndLog(cmd); err != nil {
+			log.Println("VMX: Unable to create vmdk disk", err)
+			return err
+		}
+
+		// Remove temp files
+		for _, path := range []string{dmg_path, disk_path + "_tmp.vmdk", disk_path + "_tmp-pt.vmdk"} {
+			if err := os.Remove(path); err != nil {
+				log.Println("VMX: Unable to remove file", path, err)
+				return err
+			}
+		}
+	}
+
+	if len(disk_paths) == 0 {
+		return nil
+	}
+
+	// Connect disk files to vmx
+	var to_replace []string
+	// Use SCSI adapter
+	to_replace = append(to_replace,
+		"scsi0.present =", `scsi0.present = "TRUE"`,
+		"scsi0.virtualDev =", `scsi0.virtualDev = "lsilogic"`,
+	)
+	for i, disk_path := range disk_paths {
+		prefix := fmt.Sprintf("scsi0:%d", i)
+		to_replace = append(to_replace,
+			prefix+".present =", prefix+`.present = "TRUE"`,
+			prefix+".fileName =", fmt.Sprintf("%s.fileName = %q", prefix, disk_path),
+		)
+	}
+	if err := util.FileReplaceToken(vmx_path, true, true, true, to_replace...); err != nil {
+		log.Println("VMX: Unable to add disks to VM configuration", vmx_path)
+		return err
+	}
+
+	return nil
 }
 
 func (d *Driver) Status(hwaddr string) string {

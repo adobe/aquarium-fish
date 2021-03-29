@@ -42,7 +42,7 @@ func Unpack(path string, outdir string) error {
 		switch hdr.Typeflag {
 		case tar.TypeDir:
 			// Create a directory
-			err = os.MkdirAll(target, 0755)
+			err = os.MkdirAll(target, 0o755)
 			if err != nil {
 				return err
 			}

@@ -41,13 +41,23 @@ func (e *APIv1Processor) BasicAuth() gin.HandlerFunc {
 	}
 }
 
+func (e *APIv1Processor) MeGet(c *gin.Context) {
+	user, _ := c.Get("user")
+	c.JSON(http.StatusOK, gin.H{"message": "Get me", "data": user})
+}
+
 func (e *APIv1Processor) UserListGet(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Get users list"})
 }
 
 func (e *APIv1Processor) UserGet(c *gin.Context) {
-	//id := c.Param("id")
-	c.JSON(http.StatusNotFound, gin.H{"message": "User not found"})
+	out, err := e.fish.UserGet(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"message": fmt.Sprintf("User not found: %v", err)})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Get user", "data": out})
 }
 
 func (e *APIv1Processor) UserCreatePost(c *gin.Context) {
