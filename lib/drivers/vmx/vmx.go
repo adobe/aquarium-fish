@@ -395,7 +395,7 @@ func (d *Driver) Deallocate(hwaddr string) error {
 		return errors.New(fmt.Sprintf("VMX: No VM found with HW ADDR: %s", hwaddr))
 	}
 
-	cmd := exec.Command(d.cfg.VmrunPath, "-T", "fusion", "stop", vmx_path, "hard")
+	cmd := exec.Command(d.cfg.VmrunPath, "-T", "fusion", "stop", vmx_path)
 	if _, _, err := runAndLog(cmd); err != nil {
 		log.Println("VMX: Unable to deallocate VM:", vmx_path)
 		return err

@@ -192,7 +192,7 @@ func (f *Fish) voteProcessRound(vote *Vote) error {
 		vote.Available = f.isNodeAvailableForApplication(vote.ApplicationID)
 
 		// Create vote if it's required
-		if vote.NodeID == 0 || vote.ApplicationID == 0 {
+		if vote.ID == 0 {
 			vote.NodeID = vote.Node.ID
 			if err := f.VoteCreate(vote); err != nil {
 				log.Println("Fish: Unable to create vote:", vote, err)
@@ -202,7 +202,7 @@ func (f *Fish) voteProcessRound(vote *Vote) error {
 
 		for {
 			// Check all the cluster nodes are voted
-			nodes, err := f.NodeList()
+			nodes, err := f.NodeActiveList()
 			if err != nil {
 				log.Println("Fish: Unable to get the Node list:", err)
 				return err
@@ -257,6 +257,7 @@ func (f *Fish) voteProcessRound(vote *Vote) error {
 
 				// Next round seems needed
 				vote.Round += 1
+				vote.ID = 0
 				break
 			}
 
@@ -276,7 +277,7 @@ func (f *Fish) isNodeAvailableForApplication(app_id int64) bool {
 		// TODO: Potentially a number of applications could be executed
 		// but keep it simple for now
 		if len(f.applications) > 0 {
-			log.Println("Fish: Node already busy with the application", app_id)
+			log.Println("Fish: Node already busy with the application")
 			f.applications_mutex.Unlock()
 			return false
 		}
@@ -448,14 +449,13 @@ func (f *Fish) executeApplication(app_id int64) error {
 			log.Println("Fish: Stopping the Application execution:", app.ID)
 			return nil
 		}
-		app_status, err := f.ApplicationStatusGetByApplication(app.ID)
+		app_status, err = f.ApplicationStatusGetByApplication(app.ID)
 		if err != nil {
 			log.Println("Fish: Unable to get status for Application:", app.ID, err)
 		}
 		if app_status.Status == ApplicationStatusDeallocate {
 			// Deallocating and destroy the resource
-			err = driver.Deallocate(res.HwAddr)
-			if err != nil {
+			if err := driver.Deallocate(res.HwAddr); err != nil {
 				log.Println("Fish: Unable to get status for Application:", app.ID, err)
 				app_status = &ApplicationStatus{ApplicationID: app.ID, Status: ApplicationStatusError,
 					Description: fmt.Sprintf("Driver deallocate resource error: %w", err),
@@ -465,8 +465,8 @@ func (f *Fish) executeApplication(app_id int64) error {
 				if err != nil {
 					log.Println("Fish: Unable to store resource for Application:", app.ID, err)
 				}
-				app_status = &ApplicationStatus{ApplicationID: app.ID, Status: ApplicationStatusAllocated,
-					Description: fmt.Sprintf("Driver allocated the resource"),
+				app_status = &ApplicationStatus{ApplicationID: app.ID, Status: ApplicationStatusDeallocated,
+					Description: fmt.Sprintf("Driver deallocated the resource"),
 				}
 			}
 			f.ApplicationStatusCreate(app_status)
