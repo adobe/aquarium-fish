@@ -26,6 +26,13 @@ func (f *Fish) NodeList() (ns []Node, err error) {
 	return ns, err
 }
 
+func (f *Fish) NodeActiveList() (ns []Node, err error) {
+	// Only the nodes that pinged at least twice the delay time
+	t := time.Now().Add(-NODE_PING_DELAY * 2 * time.Second)
+	err = f.db.Where("updated_at > ?", t).Find(&ns).Error
+	return ns, err
+}
+
 func (f *Fish) NodeCreate(n *Node) error {
 	if n.Name == "" {
 		return errors.New("Fish: Name can't be empty")

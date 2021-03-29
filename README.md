@@ -50,13 +50,9 @@ I saw once on the leader that the database stays locked for some reason:
 2021/03/27 19:38:54 Fish Node: ping
 ```
 
-### Unable to allocate second VM
-
-First one is ok, but second one for some reason voting weird...
-
 ### VMWare not starting the MacOS VM sometimes
 
-It's just hangs with 0% boot load bar
+VMware Fusion just hangs with 0% boot load bar
 
 ### What's block production
 
