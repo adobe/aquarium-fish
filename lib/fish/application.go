@@ -19,9 +19,9 @@ type Application struct {
 	Metadata util.UnparsedJson `json:"metadata"` // Requestor metadata in JSON format
 }
 
-func (f *Fish) ApplicationList() (apps []Application, err error) {
-	err = f.db.Find(&apps).Error
-	return apps, err
+func (f *Fish) ApplicationFind(filter string) (as []Application, err error) {
+	err = f.db.Where(filter).Find(&as).Error
+	return as, err
 }
 
 func (f *Fish) ApplicationCreate(a *Application) error {
@@ -42,10 +42,10 @@ func (f *Fish) ApplicationCreate(a *Application) error {
 	return f.db.Save(app).Error
 }*/
 
-func (f *Fish) ApplicationGet(id int64) (app *Application, err error) {
-	app = &Application{}
-	err = f.db.First(app, id).Error
-	return app, err
+func (f *Fish) ApplicationGet(id int64) (a *Application, err error) {
+	a = &Application{}
+	err = f.db.First(a, id).Error
+	return a, err
 }
 
 func (f *Fish) ApplicationListGetStatusNew() (as []Application, err error) {

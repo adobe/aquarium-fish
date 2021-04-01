@@ -18,6 +18,11 @@ type User struct {
 	Hash crypt.Hash `gorm:"embedded"`
 }
 
+func (f *Fish) UserFind(filter string) (us []Label, err error) {
+	err = f.db.Where(filter).Find(&us).Error
+	return us, err
+}
+
 func (f *Fish) UserCreate(u *User) error {
 	if u.Name == "" {
 		return errors.New("Fish: Name can't be empty")
@@ -29,14 +34,14 @@ func (f *Fish) UserCreate(u *User) error {
 	return f.db.Create(u).Error
 }
 
-func (f *Fish) UserSave(user *User) error {
-	return f.db.Save(user).Error
+func (f *Fish) UserSave(u *User) error {
+	return f.db.Save(u).Error
 }
 
-func (f *Fish) UserGet(name string) (user *User, err error) {
-	user = &User{}
-	err = f.db.Where("name = ?", name).First(user).Error
-	return user, err
+func (f *Fish) UserGet(name string) (u *User, err error) {
+	u = &User{}
+	err = f.db.Where("name = ?", name).First(u).Error
+	return u, err
 }
 
 func (f *Fish) UserAuthBasic(basic string) *User {
@@ -75,4 +80,8 @@ func (f *Fish) UserNew(name string, password string) (string, error) {
 	}
 
 	return password, nil
+}
+
+func (f *Fish) UserDelete(name string) error {
+	return f.db.Where("name = ?", name).Delete(&User{}).Error
 }

@@ -363,11 +363,10 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]drivers.Disk) err
 	var to_replace []string
 	// Use SCSI adapter
 	to_replace = append(to_replace,
-		"scsi0.present =", `scsi0.present = "TRUE"`,
-		"scsi0.virtualDev =", `scsi0.virtualDev = "lsilogic"`,
+		"sata1.present =", `sata1.present = "TRUE"`,
 	)
 	for i, disk_path := range disk_paths {
-		prefix := fmt.Sprintf("scsi0:%d", i)
+		prefix := fmt.Sprintf("sata1:%d", i)
 		to_replace = append(to_replace,
 			prefix+".present =", prefix+`.present = "TRUE"`,
 			prefix+".fileName =", fmt.Sprintf("%s.fileName = %q", prefix, disk_path),

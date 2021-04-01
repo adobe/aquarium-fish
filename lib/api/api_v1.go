@@ -47,7 +47,20 @@ func (e *APIv1Processor) MeGet(c *gin.Context) {
 }
 
 func (e *APIv1Processor) UserListGet(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "Get users list"})
+	// Only admin can list users
+	user, _ := c.Get("user")
+	if user.(*fish.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Only 'admin' user can list users")})
+		return
+	}
+
+	filter := c.Request.URL.Query().Get("filter")
+	out, err := e.fish.UserFind(filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("Unable to get the user list: %v", err)})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Get users list", "data": out})
 }
 
 func (e *APIv1Processor) UserGet(c *gin.Context) {
@@ -61,16 +74,54 @@ func (e *APIv1Processor) UserGet(c *gin.Context) {
 }
 
 func (e *APIv1Processor) UserCreatePost(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "User stored"})
+	// Only admin can create user
+	user, _ := c.Get("user")
+	if user.(*fish.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Only 'admin' user can create user")})
+		return
+	}
+
+	var data fish.User
+	if err := c.BindJSON(&data); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Wrong request body: %v", err)})
+		return
+	}
+
+	password, err := e.fish.UserNew(data.Name, "") // Generate new password for now
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Unable to create user: %v", err)})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User created", "data": gin.H{"password": password}})
 }
 
 func (e *APIv1Processor) UserDelete(c *gin.Context) {
-	//id := c.Param("id")
+	// Only admin can delete user
+	user, _ := c.Get("user")
+	if user.(*fish.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Only 'admin' user can delete user")})
+		return
+	}
+
+	if err := e.fish.UserDelete(c.Param("id")); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"message": fmt.Sprintf("User delete failed with error: %v", err)})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "User removed"})
 }
 
 func (e *APIv1Processor) ResourceListGet(c *gin.Context) {
-	out, err := e.fish.ResourceList()
+	// Only admin can list the resources
+	user, _ := c.Get("user")
+	if user.(*fish.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Only 'admin' user can list resource")})
+		return
+	}
+
+	filter := c.Request.URL.Query().Get("filter")
+	out, err := e.fish.ResourceFind(filter)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("Unable to get the resource list: %v", err)})
 		return
@@ -80,6 +131,13 @@ func (e *APIv1Processor) ResourceListGet(c *gin.Context) {
 }
 
 func (e *APIv1Processor) ResourceGet(c *gin.Context) {
+	// Only admin can get the resource directly
+	user, _ := c.Get("user")
+	if user.(*fish.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Only 'admin' user can get resource")})
+		return
+	}
+
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Wrong request param `id`: %v", err)})
@@ -96,10 +154,23 @@ func (e *APIv1Processor) ResourceGet(c *gin.Context) {
 }
 
 func (e *APIv1Processor) ApplicationListGet(c *gin.Context) {
-	out, err := e.fish.ApplicationList()
+	filter := c.Request.URL.Query().Get("filter")
+	out, err := e.fish.ApplicationFind(filter)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("Unable to get the application list: %v", err)})
 		return
+	}
+
+	// Filter the output by owner
+	user, _ := c.Get("user")
+	if user.(*fish.User).Name != "admin" {
+		var owner_out []fish.Application
+		for _, app := range out {
+			if app.ID == user.(*fish.User).ID {
+				owner_out = append(owner_out, app)
+			}
+		}
+		out = owner_out
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Get application list", "data": out})
@@ -115,6 +186,13 @@ func (e *APIv1Processor) ApplicationGet(c *gin.Context) {
 	out, err := e.fish.ApplicationGet(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"message": fmt.Sprintf("Application not found: %v", err)})
+		return
+	}
+
+	// Only the owner of the application (or admin) can request it
+	user, _ := c.Get("user")
+	if out.ID != user.(*fish.User).ID && user.(*fish.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Only the owner and admin can request the application")})
 		return
 	}
 
@@ -146,6 +224,19 @@ func (e *APIv1Processor) ApplicationResourceGet(c *gin.Context) {
 		return
 	}
 
+	app, err := e.fish.ApplicationGet(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Unable to find the application: %s", id)})
+		return
+	}
+
+	// Only the owner of the application (or admin) can request the resource
+	user, _ := c.Get("user")
+	if app.ID != user.(*fish.User).ID && user.(*fish.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Only the owner and admin can request the application resource")})
+		return
+	}
+
 	out, err := e.fish.ResourceGetByApplication(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"message": fmt.Sprintf("Resource not found: %v", err)})
@@ -159,6 +250,19 @@ func (e *APIv1Processor) ApplicationStatusGet(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Wrong request param `id`: %v", err)})
+		return
+	}
+
+	app, err := e.fish.ApplicationGet(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Unable to find the application: %s", id)})
+		return
+	}
+
+	// Only the owner of the application (or admin) can request the status
+	user, _ := c.Get("user")
+	if app.ID != user.(*fish.User).ID && user.(*fish.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Only the owner and admin can request the application status")})
 		return
 	}
 
@@ -178,6 +282,19 @@ func (e *APIv1Processor) ApplicationDeallocateGet(c *gin.Context) {
 		return
 	}
 
+	app, err := e.fish.ApplicationGet(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Unable to find the application: %s", id)})
+		return
+	}
+
+	// Only the owner of the application (or admin) could deallocate it
+	user, _ := c.Get("user")
+	if app.ID != user.(*fish.User).ID && user.(*fish.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Only the owner & admin can deallocate the application resource")})
+		return
+	}
+
 	out, err := e.fish.ApplicationStatusGetByApplication(id)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Unable to find status for the application: %s", id)})
@@ -188,7 +305,6 @@ func (e *APIv1Processor) ApplicationDeallocateGet(c *gin.Context) {
 		return
 	}
 
-	user, _ := c.Get("user")
 	as := &fish.ApplicationStatus{ApplicationID: id, Status: fish.ApplicationStatusDeallocate,
 		Description: fmt.Sprintf("Requested by user %s", user.(*fish.User).Name),
 	}
@@ -202,7 +318,8 @@ func (e *APIv1Processor) ApplicationDeallocateGet(c *gin.Context) {
 }
 
 func (e *APIv1Processor) LabelListGet(c *gin.Context) {
-	out, err := e.fish.LabelList()
+	filter := c.Request.URL.Query().Get("filter")
+	out, err := e.fish.LabelFind(filter)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("Unable to get the label list: %v", err)})
 		return
@@ -228,6 +345,13 @@ func (e *APIv1Processor) LabelGet(c *gin.Context) {
 }
 
 func (e *APIv1Processor) LabelCreatePost(c *gin.Context) {
+	// Only admin can create label
+	user, _ := c.Get("user")
+	if user.(*fish.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Only 'admin' user can create label")})
+		return
+	}
+
 	var data fish.Label
 	if err := c.BindJSON(&data); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Wrong request body: %v", err)})
@@ -241,6 +365,13 @@ func (e *APIv1Processor) LabelCreatePost(c *gin.Context) {
 }
 
 func (e *APIv1Processor) LabelDelete(c *gin.Context) {
+	// Only admin can delete label
+	user, _ := c.Get("user")
+	if user.(*fish.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Only 'admin' user can delete label")})
+		return
+	}
+
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("Wrong request param `id`: %v", err)})
