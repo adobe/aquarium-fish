@@ -121,6 +121,13 @@ To use with Jenkins - you can install [Aquarium Net Jenkins](https://github.com/
 cloud plugin to dynamically allocate the required resources. Don't forget to add the served labels
 to the cloud and you will be ready to go.
 
+### Users policy
+
+For now the policy is quite simple - `admin` user can do anything, regular users can just use the
+cluster (create application, list their resources and so on). The applications & resources could
+contain sensetive information (like jenkins agent secret), so user will see just the owned
+applications and will be able to control only them.
+
 ## Implementation
 
 Go was choosen due to it's go-dqlite, simple one-binary executable resources management with
@@ -200,7 +207,7 @@ There is a number of ways to communicate with the Fish cluster, and the most imp
 
 You can use `curl`, for example, to do that:
 ```
-$ curl -u "admin:YOUR_TOKEN" -X GET 127.0.0.1:8001/api/v1/resource/
+$ curl -u "admin:YOUR_TOKEN" -X GET 127.0.0.1:8001/api/v1/label/
 {"message": "Cluster resources list", "data": [{...}, ...]}
 ```
 
@@ -210,6 +217,9 @@ Route: `/api/v1/`
 
 Requires HTTP Basic (or JWT auth from UI in the future) auth of existing user to execute any request
 Basically uses GET (get data), POST (create/update data), DELETE (remove data) requests.
+
+Common params:
+* `filter=` - sql filter available for the general list API calls
 
 #### Users
 

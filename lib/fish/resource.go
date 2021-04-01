@@ -29,8 +29,8 @@ type Resource struct {
 	Metadata util.UnparsedJson `json:"metadata"` // Combined metadata (Request + Driver)
 }
 
-func (f *Fish) ResourceList() (rs []Resource, err error) {
-	err = f.db.Find(&rs).Error
+func (f *Fish) ResourceFind(filter string) (rs []Resource, err error) {
+	err = f.db.Where(filter).Find(&rs).Error
 	return rs, err
 }
 

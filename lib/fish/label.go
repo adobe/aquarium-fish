@@ -18,8 +18,8 @@ type Label struct {
 	Metadata   util.UnparsedJson `json:"metadata"`                                  // Additional metadata to the resource
 }
 
-func (f *Fish) LabelList() (labels []Label, err error) {
-	err = f.db.Find(&labels).Error
+func (f *Fish) LabelFind(filter string) (labels []Label, err error) {
+	err = f.db.Where(filter).Find(&labels).Error
 	return labels, err
 }
 
