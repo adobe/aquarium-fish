@@ -22,5 +22,3 @@ export CGO_LDFLAGS="-static -pthread ${DQLITE_LIBS} ${SQLITE_LIBS} ${RAFT_LIBS} 
 
 cd "${root_dir}"
 sh _build.sh
-
-#go build -ldflags="-s -w" -a -o aquarium-fish.linux ./cmd/fish

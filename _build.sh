@@ -7,6 +7,13 @@
 
 cd "${root_dir}"
 
+echo "--- PATCH GO-DQLITE ---"
+# Apply a small patch to the go-dqlite go package
+gopath=$(go env GOPATH)
+go get -d github.com/canonical/go-dqlite@v1.8.0
+chmod -R u+w "$gopath/pkg/mod/github.com/canonical/go-dqlite@v1.8.0"
+patch -N -p1 -d "$gopath/pkg/mod/github.com/canonical/go-dqlite@v1.8.0" < deps/go-dqlite.patch || true
+
 export CGO_CFLAGS="${UV_CFLAGS} ${RAFT_CFLAGS} ${SQLITE_CFLAGS} ${DQLITE_CFLAGS}"
 
 if [ "x${RELEASE}" != "x" ]; then

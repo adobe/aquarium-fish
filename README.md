@@ -6,70 +6,7 @@ have self-management resources and simple REST API to manage p2p cluster.
 
 ## Issues
 
-There is a couple of issues still needed to be fixed:
-
-### GUI VMs are not destroyed correctly
-
-It says like "nope, not enough permissions":
-```
-2021/03/27 18:17:22 VMX: Executing: /Applications/VMware Fusion.app/Contents/Public/vmrun -T fusion deleteVM /Users/parshev/git/aquarium-fish/tmp/fish_vmx_workspace/26694c600ba7/26694c600ba7.vmx
-2021/03/27 18:17:26 VMX: stdout: Error: Insufficient permissions
-2021/03/27 18:17:26 VMX: Unable to delete VM: /Users/parshev/git/aquarium-fish/tmp/fish_vmx_workspace/26694c600ba7/26694c600ba7.vmx
-2021/03/27 18:17:26 Fish: Unable to get status for Application: 1 VMware error: Error: Insufficient permissions
-```
-So what is needed - is to wait until the disk lock files will not be cleaned.
-
-### Connection again with cleaned db
-
-If the same node was connected, then stopped and get cleaned database, it can't connect again:
-
-```
-2021/03/27 16:39:02 Fish running...
-2021/03/27 16:39:02 Fish starting dqlite...
-<freeze here>
-```
-
-### Weird "database locked" error
-
-I saw once on the leader that the database stays locked for some reason:
-
-```
-...
-2021/03/27 19:38:24 Fish: NEW Application with no vote: 1
-
-2021/03/27 19:38:24 /go/src/github.com/adobe/aquarium-fish/lib/fish/vote.go:67 record not found
-[0.373ms] [rows:0] SELECT * FROM `votes` WHERE application_id = 1 AND node_id = 1 ORDER BY round DESC,`votes`.`id` LIMIT 1
-2021/03/27 19:38:24 Fish: Starting election round 0
-
-2021/03/27 19:38:24 /go/src/github.com/adobe/aquarium-fish/lib/fish/vote.go:31 database is locked
-[0.186ms] [rows:0] INSERT INTO `nodes` (`created_at`,`updated_at`,`name`,`definition`,`id`) ...
-
-2021/03/27 19:38:24 /go/src/github.com/adobe/aquarium-fish/lib/fish/vote.go:31 database is locked
-[0.469ms] [rows:0]
-2021/03/27 19:38:24 Fish: Unable to create vote: &{0 0001-01-01 00:00:00 +0000 UTC 1 <nil> 1 0xc0003cc120 0 true 1012441418} database is locked
-2021/03/27 19:38:54 Fish Node: ping
-```
-
-### VMWare not starting the MacOS VM sometimes
-
-VMware Fusion just hangs with 0% boot load bar
-
-### What's block production
-
-There is still a number of features need to be implemented for proper usage on prod:
-
-* TLS protection (for api & db)
-* DNS/NAT for the local VMs - to implement simple access restriction. For now only host connection
-available. Could be solved by the host-level firewall and network prefs for now.
-* iSCSI - in order to provide limitless access to HDD resource.
-* Users restrictions - for now only admin is available, but need labels & resources restriction.
-* Resources control & clean - need to make sure that HDD will not be overloaded.
-* User packer with a simple password on the image - need to change dynamically on run
-
-### Optimizations
-
-* Proactively check the instance got IP (macos for some reason doesn't connect immediaely to host)
-* Allow to limit node to specific labels
+Could be found here: https://github.com/adobe/aquarium-fish/issues/
 
 ## Usage
 
@@ -77,24 +14,31 @@ available. Could be solved by the host-level firewall and network prefs for now.
 
 In order to test the Fish locally with just one node or multiple local nodes:
 ```
-$ ./aquarium-fish --api 0.0.0.0:8001 --db 127.0.0.1:9001
+$ ./aquarium-fish
 ```
 
-* `--api` - is where the Fish API will listen, usually it's `0.0.0.0:8001` (it also is used for meta
+There is a number of options you can pass to the application, check `--help` to get them, but the
+most important ones is:
+* `--api` - is where the Fish API will listen, default is `0.0.0.0:8001` (it also is used for meta
 so your VMs will be able to ask for the metadata)
 * `--db` - is the listen interface for database sync. Exactly this address will be used by the other
 nodes.
+* `--cfg` - use the yaml config to specify the options
 
 If you want to use the secondary node on the same host - provide a simple config with overridden
 node name, because the first will use hostname as node name:
 * test.yml
    ```yaml
    ---
-   node_name: test-node-1
+   node_name: test-2
+   db_address: 127.0.0.1:9002
+   api_address: 0.0.0.0:8002
+   db_join:
+     - 127.0.0.1:9001
    ```
 
 ```
-$ ./aquarium-fish --api 0.0.0.0:8002 --db 127.0.0.1:9002 --cfg test.yml --join 127.0.0.1:9001
+$ ./aquarium-fish --cfg test.yml
 ```
 
 ### To run in the real cluster
@@ -102,6 +46,22 @@ $ ./aquarium-fish --api 0.0.0.0:8002 --db 127.0.0.1:9002 --cfg test.yml --join 1
 Quite the same as running locally, but `--db` should be the actual ip/name endpoint of the host,
 since it will be used to connect by the other nodes (so 0.0.0.0 will not work here). For example if
 you can connect from outside to the host via `10.0.4.35` - you need to use `10.0.4.35:9001` here.
+
+#### Security
+
+By default Fish generates a simple CA and key/cert pair for Server & Client auth - it just shows the
+example of cluster communication transport protection via TLS. If CA certificate is not exists - it
+will be generated, if it exists - generation will be skipped. If node certificate and key are
+exists, they will be used, but if not - Fish will try to generate them out of CA cert and key. So CA
+key is not needed if you already generated the node certificate yourself.
+
+TLS encryption is a must, so make sure you know how to generate CA certificate and control CA to
+issue the node certificates. Today it's the most secure way to ensure noone will join your cluster
+without your permission and do not intercept the API & DB communication. Separated CA is used to
+check that the server (or client) is the one is approved.
+
+Maybe in the future Fish will allow to manage the cluster CA and issue certificate for a new node,
+but for now just check openssl and https://github.com/jcmoraisjr/simple-ca for reference.
 
 ### Cluster usage
 

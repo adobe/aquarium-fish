@@ -29,30 +29,22 @@ type Fish struct {
 	applications       []int64
 }
 
-func New(db *gorm.DB, cfg_path string, drvs []string) (*Fish, error) {
+func New(db *gorm.DB, cfg *Config) (*Fish, error) {
 	// Init rand generator
 	rand.Seed(time.Now().UnixNano())
-
-	cfg := &Config{}
-	if err := cfg.ReadConfigFile(cfg_path); err != nil {
-		log.Println("Fish: Unable to apply config file:", cfg_path, err)
-		return nil, err
-	}
 
 	f := &Fish{db: db, cfg: cfg}
 	if err := f.Init(); err != nil {
 		return nil, err
 	}
-	if err := f.DriversSet(drvs); err != nil {
+
+	if err := f.DriversSet(); err != nil {
 		return nil, err
 	}
-	// TODO: provide actual configuration
 	if errs := f.DriversPrepare(cfg.Drivers); errs != nil {
 		log.Println("Fish: Unable to prepare some resource drivers", errs)
-		if len(drvs) > 0 {
-			return nil, errs[0]
-		}
 	}
+
 	return f, nil
 }
 
