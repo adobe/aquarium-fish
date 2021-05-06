@@ -67,7 +67,7 @@ index 40944f9..216fb93 100644
  	return 0;
  }
 diff --git a/src/server.c b/src/server.c
-index 990ba75..c1f03d0 100644
+index 990ba75..4c6cac8 100644
 --- a/src/server.c
 +++ b/src/server.c
 @@ -69,6 +69,10 @@ int dqlite__init(struct dqlite_node *d,
@@ -117,7 +117,20 @@ index 990ba75..c1f03d0 100644
  	fsm__close(&d->raft_fsm);
  	uv_loop_close(&d->loop);
  	raftProxyClose(&d->raft_transport);
-@@ -208,10 +222,16 @@ int dqlite_node_set_bind_address(dqlite_node *t, const char *address)
+@@ -203,15 +217,28 @@ int dqlite_node_set_bind_address(dqlite_node *t, const char *address)
+ 			/* Auto bind */
+ 			len = 0;
+ 		} else {
+-			strcpy(addr_un.sun_path + 1, address + 1);
++#if defined(__linux__)
++			// Linux abstract socket requires \0 in sun_path[0]
++			strncat(addr_un.sun_path + 1, address + 1, sizeof(addr_un.sun_path) - 1);
++#else
++			// MacOS do not support abstract sockets
++			strncat(addr_un.sun_path, address + 1, sizeof(addr_un.sun_path));
++			(void)unlink(addr_un.sun_path);
++#endif
+ 		}
  		len += sizeof(sa_family_t);
  		addr = (struct sockaddr *)&addr_un;
  	}
@@ -135,7 +148,7 @@ index 990ba75..c1f03d0 100644
  	if (domain == AF_INET) {
  		int reuse = 1;
  		rv = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR,
-@@ -323,6 +343,8 @@ static int maybeBootstrap(dqlite_node *d,
+@@ -323,6 +350,8 @@ static int maybeBootstrap(dqlite_node *d,
  		if (rv == RAFT_CANTBOOTSTRAP) {
  			rv = 0;
  		} else {
@@ -144,7 +157,7 @@ index 990ba75..c1f03d0 100644
  			rv = DQLITE_ERROR;
  		}
  		goto out;
-@@ -380,8 +402,12 @@ static void startup_cb(uv_timer_t *startup)
+@@ -380,8 +409,12 @@ static void startup_cb(uv_timer_t *startup)
  	struct dqlite_node *d = startup->data;
  	int rv;
  	d->running = true;
@@ -157,22 +170,12 @@ index 990ba75..c1f03d0 100644
  }
  
  static void listenCb(uv_stream_t *listener, int status)
-@@ -425,11 +451,20 @@ static void listenCb(uv_stream_t *listener, int status)
+@@ -425,11 +458,10 @@ static void listenCb(uv_stream_t *listener, int status)
  
  	/* We accept unix socket connections only from the same process. */
  	if (listener->type == UV_NAMED_PIPE) {
 +		int fd = stream->io_watcher.fd;
-+#if defined(__APPLE__) || defined(__FreeBSD__)
-+		pid_t pid = -1;
-+		socklen_t len = sizeof(pid);
-+		rv = getsockopt(fd, SOL_SOCKET, LOCAL_PEERPID, &pid, &len);
-+		if (rv != 0) {
-+			goto err;
-+		}
-+		if (pid != getpid()) {
-+			goto err;
-+		}
-+#else
++#if defined(SO_PEERCRED)
  		struct ucred cred;
 -		socklen_t len;
 -		int fd;
@@ -182,15 +185,25 @@ index 990ba75..c1f03d0 100644
  		rv = getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &cred, &len);
  		if (rv != 0) {
  			goto err;
-@@ -437,6 +472,7 @@ static void listenCb(uv_stream_t *listener, int status)
+@@ -437,6 +469,17 @@ static void listenCb(uv_stream_t *listener, int status)
  		if (cred.pid != getpid()) {
  			goto err;
  		}
++#elif defined(LOCAL_PEERPID)
++		pid_t pid = -1;
++		socklen_t len = sizeof(pid);
++		rv = getsockopt(fd, SOL_LOCAL, LOCAL_PEERPID, &pid, &len);
++		if (rv != 0) {
++			goto err;
++		}
++		if (pid != getpid()) {
++			goto err;
++		}
 +#endif
  	}
  
  	conn = sqlite3_malloc(sizeof *conn);
-@@ -492,7 +528,11 @@ static int taskRun(struct dqlite_node *d)
+@@ -492,7 +535,11 @@ static int taskRun(struct dqlite_node *d)
  		snprintf(d->errmsg, RAFT_ERRMSG_BUF_SIZE, "raft_start(): %s",
  			 raft_errmsg(&d->raft));
  		/* Unblock any client of taskReady */
@@ -202,7 +215,7 @@ index 990ba75..c1f03d0 100644
  		return rv;
  	}
  
-@@ -500,8 +540,12 @@ static int taskRun(struct dqlite_node *d)
+@@ -500,8 +547,12 @@ static int taskRun(struct dqlite_node *d)
  	assert(rv == 0);
  
  	/* Unblock any client of taskReady */
@@ -215,7 +228,7 @@ index 990ba75..c1f03d0 100644
  
  	return 0;
  }
-@@ -539,7 +583,11 @@ void dqlite_node_destroy(dqlite_node *d)
+@@ -539,7 +590,11 @@ void dqlite_node_destroy(dqlite_node *d)
  static bool taskReady(struct dqlite_node *d)
  {
  	/* Wait for the ready semaphore */

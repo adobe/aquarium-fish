@@ -11,12 +11,6 @@ deps_dir=${root_dir}/deps
 
 cd "${root_dir}"
 
-echo "--- PATCH GO-DQLITE ---"
-# Apply a small patch to the go-dqlite go package
-go get -d github.com/canonical/go-dqlite@v1.8.0
-chmod -R u+w ~/go/pkg/mod/github.com/canonical/go-dqlite@v1.8.0
-patch -N -p1 -d ~/go/pkg/mod/github.com/canonical/go-dqlite@v1.8.0 < deps/go-dqlite.patch || true
-
 # MacOS doesn't support static executables, so using .a to compile-in the dependencies at least
 export CGO_LDFLAGS="${CGO_LDFLAGS} ${DQLITE_LIB} ${SQLITE_LIB} ${RAFT_LIB} ${UV_LIB}"
 

@@ -9,22 +9,23 @@ import (
 	_ "git.corp.adobe.com/CI/aquarium-fish/lib/drivers/vmx"
 )
 
-var enabled_list []drivers.ResourceDriver
+var drivers_enabled_list []drivers.ResourceDriver
 
 func (f *Fish) DriversGet() []drivers.ResourceDriver {
-	return enabled_list
+	return drivers_enabled_list
 }
 
-func (f *Fish) DriversSet(drvs []string) error {
+func (f *Fish) DriversSet() error {
 	var list []drivers.ResourceDriver
 
 	for _, drv := range drivers.DriversList {
 		en := false
-		if len(drvs) == 0 {
+		if len(f.cfg.Drivers) == 0 {
+			// If no drivers is specified in the config - load all
 			en = true
 		} else {
-			for _, res := range drvs {
-				if res == drv.Name() {
+			for _, res := range f.cfg.Drivers {
+				if res.Name == drv.Name() {
 					en = true
 					break
 				}
@@ -36,17 +37,17 @@ func (f *Fish) DriversSet(drvs []string) error {
 		}
 	}
 
-	if len(drvs) > len(list) {
-		return fmt.Errorf("Unable to enable all the required drivers %s", drvs)
+	if len(f.cfg.Drivers) > len(list) {
+		return fmt.Errorf("Unable to enable all the required drivers %s", f.cfg.Drivers)
 	}
 
-	enabled_list = list
+	drivers_enabled_list = list
 
 	return nil
 }
 
 func (f *Fish) DriversPrepare(configs []ConfigDriver) (errs []error) {
-	for _, drv := range enabled_list {
+	for _, drv := range drivers_enabled_list {
 		// Looking for the driver config
 		var json_cfg []byte
 		for _, cfg := range configs {

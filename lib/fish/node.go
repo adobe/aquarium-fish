@@ -9,7 +9,7 @@ import (
 const NODE_PING_DELAY = 30
 
 var NodePingDuplicationErr = errors.New("Fish Node: Unable to join the Aquarium cluster due to " +
-	"the node with the same name are pinged the cluster less then 2xNODE_PING_DELAY time ago")
+	"the node with the same name pinged the cluster less then 2xNODE_PING_DELAY time ago")
 
 type Node struct {
 	ID        int64 `gorm:"primaryKey"`

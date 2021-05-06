@@ -1,21 +1,32 @@
+diff --git a/app/app.go b/app/app.go
+index 93f3e47..4d8f66b 100644
+--- a/app/app.go
++++ b/app/app.go
+@@ -7,6 +7,7 @@ import (
+ 	"net"
+ 	"os"
+ 	"path/filepath"
++	"runtime"
+ 	"sync"
+ 	"time"
+ 
+@@ -199,6 +200,11 @@ func New(dir string, options ...Option) (app *App, err error) {
+ 
+ 	ctx, stop := context.WithCancel(context.Background())
+ 
++	if runtime.GOOS != "linux" && nodeBindAddress[0] == '@' {
++		// Do not use abstract socket on other platforms and left trim "@"
++		nodeBindAddress = nodeBindAddress[1:]
++	}
++
+ 	app = &App{
+ 		id:              info.ID,
+ 		address:         info.Address,
 diff --git a/app/proxy.go b/app/proxy.go
-index 21d8ff4..9bfb7e8 100644
+index 3887055..a5004a2 100644
 --- a/app/proxy.go
 +++ b/app/proxy.go
-@@ -11,6 +11,12 @@ import (
- 	"time"
- )
- 
-+// from netinet/tcp.h (OS X 10.9.4)
-+const (
-+	_TCP_KEEPINTVL = 0x101 /* interval between keepalives */
-+	_TCP_KEEPCNT   = 0x102 /* number of keepalives before close */
-+)
-+
- // Copies data between a remote TCP network connection (possibly with TLS) and
- // a local unix socket.
- //
-@@ -108,12 +114,12 @@ func setKeepalive(conn *net.TCPConn) error {
+@@ -107,12 +107,12 @@ func setKeepalive(conn *net.TCPConn) error {
  		func(ptr uintptr) {
  			fd := int(ptr)
  			// Number of probes.
@@ -30,3 +41,36 @@ index 21d8ff4..9bfb7e8 100644
  			if err != nil {
  				return
  			}
+diff --git a/app/proxy_darwin.go b/app/proxy_darwin.go
+new file mode 100644
+index 0000000..db57ef4
+--- /dev/null
++++ b/app/proxy_darwin.go
+@@ -0,0 +1,9 @@
++package app
++
++// +build darwin
++
++// from netinet/tcp.h (OS X 10.9.4)
++const (
++	_TCP_KEEPINTVL = 0x101 /* interval between keepalives */
++	_TCP_KEEPCNT   = 0x102 /* number of keepalives before close */
++)
+diff --git a/app/proxy_linux.go b/app/proxy_linux.go
+new file mode 100644
+index 0000000..b551d1a
+--- /dev/null
++++ b/app/proxy_linux.go
+@@ -0,0 +1,12 @@
++package app
++
++// +build linux
++
++import (
++	"syscall"
++)
++
++const (
++	_TCP_KEEPINTVL = syscall.TCP_KEEPINTVL /* interval between keepalives */
++	_TCP_KEEPCNT   = syscall.TCP_KEEPCNT   /* number of keepalives before close */
++)

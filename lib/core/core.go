@@ -10,7 +10,7 @@ import (
 	"git.corp.adobe.com/CI/aquarium-fish/lib/fish"
 )
 
-func Init(fish *fish.Fish, api_address string) (*http.Server, error) {
+func Init(fish *fish.Fish, api_address, cert_path, key_path string) (*http.Server, error) {
 	router := gin.Default()
 	router.RedirectTrailingSlash = false
 	router.RedirectFixedPath = false
@@ -24,7 +24,8 @@ func Init(fish *fish.Fish, api_address string) (*http.Server, error) {
 	}
 
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		err := srv.ListenAndServeTLS(cert_path, key_path)
+		if err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %s\n", err)
 		}
 	}()
