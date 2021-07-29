@@ -1,22 +1,35 @@
-package api
+package meta
 
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"strings"
 
 	"github.com/alessio/shellescape"
-	"github.com/gin-gonic/gin"
+	"github.com/labstack/echo/v4"
 
 	"github.com/adobe/aquarium-fish/lib/fish"
+	"github.com/adobe/aquarium-fish/lib/openapi/types"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
-type MetaV1Processor struct {
+// H is a shortcut for map[string]interface{}
+type H map[string]interface{}
+
+type Processor struct {
 	fish *fish.Fish
+}
+
+func NewV1Router(e *echo.Echo, fish *fish.Fish) {
+	proc := &Processor{fish: fish}
+	router := e.Group("")
+	router.Use(
+		// Only the local interface which we own can request
+		proc.AddressAuth,
+	)
+	RegisterHandlers(router, proc)
 }
 
 func checkIPv4Address(network *net.IPNet, ip net.IP) bool {
@@ -64,22 +77,21 @@ func isControlledNetwork(ip string) bool {
 	return false
 }
 
-func (e *MetaV1Processor) AddressAuth() gin.HandlerFunc {
-	return func(c *gin.Context) {
+func (e *Processor) AddressAuth(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
 		// Only the controlled network IP's can get access to their meta
-		if !isControlledNetwork(c.ClientIP()) {
-			c.AbortWithStatus(http.StatusUnauthorized)
-			return
+		if !isControlledNetwork(c.RealIP()) {
+			return echo.NewHTTPError(http.StatusUnauthorized, "Client IP is from not controlled network")
 		}
 
 		// Only the existing local resource
-		res, err := e.fish.ResourceGetByIP(c.ClientIP())
+		res, err := e.fish.ResourceGetByIP(c.RealIP())
 		if err != nil {
-			c.AbortWithStatus(http.StatusUnauthorized)
-			return
+			return echo.NewHTTPError(http.StatusUnauthorized, "Client IP was not found in the Resources")
 		}
 
 		c.Set("resource", res)
+		return next(c)
 	}
 }
 
@@ -99,18 +111,16 @@ func cleanShellKey(in string) []byte {
 	return s[:j]
 }
 
-func (e *MetaV1Processor) Return(c *gin.Context, code int, obj gin.H) {
-	format := c.Request.URL.Query().Get("format")
+func (e *Processor) Return(c echo.Context, code int, obj map[string]interface{}) error {
+	format := c.QueryParam("format")
 	if len(format) == 0 {
 		format = "json"
 	}
 	switch format {
 	case "json": // Default json
-		c.JSON(code, obj)
-	case "yaml": // Regular yaml
-		c.YAML(code, obj)
+		return c.JSON(code, obj)
 	case "env": // Plain format suitable to use in shell
-		prefix := c.Request.URL.Query().Get("prefix")
+		prefix := c.QueryParam("prefix")
 		m := util.DotSerialize(prefix, obj)
 		c.String(code, "")
 		for key, val := range m {
@@ -119,34 +129,35 @@ func (e *MetaV1Processor) Return(c *gin.Context, code int, obj gin.H) {
 				continue
 			}
 			value := []byte("=" + shellescape.Quote(val) + "\n")
-			c.Writer.Write(append(line, value...))
+			c.Response().Write(append(line, value...))
 		}
+		return nil
 	default:
-		c.JSON(http.StatusBadRequest, gin.H{"message": "Incorrect `format` query param provided: " + format})
+		return c.JSON(http.StatusBadRequest, H{"message": "Incorrect `format` query param provided: " + format})
 	}
 }
 
-func (e *MetaV1Processor) DataGetList(c *gin.Context) {
+func (e *Processor) DataGetList(c echo.Context, params types.DataGetListParams) error {
 	var metadata map[string]interface{}
 
-	res_int, _ := c.Get("resource")
-	res, ok := res_int.(*fish.Resource)
+	res_int := c.Get("resource")
+	res, ok := res_int.(*types.Resource)
 	if !ok {
-		log.Println("Fish API Meta: Unable to get resource from context")
-		e.Return(c, http.StatusNotFound, gin.H{"message": "No data found", "data": metadata})
-		return
+		e.Return(c, http.StatusNotFound, H{"message": "No data found", "data": metadata})
+		return fmt.Errorf("Unable to get resource from context")
 	}
 
 	err := json.Unmarshal([]byte(res.Metadata), &metadata)
 	if err != nil {
-		log.Println("Fish API Meta: Unable to parse metadata of resource", res.ID, res.Metadata, err)
-		e.Return(c, http.StatusNotFound, gin.H{"message": "Unable to parse metadata json"})
-		return
+		e.Return(c, http.StatusNotFound, H{"message": "Unable to parse metadata json"})
+		return fmt.Errorf("Unable to parse metadata of resource: %d %s: %w", res.ID, res.Metadata, err)
 	}
-	e.Return(c, http.StatusOK, gin.H{"message": "MetaData list", "data": metadata})
+
+	return e.Return(c, http.StatusOK, H{"message": "MetaData list", "data": metadata})
 }
 
-func (e *MetaV1Processor) DataGet(c *gin.Context) {
-	//id := c.Param("key")
-	e.Return(c, http.StatusNotFound, gin.H{"message": "No data found"})
+func (e *Processor) DataGet(c echo.Context, keyPath string, params types.DataGetParams) error {
+	// TODO: implement it
+	e.Return(c, http.StatusNotFound, H{"message": "No data found"})
+	return fmt.Errorf("TODO: Not implemented")
 }

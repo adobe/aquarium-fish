@@ -175,9 +175,11 @@ func createCert(crt_path string, pubkey crypto.PublicKey, ca_key crypto.PrivateK
 		return err
 	}
 
-	// Attach CA certificate to generate complete chain
-	if err := pem.Encode(crt_out, &pem.Block{Type: "CA CERTIFICATE", Bytes: ca_crt.Raw}); err != nil {
-		return err
+	// Attach CA certificate to generate complete chain if it's different from the cert data
+	if cert != ca_crt {
+		if err := pem.Encode(crt_out, &pem.Block{Type: "CA CERTIFICATE", Bytes: ca_crt.Raw}); err != nil {
+			return err
+		}
 	}
 
 	return nil

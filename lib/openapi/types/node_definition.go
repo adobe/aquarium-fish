@@ -1,4 +1,4 @@
-package fish
+package types
 
 import (
 	"database/sql/driver"
@@ -6,20 +6,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/shirou/gopsutil/v3/cpu"
-	"github.com/shirou/gopsutil/v3/disk"
-	"github.com/shirou/gopsutil/v3/host"
-	"github.com/shirou/gopsutil/v3/mem"
-	"github.com/shirou/gopsutil/v3/net"
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/disk"
+	"github.com/shirou/gopsutil/host"
+	"github.com/shirou/gopsutil/mem"
+	"github.com/shirou/gopsutil/net"
 )
-
-type NodeDefinition struct {
-	Host   *host.InfoStat
-	Memory *mem.VirtualMemoryStat
-	Cpu    []cpu.InfoStat
-	Disks  map[string]*disk.UsageStat
-	Nets   []net.InterfaceStat
-}
 
 func (nd NodeDefinition) GormDataType() string {
 	return "blob"

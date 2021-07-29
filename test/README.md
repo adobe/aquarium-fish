@@ -18,5 +18,5 @@ fish_vmx_images/macos-1015-ci-xcode122-VERSION:
 total 0
 lrwxr-xr-x 1 parshev staff  59 Mar 17 22:31 macos-1015-ci-xcode122 -> /Users/user/git/aquarium-bait/out/macos-1015-ci-xcode122
 ```
-3. Now run the aquarium-fish and any `test-*` script which will guide through the resource
-allocation and deallocation process
+3. Now run the aquarium-fish and any `test-*` script with admin token as first argument which will
+guide through the resource allocation and deallocation process

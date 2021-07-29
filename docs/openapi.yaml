@@ -1,0 +1,927 @@
+---
+# Aquarium Fish OpenAPI specification
+# Use editor: https://editor.swagger.io/
+openapi: 3.0.0
+
+servers:
+  - url: https://0.0.0.0:8001/
+    description: Main API available for the Users and Meta API for the Resources
+
+info:
+  description: API of the Fish node/cluster
+  version: 1.0.0
+  title: Aqurium Fish
+  contact:
+    name: Sergei Parshev
+    url: 'https://github.com/adobe/aquarium-fish'
+  license:
+    name: Apache 2.0
+
+externalDocs:
+  url: 'https://github.com/adobe/aquarium-fish/wiki/Aquarium'
+
+paths:
+  /api/v1/user/:
+    get:
+      summary: Get list of Users
+      description: Returns a list of existing Users
+      operationId: UserListGet
+      tags:
+        - User
+      parameters:
+        - name: filter
+          in: query
+          description: SQL `WHERE` filter for the object data
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+      security:
+        - basic_auth: []
+    post:
+      summary: Create new User
+      description: Creates & return the created User
+      operationId: UserCreatePost
+      tags:
+        - User
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Bad request
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+      security:
+        - basic_auth: []
+
+  /api/v1/user/me/:
+    get:
+      summary: Get the current User
+      description: Returns the current logged in User information
+      operationId: UserMeGet
+      tags:
+        - User
+      parameters: []
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: User not found
+      security:
+        - basic_auth: []
+
+  /api/v1/user/{id}:
+    get:
+      summary: Get User by ID
+      description: Returns a single User by it's name (unique ID)
+      operationId: UserGet
+      tags:
+        - User
+      parameters:
+        - name: id
+          in: path
+          description: ID of the object
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: User not found
+      security:
+        - basic_auth: []
+    delete:
+      summary: Delete the User by ID
+      description: Will remove the User with specified ID
+      operationId: UserDelete
+      tags:
+        - User
+      parameters:
+        - name: id
+          in: path
+          description: ID of the object
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+        '400':
+          description: Only admin can do that
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: User not found
+      security:
+        - basic_auth: []
+
+  /api/v1/label/:
+    get:
+      summary: Get list of Labels
+      description: Returns a list of existing Labels
+      operationId: LabelListGet
+      tags:
+        - Label
+      parameters:
+        - name: filter
+          in: query
+          description: SQL `WHERE` filter for the object data
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Label'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+      security:
+        - basic_auth: []
+    post:
+      summary: Create new Label
+      description: Creates & return the created Label
+      operationId: LabelCreatePost
+      tags:
+        - Label
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Label'
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Label'
+        '400':
+          description: Bad request
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+      security:
+        - basic_auth: []
+
+  /api/v1/label/{id}:
+    get:
+      summary: Get Label by ID
+      description: Returns a single Label by it's ID
+      operationId: LabelGet
+      tags:
+        - Label
+      parameters:
+        - name: id
+          in: path
+          description: ID of the object
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Label'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Label not found
+      security:
+        - basic_auth: []
+    delete:
+      summary: Delete Label by ID
+      description: Deletes the Label by it's ID
+      operationId: LabelDelete
+      tags:
+        - Label
+      parameters:
+        - name: id
+          in: path
+          description: ID of the object
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Successful operation
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Label not found
+      security:
+        - basic_auth: []
+
+  /api/v1/resource/:
+    get:
+      summary: Get list of Resources
+      description: Returns a list of existing Resources
+      operationId: ResourceListGet
+      tags:
+        - Resource
+      parameters:
+        - name: filter
+          in: query
+          description: SQL `WHERE` filter for the object data
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Resource'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+      security:
+        - basic_auth: []
+
+  /api/v1/resource/{id}:
+    get:
+      summary: Get Resource by ID
+      description: Returns a single Resource by it's ID
+      operationId: ResourceGet
+      tags:
+        - Resource
+      parameters:
+        - name: id
+          in: path
+          description: ID of the object
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Resource'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Resource not found
+      security:
+        - basic_auth: []
+
+  /api/v1/application/:
+    get:
+      summary: Get list of Applications
+      description: Returns a list of existing Applications
+      operationId: ApplicationListGet
+      tags:
+        - Application
+      parameters:
+        - name: filter
+          in: query
+          description: SQL `WHERE` filter for the object data
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Application'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+      security:
+        - basic_auth: []
+    post:
+      summary: Create new Application
+      description: Creates & return the created Application
+      operationId: ApplicationCreatePost
+      tags:
+        - Application
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Application'
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
+        '400':
+          description: Bad request
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+      security:
+        - basic_auth: []
+
+  /api/v1/application/{id}:
+    get:
+      summary: Get Application by ID
+      description: Returns a single Application by it's ID
+      operationId: ApplicationGet
+      tags:
+        - Application
+      parameters:
+        - name: id
+          in: path
+          description: ID of the object
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Application not found
+      security:
+        - basic_auth: []
+
+  /api/v1/application/{id}/state:
+    get:
+      summary: Get ApplicationState of the Application
+      description: Returns the current ApplicationState by Application ID
+      operationId: ApplicationStateGet
+      tags:
+        - Application
+      parameters:
+        - name: id
+          in: path
+          description: ID of the Application
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationState'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Application not found
+      security:
+        - basic_auth: []
+
+  /api/v1/application/{id}/resource:
+    get:
+      summary: Get Resource by Application ID
+      description: Returns a Resource by it's Application ID
+      operationId: ApplicationResourceGet
+      tags:
+        - Application
+      parameters:
+        - name: id
+          in: path
+          description: ID of the Application
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Resource'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Resource not found
+      security:
+        - basic_auth: []
+
+  /api/v1/application/{id}/deallocate:
+    get:
+      summary: Triggers Application deallocate
+      description: Moves the Application to the DEALLOCATE state
+      operationId: ApplicationDeallocateGet
+      tags:
+        - Application
+      parameters:
+        - name: id
+          in: path
+          description: ID of the Application
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Successful operation
+        '400':
+          description: Bad parameter or conditions
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Application not found
+      security:
+        - basic_auth: []
+
+  /meta/v1/data/:
+    get:
+      summary: Get the Resource metadata
+      description:
+        Returns the hash of the Resource metadata (combined Label and Application metadata)
+      operationId: DataGetList
+      tags:
+        - MetaData
+      parameters:
+        - name: format
+          in: query
+          description: Set the return format
+          required: false
+          schema:
+            type: string
+            enum:
+              - json  # Regular JSON
+              - env   # Plain format suitable to use as shell variables
+            default: json
+        - name: prefix
+          in: query
+          description: Additional prefix for the key path if `format=env`
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+            application/yaml:
+              schema:
+                type: object
+            text/plain; charset=utf-8:
+              schema:
+                type: string
+        '401':
+          description: Not in controlled network or Resource with IpAddr or HwAddr not found
+        '404':
+          description: Key path not found
+
+  /meta/v1/data/{key_path}:
+    get:
+      summary: TODO Get value by key path
+      description: Returns a required Resource metadata key path value
+      operationId: DataGet
+      tags:
+        - MetaData
+      parameters:
+        - name: key_path
+          in: path
+          description: Key path of the required value
+          required: true
+          schema:
+            type: string
+        - name: format
+          in: query
+          description: Set the return format
+          required: false
+          schema:
+            type: string
+            enum:
+              - json  # Regular JSON
+              - env   # Plain format suitable to use as shell variables
+            default: json
+        - name: prefix
+          in: query
+          description: Additional prefix for the key path if `format=env`
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+            application/yaml:
+              schema:
+                type: object
+            text/plain; charset=utf-8:
+              schema:
+                type: string
+        '401':
+          description: Not in controlled network or Resource with IpAddr or HwAddr not found
+        '404':
+          description: Key path not found
+
+
+components:
+  schemas:
+    Application:
+      type: object
+      x-go-json-ignore: true
+      description: >
+        Resource request created by the user. Each node votes for the availability to allocate the
+        resource and the cluster choose which one node will actually do the work.
+      required:
+        - ID
+        - created_at
+        - user_ID
+        - label_ID
+        - metadata
+      properties:
+        ID:
+          type: integer
+          format: int64
+          x-oapi-codegen-extra-tags:
+            gorm: primaryKey
+        created_at:
+          x-go-type: time.Time
+        user_ID:
+          type: integer
+          format: int64
+        user:
+          $ref: '#/components/schemas/User'
+        label_ID:
+          type: integer
+          format: int64
+        label:
+          $ref: '#/components/schemas/Label'
+        metadata:
+          x-go-type: util.UnparsedJson
+          description: Additional metadata in JSON format (can't override Label metadata)
+          example:
+            JENKINS_URL: 'http://172.16.1.1:8085/'
+            JENKINS_AGENT_SECRET: 03839eabcf945b1e780be8f9488d264c4c57bf388546da9a84588345555f29b0
+            JENKINS_AGENT_NAME: test-node
+
+    ApplicationState:
+      type: object
+      description: >
+        The state of the Application - it goes through graph of states, so this object stores the
+        info when the Application comes to this state and the last one describes the current state
+        of the Application.
+      required:
+        - ID
+        - created_at
+        - application_ID
+        - status
+        - description
+      properties:
+        ID:
+          type: integer
+          format: int64
+          x-oapi-codegen-extra-tags:
+            gorm: primaryKey
+        created_at:
+          x-go-type: time.Time
+        application_ID:
+          type: integer
+          format: int64
+        application:
+          $ref: '#/components/schemas/Application'
+        status:
+          type: string
+          enum:
+            - NEW          # The application just created
+            - ELECTED      # Node is elected during the voting process
+            - ALLOCATED    # The resource is allocated and starting up
+            - DEALLOCATE   # User requested the application deallocate
+            - DEALLOCATED  # The resource is deallocated
+            - ERROR        # The error happened
+        description:
+          type: string
+          description: Additional information for the state
+
+    User:
+      type: object
+      x-go-json-ignore: true
+      description: >
+        Contains limits and hash to login, name is unique, `admin` created during the first cluster
+        start and prints it to stderr.
+      required:
+        - ID
+        - created_at
+        - updated_at
+        - name
+        - hash
+      properties:
+        ID:
+          type: integer
+          format: int64
+          x-oapi-codegen-extra-tags:
+            gorm: primaryKey
+        created_at:
+          x-go-type: time.Time
+        updated_at:
+          x-go-type: time.Time
+        name:
+          type: string
+          x-oapi-codegen-extra-tags:
+            gorm: unique
+        hash:
+          x-go-type: crypt.Hash
+          x-oapi-codegen-extra-tags:
+            gorm: embedded
+
+    Label:
+      type: object
+      x-go-json-ignore: true
+      description: >
+        This one filled by the cluster admin, depends on the needs. Labels could be implemented in
+        different drivers, but it's not recommended to keep the label stable. Version could be used
+        during request, but by default it's the latest.
+
+        Label - is one of the most important part of the system, because it makes the resources
+        reproducible in time. It contains the driver name and configuration, so can be started
+        again and again as much times we need. Versions make possible to update the labels and
+        store the old ones in case we need to run the same environment 10y from now and rebuild the
+        old code revision for example.
+
+        Labels can't be updated. Once they are stored - they are here to keep the history of
+        environements and make possible to mark build with the specified label version in order to
+        be able to reproduce it later. Also labels can be implemented just by one driver. If you
+        want to use another one - you will need to create another label version and the resource
+        requests that uses latest will swith to it.
+      required:
+        - ID
+        - created_at
+        - name
+        - version
+        - driver
+        - definition
+        - metadata
+      properties:
+        ID:
+          type: integer
+          format: int64
+          x-oapi-codegen-extra-tags:
+            gorm: primaryKey
+        created_at:
+          x-go-type: time.Time
+        name:
+          type: string
+          x-oapi-codegen-extra-tags:
+            gorm: uniqueIndex:idx_label_uniq
+          description: Simple name to identify the Label
+          example: xcode12.2
+        version:
+          type: integer
+          x-oapi-codegen-extra-tags:
+            gorm: uniqueIndex:idx_label_uniq
+          description: >
+            In order to update the labels freely and save the previous Label state for the past
+            builds.
+        driver:
+          type: string
+          description: Name of the driver to run the Resource with this Label
+          example: vmx
+        definition:
+          x-go-type: util.UnparsedJson
+          description: Actual Labl definition depends on the used driver
+          example:
+            image: macos-1015-ci-xcode122
+            images:
+              macos-1015: 'https://artifact-storage/aquarium/image/macos-1015-VERSION/macos-1015-VERSION.tar.xz'
+              macos-1015-ci: 'https://artifact-storage/aquarium/image/macos-1015-ci-VERSION/macos-1015-ci-VERSION.tar.xz'
+              macos-1015-ci-xcode122: 'https://artifact-storage/aquarium/image/macos-1015-ci-xcode122-VERSION/macos-1015-ci-xcode122-VERSION.tar.xz'
+            requirements:
+              cpu: 14
+              ram: 12
+              disks:
+                xcode122:
+                  size: 100
+                  reuse: true
+        metadata:
+          x-go-type: util.UnparsedJson
+          description: Basic metadata to pass to the Resource
+          example:
+            JENKINS_AGENT_WORKSPACE: /Volumes/xcode122
+
+    Node:
+      type: object
+      x-go-json-ignore: true
+      description: >
+        Each node need to report it's description, status and ensure there is no duplications and
+        to perform the cluster worker election process properly.
+      required:
+        - ID
+        - created_at
+        - updated_at
+        - name
+        - definition
+      properties:
+        ID:
+          type: integer
+          format: int64
+          x-oapi-codegen-extra-tags:
+            gorm: primaryKey
+        created_at:
+          x-go-type: time.Time
+        updated_at:
+          x-go-type: time.Time
+          description: This field is used as ping, so the cluster knows the Node is alive.
+        name:
+          type: string
+          x-oapi-codegen-extra-tags:
+            gorm: unique
+        definition:
+          $ref: '#/components/schemas/NodeDefinition'
+
+    NodeDefinition:
+      type: object
+      description: Contains technical information about the node
+      required:
+        - cpu
+        - disks
+        - nets
+      properties:
+        host:
+          x-go-type: host.InfoStat
+          x-omitempty: false
+        memory:
+          x-go-type: mem.VirtualMemoryStat
+          x-omitempty: false
+        cpu:
+          type: array
+          items:
+            x-go-type: cpu.InfoStat
+        disks:
+          x-go-type: 'map[string]*disk.UsageStat'
+        nets:
+          type: array
+          items:
+            x-go-type: net.InterfaceStat
+
+    Resource:
+      type: object
+      description: >
+        Active resource definition to be able to properly restore the state during the cluster node
+        restart. Also contains additional info about the resource, for example user requested
+        metadata, which is available for the resource through the `Meta API`.
+      required:
+        - ID
+        - created_at
+        - updated_at
+        - application_ID
+        - node_ID
+        - ip_addr
+        - hw_addr
+        - metadata
+      properties:
+        ID:
+          type: integer
+          format: int64
+          x-oapi-codegen-extra-tags:
+            gorm: primaryKey
+        created_at:
+          x-go-type: time.Time
+        updated_at:
+          x-go-type: time.Time
+        application_ID:
+          type: integer
+          format: int64
+        application:
+          $ref: '#/components/schemas/Application'
+        node_ID:
+          type: integer
+          format: int64
+        node:
+          $ref: '#/components/schemas/Node'
+        ip_addr:
+          type: string
+          description: Is a weak current network IP address of the resource, usually gathered based on the `HwAddr`.
+        hw_addr:
+          type: string
+          description: MAC or any other type of network address which will allow to properly identify the node through network interaction.
+        metadata:
+          x-go-type: util.UnparsedJson
+          description: Combined Application and Label metadata (in this order) to make it available through `Meta API` to the resource.
+          example:
+            JENKINS_URL: 'http://172.16.1.1:8085/'
+            JENKINS_AGENT_SECRET: 03839eabcf945b1e780be8f9488d264c4c57bf388546da9a84588345555f29b0
+            JENKINS_AGENT_NAME: test-node
+            JENKINS_AGENT_WORKSPACE: /Volumes/xcode122
+
+    Vote:
+      type: object
+      x-go-json-ignore: true
+      description: >
+        When Application becomes available for the node it starts to vote to notify the cluster
+        about its availability. Votes are basically "yes" or "no" and could take a number of rounds
+        depends on the cluster voting and election rules.
+      required:
+        - ID
+        - created_at
+        - application_ID
+        - node_ID
+        - round
+        - available
+        - rand
+      properties:
+        ID:
+          type: integer
+          format: int64
+          x-oapi-codegen-extra-tags:
+            gorm: primaryKey
+        created_at:
+          x-go-type: time.Time
+        application_ID:
+          type: integer
+          format: int64
+          x-oapi-codegen-extra-tags:
+            gorm: uniqueIndex:idx_node_app_round_uniq
+        application:
+          $ref: '#/components/schemas/Application'
+        node_ID:
+          type: integer
+          format: int64
+          x-oapi-codegen-extra-tags:
+            gorm: uniqueIndex:idx_node_app_round_uniq
+        node:
+          $ref: '#/components/schemas/Node'
+        round:
+          x-go-type: uint16
+          x-oapi-codegen-extra-tags:
+            gorm: uniqueIndex:idx_node_app_round_uniq
+          description: >
+            Round of the election, because it can take a number of rounds to figure out the Only
+            One.
+        available:
+          type: boolean
+          description: >
+            General answer of the node - the cluster will wait until receive answer from each
+            active node.
+        rand:
+          x-go-type: uint32
+          description: The last resort to figure out for the winner.
+
+  securitySchemes:
+    basic_auth:
+      type: http
+      scheme: basic
+
+  responses:
+    UnauthorizedError:
+      description: Authentication information is missing or invalid
+      headers:
+        WWW_Authenticate:
+          schema:
+            type: string

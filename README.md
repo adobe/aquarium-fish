@@ -103,22 +103,9 @@ select the ones I actually want to use by `--drivers` option or via the API.
 ### Internal DB structure
 
 The cluster supports the internal SQL database, which provides a common storage for the cluster
-info.
-
-* **Users** - contains limits and hash to login, id (login) is unique, `admin` created during the
-first cluster start and prints it to stderr.
-* **Nodes** - each node need to report it's description, status and ensure there is no duplications.
-* **Labels** - this one filled by the cluster admin, depends on the needs. Labels could be
-implemented in different drivers, but it's not recommended to keep the label stable. Version could
-be used during request, but by default it's the latest.
-* **Applications** - is a resource request created by the user. Each node votes for the availability
-to allocate the resource and the cluster choose which one node will actually do the work.
-* **Votes** - when Application becomes available for the node it starts to vote to notify the
-cluster about its availability. Votes are basically "yes" or "no" and could take a number of rounds
-depends on the cluster voting and election rules.
-* **Resources** - list of the active resources to be able to properly restore the state during the
-cluster node restart. Also contains additional info about the resource, for example user requested
-metadata, which is available for the resource through the `Meta API`.
+info. The current schema could be found in OpenAPI format here:
+ * When the Fish app is running locally: https://0.0.0.0:8001/api/
+ * YAML specification: https://github.com/adobe/aquarium-fish/blob/master/docs/openapi.yaml
 
 ### How the cluster choose node for resource allocation
 
@@ -171,81 +158,6 @@ $ curl -u "admin:YOUR_TOKEN" -X GET 127.0.0.1:8001/api/v1/label/
 {"message": "Cluster resources list", "data": [{...}, ...]}
 ```
 
-### General API
-
-Route: `/api/v1/`
-
-Requires HTTP Basic (or JWT auth from UI in the future) auth of existing user to execute any request
-Basically uses GET (get data), POST (create/update data), DELETE (remove data) requests.
-
-Common params:
-* `filter=` - sql filter available for the general list API calls
-
-#### Users
-
-Route: `/api/v1/user/`
-
-Allow to get the info about the cluster users, add new, modify or remove them.
-
-#### Nodes
-
-Route: `/api/v1/node/`
-
-Allows to get info about the cluster nodes and allows to manipulate each node of the cluster
-personally.
-
-#### Applications
-
-Route: `/api/v1/application/`
-
-Resource application in order to allocate resources. Can be created and listed, but not updated or
-deleted.
-
-* `/api/v1/application/:id/status` - Current status of the application
-* `/api/v1/application/:id/resource` - Linked resource when some node took it in execution
-* `/api/v1/application/:id/deallocate` - Execute it to deallocate the application resource
-
-#### Resources
-
-Route: `/api/v1/resource/`
-
-Allow to get info about the allocated cluster resources.
-
-#### Labels
-
-Route: `/api/v1/label/`
-
-Allow to get info about the cluster labels, create the new and delete the existing ones.
-
-Label - is one of the most important part of the system, because it makes the resources reproducible
-in time. It contains the driver name and configuration, so can be started again and again as much
-times we need. Versions make possible to update the labels and store the old ones in case we need to
-run the same environment 10y from now and rebuild the old code revision for example.
-
-Labels can't be updated. Once they are stored - they are here to keep the history of environements
-and make possible to mark build with the specified label version in order to be able to reproduce it
-later. Also labels can be implemented just by one driver. If you want to use another one - you will
-need to create another label version and the resource requests that uses latest will swith to it.
-
-### Meta API
-
-Route: `/meta/v1/`
-
-In order to provide additional info for the resource environment there is `Meta API` which is
-available for the controlled networks. If the request is coming from such network - Meta API checks
-the resource table trying to locate the required resource by IP or HW address and gives the
-requestor required information based on this data.
-
-Common params:
-* `format=` - can be used to format the output:
-   * json - default format
-   * yaml - in case someone need yaml
-   * env - useful for shell scripts to get the quoted key=value env variables
-      * `prefix=` - allows to set a custom prefix for the env variables
-
-#### Data
-
-Route: `/meta/v1/data/`
-
-Requests the stored metadata for the current resource. For example metadata could contain Jenkins
-URL and JNLP Agent token to get the Agent and connect to the Agent node.
+The current API could be found in OpenAPI format here:
+ * When the Fish app is running locally: https://0.0.0.0:8001/api/
+ * YAML specification: https://github.com/adobe/aquarium-fish/blob/master/docs/openapi.yaml
