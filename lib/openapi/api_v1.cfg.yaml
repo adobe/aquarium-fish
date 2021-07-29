@@ -1,0 +1,11 @@
+---
+package: api
+types-package: types
+include-tags:
+  - User
+  - Label
+  - Resource
+  - Application
+output: api/server_v1.gen.go
+generate:
+  - server

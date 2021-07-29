@@ -1,0 +1,8 @@
+---
+package: meta
+types-package: types
+include-tags:
+  - MetaData
+output: meta/server_v1.gen.go
+generate:
+  - server

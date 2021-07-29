@@ -1,0 +1,13 @@
+---
+# For more information on configuring yamllint
+# https://yamllint.readthedocs.io/en/stable/configuration.html
+# This file extends the default conf by adjusting some options.
+
+extends: default
+
+rules:
+  line-length:
+    max: 200
+  indentation:
+    spaces: 2
+    indent-sequences: true  # Lists are properly aligned

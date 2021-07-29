@@ -1,0 +1,5 @@
+---
+package: types
+output: types/types.gen.go
+generate:
+  - types

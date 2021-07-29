@@ -1,63 +1,52 @@
 package fish
 
 import (
-	"time"
-
-	"git.corp.adobe.com/CI/aquarium-fish/lib/util"
+	"git.corp.adobe.com/CI/aquarium-fish/lib/openapi/types"
 )
 
-type Application struct {
-	ID        int64 `gorm:"primaryKey"`
-	CreatedAt time.Time
-
-	UserID int64 `json:"user_id"`
-	User   *User `json:"-"` // User requested the resource
-
-	LabelID int64  `json:"label_id"`
-	Label   *Label `json:"-"` // Label configuration which defines the resource
-
-	Metadata util.UnparsedJson `json:"metadata"` // Requestor metadata in JSON format
-}
-
-func (f *Fish) ApplicationFind(filter string) (as []Application, err error) {
-	err = f.db.Where(filter).Find(&as).Error
+func (f *Fish) ApplicationFind(filter *string) (as []types.Application, err error) {
+	db := f.db
+	if filter != nil {
+		db = db.Where(*filter)
+	}
+	err = db.Find(&as).Error
 	return as, err
 }
 
-func (f *Fish) ApplicationCreate(a *Application) error {
+func (f *Fish) ApplicationCreate(a *types.Application) error {
 	if a.Metadata == "" {
 		a.Metadata = "{}"
 	}
 	err := f.db.Create(a).Error
-	// Create ApplicationStatus NEW too
-	f.ApplicationStatusCreate(&ApplicationStatus{
-		Application: a, Status: ApplicationStatusNew,
+	// Create ApplicationState NEW too
+	f.ApplicationStateCreate(&types.ApplicationState{
+		Application: a, Status: types.ApplicationStateStatusNEW,
 		Description: "Just created by Fish " + f.node.Name,
 	})
 	return err
 }
 
 // Intentionally disabled, application can't be updated
-/*func (f *Fish) ApplicationSave(app *Application) error {
+/*func (f *Fish) ApplicationSave(app *types.Application) error {
 	return f.db.Save(app).Error
 }*/
 
-func (f *Fish) ApplicationGet(id int64) (a *Application, err error) {
-	a = &Application{}
+func (f *Fish) ApplicationGet(id int64) (a *types.Application, err error) {
+	a = &types.Application{}
 	err = f.db.First(a, id).Error
 	return a, err
 }
 
-func (f *Fish) ApplicationListGetStatusNew() (as []Application, err error) {
+func (f *Fish) ApplicationListGetStatusNew() (as []types.Application, err error) {
 	// SELECT * FROM applications WHERE ID in (
 	//    SELECT application_id FROM (
-	//        SELECT application_id, status, max(created_at) FROM application_statuses GROUP BY application_id
+	//        SELECT application_id, status, max(created_at) FROM application_states GROUP BY application_id
 	//    ) WHERE status = "NEW"
 	// )
 	err = f.db.Where("ID in (?)",
 		f.db.Select("application_id").Table("(?)",
-			f.db.Model(&ApplicationStatus{}).Select("application_id, status, max(created_at)").Group("application_id"),
-		).Where("Status = ?", ApplicationStatusNew),
+			f.db.Model(&types.ApplicationState{}).Select("application_id, status, max(created_at)").Group("application_id"),
+		).Where("Status = ?", types.ApplicationStateStatusNEW),
 	).Find(&as).Error
 	return as, err
 }

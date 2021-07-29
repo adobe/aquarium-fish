@@ -5,41 +5,28 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"time"
 
 	"github.com/mostlygeek/arp"
 	"gorm.io/gorm"
 
-	"git.corp.adobe.com/CI/aquarium-fish/lib/util"
+	"git.corp.adobe.com/CI/aquarium-fish/lib/openapi/types"
 )
 
-type Resource struct {
-	ID        int64 `gorm:"primaryKey"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
-
-	ApplicationID int64        `json:"application_id"`
-	Application   *Application `json:"-"` // Resource request from the user
-
-	NodeID int64 `json:"node_id"`
-	Node   *Node `json:"-"` // Node that owns the resource
-
-	IpAddr   string            `json:"ip_addr"`  // IP Address of the resource to identify by the node
-	HwAddr   string            `json:"hw_addr"`  // MAC or any other network hardware address to identify incoming request
-	Metadata util.UnparsedJson `json:"metadata"` // Combined metadata (Request + Driver)
-}
-
-func (f *Fish) ResourceFind(filter string) (rs []Resource, err error) {
-	err = f.db.Where(filter).Find(&rs).Error
+func (f *Fish) ResourceFind(filter *string) (rs []types.Resource, err error) {
+	db := f.db
+	if filter != nil {
+		db = db.Where(*filter)
+	}
+	err = db.Find(&rs).Error
 	return rs, err
 }
 
-func (f *Fish) ResourceListNode(node_id int64) (rs []Resource, err error) {
+func (f *Fish) ResourceListNode(node_id int64) (rs []types.Resource, err error) {
 	err = f.db.Where("node_id = ?", node_id).Find(&rs).Error
 	return rs, err
 }
 
-func (f *Fish) ResourceCreate(r *Resource) error {
+func (f *Fish) ResourceCreate(r *types.Resource) error {
 	if len(r.HwAddr) == 0 {
 		return errors.New("Fish: HwAddr can't be empty")
 	}
@@ -51,15 +38,15 @@ func (f *Fish) ResourceCreate(r *Resource) error {
 }
 
 func (f *Fish) ResourceDelete(id int64) error {
-	return f.db.Delete(&Resource{}, id).Error
+	return f.db.Delete(&types.Resource{}, id).Error
 }
 
-func (f *Fish) ResourceSave(res *Resource) error {
+func (f *Fish) ResourceSave(res *types.Resource) error {
 	return f.db.Save(res).Error
 }
 
-func (f *Fish) ResourceGet(id int64) (res *Resource, err error) {
-	res = &Resource{}
+func (f *Fish) ResourceGet(id int64) (res *types.Resource, err error) {
+	res = &types.Resource{}
 	err = f.db.First(res, id).Error
 	return res, err
 }
@@ -77,8 +64,8 @@ func fixHwAddr(hwaddr string) string {
 	return hwaddr
 }
 
-func (f *Fish) ResourceGetByIP(ip string) (res *Resource, err error) {
-	res = &Resource{}
+func (f *Fish) ResourceGetByIP(ip string) (res *types.Resource, err error) {
+	res = &types.Resource{}
 
 	// Check by IP first
 	err = f.db.Where("node_id = ?", f.GetNodeID()).Where("ip_addr = ?", ip).First(res).Error
@@ -104,8 +91,8 @@ func (f *Fish) ResourceGetByIP(ip string) (res *Resource, err error) {
 	return res, err
 }
 
-func (f *Fish) ResourceGetByApplication(app_id int64) (res *Resource, err error) {
-	res = &Resource{}
+func (f *Fish) ResourceGetByApplication(app_id int64) (res *types.Resource, err error) {
+	res = &types.Resource{}
 	err = f.db.Where("application_id = ?", app_id).First(res).Error
 	return res, err
 }

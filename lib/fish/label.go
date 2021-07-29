@@ -2,28 +2,20 @@ package fish
 
 import (
 	"errors"
-	"time"
 
-	"git.corp.adobe.com/CI/aquarium-fish/lib/util"
+	"git.corp.adobe.com/CI/aquarium-fish/lib/openapi/types"
 )
 
-type Label struct {
-	ID        int64 `gorm:"primaryKey"`
-	CreatedAt time.Time
-
-	Name       string            `json:"name" gorm:"uniqueIndex:idx_label_uniq"`    // Label name to find the proper one
-	Version    int               `json:"version" gorm:"uniqueIndex:idx_label_uniq"` // Revision of the label
-	Driver     string            `json:"driver"`                                    // Driver implements the label definition configuration
-	Definition util.UnparsedJson `json:"definition"`                                // JSON-encoded definition for the driver
-	Metadata   util.UnparsedJson `json:"metadata"`                                  // Additional metadata to the resource
-}
-
-func (f *Fish) LabelFind(filter string) (labels []Label, err error) {
-	err = f.db.Where(filter).Find(&labels).Error
+func (f *Fish) LabelFind(filter *string) (labels []types.Label, err error) {
+	db := f.db
+	if filter != nil {
+		db = db.Where(*filter)
+	}
+	err = db.Find(&labels).Error
 	return labels, err
 }
 
-func (f *Fish) LabelCreate(l *Label) error {
+func (f *Fish) LabelCreate(l *types.Label) error {
 	if l.Name == "" {
 		return errors.New("Fish: Name can't be empty")
 	}
@@ -42,16 +34,16 @@ func (f *Fish) LabelCreate(l *Label) error {
 
 // Intentionally disabled - labels can be created once and can't be updated
 // Create label with incremented version instead
-/*func (f *Fish) LabelSave(label *Label) error {
+/*func (f *Fish) LabelSave(label *types.Label) error {
 	return f.db.Save(label).Error
 }*/
 
-func (f *Fish) LabelGet(id int64) (label *Label, err error) {
-	label = &Label{}
+func (f *Fish) LabelGet(id int64) (label *types.Label, err error) {
+	label = &types.Label{}
 	err = f.db.First(label, id).Error
 	return label, err
 }
 
 func (f *Fish) LabelDelete(id int64) error {
-	return f.db.Delete(&Label{}, id).Error
+	return f.db.Delete(&types.Label{}, id).Error
 }

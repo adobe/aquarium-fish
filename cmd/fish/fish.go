@@ -21,9 +21,9 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	"git.corp.adobe.com/CI/aquarium-fish/lib/core"
 	"git.corp.adobe.com/CI/aquarium-fish/lib/crypt"
 	"git.corp.adobe.com/CI/aquarium-fish/lib/fish"
+	"git.corp.adobe.com/CI/aquarium-fish/lib/openapi"
 )
 
 func main() {
@@ -134,13 +134,13 @@ func main() {
 			if err != nil {
 				return err
 			}
-			srv, err := core.Init(fish, cfg.APIAddress, cert_path, key_path)
+			srv, err := openapi.Init(fish, cfg.APIAddress, cert_path, key_path)
 			if err != nil {
 				return err
 			}
 
 			log.Println("Fish initialized")
-			quit := make(chan os.Signal)
+			quit := make(chan os.Signal, 1)
 			signal.Notify(quit, unix.SIGINT)
 			signal.Notify(quit, unix.SIGQUIT)
 			signal.Notify(quit, unix.SIGTERM)
