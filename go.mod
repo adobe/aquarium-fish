@@ -5,6 +5,7 @@ go 1.16
 require (
 	github.com/StackExchange/wmi v0.0.0-20210224194228-fe8f1750fd46 // indirect
 	github.com/alessio/shellescape v1.4.1
+	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/canonical/go-dqlite v1.8.0
 	github.com/deepmap/oapi-codegen v1.8.1
 	github.com/getkin/kin-openapi v0.61.0
@@ -18,6 +19,7 @@ require (
 	github.com/tklauser/go-sysconf v0.3.6 // indirect
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
+	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4
 	golang.org/x/sys v0.0.0-20210403161142-5e06dd20ab57
 	gorm.io/driver/sqlite v1.1.4
 	gorm.io/gorm v1.21.3
