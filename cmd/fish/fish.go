@@ -24,10 +24,12 @@ import (
 	"git.corp.adobe.com/CI/aquarium-fish/lib/crypt"
 	"git.corp.adobe.com/CI/aquarium-fish/lib/fish"
 	"git.corp.adobe.com/CI/aquarium-fish/lib/openapi"
+	"git.corp.adobe.com/CI/aquarium-fish/lib/proxy"
 )
 
 func main() {
 	var api_address string
+	var proxy_address string
 	var db_address string
 	var db_join *[]string
 	var cfg_path string
@@ -48,6 +50,9 @@ func main() {
 			}
 			if api_address != "" {
 				cfg.APIAddress = api_address
+			}
+			if proxy_address != "" {
+				cfg.ProxyAddress = proxy_address
 			}
 			if db_address != "" {
 				cfg.DBAddress = db_address
@@ -134,6 +139,14 @@ func main() {
 			if err != nil {
 				return err
 			}
+
+			log.Println("Fish starting socks5 proxy...")
+			err = proxy.Init(fish, cfg.ProxyAddress)
+			if err != nil {
+				return err
+			}
+
+			log.Println("Fish starting API...")
 			srv, err := openapi.Init(fish, cfg.APIAddress, cert_path, key_path)
 			if err != nil {
 				return err
@@ -167,6 +180,7 @@ func main() {
 
 	flags := cmd.Flags()
 	flags.StringVarP(&api_address, "api", "a", "", "address used to expose the fish API")
+	flags.StringVarP(&proxy_address, "proxy", "p", "", "address used to expose the SOCKS5 proxy")
 	flags.StringVarP(&db_address, "db", "d", "", "address used for internal database replication")
 	db_join = flags.StringSliceP("db_join", "j", nil, "database addresses of existing nodes, comma separated")
 	flags.StringVarP(&cfg_path, "cfg", "c", "", "yaml configuration file")
