@@ -3,7 +3,6 @@ package meta
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"strings"
 
@@ -32,62 +31,12 @@ func NewV1Router(e *echo.Echo, fish *fish.Fish) {
 	RegisterHandlers(router, proc)
 }
 
-func checkIPv4Address(network *net.IPNet, ip net.IP) bool {
-	// Processing only networks we controlling (IPv4)
-	// TODO: not 100% ensurance over the network control, but good enough for now
-	if !strings.HasSuffix(network.IP.String(), ".1") {
-		return false
-	}
-
-	// Make sure checked IP is in the network
-	if !network.Contains(ip) {
-		return false
-	}
-
-	return true
-}
-
-func isControlledNetwork(ip string) bool {
-	// Relatively long process executed for each request, but gives us flexibility
-	// TODO: Could be optimized to collect network data on start or periodically
-	ip_parsed := net.ParseIP(ip)
-
-	ifaces, err := net.Interfaces()
-	if err != nil {
-		fmt.Print(fmt.Errorf("Unable to get the available network interfaces: %+v\n", err.Error()))
-		return false
-	}
-
-	for _, i := range ifaces {
-		addrs, err := i.Addrs()
-		if err != nil {
-			fmt.Print(fmt.Errorf("Unable to get available addresses of the interface %s: %+v\n", i.Name, err.Error()))
-			continue
-		}
-
-		for _, a := range addrs {
-			switch v := a.(type) {
-			case *net.IPNet:
-				if checkIPv4Address(v, ip_parsed) {
-					return true
-				}
-			}
-		}
-	}
-	return false
-}
-
 func (e *Processor) AddressAuth(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		// Only the controlled network IP's can get access to their meta
-		if !isControlledNetwork(c.RealIP()) {
-			return echo.NewHTTPError(http.StatusUnauthorized, "Client IP is from not controlled network")
-		}
-
-		// Only the existing local resource
+		// Only the existing local resource access it's metadata
 		res, err := e.fish.ResourceGetByIP(c.RealIP())
 		if err != nil {
-			return echo.NewHTTPError(http.StatusUnauthorized, "Client IP was not found in the Resources")
+			return echo.NewHTTPError(http.StatusUnauthorized, "Client IP was not found in the node Resources")
 		}
 
 		c.Set("resource", res)

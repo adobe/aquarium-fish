@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"strings"
 
 	"github.com/mostlygeek/arp"
@@ -64,6 +65,51 @@ func fixHwAddr(hwaddr string) string {
 	return hwaddr
 }
 
+func checkIPv4Address(network *net.IPNet, ip net.IP) bool {
+	// Processing only networks we controlling (IPv4)
+	// TODO: not 100% ensurance over the network control, but good enough for now
+	if !strings.HasSuffix(network.IP.String(), ".1") {
+		return false
+	}
+
+	// Make sure checked IP is in the network
+	if !network.Contains(ip) {
+		return false
+	}
+
+	return true
+}
+
+func isControlledNetwork(ip string) bool {
+	// Relatively long process executed for each request, but gives us flexibility
+	// TODO: Could be optimized to collect network data on start or periodically
+	ip_parsed := net.ParseIP(ip)
+
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		fmt.Print(fmt.Errorf("Unable to get the available network interfaces: %+v\n", err.Error()))
+		return false
+	}
+
+	for _, i := range ifaces {
+		addrs, err := i.Addrs()
+		if err != nil {
+			fmt.Print(fmt.Errorf("Unable to get available addresses of the interface %s: %+v\n", i.Name, err.Error()))
+			continue
+		}
+
+		for _, a := range addrs {
+			switch v := a.(type) {
+			case *net.IPNet:
+				if checkIPv4Address(v, ip_parsed) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 func (f *Fish) ResourceGetByIP(ip string) (res *types.Resource, err error) {
 	res = &types.Resource{}
 
@@ -71,6 +117,12 @@ func (f *Fish) ResourceGetByIP(ip string) (res *types.Resource, err error) {
 	err = f.db.Where("node_id = ?", f.GetNodeID()).Where("ip_addr = ?", ip).First(res).Error
 	if err == nil {
 		return res, nil
+	}
+
+	// Make sure the IP is the controlled network, otherwise someone from outside
+	// could become a local node resource, so let's be careful
+	if !isControlledNetwork(ip) {
+		return res, errors.New("Fish: Prohibited to serve the Resource IP from not controlled network")
 	}
 
 	// Check by MAC and update IP if found
@@ -95,4 +147,21 @@ func (f *Fish) ResourceGetByApplication(app_id int64) (res *types.Resource, err 
 	res = &types.Resource{}
 	err = f.db.Where("application_id = ?", app_id).First(res).Error
 	return res, err
+}
+
+func (f *Fish) ResourceServiceMapping(res *types.Resource, dest string) string {
+	sm := &types.ServiceMapping{}
+
+	// Trying to find the record with Application and Location if possible
+	// The application in priority, location - secondary priority, if no such
+	// records found - default (ID 0) will be used
+	err := f.db.Where(
+		"application_id IN (?, 0)", res.ApplicationID).Where(
+		"location_id IN (?, 0)", f.GetLocationID()).Where(
+		"service = ?", dest).Order("application_id DESC").Order("location_id DESC").First(sm).Error
+	if err != nil {
+		return ""
+	}
+
+	return sm.Redirect
 }

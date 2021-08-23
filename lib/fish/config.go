@@ -20,7 +20,8 @@ type Config struct {
 	TLSCrt   string `json:"tls_crt"`    // TLS PEM public certificate (if relative - to directory)
 	TLSCaCrt string `json:"tls_ca_crt"` // TLS PEM certificate authority certificate (if relative - to directory)
 
-	NodeName string `json:"node_name"` // Last resort in case you need to override the default host node name
+	NodeName     string `json:"node_name"`     // Last resort in case you need to override the default host node name
+	NodeLocation string `json:"node_location"` // Specify cluster node location for multi-dc configurations
 
 	Drivers []ConfigDriver `json:"drivers"` // If specified - only the listed plugins will be loaded
 }
