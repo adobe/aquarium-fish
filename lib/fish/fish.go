@@ -58,6 +58,8 @@ func (f *Fish) Init() error {
 		&types.ApplicationState{},
 		&types.Resource{},
 		&types.Vote{},
+		&types.Location{},
+		&types.ServiceMapping{},
 	); err != nil {
 		log.Println("Fish: Unable to apply DB schema:", err)
 		return err
@@ -79,11 +81,26 @@ func (f *Fish) Init() error {
 	create_node := false
 	node, err := f.NodeGet(f.cfg.NodeName)
 	if err != nil {
-		log.Println("Create new node with name:", f.cfg.NodeName)
+		log.Println("Create new node:", f.cfg.NodeName, f.cfg.NodeLocation)
 		create_node = true
-		node = &types.Node{Name: f.cfg.NodeName}
+
+		if f.cfg.NodeLocation != "" {
+			loc, err := f.LocationGetByName(f.cfg.NodeLocation)
+			if err != nil {
+				log.Println("Fish: Creating new location", f.cfg.NodeLocation)
+				loc.Name = f.cfg.NodeLocation
+				loc.Description = fmt.Sprintf("Created automatically during node '%s' startup", f.cfg.NodeName)
+				if f.LocationCreate(loc) != nil {
+					log.Println("Fish: Unable to create new location")
+					return err
+				}
+			}
+			node = &types.Node{Name: f.cfg.NodeName, LocationID: loc.ID}
+		} else {
+			node = &types.Node{Name: f.cfg.NodeName, LocationID: 0}
+		}
 	} else {
-		log.Println("Use existing node with name:", f.cfg.NodeName)
+		log.Println("Use existing node:", node.Name, node.LocationID)
 	}
 
 	if err := node.Init(); err != nil {
@@ -132,6 +149,10 @@ func (f *Fish) Close() {
 
 func (f *Fish) GetNodeID() int64 {
 	return f.node.ID
+}
+
+func (f *Fish) GetLocationID() int64 {
+	return f.node.LocationID
 }
 
 func (f *Fish) checkNewApplicationProcess() error {

@@ -19,33 +19,50 @@ func (d ResolverSkip) Resolve(ctx context.Context, name string) (context.Context
 }
 
 type ProxyAccess struct {
-	f    *fish.Fish
-	orig socks5.PermitCommand
+	fish *fish.Fish
 }
 
 func (p *ProxyAccess) Allow(ctx context.Context, req *socks5.Request) (context.Context, bool) {
-	log.Println("Proxy: Requested access from", req.RemoteAddr, "to", req.DestAddr)
+	log.Println("Proxy: Requested proxy from", req.RemoteAddr, "to", req.DestAddr)
 
-	// TODO: Verify access of the client
-	ok := true
+	// Only the existing node resource can use the proxy
+	res, err := p.fish.ResourceGetByIP(req.RemoteAddr.IP.String())
+	if err != nil {
+		log.Println("Proxy: Denied proxy from the unauthorized client", req.RemoteAddr)
+		return ctx, false
+	}
 
-	if req.DestAddr.FQDN != "" {
-		// TODO: Override the address via the mapping
+	// Make sure we have the address in the allow list and rewrite it
+	dest := req.DestAddr.FQDN
+	if dest == "" {
+		dest = req.DestAddr.IP.String()
+	}
+	over_dest := p.fish.ResourceServiceMapping(res, dest)
+	if over_dest == "" {
+		log.Println("Proxy: Denied proxy from", req.RemoteAddr, "to", req.DestAddr)
+		return ctx, false
+	}
+
+	// Resolve destination address if it's not an IP
+	req.DestAddr.IP = net.ParseIP(over_dest)
+	if req.DestAddr.IP == nil {
+		req.DestAddr.FQDN = over_dest
 		addr, err := net.ResolveIPAddr("ip", req.DestAddr.FQDN)
 		if err != nil {
 			return ctx, false
 		}
 		req.DestAddr.IP = addr.IP
 	}
-	log.Println("Proxy: Allowed access from", req.RemoteAddr, "to", req.DestAddr)
 
-	return ctx, ok
+	log.Println("Proxy: Allowed proxy from", req.RemoteAddr, "to", req.DestAddr)
+
+	return ctx, true
 }
 
 func Init(fish *fish.Fish, address string) error {
 	conf := &socks5.Config{
-		Resolver: &ResolverSkip{},                            // Skipping the resolver phase until access checked
-		Rules:    &ProxyAccess{fish, socks5.PermitCommand{}}, // Allow only known resources to access proxy
+		Resolver: &ResolverSkip{},    // Skipping the resolver phase until access checked
+		Rules:    &ProxyAccess{fish}, // Allow only known resources to access proxy
 	}
 
 	server, err := socks5.New(conf)

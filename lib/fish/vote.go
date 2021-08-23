@@ -6,8 +6,12 @@ import (
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
-func (f *Fish) VoteList() (vs []types.Vote, err error) {
-	err = f.db.Find(&vs).Error
+func (f *Fish) VoteFind(filter *string) (vs []types.Vote, err error) {
+	db := f.db
+	if filter != nil {
+		db = db.Where(*filter)
+	}
+	err = db.Find(&vs).Error
 	return vs, err
 }
 

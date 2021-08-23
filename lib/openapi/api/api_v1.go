@@ -341,3 +341,109 @@ func (e *Processor) LabelDelete(c echo.Context, id int64) error {
 
 	return c.JSON(http.StatusOK, H{"message": "Label removed"})
 }
+
+func (e *Processor) VoteListGet(c echo.Context, params types.VoteListGetParams) error {
+	user := c.Get("user")
+	if user.(*types.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can get votes")})
+		return fmt.Errorf("Only 'admin' user can get votes")
+	}
+
+	out, err := e.fish.VoteFind(params.Filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the vote list: %v", err)})
+		return fmt.Errorf("Unable to get the vote list: %w", err)
+	}
+
+	return c.JSON(http.StatusOK, out)
+}
+
+func (e *Processor) LocationListGet(c echo.Context, params types.LocationListGetParams) error {
+	user := c.Get("user")
+	if user.(*types.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can get locations")})
+		return fmt.Errorf("Only 'admin' user can get locations")
+	}
+
+	out, err := e.fish.LocationFind(params.Filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the location list: %v", err)})
+		return fmt.Errorf("Unable to get the location list: %w", err)
+	}
+
+	return c.JSON(http.StatusOK, out)
+}
+
+func (e *Processor) LocationCreatePost(c echo.Context) error {
+	user := c.Get("user")
+	if user.(*types.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can create location")})
+		return fmt.Errorf("Only 'admin' user can create location")
+	}
+
+	var data types.Location
+	if err := c.Bind(&data); err != nil {
+		c.JSON(http.StatusBadRequest, H{"error": fmt.Sprintf("Wrong request body: %v", err)})
+		return fmt.Errorf("Wrong request body: %w", err)
+	}
+
+	if err := e.fish.LocationCreate(&data); err != nil {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to create location: %v", err)})
+		return fmt.Errorf("Unable to create location: %w", err)
+	}
+
+	return c.JSON(http.StatusOK, data)
+}
+
+func (e *Processor) ServiceMappingListGet(c echo.Context, params types.ServiceMappingListGetParams) error {
+	user := c.Get("user")
+	if user.(*types.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can get service mappings")})
+		return fmt.Errorf("Only 'admin' user can get service mappings")
+	}
+
+	out, err := e.fish.ServiceMappingFind(params.Filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the servicemappings list: %v", err)})
+		return fmt.Errorf("Unable to get the servicemappings list: %w", err)
+	}
+
+	return c.JSON(http.StatusOK, out)
+}
+
+func (e *Processor) ServiceMappingCreatePost(c echo.Context) error {
+	user := c.Get("user")
+	if user.(*types.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can create service mapping")})
+		return fmt.Errorf("Only 'admin' user can create service mapping")
+	}
+
+	var data types.ServiceMapping
+	if err := c.Bind(&data); err != nil {
+		c.JSON(http.StatusBadRequest, H{"error": fmt.Sprintf("Wrong request body: %v", err)})
+		return fmt.Errorf("Wrong request body: %w", err)
+	}
+
+	if err := e.fish.ServiceMappingCreate(&data); err != nil {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to create service mapping: %v", err)})
+		return fmt.Errorf("Unable to create service mapping: %w", err)
+	}
+
+	return c.JSON(http.StatusOK, data)
+}
+
+func (e *Processor) ServiceMappingDelete(c echo.Context, id int64) error {
+	// Only admin can delete ServiceMapping
+	user := c.Get("user")
+	if user.(*types.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can delete service mapping")})
+		return fmt.Errorf("Only 'admin' user can delete service mapping")
+	}
+
+	if err := e.fish.ServiceMappingDelete(id); err != nil {
+		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("ServiceMapping delete failed with error: %v", err)})
+		return fmt.Errorf("ServiceMapping delete failed with error: %w", err)
+	}
+
+	return c.JSON(http.StatusOK, H{"message": "ServiceMapping removed"})
+}
