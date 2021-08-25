@@ -62,6 +62,12 @@ func (e *Processor) UserListGet(c echo.Context, params types.UserListGetParams) 
 }
 
 func (e *Processor) UserGet(c echo.Context, id string) error {
+	user := c.Get("user")
+	if user.(*types.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can get user")})
+		return fmt.Errorf("Only 'admin' user can get user")
+	}
+
 	out, err := e.fish.UserGet(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("User not found: %v", err)})
@@ -395,6 +401,22 @@ func (e *Processor) LocationCreatePost(c echo.Context) error {
 	return c.JSON(http.StatusOK, data)
 }
 
+func (e *Processor) ServiceMappingGet(c echo.Context, id int64) error {
+	user := c.Get("user")
+	if user.(*types.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can get service mapping")})
+		return fmt.Errorf("Only 'admin' user can get service mapping")
+	}
+
+	out, err := e.fish.ServiceMappingGet(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("ServiceMapping not found: %v", err)})
+		return fmt.Errorf("ServiceMapping not found: %w", err)
+	}
+
+	return c.JSON(http.StatusOK, out)
+}
+
 func (e *Processor) ServiceMappingListGet(c echo.Context, params types.ServiceMappingListGetParams) error {
 	user := c.Get("user")
 	if user.(*types.User).Name != "admin" {
@@ -412,16 +434,28 @@ func (e *Processor) ServiceMappingListGet(c echo.Context, params types.ServiceMa
 }
 
 func (e *Processor) ServiceMappingCreatePost(c echo.Context) error {
-	user := c.Get("user")
-	if user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can create service mapping")})
-		return fmt.Errorf("Only 'admin' user can create service mapping")
-	}
-
 	var data types.ServiceMapping
 	if err := c.Bind(&data); err != nil {
 		c.JSON(http.StatusBadRequest, H{"error": fmt.Sprintf("Wrong request body: %v", err)})
 		return fmt.Errorf("Wrong request body: %w", err)
+	}
+
+	user := c.Get("user")
+	if data.ApplicationID != 0 {
+		// Only the owner and admin can create servicemapping for his application
+		app, err := e.fish.ApplicationGet(data.ApplicationID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the application: %s", data.ApplicationID)})
+			return fmt.Errorf("Unable to find the application: %s, %w", data.ApplicationID, err)
+		}
+
+		if app.ID != user.(*types.User).ID && user.(*types.User).Name != "admin" {
+			c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner & admin can assign service mapping to the application")})
+			return fmt.Errorf("Only the owner & admin can assign service mapping to the application")
+		}
+	} else if user.(*types.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can create service mapping with undefined application")})
+		return fmt.Errorf("Only 'admin' user can create service mapping with undefined application")
 	}
 
 	if err := e.fish.ServiceMappingCreate(&data); err != nil {

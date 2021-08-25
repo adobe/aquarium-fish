@@ -562,7 +562,7 @@ paths:
       security:
         - basic_auth: []
 
-  /api/v1/servicemappig/:
+  /api/v1/servicemapping/:
     get:
       summary: Get list of service mappings
       description: Returns a list of existing ServiceMappings
@@ -1159,29 +1159,25 @@ components:
             gorm: primaryKey
         created_at:
           x-go-type: time.Time
-        location_ID:
-          type: integer
-          format: int64
-          x-oapi-codegen-extra-tags:
-            gorm: uniqueIndex:idx_location_service_redirect_app_uniq
         service:
           type: string
           description: FQDN or IP address of the requested service
           x-oapi-codegen-extra-tags:
-            gorm: uniqueIndex:idx_location_service_redirect_app_uniq
+            gorm: uniqueIndex:idx_location_service_app_uniq
         redirect:
           type: string
           description: FQDN or IP address of where to rediect the service request
+        location_ID:
+          type: integer
+          format: int64
           x-oapi-codegen-extra-tags:
-            gorm: uniqueIndex:idx_location_service_redirect_app_uniq
+            gorm: uniqueIndex:idx_location_service_app_uniq
         application_ID:
           type: integer
           format: int64
           description: Optional, if need to override the cluster-wide redirects
           x-oapi-codegen-extra-tags:
-            gorm: uniqueIndex:idx_location_service_redirect_app_uniq
-        application:
-          $ref: '#/components/schemas/Application'
+            gorm: uniqueIndex:idx_location_service_app_uniq
 
   securitySchemes:
     basic_auth:
