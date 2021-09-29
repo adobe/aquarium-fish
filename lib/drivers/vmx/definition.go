@@ -22,6 +22,7 @@ import (
  *       xcode122_workspace:
  *         size: 100,
  *         reuse: true
+ *     network: ""
  *   metadata:
  *     JENKINS_AGENT_WORKDIR: /Users/jenkins/workdir
  */

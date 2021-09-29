@@ -61,6 +61,11 @@ func (d *Driver) Allocate(definition string) (string, error) {
 	vm_id := fmt.Sprintf("%02x%02x%02x%02x%02x%02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5])
 	vm_hwaddr := fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5])
 
+	vm_network := def.Requirements.Network
+	if vm_network == "" {
+		vm_network = "hostonly"
+	}
+
 	vm_dir := filepath.Join(d.cfg.WorkspacePath, vm_id)
 	vm_images_dir := filepath.Join(vm_dir, "images")
 
@@ -86,6 +91,7 @@ func (d *Driver) Allocate(definition string) (string, error) {
 		true, true, true,
 		"ethernet0.addressType =", `ethernet0.addressType = "static"`,
 		"ethernet0.address =", fmt.Sprintf("ethernet0.address = %q", vm_hwaddr),
+		"ethernet0.connectiontype =", fmt.Sprintf("ethernet0.connectiontype = %q", vm_network),
 		"numvcpus =", fmt.Sprintf(`numvcpus = "%d"`, def.Requirements.Cpu),
 		"cpuid.corespersocket =", fmt.Sprintf(`cpuid.corespersocket = "%d"`, def.Requirements.Cpu),
 		"memsize =", fmt.Sprintf(`memsize = "%d"`, def.Requirements.Ram*1024),
