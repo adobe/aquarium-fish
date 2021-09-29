@@ -6,9 +6,10 @@ import (
 
 // Resource requirements
 type Requirements struct {
-	Cpu   uint            `json:"cpu"`   // Number of CPU cores to use
-	Ram   uint            `json:"ram"`   // Amount of memory in GB
-	Disks map[string]Disk `json:"disks"` // Disks to create and connect
+	Cpu     uint            `json:"cpu"`     // Number of CPU cores to use
+	Ram     uint            `json:"ram"`     // Amount of memory in GB
+	Disks   map[string]Disk `json:"disks"`   // Disks to create and connect
+	Network string          `json:"network"` // Which network configuration to use for VM
 }
 
 type Disk struct {
@@ -31,6 +32,9 @@ func (r *Requirements) Validate() error {
 		if data.Size < 1 {
 			return errors.New("Driver: Size of the disk can't be less than 1GB")
 		}
+	}
+	if r.Network != "" || r.Network != "nat" {
+		return errors.New("Driver: The network configuration can be '' (empty for hosted) or 'nat'")
 	}
 
 	return nil
