@@ -33,6 +33,8 @@ func FileReplaceToken(path string, full_line, add, anycase bool, token_values ..
 	var tokens []string
 	var values []string
 
+	// Walking through the list of tokens to split them into pairs
+	// 0 - key, 1 - value
 	for i, tv := range token_values {
 		if i%2 == 0 {
 			if anycase {
@@ -62,7 +64,20 @@ func FileReplaceToken(path string, full_line, add, anycase bool, token_values ..
 					line = value
 					break // No need to check the other tokens
 				} else {
-					strings.ReplaceAll(line, tokens[i], value)
+					if anycase {
+						// We're not using RE because it's hard to predict the token
+						// and escape it to compile the proper regular expression
+						// so instead we using just regular replace by position of the token
+						idx := strings.Index(comp_line, tokens[i])
+						for idx != -1 {
+							// To support unicode use runes
+							line = string([]rune(line)[0:idx]) + value + string([]rune(line)[idx+len(tokens[i]):len(line)])
+							comp_line = strings.ToLower(line)
+							idx = strings.Index(comp_line, tokens[i])
+						}
+					} else {
+						line = strings.ReplaceAll(line, tokens[i], value)
+					}
 				}
 			}
 		}

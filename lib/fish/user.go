@@ -62,7 +62,7 @@ func (f *Fish) UserNew(name string, password string) (string, error) {
 	user := &types.User{Name: name, Hash: crypt.Generate(password, nil)}
 
 	if err := f.UserCreate(user); err != nil {
-		log.Printf("Fish: Unable to create new user: %s, %w", name, err)
+		log.Printf("Fish: Unable to create new user: %s, %s", name, err)
 		return "", err
 	}
 

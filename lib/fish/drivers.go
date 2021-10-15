@@ -32,7 +32,7 @@ func (f *Fish) DriversSet() error {
 			}
 		}
 		if en {
-			log.Println("Fish: Resource driver enabled:", drv.Name())
+			log.Println("Fish: Resource driver available:", drv.Name())
 			list = append(list, drv)
 		}
 	}
@@ -59,8 +59,9 @@ func (f *Fish) DriversPrepare(configs []ConfigDriver) (errs []error) {
 
 		if err := drv.Prepare(json_cfg); err != nil {
 			errs = append(errs, err)
+			log.Println("Fish: Resource driver skipped:", drv.Name())
 		} else {
-			log.Println("Fish: Resource driver prepared:", drv.Name())
+			log.Println("Fish: Resource driver activated:", drv.Name())
 		}
 	}
 	return errs

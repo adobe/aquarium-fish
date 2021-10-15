@@ -110,7 +110,8 @@ func (d *Driver) Allocate(definition string) (string, error) {
 	cmd = exec.Command(d.cfg.VmrunPath, "-T", "fusion", "start", vmx_path, "nogui")
 	if _, _, err := runAndLog(cmd); err != nil {
 		log.Println("VMX: Unable to run VM", vmx_path, err)
-		log.Println("VMX: Check the log info:", filepath.Join(filepath.Dir(vmx_path), "vmware.log"))
+		log.Println("VMX: Check the log info:", filepath.Join(filepath.Dir(vmx_path), "vmware.log"),
+			"and directory ~/Library/Logs/VMware/ for additional logs")
 		return vm_hwaddr, err
 	}
 
@@ -157,7 +158,8 @@ func (d *Driver) loadImages(def *Definition, vm_images_dir string) error {
 			}
 		}
 
-		// Unfortunately the linked clones requires full path to the parent,
+		// Unfortunately the linked clones requires full path to the parent
+		// and modifies the image snapshots description during linked clone,
 		// so walk through the image files, link them to the workspace dir
 		// and copy the vmsd file with path to the workspace images dir
 		root_dir := filepath.Join(image_unpacked, name)
@@ -177,9 +179,9 @@ func (d *Driver) loadImages(def *Definition, vm_images_dir string) error {
 			in_path := filepath.Join(root_dir, entry.Name())
 			out_path := filepath.Join(out_dir, entry.Name())
 
-			// Check if the file is not the disk file
-			if strings.HasSuffix(entry.Name(), ".vmdk") {
-				// Just link the disk image to the vm image dir
+			// Check if the file is the big disk
+			if strings.HasSuffix(entry.Name(), ".vmdk") && util.FileStartsWith(in_path, []byte("# Disk DescriptorFile")) != nil {
+				// Just link the disk image to the vm image dir - we will not modify it anyway
 				if err := os.Symlink(in_path, out_path); err != nil {
 					return err
 				}
@@ -192,7 +194,7 @@ func (d *Driver) loadImages(def *Definition, vm_images_dir string) error {
 				return err
 			}
 
-			// Modify the vmsd file to replace token - it's require absolute path
+			// Modify the vmsd file cloneOf0 to replace token - it requires absolute path
 			if strings.HasSuffix(entry.Name(), ".vmsd") {
 				if err := util.FileReplaceToken(out_path,
 					false, false, false,

@@ -33,8 +33,8 @@ func (r *Requirements) Validate() error {
 			return errors.New("Driver: Size of the disk can't be less than 1GB")
 		}
 	}
-	if r.Network != "" || r.Network != "nat" {
-		return errors.New("Driver: The network configuration can be '' (empty for hosted) or 'nat'")
+	if r.Network != "" && r.Network != "nat" {
+		return errors.New("Driver: The network configuration must be either '' (empty for hosted) or 'nat'")
 	}
 
 	return nil

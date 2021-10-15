@@ -211,8 +211,8 @@ func (e *Processor) ApplicationCreatePost(c echo.Context) error {
 func (e *Processor) ApplicationResourceGet(c echo.Context, id int64) error {
 	app, err := e.fish.ApplicationGet(id)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the application: %s", id)})
-		return fmt.Errorf("Unable to find the application: %s, %w", id, err)
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the application: %d", id)})
+		return fmt.Errorf("Unable to find the application: %d, %w", id, err)
 	}
 
 	// Only the owner of the application (or admin) can request the resource
@@ -234,8 +234,8 @@ func (e *Processor) ApplicationResourceGet(c echo.Context, id int64) error {
 func (e *Processor) ApplicationStateGet(c echo.Context, id int64) error {
 	app, err := e.fish.ApplicationGet(id)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the application: %s", id)})
-		return fmt.Errorf("Unable to find the application: %s, %w", id, err)
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the application: %d", id)})
+		return fmt.Errorf("Unable to find the application: %d, %w", id, err)
 	}
 
 	// Only the owner of the application (or admin) can request the status
@@ -257,8 +257,8 @@ func (e *Processor) ApplicationStateGet(c echo.Context, id int64) error {
 func (e *Processor) ApplicationDeallocateGet(c echo.Context, id int64) error {
 	app, err := e.fish.ApplicationGet(id)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the application: %s", id)})
-		return fmt.Errorf("Unable to find the application: %s, %w", id, err)
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the application: %d", id)})
+		return fmt.Errorf("Unable to find the application: %d, %w", id, err)
 	}
 
 	// Only the owner of the application (or admin) could deallocate it
@@ -270,8 +270,8 @@ func (e *Processor) ApplicationDeallocateGet(c echo.Context, id int64) error {
 
 	out, err := e.fish.ApplicationStateGetByApplication(id)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find status for the application: %s", id)})
-		return fmt.Errorf("Unable to find status for the application: %s, %w", id, err)
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find status for the application: %d", id)})
+		return fmt.Errorf("Unable to find status for the application: %d, %w", id, err)
 	}
 	if out.Status != types.ApplicationStateStatusALLOCATED {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to deallocate the application with status: %s", out.Status)})
@@ -283,8 +283,8 @@ func (e *Processor) ApplicationDeallocateGet(c echo.Context, id int64) error {
 	}
 	err = e.fish.ApplicationStateCreate(as)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to deallocate the application: %s", id)})
-		return fmt.Errorf("Unable to deallocate the application: %s, %w", id, err)
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to deallocate the application: %d", id)})
+		return fmt.Errorf("Unable to deallocate the application: %d, %w", id, err)
 	}
 
 	return c.JSON(http.StatusOK, as)
@@ -445,8 +445,8 @@ func (e *Processor) ServiceMappingCreatePost(c echo.Context) error {
 		// Only the owner and admin can create servicemapping for his application
 		app, err := e.fish.ApplicationGet(data.ApplicationID)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the application: %s", data.ApplicationID)})
-			return fmt.Errorf("Unable to find the application: %s, %w", data.ApplicationID, err)
+			c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the application: %d", data.ApplicationID)})
+			return fmt.Errorf("Unable to find the application: %d, %w", data.ApplicationID, err)
 		}
 
 		if app.ID != user.(*types.User).ID && user.(*types.User).Name != "admin" {
