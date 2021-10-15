@@ -382,21 +382,21 @@ func (f *Fish) executeApplication(app_id int64) error {
 	if err := json.Unmarshal([]byte(app.Metadata), &metadata); err != nil {
 		log.Println("Fish: Unable to parse the app metadata:", app.ID, err)
 		app_state = &types.ApplicationState{ApplicationID: app.ID, Status: types.ApplicationStateStatusERROR,
-			Description: fmt.Sprintf("Unable to parse the app metadata: %w", err),
+			Description: fmt.Sprintf("Unable to parse the app metadata: %s", err),
 		}
 		f.ApplicationStateCreate(app_state)
 	}
 	if err := json.Unmarshal([]byte(label.Metadata), &metadata); err != nil {
 		log.Println("Fish: Unable to parse the label metadata:", label.ID, err)
 		app_state = &types.ApplicationState{ApplicationID: app.ID, Status: types.ApplicationStateStatusERROR,
-			Description: fmt.Sprintf("Unable to parse the label metadata: %w", err),
+			Description: fmt.Sprintf("Unable to parse the label metadata: %s", err),
 		}
 		f.ApplicationStateCreate(app_state)
 	}
 	if merged_metadata, err = json.Marshal(metadata); err != nil {
 		log.Println("Fish: Unable to merge metadata:", label.ID, err)
 		app_state = &types.ApplicationState{ApplicationID: app.ID, Status: types.ApplicationStateStatusERROR,
-			Description: fmt.Sprintf("Unable to merge metadata: %w", err),
+			Description: fmt.Sprintf("Unable to merge metadata: %s", err),
 		}
 		f.ApplicationStateCreate(app_state)
 	}
@@ -412,7 +412,7 @@ func (f *Fish) executeApplication(app_id int64) error {
 		if err != nil {
 			log.Println("Fish: Unable to get the allocated resource for Application:", app.ID, err)
 			app_state = &types.ApplicationState{ApplicationID: app.ID, Status: types.ApplicationStateStatusERROR,
-				Description: fmt.Sprintf("Unable to find the allocated resource: %w", err),
+				Description: fmt.Sprintf("Unable to find the allocated resource: %s", err),
 			}
 			f.ApplicationStateCreate(app_state)
 		}
@@ -443,7 +443,7 @@ func (f *Fish) executeApplication(app_id int64) error {
 		if err != nil {
 			log.Println("Fish: Unable to allocate resource for the Application:", app.ID, err)
 			app_state = &types.ApplicationState{ApplicationID: app.ID, Status: types.ApplicationStateStatusERROR,
-				Description: fmt.Sprintf("Driver allocate resource error: %w", err),
+				Description: fmt.Sprintf("Driver allocate resource error: %s", err),
 			}
 		} else {
 			err := f.ResourceCreate(res)
@@ -472,7 +472,7 @@ func (f *Fish) executeApplication(app_id int64) error {
 			if err := driver.Deallocate(res.HwAddr); err != nil {
 				log.Println("Fish: Unable to get state for Application:", app.ID, err)
 				app_state = &types.ApplicationState{ApplicationID: app.ID, Status: types.ApplicationStateStatusERROR,
-					Description: fmt.Sprintf("Driver deallocate resource error: %w", err),
+					Description: fmt.Sprintf("Driver deallocate resource error: %s", err),
 				}
 			} else {
 				err := f.ResourceDelete(res.ID)

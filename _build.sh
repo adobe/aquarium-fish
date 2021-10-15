@@ -26,19 +26,25 @@ echo "--- GENERATE CODE FOR AQUARIUM-FISH ---"
 find ./lib/ -name '*.gen.go' -delete
 go generate -v ./lib/...
 
-echo
-
-echo "--- BUILD AQUARIUM-FISH ---"
-
 if [ "x${RELEASE}" != "x" ]; then
     export GIN_MODE=release
 else
+    echo
     echo "--- WARNING: build DEBUG mode ---"
 fi
 
+
 export CGO_CFLAGS="${UV_CFLAGS} ${RAFT_CFLAGS} ${SQLITE_CFLAGS} ${DQLITE_CFLAGS}"
 export CGO_LDFLAGS="${SET_CGO_LDFLAGS}"
+
+echo
+echo "--- RUN UNIT TESTS ---"
+go test -v ./lib/... ./cmd/...
+
+echo
+echo "--- BUILD AQUARIUM-FISH ---"
 go build -ldflags="-s -w" -a -o "aquarium-fish.$suffix" ./cmd/fish
+
 
 # Remove debug symbols
 strip "aquarium-fish.$suffix"
