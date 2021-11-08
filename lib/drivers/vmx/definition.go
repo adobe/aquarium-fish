@@ -20,7 +20,8 @@ import (
  *     ram: 14
  *     disks:
  *       xcode122_workspace:
- *         size: 100,
+ *         type: exfat
+ *         size: 100
  *         reuse: true
  *     network: ""
  *   metadata:

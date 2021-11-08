@@ -81,6 +81,20 @@ func (e *Processor) Return(c echo.Context, code int, obj map[string]interface{})
 			c.Response().Write(append(line, value...))
 		}
 		return nil
+	case "ps1": // Plain format suitable to use in powershell
+		prefix := c.QueryParam("prefix")
+		m := util.DotSerialize(prefix, obj)
+		c.String(code, "")
+		for key, val := range m {
+			line := cleanShellKey(strings.Replace(shellescape.StripUnsafe(key), ".", "_", -1))
+			if len(line) == 0 {
+				continue
+			}
+			// Shell quote is not applicable here, so using the custom one
+			value := []byte("='" + strings.Replace(val, "'", "''", -1) + "'\n")
+			c.Response().Write(append([]byte("$"), append(line, value...)...))
+		}
+		return nil
 	default:
 		return c.JSON(http.StatusBadRequest, H{"message": "Incorrect `format` query param provided: " + format})
 	}
@@ -92,7 +106,7 @@ func (e *Processor) DataGetList(c echo.Context, params types.DataGetListParams) 
 	res_int := c.Get("resource")
 	res, ok := res_int.(*types.Resource)
 	if !ok {
-		e.Return(c, http.StatusNotFound, H{"message": "No data found", "data": metadata})
+		e.Return(c, http.StatusNotFound, H{"message": "No data found"})
 		return fmt.Errorf("Unable to get resource from context")
 	}
 
@@ -102,7 +116,7 @@ func (e *Processor) DataGetList(c echo.Context, params types.DataGetListParams) 
 		return fmt.Errorf("Unable to parse metadata of resource: %d %s: %w", res.ID, res.Metadata, err)
 	}
 
-	return e.Return(c, http.StatusOK, H{"message": "MetaData list", "data": metadata})
+	return e.Return(c, http.StatusOK, metadata)
 }
 
 func (e *Processor) DataGet(c echo.Context, keyPath string, params types.DataGetParams) error {

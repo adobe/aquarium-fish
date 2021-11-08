@@ -23,6 +23,7 @@ if [ -z "$label_id" ]; then
                 "ram": 12,
                 "disks": {
                     "xcode122": {
+                        "type": "hfs+",
                         "size": 100,
                         "reuse": true
                     }

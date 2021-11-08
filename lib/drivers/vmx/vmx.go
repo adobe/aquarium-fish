@@ -280,8 +280,22 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]drivers.Disk) err
 
 		// Create virtual disk
 		dmg_path := disk_path + ".dmg"
-		cmd := exec.Command("/usr/bin/hdiutil", "create", dmg_path, "-fs", "HFS+",
-			"-volname", name,
+		disk_type := ""
+		switch disk.Type {
+		case "hfs+":
+			disk_type = "HFS+"
+		case "fat32":
+			disk_type = "FAT32"
+		default:
+			disk_type = "ExFAT"
+		}
+		label := name
+		if disk.Label != "" {
+			label = disk.Label
+		}
+		cmd := exec.Command("/usr/bin/hdiutil", "create", dmg_path,
+			"-fs", disk_type,
+			"-volname", label,
 			"-size", fmt.Sprintf("%dm", disk.Size*1024),
 		)
 		if _, _, err := runAndLog(cmd); err != nil {
@@ -299,7 +313,7 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]drivers.Disk) err
 
 		// Get attached disk device
 		dev_path := strings.SplitN(stdout, " ", 2)[0]
-		mount_point := filepath.Join("/Volumes", name)
+		mount_point := filepath.Join("/Volumes", label)
 
 		// Allow anyone to modify the disk content
 		if err := os.Chmod(mount_point, 0o777); err != nil {
