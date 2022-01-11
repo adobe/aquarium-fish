@@ -116,13 +116,18 @@ func (f *Fish) ResourceGetByIP(ip string) (res *types.Resource, err error) {
 	// Check by IP first
 	err = f.db.Where("node_id = ?", f.GetNodeID()).Where("ip_addr = ?", ip).First(res).Error
 	if err == nil {
+		// Check if the state is allocated to prevent old resources access
+		if f.ApplicationIsAllocated(res.ApplicationID) != nil {
+			return nil, errors.New("Fish: Prohibited to access the Resource of not allocated Application")
+		}
+
 		return res, nil
 	}
 
 	// Make sure the IP is the controlled network, otherwise someone from outside
 	// could become a local node resource, so let's be careful
 	if !isControlledNetwork(ip) {
-		return res, errors.New("Fish: Prohibited to serve the Resource IP from not controlled network")
+		return nil, errors.New("Fish: Prohibited to serve the Resource IP from not controlled network")
 	}
 
 	// Check by MAC and update IP if found
@@ -134,6 +139,11 @@ func (f *Fish) ResourceGetByIP(ip string) (res *types.Resource, err error) {
 	err = f.db.Where("node_id = ?", f.GetNodeID()).Where("hw_addr = ?", hw_addr).First(res).Error
 	if err != nil {
 		return nil, err
+	}
+
+	// Check if the state is allocated to prevent old resources access
+	if f.ApplicationIsAllocated(res.ApplicationID) != nil {
+		return nil, errors.New("Fish: Prohibited to access the Resource of not allocated Application")
 	}
 
 	log.Println("Fish: Update IP address for the Resource", res.ID, ip)

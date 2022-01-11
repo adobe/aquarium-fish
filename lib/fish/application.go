@@ -1,6 +1,8 @@
 package fish
 
 import (
+	"errors"
+
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
@@ -49,4 +51,14 @@ func (f *Fish) ApplicationListGetStatusNew() (as []types.Application, err error)
 		).Where("Status = ?", types.ApplicationStateStatusNEW),
 	).Find(&as).Error
 	return as, err
+}
+
+func (f *Fish) ApplicationIsAllocated(app_id int64) (err error) {
+	state, err := f.ApplicationStateGetByApplication(app_id)
+	if err != nil {
+		return err
+	} else if state.Status != types.ApplicationStateStatusALLOCATED {
+		return errors.New("Fish: The Application is not allocated")
+	}
+	return nil
 }
