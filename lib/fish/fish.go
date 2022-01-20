@@ -131,7 +131,10 @@ func (f *Fish) Init() error {
 		return err
 	}
 	for _, res := range resources {
-		go f.executeApplication(res.ApplicationID)
+		if f.ApplicationIsAllocated(res.ApplicationID) == nil {
+			log.Println("Fish: Found allocated resource to serve:", res.ID)
+			go f.executeApplication(res.ApplicationID)
+		}
 	}
 
 	// Run node ping timer

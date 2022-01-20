@@ -3,27 +3,28 @@
 token=$1
 [ "$token" ] || exit 1
 
-label=xcode12.2
+label=vs2019
+version=3
 
 echo "Get or create the label"
 
-label_id=$(curl -u "admin:$token" -k 'https://127.0.0.1:8001/api/v1/label/?filter=name="'$label'"' | grep -o '"ID": *[0-9]\+,' | tr -dc '0-9')
+label_id=$(curl -u "admin:$token" -k 'https://127.0.0.1:8001/api/v1/label/?filter=name="'$label'"%20AND%20version="'$version'"' | grep -o '"ID": *[0-9]\+,' | tr -dc '0-9')
 
 if [ -z "$label_id" ]; then
-    label_id=$(curl -u "admin:$token" -k -X POST -H 'Content-Type: application/json' -d '{"name":"'$label'", "version":1, "driver":"vmx",
+    label_id=$(curl -u "admin:$token" -k -X POST -H 'Content-Type: application/json' -d '{"name":"'$label'", "version":'$version', "driver":"vmx",
         "definition": {
-            "image": "macos-1015-ci-xcode122",
+            "image": "winserver2019-ci-vs2019",
             "images": {
-                "macos-1015": "https://artifact-storage/aquarium/image/macos-1015-VERSION/macos-1015-VERSION.tar.xz",
-                "macos-1015-ci": "https://artifact-storage/aquarium/image/macos-1015-ci-VERSION/macos-1015-ci-VERSION.tar.xz",
-                "macos-1015-ci-xcode122": "https://artifact-storage/aquarium/image/macos-1015-ci-xcode122-VERSION/macos-1015-ci-xcode122-VERSION.tar.xz"
+                "winserver2019": "https://artifact-storage/aquarium/image/winserver2019-VERSION/winserver2019-VERSION.tar.xz",
+                "winserver2019-ci": "https://artifact-storage/aquarium/image/winserver2019-ci-VERSION/winserver2019-ci-VERSION.tar.xz",
+                "winserver2019-ci-vs2019": "https://artifact-storage/aquarium/image/winserver2019-ci-vs2019-VERSION/winserver2019-ci-vs2019-VERSION.tar.xz"
             },
             "requirements": {
                 "cpu": 14,
                 "ram": 12,
                 "disks": {
-                    "xcode122": {
-                        "type": "hfs+",
+                    "vs2019": {
+                        "type": "exfat",
                         "size": 100,
                         "reuse": true
                     }
@@ -31,7 +32,7 @@ if [ -z "$label_id" ]; then
             }
         },
         "metadata": {
-            "JENKINS_AGENT_WORKSPACE": "/Volumes/xcode122"
+            "JENKINS_AGENT_WORKSPACE": "D:\\"
         }
     }' https://127.0.0.1:8001/api/v1/label/ | grep -o '"ID": *[0-9]\+,' | tr -dc '0-9')
 fi

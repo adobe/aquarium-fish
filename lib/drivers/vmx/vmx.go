@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -38,6 +39,7 @@ func (d *Driver) Prepare(config []byte) error {
 	if err := d.cfg.Validate(); err != nil {
 		return err
 	}
+	// TODO: Cleanup the image directory in case the images are not good
 	return nil
 }
 
@@ -70,14 +72,15 @@ func (d *Driver) Allocate(definition string) (string, error) {
 	vm_images_dir := filepath.Join(vm_dir, "images")
 
 	// Load the required images
-	if err := d.loadImages(&def, vm_images_dir); err != nil {
+	img_path, err := d.loadImages(&def, vm_images_dir)
+	if err != nil {
 		return vm_hwaddr, err
 	}
 
 	// Clone VM from the image
 	vmx_path := filepath.Join(vm_dir, vm_id+".vmx")
 	args := []string{"-T", "fusion", "clone",
-		filepath.Join(vm_images_dir, def.Image, def.Image+".vmx"), vmx_path,
+		img_path, vmx_path,
 		"linked", "-snapshot", "original",
 	}
 	cmd := exec.Command(d.cfg.VmrunPath, args...)
@@ -120,59 +123,88 @@ func (d *Driver) Allocate(definition string) (string, error) {
 	return vm_hwaddr, nil
 }
 
-func (d *Driver) loadImages(def *Definition, vm_images_dir string) error {
+// Load images and returns the target image path for cloning
+func (d *Driver) loadImages(def *Definition, vm_images_dir string) (string, error) {
 	if err := os.MkdirAll(vm_images_dir, 0o755); err != nil {
 		log.Println("VMX: Unable to create the vm images dir:", vm_images_dir)
-		return err
+		return "", err
 	}
+	target_path := ""
 	for name, url := range def.Images {
 		archive_name := filepath.Base(url)
 		image_archive := filepath.Join(d.cfg.WorkspacePath, archive_name)
 		image_unpacked := filepath.Join(d.cfg.ImagesPath, strings.TrimSuffix(archive_name, ".tar.xz"))
-		image_vmx_path := filepath.Join(image_unpacked, name, name+".vmx")
 
-		log.Println("VMX: Loading the required image:", name, image_vmx_path, url)
+		log.Println("VMX: Loading the required image:", name, url)
 
 		// Check the image is unpacked
-		if _, err := os.Stat(image_vmx_path); os.IsNotExist(err) {
+		if _, err := os.Stat(image_unpacked); os.IsNotExist(err) {
 			// Download archive to workspace
 			if err := util.DownloadUrl(url, image_archive); err != nil {
 				log.Println("VMX: Unable to download image:", name, url)
-				return err
+				return "", err
 			}
 			defer os.Remove(image_archive)
 
 			// Unpack archive
 			if err := os.MkdirAll(image_unpacked, 0o755); err != nil {
 				log.Println("VMX: Unable to create the image dir:", name, url)
-				return err
+				return "", err
 			}
 			if err := util.Unpack(image_archive, image_unpacked); err != nil {
-				log.Println("VMX: Unable to unpack image:", name, url)
-				return err
+				log.Println("VMX: Unable to unpack the image:", name, url)
+				return "", err
 			}
 
 			// Remove the archive
 			if err := os.Remove(image_archive); err != nil {
-				log.Println("VMX: Unable to remove image archive:", image_archive, err)
+				log.Println("VMX: Unable to remove the image archive:", image_archive, err)
+				return "", err
 			}
 		}
 
-		// Unfortunately the linked clones requires full path to the parent
-		// and modifies the image snapshots description during linked clone,
-		// so walk through the image files, link them to the workspace dir
-		// and copy the vmsd file with path to the workspace images dir
-		root_dir := filepath.Join(image_unpacked, name)
-		out_dir := filepath.Join(vm_images_dir, name)
+		// Getting the subdir in the unpacked dir
+		subdir := ""
+		items, err := ioutil.ReadDir(image_unpacked)
+		if err != nil {
+			log.Println("VMX: Unable to read the unpacked directory:", image_unpacked, err)
+			return "", err
+		}
+		for _, f := range items {
+			if strings.HasPrefix(f.Name(), name) {
+				if f.Mode()&os.ModeSymlink != 0 {
+					// Potentially it can be a symlink (like used in local tests)
+					if _, err := os.Stat(filepath.Join(image_unpacked, f.Name())); err != nil {
+						log.Println("VMX: The image link is broken:", f.Name(), err)
+						continue
+					}
+				}
+				subdir = f.Name()
+				break
+			}
+		}
+		if subdir == "" {
+			log.Printf("VMX: Unpacked image '%s' has no subfolder '%s', only %s:\n", image_unpacked, name, items)
+			return "", errors.New("VMX: Can't find the subfolder in the unpacked image")
+		}
+
+		// Unfortunately the clone operation modifies the image snapshots description
+		// so we walk through the image files, link them to the workspace dir and copy
+		// the files (except for vmdk bins) with path to the workspace images dir
+		root_dir := filepath.Join(image_unpacked, subdir)
+		out_dir := filepath.Join(vm_images_dir, subdir)
+		if def.Image == name {
+			target_path = filepath.Join(out_dir, def.Image+".vmx")
+		}
 		if err := os.MkdirAll(out_dir, 0o755); err != nil {
 			log.Println("VMX: Unable to create the vm image dir:", out_dir)
-			return err
+			return "", err
 		}
 
 		tocopy_list, err := os.ReadDir(root_dir)
 		if err != nil {
-			log.Println("VMX: Unable to list image directory:", root_dir)
-			return err
+			log.Println("VMX: Unable to list the image directory:", root_dir)
+			return "", err
 		}
 
 		for _, entry := range tocopy_list {
@@ -183,7 +215,7 @@ func (d *Driver) loadImages(def *Definition, vm_images_dir string) error {
 			if strings.HasSuffix(entry.Name(), ".vmdk") && util.FileStartsWith(in_path, []byte("# Disk DescriptorFile")) != nil {
 				// Just link the disk image to the vm image dir - we will not modify it anyway
 				if err := os.Symlink(in_path, out_path); err != nil {
-					return err
+					return "", err
 				}
 				continue
 			}
@@ -191,9 +223,13 @@ func (d *Driver) loadImages(def *Definition, vm_images_dir string) error {
 			// Copy VM file in order to prevent the image modification
 			if err := util.FileCopy(in_path, out_path); err != nil {
 				log.Println("VMX: Unable to copy image file", in_path, out_path)
-				return err
+				return "", err
 			}
 
+			// Deprecated functionality
+			// Since aquarium-bait tag `20220118` the images are using only relative paths
+			// TODO: Remove it on release v1.0
+			//
 			// Modify the vmsd file cloneOf0 to replace token - it requires absolute path
 			if strings.HasSuffix(entry.Name(), ".vmsd") {
 				if err := util.FileReplaceToken(out_path,
@@ -201,13 +237,13 @@ func (d *Driver) loadImages(def *Definition, vm_images_dir string) error {
 					"<REPLACE_PARENT_VM_FULL_PATH>", vm_images_dir,
 				); err != nil {
 					log.Println("VMX: Unable to replace full path token in vmsd", name)
-					return err
+					return "", err
 				}
 			}
 		}
 	}
 
-	return nil
+	return target_path, nil
 }
 
 func (d *Driver) getAllocatedVMX(hwaddr string) string {
