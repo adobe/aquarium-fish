@@ -87,14 +87,14 @@ func isControlledNetwork(ip string) bool {
 
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		fmt.Print(fmt.Errorf("Unable to get the available network interfaces: %+v\n", err.Error()))
+		log.Print(fmt.Errorf("Unable to get the available network interfaces: %+v\n", err.Error()))
 		return false
 	}
 
 	for _, i := range ifaces {
 		addrs, err := i.Addrs()
 		if err != nil {
-			fmt.Print(fmt.Errorf("Unable to get available addresses of the interface %s: %+v\n", i.Name, err.Error()))
+			log.Print(fmt.Errorf("Unable to get available addresses of the interface %s: %+v\n", i.Name, err.Error()))
 			continue
 		}
 

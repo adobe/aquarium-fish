@@ -15,6 +15,9 @@ type Config struct {
 
 	ImagesPath    string `json:"images_path"`    // Where to look/store VM images
 	WorkspacePath string `json:"workspace_path"` // Where to place the cloned VM
+
+	DownloadUser     string `json:"download_user"`     // The user will be used to auth in download operations
+	DownloadPassword string `json:"download_password"` // The user will be used to auth in download operations
 }
 
 func (c *Config) Apply(config []byte) error {

@@ -1,12 +1,12 @@
 #!/bin/sh -e
 # Build fish for linux (using docker)
 
-root_dir=$(dirname "`realpath "$0"`")
-module=$(grep '^module' "${root_dir}/go.mod" | cut -d ' ' -f 2)
+export root_dir=$(dirname "`realpath "$0"`")
+export module=$(grep '^module' "${root_dir}/go.mod" | cut -d ' ' -f 2)
 
 # Run in docker container
 if [ "$(command -v go)" = "" -o "$(go env GOOS)" != "linux" ]; then
-    docker run --rm -it -v "$root_dir":/go/src/${module}:z -w /go/src/${module} -e GOOS=linux -e GOARCH=amd64 golang:1.16 ./build-linux.sh
+    docker run --rm -it -v "$root_dir":/go/src/${module}:z -w /go/src/${module} -e GOOS=linux -e GOARCH=amd64 golang:1.17 ./build-linux.sh
     exit 0
 fi
 

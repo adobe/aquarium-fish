@@ -5,25 +5,31 @@
 [ "x$suffix" != "x" ] || suffix="$1"
 [ "x$suffix" != "x" ] || suffix="$(uname -s)_$(uname -m)"
 
+echo "ROOT DIR: ${root_dir}"
 cd "${root_dir}"
 
 ./check.sh
 
+
+gopath=$(go env GOPATH)
+cd /tmp  # Don't let go get to modify project go.mod
+
 echo "--- PATCH GO-DQLITE ---"
 # Apply a small patch to the go-dqlite go package
-gopath=$(go env GOPATH)
 go get -d github.com/canonical/go-dqlite@v1.8.0
 chmod -R u+w "$gopath/pkg/mod/github.com/canonical/go-dqlite@v1.8.0"
-patch -N -p1 -d "$gopath/pkg/mod/github.com/canonical/go-dqlite@v1.8.0" < deps/go-dqlite.patch || true
+patch -N -p1 -d "$gopath/pkg/mod/github.com/canonical/go-dqlite@v1.8.0" < "${root_dir}/deps/go-dqlite.patch" || true
 
 echo "--- PATCH OAPI-CODEGEN ---"
 # Generate the API code patch
 go get -d "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.8.1"
 chmod -R u+w "$gopath/pkg/mod/github.com/deepmap/oapi-codegen@v1.8.1"
-patch -N -p1 -d "$gopath/pkg/mod/github.com/deepmap/oapi-codegen@v1.8.1" < deps/oapi-codegen.patch || true
+patch -N -p1 -d "$gopath/pkg/mod/github.com/deepmap/oapi-codegen@v1.8.1" < "${root_dir}/deps/oapi-codegen.patch" || true
+
+cd "${root_dir}"
 
 echo "--- GENERATE CODE FOR AQUARIUM-FISH ---"
-find ./lib/ -name '*.gen.go' -delete
+find ./lib -name '*.gen.go' -delete
 go generate -v ./lib/...
 
 if [ "x${RELEASE}" != "x" ]; then

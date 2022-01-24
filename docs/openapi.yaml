@@ -927,11 +927,11 @@ components:
           x-go-type: util.UnparsedJson
           description: Actual Labl definition depends on the used driver
           example:
-            image: macos-1015-ci-xcode122
+            image: macos1015-ci-xcode122
             images:
-              macos-1015: 'https://artifact-storage/aquarium/image/macos-1015-VERSION/macos-1015-VERSION.tar.xz'
-              macos-1015-ci: 'https://artifact-storage/aquarium/image/macos-1015-ci-VERSION/macos-1015-ci-VERSION.tar.xz'
-              macos-1015-ci-xcode122: 'https://artifact-storage/aquarium/image/macos-1015-ci-xcode122-VERSION/macos-1015-ci-xcode122-VERSION.tar.xz'
+              macos1015: 'https://artifact-storage/aquarium/image/macos1015-VERSION/macos1015-VERSION.tar.xz'
+              macos1015-ci: 'https://artifact-storage/aquarium/image/macos1015-ci-VERSION/macos1015-ci-VERSION.tar.xz'
+              macos1015-ci-xcode122: 'https://artifact-storage/aquarium/image/macos1015-ci-xcode122-VERSION/macos1015-ci-xcode122-VERSION.tar.xz'
             requirements:
               cpu: 14
               ram: 12
