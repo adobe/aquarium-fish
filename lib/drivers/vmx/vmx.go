@@ -65,8 +65,9 @@ func (d *Driver) ValidateDefinition(definition string) error {
  * Allocate VM with provided images
  *
  * It automatically download the required images, unpack them and runs the VM.
+ * Not using metadata because there is no good interfaces to pass it to VM.
  */
-func (d *Driver) Allocate(definition string) (string, error) {
+func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (string, error) {
 	var def Definition
 	def.Apply(definition)
 

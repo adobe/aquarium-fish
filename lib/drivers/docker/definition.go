@@ -10,7 +10,7 @@
  * governing permissions and limitations under the License.
  */
 
-package vmx
+package docker
 
 import (
 	"encoding/json"
@@ -22,32 +22,33 @@ import (
 
 /**
  * Definition example:
- *   image: macos1015-xcode122-ci
+ *   image: ubuntu2004-python3-ci
  *   images:
- *     macos1015: https://artifact-storage/aquarium/image/macos1015-VERSION/macos1015-VERSION.tar.xz
- *     macos1015-xcode122: https://artifact-storage/aquarium/image/macos1015-xcode122-VERSION/macos1015-xcode122-VERSION.tar.xz
- *     macos1015-xcode122-ci: https://artifact-storage/aquarium/image/macos1015-xcode122-ci-VERSION/macos1015-xcode122-ci-VERSION.tar.xz
+ *     ubuntu2004: https://artifact-storage/aquarium/image/docker/ubuntu2004/ubuntu2004-VERSION.tar.xz
+ *     ubuntu2004-python3: https://artifact-storage/aquarium/image/docker/ubuntu2004-python3/ubuntu2004-python3-VERSION.tar.xz
+ *     ubuntu2004-python3-ci: https://artifact-storage/aquarium/image/docker/ubuntu2004-python3-ci/ubuntu2004-python3-ci-VERSION.tar.xz
  *   requirements:
  *     cpu: 14
  *     ram: 14
  *     disks:
- *       xcode122_workspace:
- *         type: exfat
+ *       python3_workspace:
+ *         label: workspace
+ *		   type: dir
  *         size: 100
  *         reuse: true
  *     network: ""
  *   metadata:
- *     JENKINS_AGENT_WORKDIR: /Users/jenkins/workdir
+ *     JENKINS_AGENT_WORKDIR: /mnt/workspace
  */
 type Definition struct {
-	Image        string               `json:"image"`        // Main image to use as reference
+	Image        string               `json:"image"`        // Image name to use
 	Images       map[string]string    `json:"images"`       // List of image dependencies
 	Requirements drivers.Requirements `json:"requirements"` // Required resources to allocate
 }
 
 func (d *Definition) Apply(definition string) error {
 	if err := json.Unmarshal([]byte(definition), d); err != nil {
-		log.Println("VMX: Unable to apply the driver definition", err)
+		log.Println("DOCKER: Unable to apply the driver definition", err)
 		return err
 	}
 
@@ -57,29 +58,29 @@ func (d *Definition) Apply(definition string) error {
 func (d *Definition) Validate() error {
 	// Check image
 	if d.Image == "" {
-		return errors.New("VMX: No image is specified")
+		return errors.New("DOCKER: No image is specified")
 	}
 
-	// Check images
+	// Check the images
 	image_exist := false
 	for name, url := range d.Images {
 		if name == "" {
-			return errors.New("VMX: No image name is specified")
+			return errors.New("DOCKER: No image name is specified")
 		}
 		if url == "" {
-			return errors.New("VMX: No image url is specified")
+			return errors.New("DOCKER: No image url is specified")
 		}
 		if name == d.Image {
 			image_exist = true
 		}
 	}
 	if !image_exist {
-		return errors.New("VMX: No image found in the images")
+		return errors.New("DOCKER: No image found in the images")
 	}
 
 	// Check resources
-	if d.Requirements.Validate([]string{"hfs+", "exfat", "fat32"}) != nil {
-		return errors.New("VMX: Requirements validation failed")
+	if d.Requirements.Validate([]string{"dir", "hfs+", "exfat", "fat32"}) != nil {
+		return errors.New("DOCKER: Requirements validation failed")
 	}
 
 	return nil

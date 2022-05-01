@@ -30,7 +30,7 @@ type ResourceDriver interface {
 	ValidateDefinition(definition string) error
 
 	// Allocate the resource by definition and returns hw address
-	Allocate(definition string) (string, error)
+	Allocate(definition string, metadata map[string]interface{}) (string, error)
 
 	// Get the status of the resource with given hw address
 	Status(hwaddr string) string

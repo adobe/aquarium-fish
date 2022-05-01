@@ -10,7 +10,7 @@
  * governing permissions and limitations under the License.
  */
 
-package vmx
+package docker
 
 import (
 	"encoding/json"
@@ -21,12 +21,10 @@ import (
 )
 
 type Config struct {
-	VmrunPath          string `json:"vmrun_path"`          // '/Applications/VMware Fusion.app/Contents/Library/vmrun'
-	RawdiskCreatorPath string `json:"rawdiskcreator_path"` // '/Applications/VMware Fusion.app/Contents/Library/vmware-rawdiskCreator'
-	VdiskmanagerPath   string `json:"vdiskmanager_path"`   // '/Applications/VMware Fusion.app/Contents/Library/vmware-vdiskmanager'
+	DockerPath string `json:"docker_path"` // '/Applications/Docker.app/Contents/Resources/bin/docker'
 
-	ImagesPath    string `json:"images_path"`    // Where to look/store VM images
-	WorkspacePath string `json:"workspace_path"` // Where to place the cloned VM and disks
+	ImagesPath    string `json:"images_path"`    // Where to look/store docker file images
+	WorkspacePath string `json:"workspace_path"` // Where to place the disks
 
 	DownloadUser     string `json:"download_user"`     // The user will be used in download operations
 	DownloadPassword string `json:"download_password"` // The password will be used in download operations
@@ -35,7 +33,7 @@ type Config struct {
 func (c *Config) Apply(config []byte) error {
 	if len(config) > 0 {
 		if err := json.Unmarshal(config, c); err != nil {
-			log.Println("VMX: Unable to apply the driver config", err)
+			log.Println("DOCKER: Unable to apply the driver config", err)
 			return err
 		}
 	}
@@ -44,34 +42,19 @@ func (c *Config) Apply(config []byte) error {
 
 func (c *Config) Validate() (err error) {
 	// Check that values of the config is filled at least with defaults
-	if c.VmrunPath == "" {
+	if c.DockerPath == "" {
 		// Look in the PATH
-		if c.VmrunPath, err = exec.LookPath("vmrun"); err != nil {
-			log.Println("VMX: Unable to locate `vmrun` path", err)
+		if c.DockerPath, err = exec.LookPath("docker"); err != nil {
+			log.Println("DOCKER: Unable to locate `docker` path", err)
 			return err
 		}
 	}
-	if c.RawdiskCreatorPath == "" {
-		// Use VmrunPath to get the path
-		c.RawdiskCreatorPath = filepath.Join(filepath.Dir(filepath.Dir(c.VmrunPath)), "Library", "vmware-rawdiskCreator")
-		if _, err := os.Stat(c.RawdiskCreatorPath); os.IsNotExist(err) {
-			log.Println("VMX: Unable to locate `vmware-rawdiskCreator` path", err)
-			return err
-		}
-	}
-	if c.VdiskmanagerPath == "" {
-		// Use VmrunPath to get the path
-		c.VdiskmanagerPath = filepath.Join(filepath.Dir(filepath.Dir(c.VmrunPath)), "Library", "vmware-vdiskmanager")
-		if _, err := os.Stat(c.RawdiskCreatorPath); os.IsNotExist(err) {
-			log.Println("VMX: Unable to locate `vmware-vdiskmanager` path", err)
-			return err
-		}
-	}
+
 	if c.ImagesPath == "" {
-		c.ImagesPath = "fish_vmx_images"
+		c.ImagesPath = "fish_docker_images"
 	}
 	if c.WorkspacePath == "" {
-		c.WorkspacePath = "fish_vmx_workspace"
+		c.WorkspacePath = "fish_docker_workspace"
 	}
 
 	// Making paths absolute
@@ -82,7 +65,7 @@ func (c *Config) Validate() (err error) {
 		return err
 	}
 
-	log.Println("VMX: Creating working directories:", c.ImagesPath, c.WorkspacePath)
+	log.Println("DOCKER: Creating working directories:", c.ImagesPath, c.WorkspacePath)
 	if err := os.MkdirAll(c.ImagesPath, 0o750); err != nil {
 		return err
 	}

@@ -1,14 +1,45 @@
-# Aquarium: Fish
+# Aquarium Fish
 
-Distributed p2p system to manage resources. Primarily was developed in order to manage the dynamic
-Jenkins CI and simplify the infrastructure management, but can be used in various applications to
-have self-management resources and simple REST API to manage p2p cluster.
+Distributed p2p system to manage resources. Primarily was developed to manage the dynamic Jenkins
+CI agents in heterogeneous environment and simplify the infrastructure management, but can be used
+in various applications to have self-management resources and simple REST API to manage p2p cluster.
 
-## Issues
+Eventally becomes an internal cloud or pool of resources with high availability and business
+continuity features - an essential part of the modern infrastructure in worldwide companies. It
+will allow to build the automation without an issues of centralization (by proxying requests to
+nearby services), complete control on the environments and safety provided by sandboxing and
+dynamic nature of the envs.
 
-Could be found here: https://github.com/adobe/aquarium-fish/issues/
+Aquarium will make the resource management as simple as possible and hopefully unify the dynamic
+resource management by integrating multiple environment providers (VM, container, native, clouds,
+etc.) to one entry point of allocating devices which can be used across the organization.
+
+## Requirements
+
+To run the node you need nothing, but the drivers usually require some apps to be installed into
+the environment.
+
+## Goals
+
+* Completely distributed system
+* Run and operate locally with minimal required configuration
+* Flexible to use different database engines
+* Simple interface for the drivers which provides resources
+* Proper sandboxing of the running resources (host only networking by default)
+* Compact API with straightforward definitions
+* Socks5 and other proxies to redirect the applications to nearby services
 
 ## Usage
+
+To use the Aquarium Fish you just need to execute the next steps:
+* Ensure the driver requirements for needed driver are installed
+* Run Fish node
+* Obtain the generated admin user token
+* With HTTP API:
+   * Create Label which describes the resource you want to see
+   * Create Application to request the resource
+   * Use the allocated resource
+   * Destroy the resource
 
 ### To run locally
 
@@ -27,7 +58,7 @@ nodes.
 
 If you want to use the secondary node on the same host - provide a simple config with overridden
 node name, because the first will use hostname as node name:
-* test.yml
+* local2.yml
    ```yaml
    ---
    node_name: test-2
@@ -38,10 +69,10 @@ node name, because the first will use hostname as node name:
    ```
 
 ```
-$ ./aquarium-fish --cfg test.yml
+$ ./aquarium-fish --cfg local2.yml
 ```
 
-### To run in the real cluster
+### To run as a cluster
 
 Quite the same as running locally, but `--db` should be the actual ip/name endpoint of the host,
 since it will be used to connect by the other nodes (so 0.0.0.0 will not work here). For example if

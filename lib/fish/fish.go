@@ -454,7 +454,7 @@ func (f *Fish) executeApplication(app_id int64) error {
 	if app_state.Status == types.ApplicationStateStatusELECTED {
 		// Run the allocation
 		log.Println("Fish: Allocate the resource using the driver", driver.Name())
-		res.HwAddr, err = driver.Allocate(string(label.Definition))
+		res.HwAddr, err = driver.Allocate(string(label.Definition), metadata)
 		if err != nil {
 			log.Println("Fish: Unable to allocate resource for the Application:", app.ID, err)
 			app_state = &types.ApplicationState{ApplicationID: app.ID, Status: types.ApplicationStateStatusERROR,

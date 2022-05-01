@@ -14,6 +14,7 @@ package drivers
 
 import (
 	"errors"
+	"fmt"
 )
 
 // Resource requirements
@@ -28,10 +29,10 @@ type Disk struct {
 	Type  string `json:"type"`  // Type of the filesystem to create
 	Label string `json:"label"` // Volume name will be given to the disk, empty will use the disk key
 	Size  uint   `json:"size"`  // Amount of disk space in GB
-	Reuse bool   `json:"reuse"` // Do not remove the disk and reuse it for the next image run
+	Reuse bool   `json:"reuse"` // Do not remove the disk and reuse it for the next resource run
 }
 
-func (r *Requirements) Validate() error {
+func (r *Requirements) Validate(disk_types []string) error {
 	// Check resources
 	if r.Cpu < 1 {
 		return errors.New("Driver: Number of CPU cores is less then 1")
@@ -43,16 +44,25 @@ func (r *Requirements) Validate() error {
 		if name == "" {
 			return errors.New("Driver: Disk name can't be empty")
 		}
-		if data.Type != "hfs+" && data.Type != "exfat" && data.Type != "fat32" {
-			return errors.New("Driver: Type of disk must be either 'hfs+', 'exfat' or 'fat32'")
+		if !contains(disk_types, data.Type) {
+			return errors.New(fmt.Sprintf("Driver: Type of disk must be one of: %+q", disk_types))
 		}
 		if data.Size < 1 {
 			return errors.New("Driver: Size of the disk can't be less than 1GB")
 		}
 	}
 	if r.Network != "" && r.Network != "nat" {
-		return errors.New("Driver: The network configuration must be either '' (empty for hosted) or 'nat'")
+		return errors.New("Driver: The network configuration must be either '' (empty for hostonly) or 'nat'")
 	}
 
 	return nil
+}
+
+func contains(list []string, value string) bool {
+	for _, v := range list {
+		if v == value {
+			return true
+		}
+	}
+	return false
 }
