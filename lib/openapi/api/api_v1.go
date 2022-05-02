@@ -285,12 +285,17 @@ func (e *Processor) ApplicationDeallocateGet(c echo.Context, id int64) error {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find status for the application: %d", id)})
 		return fmt.Errorf("Unable to find status for the application: %d, %w", id, err)
 	}
-	if out.Status != types.ApplicationStateStatusALLOCATED {
+	if !e.fish.ApplicationStateIsActive(out.Status) {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to deallocate the application with status: %s", out.Status)})
 		return fmt.Errorf("Unable to deallocate the application with status: %s", out.Status)
 	}
 
-	as := &types.ApplicationState{ApplicationID: id, Status: types.ApplicationStateStatusDEALLOCATE,
+	new_status := types.ApplicationStateStatusDEALLOCATE
+	if out.Status != types.ApplicationStateStatusALLOCATED {
+		// The Application was not yet Allocated so just mark it as Recalled
+		new_status = types.ApplicationStateStatusRECALLED
+	}
+	as := &types.ApplicationState{ApplicationID: id, Status: new_status,
 		Description: fmt.Sprintf("Requested by user %s", user.(*types.User).Name),
 	}
 	err = e.fish.ApplicationStateCreate(as)

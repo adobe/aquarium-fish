@@ -140,7 +140,7 @@ func main() {
 
 			log.Println("Fish starting ORM...")
 			db, err := gorm.Open(&sqlite.Dialector{Conn: dqlite_db}, &gorm.Config{
-				Logger: logger.Default.LogMode(logger.Warn),
+				Logger: logger.Default.LogMode(logger.Error),
 			})
 			if err != nil {
 				return err

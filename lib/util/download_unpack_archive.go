@@ -108,6 +108,11 @@ func DownloadUnpackArchive(url, out_dir, user, password string) error {
 		case tar.TypeReg, tar.TypeRegA:
 			// Write a file
 			log.Printf("Extracting '%s': %s\n", out_dir, hdr.Name)
+			err = os.MkdirAll(filepath.Dir(target), 0750)
+			if err != nil {
+				os.RemoveAll(out_dir)
+				return err
+			}
 			w, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(hdr.Mode))
 			if err != nil {
 				os.RemoveAll(out_dir)

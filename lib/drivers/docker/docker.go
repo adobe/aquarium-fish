@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 
@@ -60,6 +61,10 @@ func (d *Driver) ValidateDefinition(definition string) error {
 	return def.Apply(definition)
 }
 
+func (d *Driver) getContainerName(hwaddr string) string {
+	return fmt.Sprintf("fish-%s", strings.ReplaceAll(hwaddr, ":", ""))
+}
+
 /**
  * Allocate container out of the images
  *
@@ -73,8 +78,8 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 	// Generate unique id from the hw address and required directories
 	buf := crypt.RandBytes(6)
 	buf[0] = (buf[0] | 2) & 0xfe // Set local bit, ensure unicast address
-	c_id := fmt.Sprintf("fish-%02x%02x%02x%02x%02x%02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5])
 	c_hwaddr := fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5])
+	c_name := d.getContainerName(c_hwaddr)
 
 	// Create the docker network
 	// TODO: For now hostonly is only works properly (allows access to host
@@ -106,7 +111,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 
 	// Set the arguments to run the container
 	run_args := []string{"run", "--detach",
-		"--name", c_id,
+		"--name", c_name,
 		"--mac-address", c_hwaddr,
 		"--network", "aquarium-" + c_network,
 		"--cpus", fmt.Sprintf("%d", def.Requirements.Cpu),
@@ -115,13 +120,13 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 	}
 
 	// Create and connect volumes to container
-	if err := d.disksCreate(c_id, &run_args, def.Requirements.Disks); err != nil {
+	if err := d.disksCreate(c_name, &run_args, def.Requirements.Disks); err != nil {
 		log.Println("DOCKER: Unable to create the required disks")
 		return c_hwaddr, err
 	}
 
 	// Create env file
-	env_path, err := d.envCreate(c_id, metadata)
+	env_path, err := d.envCreate(c_name, metadata)
 	if err != nil {
 		log.Println("DOCKER: Unable to create the required disks")
 		return c_hwaddr, err
@@ -135,11 +140,11 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 	run_args = append(run_args, img_name_version)
 	cmd := exec.Command(d.cfg.DockerPath, run_args...)
 	if _, _, err := runAndLog(cmd); err != nil {
-		log.Println("DOCKER: Unable to run container", c_id, err)
+		log.Println("DOCKER: Unable to run container", c_name, err)
 		return c_hwaddr, err
 	}
 
-	log.Println("DOCKER: Allocate of VM", c_hwaddr, c_id, "completed")
+	log.Println("DOCKER: Allocate of VM", c_hwaddr, c_name, "completed")
 
 	return c_hwaddr, nil
 }
@@ -173,9 +178,17 @@ func (d *Driver) loadImages(def *Definition) (string, error) {
 	// They needed to be processed sequentially because the childs does not
 	// contains the parent's layers so parents should be loaded first
 
+	// The def.Images is unsorted map, so need to sort the keys first for proper order of loading
+	image_names := make([]string, 0, len(def.Images))
+	for name, _ := range def.Images {
+		image_names = append(image_names, name)
+	}
+	sort.Strings(image_names)
+
 	target_out := ""
 	var loaded_images []string
-	for name, url := range def.Images {
+	for _, name := range image_names {
+		url, _ := def.Images[name]
 		archive_name := filepath.Base(url)
 		image_unpacked := filepath.Join(d.cfg.ImagesPath, strings.TrimSuffix(archive_name, ".tar.xz"))
 
@@ -273,7 +286,7 @@ func (d *Driver) loadImages(def *Definition) (string, error) {
 func (d *Driver) getAllocatedContainer(hwaddr string) string {
 	// Probably it's better to store the current list in the memory
 	cmd := exec.Command(d.cfg.DockerPath, "ps", "-a", "-q",
-		"--filter", "name=fish-"+strings.ReplaceAll(hwaddr, ":", ""),
+		"--filter", "name="+d.getContainerName(hwaddr),
 	)
 	stdout, _, err := runAndLog(cmd)
 	if err != nil {
@@ -294,14 +307,14 @@ func (d *Driver) isNetworkExists(name string) bool {
 	return len(stdout) > 0
 }
 
-func (d *Driver) disksCreate(c_id string, run_args *[]string, disks map[string]drivers.Disk) error {
+func (d *Driver) disksCreate(c_name string, run_args *[]string, disks map[string]drivers.Disk) error {
 	// Create disks
 	disk_paths := make(map[string]string, len(disks))
 
-	for name, disk := range disks {
-		disk_path := filepath.Join(d.cfg.WorkspacePath, c_id, "disk-"+name)
+	for d_name, disk := range disks {
+		disk_path := filepath.Join(d.cfg.WorkspacePath, c_name, "disk-"+d_name)
 		if disk.Reuse {
-			disk_path = filepath.Join(d.cfg.WorkspacePath, "disk-"+name)
+			disk_path = filepath.Join(d.cfg.WorkspacePath, "disk-"+d_name)
 		}
 		if err := os.MkdirAll(filepath.Dir(disk_path), 0o755); err != nil {
 			return err
@@ -323,7 +336,7 @@ func (d *Driver) disksCreate(c_id string, run_args *[]string, disks map[string]d
 		// Create virtual disk in order to restrict the disk space
 		dmg_path := disk_path + ".dmg"
 
-		label := name
+		label := d_name
 		if disk.Label != "" {
 			// Label can be used as mount point so cut the path separator out
 			label = strings.ReplaceAll(disk.Label, "/", "")
@@ -353,14 +366,14 @@ func (d *Driver) disksCreate(c_id string, run_args *[]string, disks map[string]d
 			}
 		}
 
+		mount_point := filepath.Join("/Volumes", fmt.Sprintf("%s-%s", c_name, d_name))
+
 		// Attach & mount disk
-		cmd := exec.Command("/usr/bin/hdiutil", "attach", dmg_path)
+		cmd := exec.Command("/usr/bin/hdiutil", "attach", dmg_path, "-mountpoint", mount_point)
 		if _, _, err := runAndLog(cmd); err != nil {
 			log.Println("DOCKER: Unable to attach dmg disk", err)
 			return err
 		}
-
-		mount_point := filepath.Join("/Volumes", label)
 
 		// Allow anyone to modify the disk content
 		if err := os.Chmod(mount_point, 0o777); err != nil {
@@ -387,8 +400,8 @@ func (d *Driver) disksCreate(c_id string, run_args *[]string, disks map[string]d
 	return nil
 }
 
-func (d *Driver) envCreate(c_id string, metadata map[string]interface{}) (string, error) {
-	env_file_path := filepath.Join(d.cfg.WorkspacePath, c_id, ".env")
+func (d *Driver) envCreate(c_name string, metadata map[string]interface{}) (string, error) {
+	env_file_path := filepath.Join(d.cfg.WorkspacePath, c_name, ".env")
 	if err := os.MkdirAll(filepath.Dir(env_file_path), 0o755); err != nil {
 		log.Println("DOCKER: Unable to create the container directory", err)
 		return "", err
@@ -419,6 +432,7 @@ func (d *Driver) Status(hwaddr string) string {
 }
 
 func (d *Driver) Deallocate(hwaddr string) error {
+	c_name := d.getContainerName(hwaddr)
 	c_id := d.getAllocatedContainer(hwaddr)
 	if len(c_id) == 0 {
 		log.Println("DOCKER: Unable to find container with HW ADDR:", hwaddr)
@@ -431,7 +445,7 @@ func (d *Driver) Deallocate(hwaddr string) error {
 	)
 	stdout, _, err := runAndLog(cmd)
 	if err != nil {
-		log.Println("DOCKER: Unable to inspect the container:", c_id)
+		log.Println("DOCKER: Unable to inspect the container:", c_name)
 		return err
 	}
 	c_volumes := strings.Split(strings.TrimSpace(stdout), "\n")
@@ -439,20 +453,20 @@ func (d *Driver) Deallocate(hwaddr string) error {
 	// Stop the container
 	cmd = exec.Command(d.cfg.DockerPath, "stop", c_id)
 	if _, _, err := runAndLog(cmd); err != nil {
-		log.Println("DOCKER: Unable to stop the container:", c_id)
+		log.Println("DOCKER: Unable to stop the container:", c_name)
 		return err
 	}
 	// Remove the container
 	cmd = exec.Command(d.cfg.DockerPath, "rm", c_id)
 	if _, _, err := runAndLog(cmd); err != nil {
-		log.Println("DOCKER: Unable to remove the container:", c_id)
+		log.Println("DOCKER: Unable to remove the container:", c_name)
 		return err
 	}
 
 	// Umount the disk volumes if needed
 	mounts, _, err := runAndLog(exec.Command("/sbin/mount"))
 	if err != nil {
-		log.Println("DOCKER: Unable to list the mount points:", c_id)
+		log.Println("DOCKER: Unable to list the mount points:", c_name)
 		return err
 	}
 	for _, vol_path := range c_volumes {
@@ -466,14 +480,14 @@ func (d *Driver) Deallocate(hwaddr string) error {
 	}
 
 	// Cleaning the container work directory with non-reuse disks
-	c_workspace_path := filepath.Join(d.cfg.WorkspacePath, c_id)
+	c_workspace_path := filepath.Join(d.cfg.WorkspacePath, c_name)
 	if _, err := os.Stat(c_workspace_path); !os.IsNotExist(err) {
 		if err := os.RemoveAll(c_workspace_path); err != nil {
 			return err
 		}
 	}
 
-	log.Println("DOCKER: Deallocate of container", hwaddr, c_id, "completed")
+	log.Println("DOCKER: Deallocate of container", hwaddr, c_name, "completed")
 
 	return nil
 }

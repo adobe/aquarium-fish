@@ -24,9 +24,9 @@ import (
  * Definition example:
  *   image: macos1015-xcode122-ci
  *   images:
- *     macos1015: https://artifact-storage/aquarium/image/macos1015-VERSION/macos1015-VERSION.tar.xz
- *     macos1015-xcode122: https://artifact-storage/aquarium/image/macos1015-xcode122-VERSION/macos1015-xcode122-VERSION.tar.xz
- *     macos1015-xcode122-ci: https://artifact-storage/aquarium/image/macos1015-xcode122-ci-VERSION/macos1015-xcode122-ci-VERSION.tar.xz
+ *     macos1015: https://artifact-storage/aquarium/image/vmx/macos1015-VERSION/macos1015-VERSION.tar.xz
+ *     macos1015-xcode122: https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-VERSION/macos1015-xcode122-VERSION.tar.xz
+ *     macos1015-xcode122-ci: https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-ci-VERSION/macos1015-xcode122-ci-VERSION.tar.xz
  *   requirements:
  *     cpu: 14
  *     ram: 14

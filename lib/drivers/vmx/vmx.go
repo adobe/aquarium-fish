@@ -307,10 +307,10 @@ func (d *Driver) getAllocatedVMX(hwaddr string) string {
 func (d *Driver) disksCreate(vmx_path string, disks map[string]drivers.Disk) error {
 	// Create disk files
 	var disk_paths []string
-	for name, disk := range disks {
-		disk_path := filepath.Join(filepath.Dir(vmx_path), name)
+	for d_name, disk := range disks {
+		disk_path := filepath.Join(filepath.Dir(vmx_path), d_name)
 		if disk.Reuse {
-			disk_path = filepath.Join(d.cfg.WorkspacePath, "disk-"+name, name)
+			disk_path = filepath.Join(d.cfg.WorkspacePath, "disk-"+d_name, d_name)
 			if err := os.MkdirAll(filepath.Dir(disk_path), 0o755); err != nil {
 				return err
 			}
@@ -343,7 +343,7 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]drivers.Disk) err
 		default:
 			disk_type = "ExFAT"
 		}
-		label := name
+		label := d_name
 		if disk.Label != "" {
 			label = disk.Label
 		}
@@ -357,8 +357,11 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]drivers.Disk) err
 			return err
 		}
 
+		vm_name := strings.TrimSuffix(filepath.Base(vmx_path), ".vmx")
+		mount_point := filepath.Join("/Volumes", fmt.Sprintf("%s-%s", vm_name, d_name))
+
 		// Attach & mount disk
-		cmd = exec.Command("/usr/bin/hdiutil", "attach", dmg_path)
+		cmd = exec.Command("/usr/bin/hdiutil", "attach", dmg_path, "-mountpoint", mount_point)
 		stdout, _, err := runAndLog(cmd)
 		if err != nil {
 			log.Println("VMX: Unable to attach dmg disk", err)
@@ -367,7 +370,6 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]drivers.Disk) err
 
 		// Get attached disk device
 		dev_path := strings.SplitN(stdout, " ", 2)[0]
-		mount_point := filepath.Join("/Volumes", label)
 
 		// Allow anyone to modify the disk content
 		if err := os.Chmod(mount_point, 0o777); err != nil {

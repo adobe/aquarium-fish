@@ -303,10 +303,8 @@ func (f *Fish) isNodeAvailableForApplication(app_id int64) bool {
 	// Is node executing the application right now
 	f.applications_mutex.Lock()
 	{
-		// TODO: Potentially a number of applications could be executed
-		// but keep it simple for now
-		if len(f.applications) > 0 {
-			log.Println("Fish: Node already busy with the application")
+		if len(f.applications) >= f.cfg.NodeSlots {
+			log.Println("Fish: All the slots of the Node are busy", app_id)
 			f.applications_mutex.Unlock()
 			return false
 		}
@@ -337,15 +335,19 @@ func (f *Fish) isNodeAvailableForApplication(app_id int64) bool {
 		return false
 	}
 
+	// TODO: Check with driver if label is capable to be running in parallel on the same
+	// node (in case there is running apps with the same label), because the labels could
+	// contain reuse disks for example which are hard to use by two environments at the same
+	// time.
+
 	return true
 }
 
 func (f *Fish) executeApplication(app_id int64) error {
 	f.applications_mutex.Lock()
 	{
-		// TODO: Allow to execute more than one application
-		if len(f.applications) > 0 {
-			log.Println("Fish: Node already busy with the application", app_id)
+		if len(f.applications) >= f.cfg.NodeSlots {
+			log.Println("Fish: All the slots of the Node are busy", app_id)
 			f.applications_mutex.Unlock()
 			return nil
 		}
@@ -482,7 +484,7 @@ func (f *Fish) executeApplication(app_id int64) error {
 		if err != nil {
 			log.Println("Fish: Unable to get status for Application:", app.ID, err)
 		}
-		if app_state.Status == types.ApplicationStateStatusDEALLOCATE {
+		if app_state.Status == types.ApplicationStateStatusDEALLOCATE || app_state.Status == types.ApplicationStateStatusRECALLED {
 			// Deallocating and destroy the resource
 			if err := driver.Deallocate(res.HwAddr); err != nil {
 				log.Println("Fish: Unable to get state for Application:", app.ID, err)

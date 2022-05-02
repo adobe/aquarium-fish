@@ -47,3 +47,20 @@ func (f *Fish) ApplicationStateGetByApplication(app_id int64) (as *types.Applica
 	err = f.db.Where("application_id = ?", app_id).Order("created_at desc").First(as).Error
 	return as, err
 }
+
+// Return false if Status in ERROR, DEALLOCATE or DEALLOCATED state
+func (f *Fish) ApplicationStateIsActive(status types.ApplicationStateStatus) bool {
+	if status == types.ApplicationStateStatusERROR {
+		return false
+	}
+	if status == types.ApplicationStateStatusDEALLOCATE {
+		return false
+	}
+	if status == types.ApplicationStateStatusRECALLED {
+		return false
+	}
+	if status == types.ApplicationStateStatusDEALLOCATED {
+		return false
+	}
+	return true
+}

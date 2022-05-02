@@ -830,12 +830,13 @@ components:
         status:
           type: string
           enum:
-            - NEW          # The application just created
-            - ELECTED      # Node is elected during the voting process
-            - ALLOCATED    # The resource is allocated and starting up
-            - DEALLOCATE   # User requested the application deallocate
-            - DEALLOCATED  # The resource is deallocated
-            - ERROR        # The error happened
+            - NEW          # The Application just created (active)
+            - ELECTED      # Node is elected during the voting process (active)
+            - ALLOCATED    # The Resource is allocated and starting up (active)
+            - DEALLOCATE   # User requested the Application deallocate (not active)
+            - RECALLED     # User requested the Application deallocate, but it was not allocated (not active)
+            - DEALLOCATED  # The Resource is deallocated (not active)
+            - ERROR        # The error happened (not active)
         description:
           type: string
           description: Additional information for the state
@@ -927,11 +928,11 @@ components:
           x-go-type: util.UnparsedJson
           description: Actual Labl definition depends on the used driver
           example:
-            image: macos1015-ci-xcode122
+            image: macos1015-xcode122-ci
             images:
-              macos1015: 'https://artifact-storage/aquarium/image/macos1015-VERSION/macos1015-VERSION.tar.xz'
-              macos1015-ci: 'https://artifact-storage/aquarium/image/macos1015-ci-VERSION/macos1015-ci-VERSION.tar.xz'
-              macos1015-ci-xcode122: 'https://artifact-storage/aquarium/image/macos1015-ci-xcode122-VERSION/macos1015-ci-xcode122-VERSION.tar.xz'
+              macos1015: 'https://artifact-storage/aquarium/image/vmx/macos1015-VERSION/macos1015-VERSION.tar.xz'
+              macos1015-xcode122: 'https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-VERSION/macos1015-xcode122-VERSION.tar.xz'
+              macos1015-xcode122-ci: 'https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-ci-VERSION/macos1015-xcode122-ci-VERSION.tar.xz'
             requirements:
               cpu: 14
               ram: 12
