@@ -1,20 +1,24 @@
-# Aquarium Fish
+# [Aquarium Fish](https://github.com/adobe/aquarium-fish)
 
-Distributed p2p system to manage resources. Primarily was developed to manage the dynamic Jenkins
-CI agents in heterogeneous environment and simplify the infrastructure management, but can be used
-in various applications to have self-management resources and simple REST API to manage p2p cluster.
+Main part of the [Aquarium](https://github.com/adobe/aquarium-fish/wiki/Aquarium) distributed p2p
+system to manage resources. Primarily was developed to manage the dynamic Jenkins CI agents in
+heterogeneous environment and simplify the infrastructure management, but can be used in various
+applications to have self-management resources and simple REST API to manage p2p cluster.
 
-Eventally becomes an internal cloud or pool of resources with high availability and business
-continuity features - an essential part of the modern infrastructure in worldwide companies. It
-will allow to build the automation without an issues of centralization (by proxying requests to
-nearby services), complete control on the environments and safety provided by sandboxing and
+Eventually becomes an internal cloud or pool of resources with high availability and business
+continuity features - an essential part of the modern infrastructure in international companies. It
+will allow to build the automation without the issues of centralization (by proxying requests to
+nearby services), complete control of the environments and security provided by sandboxing and
 dynamic nature of the envs.
 
-Aquarium will make the resource management as simple as possible and hopefully unify the dynamic
-resource management by integrating multiple environment providers (VM, container, native, clouds,
-etc.) to one entry point of allocating devices which can be used across the organization.
+The Aquarium system will make the resource management as simple as possible and will unify the
+dynamic resource management by integrating multiple environment providers (VM, container, native,
+clouds, etc.) to one entry point of allocating devices which can be used across the organization.
 
 ## Requirements
+
+* MacOS
+* Linux
 
 To run the node you need nothing, but the drivers usually require some apps to be installed into
 the environment.
@@ -80,13 +84,13 @@ you can connect from outside to the host via `10.0.4.35` - you need to use `10.0
 
 #### Security
 
-By default Fish generates a simple CA and key/cert pair for Server & Client auth - it just shows the
-example of cluster communication transport protection via TLS. If CA certificate is not exists - it
-will be generated, if it exists - generation will be skipped. If node certificate and key are
-exists, they will be used, but if not - Fish will try to generate them out of CA cert and key. So CA
-key is not needed if you already generated the node certificate yourself.
+By default Fish generates a simple CA and key/cert pair for Server & Client auth - it just shows
+the example of cluster communication transport protection via TLS. If a CA certificate is not
+exists - it will be generated, if it exists - generation will be skipped. If node certificate and
+key are exists, they will be used, but if not - Fish will try to generate them out of CA cert and
+key. So CA key is not needed if you already generated the node certificate yourself.
 
-TLS encryption is a must, so make sure you know how to generate CA certificate and control CA to
+TLS encryption is a must, so make sure you know how to generate a CA certificate and control CA to
 issue the node certificates. Today it's the most secure way to ensure noone will join your cluster
 without your permission and do not intercept the API & DB communication. Separated CA is used to
 check that the server (or client) is the one is approved.
@@ -116,17 +120,17 @@ to the cloud and you will be ready to go.
 
 For now the policy is quite simple - `admin` user can do anything, regular users can just use the
 cluster (create application, list their resources and so on). The applications & resources could
-contain sensetive information (like jenkins agent secret), so user will see just the owned
+contain sensitive information (like jenkins agent secret), so user will see just the owned
 applications and will be able to control only them.
 
 ## Implementation
 
-Go was choosen due to it's go-dqlite, simple one-binary executable resources management with
-embedded sql database that is synced automatically between the nodes. It's needed to store cluster
+Go was chosen due to its go-dqlite, simple one-binary executable resources management with embedded
+sql database that is synced automatically between the nodes. It's needed to store cluster
 information for decision making (for example: which node will allocate the requested resources to
 handle the workload in the most efficient way).
 
-Resource drivers is the way nodes managing the resources. For example - if I have VMWare Fusion
+Resource drivers are the way nodes managing the resources. For example - if I have VMWare Fusion
 installed on my machine - I can run Fish and it's VMX driver will automatically detect that it can
 run VMX images. In case I have docker installed too - I can use both for different workloads or
 select the ones I actually want to use by `--drivers` option or via the API.
@@ -136,7 +140,7 @@ select the ones I actually want to use by `--drivers` option or via the API.
 The cluster supports the internal SQL database, which provides a common storage for the cluster
 info. The current schema could be found in OpenAPI format here:
  * When the Fish app is running locally: https://0.0.0.0:8001/api/
- * YAML specification: https://github.com/adobe/aquarium-fish/blob/master/docs/openapi.yaml
+ * YAML specification: https://github.com/adobe/aquarium-fish/blob/main/docs/openapi.yaml
 
 ### How the cluster choose node for resource allocation
 
@@ -144,8 +148,8 @@ The cluster can't force any node to follow the majority decision, so the rules a
 consensus.
 
 For now the rule is simple - when all the nodes are voted each node can find the first node in the
-vote table that answered "yes". There is a couple of protection mechanisms like "CreateAt" to find
-the actual first one and "Rand" field as last resort (if the other params are identical).
+vote table that answered "yes". There are a couple of protection mechanisms like "CreateAt" to find
+the actual first one and "Rand" field as a last resort (if the other params are identical).
 
 In the future to allow to update cluster with the new rules the Rules table will be created and the
 different versions of the Aquarium Fish could find the common rules and switch them depends on
@@ -191,4 +195,4 @@ $ curl -u "admin:YOUR_TOKEN" -X GET 127.0.0.1:8001/api/v1/label/
 
 The current API could be found in OpenAPI format here:
  * When the Fish app is running locally: https://0.0.0.0:8001/api/
- * YAML specification: https://github.com/adobe/aquarium-fish/blob/master/docs/openapi.yaml
+ * YAML specification: https://github.com/adobe/aquarium-fish/blob/main/docs/openapi.yaml

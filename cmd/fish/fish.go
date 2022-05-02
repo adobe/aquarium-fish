@@ -138,9 +138,18 @@ func main() {
 				return err
 			}
 
+			// Set one connection and WAL mode to handle "database is locked" errors
+			dqlite_db.SetMaxOpenConns(1)
+			dqlite_db.Exec("PRAGMA journal_mode=WAL;")
+
 			log.Println("Fish starting ORM...")
 			db, err := gorm.Open(&sqlite.Dialector{Conn: dqlite_db}, &gorm.Config{
-				Logger: logger.Default.LogMode(logger.Error),
+				Logger: logger.New(log.New(os.Stdout, "\n", log.LstdFlags), logger.Config{
+					SlowThreshold:             500 * time.Millisecond,
+					LogLevel:                  logger.Error,
+					IgnoreRecordNotFoundError: true,
+					Colorful:                  true,
+				}),
 			})
 			if err != nil {
 				return err
