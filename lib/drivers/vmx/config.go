@@ -29,9 +29,15 @@ type Config struct {
 
 	DownloadUser     string `json:"download_user"`     // The user will be used in download operations
 	DownloadPassword string `json:"download_password"` // The password will be used in download operations
+
+	LogMonitor bool `json:"log_monitor"` // Actively monitor the vmware.log of VM and reset it on halt
 }
 
 func (c *Config) Apply(config []byte) error {
+	// Set defaults
+	c.LogMonitor = true
+
+	// Parse json
 	if len(config) > 0 {
 		if err := json.Unmarshal(config, c); err != nil {
 			log.Println("VMX: Unable to apply the driver config", err)

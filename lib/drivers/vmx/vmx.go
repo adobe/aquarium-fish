@@ -27,6 +27,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/hpcloud/tail"
+
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/util"
@@ -124,8 +126,13 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 		return vm_hwaddr, err
 	}
 
+	// Run the background monitoring of the vmware log
+	if d.cfg.LogMonitor {
+		go d.logMonitor(vmx_path)
+	}
+
 	// Run
-	cmd = exec.Command(d.cfg.VmrunPath, "-T", "fusion", "start", vmx_path, "nogui")
+	cmd = exec.Command(d.cfg.VmrunPath, "start", vmx_path, "nogui")
 	if _, _, err := runAndLog(cmd); err != nil {
 		log.Println("VMX: Unable to run VM", vmx_path, err)
 		log.Println("VMX: Check the log info:", filepath.Join(filepath.Dir(vmx_path), "vmware.log"),
@@ -267,7 +274,7 @@ func (d *Driver) loadImages(def *Definition, vm_images_dir string) (string, erro
 func (d *Driver) getAllocatedVMX(hwaddr string) string {
 	// Probably it's better to store the current list in the memory and
 	// update on fnotify or something like that...
-	cmd := exec.Command(d.cfg.VmrunPath, "-T", "fusion", "list")
+	cmd := exec.Command(d.cfg.VmrunPath, "list")
 	stdout, _, err := runAndLog(cmd)
 	if err != nil {
 		return ""
@@ -468,6 +475,24 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]drivers.Disk) err
 	return nil
 }
 
+func (d *Driver) logMonitor(vmx_path string) {
+	// Monitor the vmware.log file
+	log_path := filepath.Join(filepath.Dir(vmx_path), "vmware.log")
+	t, _ := tail.TailFile(log_path, tail.Config{Follow: true, Poll: true})
+	log.Println("VMX: Start monitoring of log:", log_path)
+	for line := range t.Lines {
+		// Send reset if the VM is switched to 0 status
+		if strings.Contains(line.Text, "Tools: Changing running status: 1 => 0") {
+			log.Println("VMX: Resetting the stale VM", vmx_path)
+			cmd := exec.Command(d.cfg.VmrunPath, "reset", vmx_path)
+			// We should not spend much time here, because we can miss
+			// the file delete so running in a separated thread
+			go runAndLog(cmd)
+		}
+	}
+	log.Println("VMX: Done monitoring of log:", log_path)
+}
+
 func (d *Driver) Status(hwaddr string) string {
 	if len(d.getAllocatedVMX(hwaddr)) > 0 {
 		return drivers.StatusAllocated
@@ -482,14 +507,14 @@ func (d *Driver) Deallocate(hwaddr string) error {
 		return errors.New(fmt.Sprintf("VMX: No VM found with HW ADDR: %s", hwaddr))
 	}
 
-	cmd := exec.Command(d.cfg.VmrunPath, "-T", "fusion", "stop", vmx_path)
+	cmd := exec.Command(d.cfg.VmrunPath, "stop", vmx_path)
 	if _, _, err := runAndLog(cmd); err != nil {
 		log.Println("VMX: Unable to deallocate VM:", vmx_path)
 		return err
 	}
 
 	// Delete VM
-	cmd = exec.Command(d.cfg.VmrunPath, "-T", "fusion", "deleteVM", vmx_path)
+	cmd = exec.Command(d.cfg.VmrunPath, "deleteVM", vmx_path)
 	if _, _, err := runAndLog(cmd); err != nil {
 		log.Println("VMX: Unable to delete VM:", vmx_path)
 		return err
