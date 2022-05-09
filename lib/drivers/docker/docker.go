@@ -357,6 +357,7 @@ func (d *Driver) disksCreate(c_name string, run_args *[]string, disks map[string
 			}
 			cmd := exec.Command("/usr/bin/hdiutil", "create", dmg_path,
 				"-fs", disk_type,
+				"-layout", "NONE",
 				"-volname", label,
 				"-size", fmt.Sprintf("%dm", disk.Size*1024),
 			)
