@@ -20,15 +20,10 @@ if [ "$(command -v go)" = "" -o "$(go env GOOS)" != "linux" ]; then
     exit 0
 fi
 
-export DEBIAN_FRONTEND=noninteractive
-
 apt update
-apt install -y autotools-dev autoconf patch libtool m4 automake
+apt install -y patch
 
-deps_dir=${root_dir}/deps
-. deps/build-deps.sh
-
-export SET_CGO_LDFLAGS="-static -pthread ${DQLITE_LIBS} ${SQLITE_LIBS} ${RAFT_LIBS} ${UV_LIBS} -lm -ldl"
+export DEBIAN_FRONTEND=noninteractive
 
 cd "${root_dir}"
 sh _build.sh

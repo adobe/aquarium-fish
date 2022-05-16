@@ -80,6 +80,7 @@ func generateSimpleCa(key_path, crt_path string) error {
 		Subject: pkix.Name{
 			// It's just an example CA - for prod generate CA & certs yourself with openssl
 			Organization: []string{"Example Co CA"},
+			CommonName:   "ClusterCA",
 		},
 
 		NotBefore: not_before,
@@ -135,6 +136,7 @@ func generateSimpleKeyCert(hosts []string, key_path, crt_path, ca_path string) e
 		SerialNumber: serial_number,
 		Subject: pkix.Name{
 			Organization: []string{"Example Co Crt"},
+			CommonName:   hosts[0], // Node Name is first in hosts list
 		},
 
 		NotBefore: not_before,

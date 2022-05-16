@@ -5,10 +5,11 @@ go 1.17
 require (
 	github.com/alessio/shellescape v1.4.1
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
-	github.com/canonical/go-dqlite v1.8.0
 	github.com/deepmap/oapi-codegen v1.8.1
-	github.com/getkin/kin-openapi v0.88.0
+	github.com/getkin/kin-openapi v0.61.0
 	github.com/ghodss/yaml v1.0.0
+	github.com/glebarez/sqlite v1.4.3
+	github.com/gorilla/websocket v1.4.0
 	github.com/hpcloud/tail v1.0.0
 	github.com/labstack/echo/v4 v4.6.3
 	github.com/mostlygeek/arp v0.0.0-20170424181311-541a2129847a
@@ -18,18 +19,18 @@ require (
 	github.com/ulikunitz/xz v0.5.10
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 	golang.org/x/net v0.0.0-20210913180222-943fd674d43e
-	golang.org/x/sys v0.0.0-20211103235746-7861aae1554b
-	gorm.io/driver/sqlite v1.3.2
+	golang.org/x/sys v0.0.0-20220405052023-b1e9470b6e64
 	gorm.io/gorm v1.23.5
 )
 
 require (
-	github.com/Rican7/retry v0.1.0 // indirect
 	github.com/StackExchange/wmi v0.0.0-20210224194228-fe8f1750fd46 // indirect
+	github.com/glebarez/go-sqlite v1.16.0 // indirect
 	github.com/go-ole/go-ole v1.2.5 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/swag v0.19.5 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
+	github.com/google/uuid v1.3.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
@@ -38,7 +39,7 @@ require (
 	github.com/mailru/easyjson v0.0.0-20190626092158-b2ccc519800e // indirect
 	github.com/mattn/go-colorable v0.1.11 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
-	github.com/mattn/go-sqlite3 v2.0.3+incompatible // indirect
+	github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0 // indirect
 	github.com/rogpeppe/go-internal v1.8.0 // indirect
 	github.com/spf13/pflag v1.0.3 // indirect
 	github.com/tklauser/go-sysconf v0.3.6 // indirect
@@ -51,4 +52,8 @@ require (
 	gopkg.in/fsnotify.v1 v1.4.7 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
+	modernc.org/libc v1.14.12 // indirect
+	modernc.org/mathutil v1.4.1 // indirect
+	modernc.org/memory v1.0.7 // indirect
+	modernc.org/sqlite v1.16.0 // indirect
 )
