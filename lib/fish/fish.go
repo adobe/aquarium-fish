@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -95,6 +96,8 @@ func (f *Fish) Init() error {
 	if err != nil {
 		log.Println("Create new node:", f.cfg.NodeName, f.cfg.NodeLocation)
 		create_node = true
+		var loc_id int64
+		loc_id = 0
 
 		if f.cfg.NodeLocation != "" {
 			loc, err := f.LocationGetByName(f.cfg.NodeLocation)
@@ -107,15 +110,21 @@ func (f *Fish) Init() error {
 					return err
 				}
 			}
-			node = &types.Node{Name: f.cfg.NodeName, LocationID: loc.ID}
-		} else {
-			node = &types.Node{Name: f.cfg.NodeName, LocationID: 0}
+			loc_id = loc.ID
+		}
+		node = &types.Node{
+			Name:       f.cfg.NodeName,
+			LocationID: loc_id,
 		}
 	} else {
 		log.Println("Use existing node:", node.Name, node.LocationID)
 	}
 
-	if err := node.Init(); err != nil {
+	cert_path := f.cfg.TLSCrt
+	if !filepath.IsAbs(cert_path) {
+		cert_path = filepath.Join(f.cfg.Directory, cert_path)
+	}
+	if err := node.Init(f.cfg.NodeAddress, cert_path); err != nil {
 		log.Println("Fish: Unable to init node due to err:", err)
 		return err
 	}

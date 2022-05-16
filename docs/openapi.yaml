@@ -797,6 +797,25 @@ paths:
         '404':
           description: Key path not found
 
+  /cluster/v1/connect:
+    post:
+      summary: Connect to the cluster
+      description: WebSocket json-based messaging between the cluster nodes
+      operationId: ClusterConnect
+      tags:
+        - Cluster
+      responses:
+        '200':
+          description: The connection is established
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Incorrect request
+        '409':
+          description: Conflict, the node is already connected to the cluster
+
 
 components:
   schemas:
@@ -986,8 +1005,8 @@ components:
       type: object
       x-go-json-ignore: true
       description: >
-        Each node need to report it's description, status and ensure there is no duplications and
-        to perform the cluster worker election process properly.
+        Each node need to report it's status and ensure there is no duplications and to perform the
+        cluster worker election process properly.
       required:
         - ID
         - created_at
@@ -995,6 +1014,7 @@ components:
         - name
         - definition
         - location_ID
+        - address
       properties:
         ID:
           type: integer
@@ -1010,12 +1030,22 @@ components:
           type: string
           x-oapi-codegen-extra-tags:
             gorm: unique
+          description: Unique name of the Node
         definition:
           $ref: '#/components/schemas/NodeDefinition'
         location_ID:
           type: integer
           format: int64
           description: Where the Node is located
+        address:
+          type: string
+          description: External address to reach the Node from outside
+        pubkey:
+          type: string
+          format: byte
+          x-oapi-codegen-extra-tags:
+            gorm: unique
+          description: The node public key to verify on secondary connections and signatures
 
     NodeDefinition:
       type: object

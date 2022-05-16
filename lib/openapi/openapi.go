@@ -18,7 +18,10 @@
 package openapi
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 
@@ -28,10 +31,11 @@ import (
 
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/openapi/api"
+	"github.com/adobe/aquarium-fish/lib/openapi/cluster"
 	"github.com/adobe/aquarium-fish/lib/openapi/meta"
 )
 
-func Init(fish *fish.Fish, api_address, cert_path, key_path string) (*http.Server, error) {
+func Init(fish *fish.Fish, api_address, ca_path, cert_path, key_path string) (*http.Server, error) {
 	swagger, err := GetSwagger()
 	if err != nil {
 		return nil, fmt.Errorf("Fish OpenAPI: Error loading swagger spec: %w", err)
@@ -46,12 +50,25 @@ func Init(fish *fish.Fish, api_address, cert_path, key_path string) (*http.Serve
 	//router.Use(oapimw.OapiRequestValidator(swagger))
 	router.HideBanner = true
 
+	// TODO: Probably it will be a feature an ability to separate those
+	// routers to independance ports if needed
 	meta.NewV1Router(router, fish)
+	cluster.NewV1Router(router, fish)
 	api.NewV1Router(router, fish)
+	// TODO: web UI router
 
 	go func() {
-		err := router.StartTLS(api_address, cert_path, key_path)
-		if err != nil && err != http.ErrServerClosed {
+		ca_pool := x509.NewCertPool()
+		if ca_bytes, err := ioutil.ReadFile(ca_path); err == nil {
+			ca_pool.AppendCertsFromPEM(ca_bytes)
+		}
+		s := router.TLSServer
+		s.Addr = api_address
+		s.TLSConfig = &tls.Config{
+			ClientAuth: tls.RequestClientCert, // Need for the client certificate auth
+			ClientCAs:  ca_pool,               // Verify client certificate with the cluster CA
+		}
+		if err := s.ListenAndServeTLS(cert_path, key_path); err != http.ErrServerClosed {
 			log.Fatalf("listen: %s\n", err)
 		}
 	}()

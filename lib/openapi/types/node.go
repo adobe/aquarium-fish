@@ -13,22 +13,48 @@
 package types
 
 import (
+	"bytes"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
+	"io/ioutil"
 	"time"
 )
 
-const NODE_PING_DELAY = 30
+const NODE_PING_DELAY = 10
 
 var NodePingDuplicationErr = fmt.Errorf("Fish Node: Unable to join the Aquarium cluster due to " +
 	"the node with the same name pinged the cluster less then 2xNODE_PING_DELAY time ago")
 
-func (n *Node) Init() error {
-	curr_time := time.Now()
+func (n *Node) Init(node_address, cert_path string) error {
+	// Set the node external address
+	n.Address = node_address
 
-	// Allow to join cluster only if it's the new node or the existing node
-	// was here 2xNODE_PING_DELAY seconds ago to prevent duplication
-	if curr_time.Before(n.UpdatedAt.Add(NODE_PING_DELAY * 2 * time.Second)) {
-		return NodePingDuplicationErr
+	// Read certificate's pubkey to put or compare
+	cert_bytes, err := ioutil.ReadFile(cert_path)
+	if err != nil {
+		return err
+	}
+	block, _ := pem.Decode(cert_bytes)
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return err
+	}
+	pubkey_der, err := x509.MarshalPKIXPublicKey(cert.PublicKey)
+	if err != nil {
+		return err
+	}
+
+	// Update the pubkey once - it can not be changed for the node name for now,
+	// maybe later the process of key interchange will be implemented
+	if n.Pubkey == nil {
+		// Set the pubkey once
+		n.Pubkey = &pubkey_der
+	} else {
+		// Validate the existing pubkey
+		if bytes.Compare(*n.Pubkey, pubkey_der) != 0 {
+			return fmt.Errorf("Fish Node: The pubkey was changed for Node, that's not supported")
+		}
 	}
 
 	// Collect the node definition data

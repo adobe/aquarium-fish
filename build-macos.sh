@@ -16,13 +16,7 @@
 
 root_dir=$(dirname "`realpath "$0"`")
 
-deps_dir=${root_dir}/deps
-. deps/build-deps.sh
-
 cd "${root_dir}"
-
-# MacOS doesn't support static executables, so using .a to compile-in the dependencies at least
-export SET_CGO_LDFLAGS="${CGO_LDFLAGS} ${DQLITE_LIB} ${SQLITE_LIB} ${RAFT_LIB} ${UV_LIB}"
 
 source _build.sh
 
