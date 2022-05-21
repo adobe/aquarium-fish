@@ -25,8 +25,8 @@ type Config struct {
 
 	APIAddress   string   `json:"api_address"`   // Where to serve Web UI, API & Meta API
 	ProxyAddress string   `json:"proxy_address"` // Where to serve SOCKS5 proxy for the allocated resources
-	DBAddress    string   `json:"db_address"`    // External address to sync Dqlite
-	DBJoin       []string `json:"db_join"`       // The node addresses to join the Dqlite cluster
+	NodeAddress  string   `json:"node_address"`  // What is the external address of the node
+	ClusterJoin  []string `json:"cluster_join"`  // The node addresses to join the cluster
 
 	TLSKey   string `json:"tls_key"`    // TLS PEM private key (if relative - to directory)
 	TLSCrt   string `json:"tls_crt"`    // TLS PEM public certificate (if relative - to directory)
@@ -79,7 +79,7 @@ func (c *Config) initDefaults() {
 	c.Directory = "fish_data"
 	c.APIAddress = "0.0.0.0:8001"
 	c.ProxyAddress = "0.0.0.0:1080"
-	c.DBAddress = "127.0.0.1:9001"
+	c.NodeAddress = "127.0.0.1:8001"
 	c.TLSKey = "" // Will be set after read config file from NodeName
 	c.TLSCrt = "" // ...
 	c.TLSCaCrt = "ca.crt"
