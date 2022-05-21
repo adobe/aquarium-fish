@@ -15,6 +15,7 @@ package meta
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -48,6 +49,7 @@ func (e *Processor) AddressAuth(next echo.HandlerFunc) echo.HandlerFunc {
 		// Only the existing local resource access it's metadata
 		res, err := e.fish.ResourceGetByIP(c.RealIP())
 		if err != nil {
+			log.Println("WARN: Unauthorized access to meta:", err)
 			return echo.NewHTTPError(http.StatusUnauthorized, "Client IP was not found in the node Resources")
 		}
 

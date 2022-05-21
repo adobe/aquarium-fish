@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mostlygeek/arp"
 	"gorm.io/gorm"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
@@ -154,6 +155,9 @@ func (f *Fish) Init() error {
 
 	// Run application vote process
 	go f.checkNewApplicationProcess()
+
+	// Run ARP autoupdate process to ensure the addresses will be ok
+	arp.AutoRefresh(30 * time.Second)
 
 	return nil
 }

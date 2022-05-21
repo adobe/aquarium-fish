@@ -150,7 +150,7 @@ func (f *Fish) ResourceGetByIP(ip string) (res *types.Resource, err error) {
 	}
 	err = f.db.Where("node_id = ?", f.GetNodeID()).Where("hw_addr = ?", hw_addr).First(res).Error
 	if err != nil {
-		return nil, err
+		return nil, errors.New(fmt.Sprintf("Fish: %s for HW address %s", err, hw_addr))
 	}
 
 	// Check if the state is allocated to prevent old resources access
@@ -158,7 +158,7 @@ func (f *Fish) ResourceGetByIP(ip string) (res *types.Resource, err error) {
 		return nil, errors.New("Fish: Prohibited to access the Resource of not allocated Application")
 	}
 
-	log.Println("Fish: Update IP address for the Resource", res.ID, ip)
+	log.Println("Fish: Update IP address for the Resource of Application", res.ApplicationID, ip)
 	res.IpAddr = ip
 	err = f.ResourceSave(res)
 
