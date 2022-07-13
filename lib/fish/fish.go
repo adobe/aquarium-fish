@@ -147,6 +147,15 @@ func (f *Fish) Init() error {
 		if f.ApplicationIsAllocated(res.ApplicationID) == nil {
 			log.Println("Fish: Found allocated resource to serve:", res.ID)
 			go f.executeApplication(res.ApplicationID)
+		} else {
+			log.Println("Fish: WARN: Found not allocated Resource of Application, cleaning up:", res.ApplicationID)
+			if err := f.ResourceDelete(res.ID); err != nil {
+				log.Println("Fish: Unable to delete Resource of Application:", res.ApplicationID, err)
+			}
+			app_state := &types.ApplicationState{ApplicationID: res.ApplicationID, Status: types.ApplicationStateStatusERROR,
+				Description: "Found not cleaned up resource",
+			}
+			f.ApplicationStateCreate(app_state)
 		}
 	}
 
@@ -489,16 +498,23 @@ func (f *Fish) executeApplication(app_id int64) error {
 			log.Println("Fish: Unable to get status for Application:", app.ID, err)
 		}
 		if app_state.Status == types.ApplicationStateStatusDEALLOCATE || app_state.Status == types.ApplicationStateStatusRECALLED {
+			log.Println("Fish: Running Deallocate of the Application:", app.ID)
 			// Deallocating and destroy the resource
 			if err := driver.Deallocate(res.HwAddr); err != nil {
-				log.Println("Fish: Unable to get state for Application:", app.ID, err)
+				log.Println("Fish: Unable to deallocate the Resource of Application:", app.ID, err)
+				// Destroying the resource anyway to not bloat the table - otherwise it will stuck there and
+				// will block the access to IP of the other VM's that will reuse this IP
+				if err := f.ResourceDelete(res.ID); err != nil {
+					log.Println("Fish: Unable to delete Resource for Application:", app.ID, err)
+				}
 				app_state = &types.ApplicationState{ApplicationID: app.ID, Status: types.ApplicationStateStatusERROR,
 					Description: fmt.Sprintf("Driver deallocate resource error: %s", err),
 				}
 			} else {
+				log.Println("Fish: Successful deallocation of the Application:", app.ID)
 				err := f.ResourceDelete(res.ID)
 				if err != nil {
-					log.Println("Fish: Unable to store resource for Application:", app.ID, err)
+					log.Println("Fish: Unable to delete Resource for Application:", app.ID, err)
 				}
 				app_state = &types.ApplicationState{ApplicationID: app.ID, Status: types.ApplicationStateStatusDEALLOCATED,
 					Description: fmt.Sprintf("Driver deallocated the resource"),

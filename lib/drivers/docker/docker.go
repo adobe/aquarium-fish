@@ -16,6 +16,7 @@ package docker
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -26,6 +27,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/drivers"
@@ -97,8 +99,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 			net_args = append(net_args, "--internal")
 		}
 		net_args = append(net_args, "aquarium-"+c_network)
-		cmd := exec.Command(d.cfg.DockerPath, net_args...)
-		if _, _, err := runAndLog(cmd); err != nil {
+		if _, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, net_args...); err != nil {
 			return "", err
 		}
 	}
@@ -138,8 +139,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 
 	// Run the container
 	run_args = append(run_args, img_name_version)
-	cmd := exec.Command(d.cfg.DockerPath, run_args...)
-	if _, _, err := runAndLog(cmd); err != nil {
+	if _, _, err := runAndLog(30*time.Second, d.cfg.DockerPath, run_args...); err != nil {
 		log.Println("DOCKER: Unable to run container", c_name, err)
 		return c_hwaddr, err
 	}
@@ -222,10 +222,10 @@ func (d *Driver) loadImages(def *Definition) (string, error) {
 		if subdir_ver_end > 0 {
 			image_found := ""
 			// Search the image by image ID prefix and list the image tags
-			image_tags, _, err := runAndLog(exec.Command(d.cfg.DockerPath, "image", "inspect",
+			image_tags, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, "image", "inspect",
 				fmt.Sprintf("sha256:%s", subdir[subdir_ver_end+1:]),
 				"--format", "{{ range .RepoTags }}{{ printf \"%s\\n\" . }}{{ end }}",
-			))
+			)
 			if err == nil {
 				// The image could contain a number of tags so check them all
 				found_images := strings.Split(strings.TrimSpace(image_tags), "\n")
@@ -251,8 +251,7 @@ func (d *Driver) loadImages(def *Definition) (string, error) {
 		// Load the docker image
 		// sha256 prefix the same
 		image_archive := filepath.Join(image_unpacked, subdir, name+".tar")
-		cmd := exec.Command(d.cfg.DockerPath, "image", "load", "-q", "-i", image_archive)
-		stdout, _, err := runAndLog(cmd)
+		stdout, _, err := runAndLog(5*time.Minute, d.cfg.DockerPath, "image", "load", "-q", "-i", image_archive)
 		if err != nil {
 			log.Println("DOCKER: ERROR: Unable to load the image:", image_archive, err)
 			return "", errors.New("DOCKER: The image was unpacked incorrectly, please check log for the errors")
@@ -285,10 +284,7 @@ func (d *Driver) loadImages(def *Definition) (string, error) {
 
 func (d *Driver) getAllocatedContainer(hwaddr string) string {
 	// Probably it's better to store the current list in the memory
-	cmd := exec.Command(d.cfg.DockerPath, "ps", "-a", "-q",
-		"--filter", "name="+d.getContainerName(hwaddr),
-	)
-	stdout, _, err := runAndLog(cmd)
+	stdout, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, "ps", "-a", "-q", "--filter", "name="+d.getContainerName(hwaddr))
 	if err != nil {
 		return ""
 	}
@@ -297,8 +293,7 @@ func (d *Driver) getAllocatedContainer(hwaddr string) string {
 }
 
 func (d *Driver) isNetworkExists(name string) bool {
-	cmd := exec.Command(d.cfg.DockerPath, "network", "ls", "-q", "--filter", "name=aquarium-"+name)
-	stdout, stderr, err := runAndLog(cmd)
+	stdout, stderr, err := runAndLog(5*time.Second, d.cfg.DockerPath, "network", "ls", "-q", "--filter", "name=aquarium-"+name)
 	if err != nil {
 		log.Println("DOCKER: Unable to list the docker network:", stdout, stderr, err)
 		return false
@@ -355,13 +350,13 @@ func (d *Driver) disksCreate(c_name string, run_args *[]string, disks map[string
 			default:
 				disk_type = "ExFAT"
 			}
-			cmd := exec.Command("/usr/bin/hdiutil", "create", dmg_path,
+			args := []string{"create", dmg_path,
 				"-fs", disk_type,
 				"-layout", "NONE",
 				"-volname", label,
 				"-size", fmt.Sprintf("%dm", disk.Size*1024),
-			)
-			if _, _, err := runAndLog(cmd); err != nil {
+			}
+			if _, _, err := runAndLog(10*time.Minute, "/usr/bin/hdiutil", args...); err != nil {
 				log.Println("DOCKER: Unable to create dmg disk", dmg_path, err)
 				return err
 			}
@@ -370,8 +365,7 @@ func (d *Driver) disksCreate(c_name string, run_args *[]string, disks map[string
 		mount_point := filepath.Join("/Volumes", fmt.Sprintf("%s-%s", c_name, d_name))
 
 		// Attach & mount disk
-		cmd := exec.Command("/usr/bin/hdiutil", "attach", dmg_path, "-mountpoint", mount_point)
-		if _, _, err := runAndLog(cmd); err != nil {
+		if _, _, err := runAndLog(10*time.Second, "/usr/bin/hdiutil", "attach", dmg_path, "-mountpoint", mount_point); err != nil {
 			log.Println("DOCKER: Unable to attach dmg disk", err)
 			return err
 		}
@@ -441,10 +435,9 @@ func (d *Driver) Deallocate(hwaddr string) error {
 	}
 
 	// Getting the mounted volumes
-	cmd := exec.Command(d.cfg.DockerPath, "inspect",
+	stdout, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, "inspect",
 		"--format", "{{ range .Mounts }}{{ printf \"%s\\n\" .Source }}{{ end }}", c_id,
 	)
-	stdout, _, err := runAndLog(cmd)
 	if err != nil {
 		log.Println("DOCKER: Unable to inspect the container:", c_name)
 		return err
@@ -452,28 +445,25 @@ func (d *Driver) Deallocate(hwaddr string) error {
 	c_volumes := strings.Split(strings.TrimSpace(stdout), "\n")
 
 	// Stop the container
-	cmd = exec.Command(d.cfg.DockerPath, "stop", c_id)
-	if _, _, err := runAndLog(cmd); err != nil {
+	if _, _, err := runAndLogRetry(3, 10*time.Second, d.cfg.DockerPath, "stop", c_id); err != nil {
 		log.Println("DOCKER: Unable to stop the container:", c_name)
 		return err
 	}
 	// Remove the container
-	cmd = exec.Command(d.cfg.DockerPath, "rm", c_id)
-	if _, _, err := runAndLog(cmd); err != nil {
+	if _, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, "rm", c_id); err != nil {
 		log.Println("DOCKER: Unable to remove the container:", c_name)
 		return err
 	}
 
 	// Umount the disk volumes if needed
-	mounts, _, err := runAndLog(exec.Command("/sbin/mount"))
+	mounts, _, err := runAndLog(3*time.Second, "/sbin/mount")
 	if err != nil {
 		log.Println("DOCKER: Unable to list the mount points:", c_name)
 		return err
 	}
 	for _, vol_path := range c_volumes {
 		if strings.Contains(mounts, vol_path) {
-			cmd := exec.Command("/usr/bin/hdiutil", "detach", vol_path)
-			if _, _, err := runAndLog(cmd); err != nil {
+			if _, _, err := runAndLog(5*time.Second, "/usr/bin/hdiutil", "detach", vol_path); err != nil {
 				log.Println("DOCKER: Unable to detach the volume disk", err)
 				return err
 			}
@@ -493,9 +483,14 @@ func (d *Driver) Deallocate(hwaddr string) error {
 	return nil
 }
 
-// Directly from packer: github.com/hashicorp/packer
-func runAndLog(cmd *exec.Cmd) (string, string, error) {
+func runAndLog(timeout time.Duration, path string, arg ...string) (string, string, error) {
 	var stdout, stderr bytes.Buffer
+
+	// Running command with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, path, arg...)
 
 	log.Printf("DOCKER: Executing: %s %s", cmd.Path, strings.Join(cmd.Args[1:], " "))
 	cmd.Stdout = &stdout
@@ -505,7 +500,10 @@ func runAndLog(cmd *exec.Cmd) (string, string, error) {
 	stdoutString := strings.TrimSpace(stdout.String())
 	stderrString := strings.TrimSpace(stderr.String())
 
-	if _, ok := err.(*exec.ExitError); ok {
+	// Check the context error to see if the timeout was executed
+	if ctx.Err() == context.DeadlineExceeded {
+		err = fmt.Errorf("Docker error: Command timed out")
+	} else if _, ok := err.(*exec.ExitError); ok {
 		message := stderrString
 		if message == "" {
 			message = stdoutString
@@ -526,4 +524,25 @@ func runAndLog(cmd *exec.Cmd) (string, string, error) {
 	returnStderr := strings.Replace(stderr.String(), "\r\n", "\n", -1)
 
 	return returnStdout, returnStderr, err
+}
+
+// Will retry on error and store the retry output and errors to return
+func runAndLogRetry(retry int, timeout time.Duration, path string, arg ...string) (stdout string, stderr string, err error) {
+	counter := 0
+	for {
+		counter++
+		rout, rerr, err := runAndLog(timeout, path, arg...)
+		if err != nil {
+			stdout += fmt.Sprintf("\n--- Fish: Command execution attempt %d ---\n", counter)
+			stdout += rout
+			stderr += fmt.Sprintf("\n--- Fish: Command execution attempt %d ---\n", counter)
+			stderr += rerr
+			if counter <= retry {
+				// Give command 5 seconds to rest
+				time.Sleep(5 * time.Second)
+				continue
+			}
+		}
+		return stdout, stderr, err
+	}
 }

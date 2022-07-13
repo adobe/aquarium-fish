@@ -17,6 +17,7 @@ package vmx
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -26,6 +27,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/hpcloud/tail"
 
@@ -100,9 +102,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 		"linked", "-snapshot", "original",
 		"-cloneName", vm_id,
 	}
-	cmd := exec.Command(d.cfg.VmrunPath, args...)
-
-	if _, _, err := runAndLog(cmd); err != nil {
+	if _, _, err := runAndLog(120*time.Second, d.cfg.VmrunPath, args...); err != nil {
 		return vm_hwaddr, err
 	}
 
@@ -131,9 +131,8 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 		go d.logMonitor(vmx_path)
 	}
 
-	// Run
-	cmd = exec.Command(d.cfg.VmrunPath, "start", vmx_path, "nogui")
-	if _, _, err := runAndLog(cmd); err != nil {
+	// Run the VM
+	if _, _, err := runAndLog(120*time.Second, d.cfg.VmrunPath, "start", vmx_path, "nogui"); err != nil {
 		log.Println("VMX: Unable to run VM", vmx_path, err)
 		log.Println("VMX: Check the log info:", filepath.Join(filepath.Dir(vmx_path), "vmware.log"),
 			"and directory ~/Library/Logs/VMware/ for additional logs")
@@ -274,8 +273,7 @@ func (d *Driver) loadImages(def *Definition, vm_images_dir string) (string, erro
 func (d *Driver) getAllocatedVMX(hwaddr string) string {
 	// Probably it's better to store the current list in the memory and
 	// update on fnotify or something like that...
-	cmd := exec.Command(d.cfg.VmrunPath, "list")
-	stdout, _, err := runAndLog(cmd)
+	stdout, _, err := runAndLog(10*time.Second, d.cfg.VmrunPath, "list")
 	if err != nil {
 		return ""
 	}
@@ -354,13 +352,13 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]drivers.Disk) err
 		if disk.Label != "" {
 			label = disk.Label
 		}
-		cmd := exec.Command("/usr/bin/hdiutil", "create", dmg_path,
+		args := []string{"create", dmg_path,
 			"-fs", disk_type,
 			"-layout", "NONE",
 			"-volname", label,
 			"-size", fmt.Sprintf("%dm", disk.Size*1024),
-		)
-		if _, _, err := runAndLog(cmd); err != nil {
+		}
+		if _, _, err := runAndLog(10*time.Minute, "/usr/bin/hdiutil", args...); err != nil {
 			log.Println("VMX: Unable to create dmg disk", dmg_path, err)
 			return err
 		}
@@ -369,8 +367,7 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]drivers.Disk) err
 		mount_point := filepath.Join("/Volumes", fmt.Sprintf("%s-%s", vm_name, d_name))
 
 		// Attach & mount disk
-		cmd = exec.Command("/usr/bin/hdiutil", "attach", dmg_path, "-mountpoint", mount_point)
-		stdout, _, err := runAndLog(cmd)
+		stdout, _, err := runAndLog(10*time.Second, "/usr/bin/hdiutil", "attach", dmg_path, "-mountpoint", mount_point)
 		if err != nil {
 			log.Println("VMX: Unable to attach dmg disk", err)
 			return err
@@ -386,16 +383,14 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]drivers.Disk) err
 		}
 
 		// Umount disk (use diskutil to umount for sure)
-		cmd = exec.Command("/usr/sbin/diskutil", "umount", mount_point)
-		stdout, _, err = runAndLog(cmd)
+		stdout, _, err = runAndLog(10*time.Second, "/usr/sbin/diskutil", "umount", mount_point)
 		if err != nil {
 			log.Println("VMX: Unable to umount dmg disk", err)
 			return err
 		}
 
 		// Detach disk
-		cmd = exec.Command("/usr/bin/hdiutil", "detach", dev_path)
-		if _, _, err := runAndLog(cmd); err != nil {
+		if _, _, err := runAndLog(10*time.Second, "/usr/bin/hdiutil", "detach", dev_path); err != nil {
 			log.Println("VMX: Unable to detach dmg disk", err)
 			return err
 		}
@@ -435,8 +430,7 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]drivers.Disk) err
 		}
 
 		// Convert linked vmdk to standalone vmdk
-		cmd = exec.Command(d.cfg.VdiskmanagerPath, "-r", disk_path+"_tmp.vmdk", "-t", "0", disk_path+".vmdk")
-		if _, _, err := runAndLog(cmd); err != nil {
+		if _, _, err := runAndLog(10*time.Minute, d.cfg.VdiskmanagerPath, "-r", disk_path+"_tmp.vmdk", "-t", "0", disk_path+".vmdk"); err != nil {
 			log.Println("VMX: Unable to create vmdk disk", err)
 			return err
 		}
@@ -484,10 +478,9 @@ func (d *Driver) logMonitor(vmx_path string) {
 		// Send reset if the VM is switched to 0 status
 		if strings.Contains(line.Text, "Tools: Changing running status: 1 => 0") {
 			log.Println("VMX: Resetting the stale VM", vmx_path)
-			cmd := exec.Command(d.cfg.VmrunPath, "reset", vmx_path)
 			// We should not spend much time here, because we can miss
 			// the file delete so running in a separated thread
-			go runAndLog(cmd)
+			go runAndLog(10*time.Second, d.cfg.VmrunPath, "reset", vmx_path)
 		}
 	}
 	log.Println("VMX: Done monitoring of log:", log_path)
@@ -507,15 +500,14 @@ func (d *Driver) Deallocate(hwaddr string) error {
 		return errors.New(fmt.Sprintf("VMX: No VM found with HW ADDR: %s", hwaddr))
 	}
 
-	cmd := exec.Command(d.cfg.VmrunPath, "stop", vmx_path)
-	if _, _, err := runAndLog(cmd); err != nil {
+	// Sometimes it's stuck, so try to stop a bit more than usual
+	if _, _, err := runAndLogRetry(3, 60*time.Second, d.cfg.VmrunPath, "stop", vmx_path); err != nil {
 		log.Println("VMX: Unable to deallocate VM:", vmx_path)
 		return err
 	}
 
 	// Delete VM
-	cmd = exec.Command(d.cfg.VmrunPath, "deleteVM", vmx_path)
-	if _, _, err := runAndLog(cmd); err != nil {
+	if _, _, err := runAndLogRetry(3, 30*time.Second, d.cfg.VmrunPath, "deleteVM", vmx_path); err != nil {
 		log.Println("VMX: Unable to delete VM:", vmx_path)
 		return err
 	}
@@ -530,9 +522,14 @@ func (d *Driver) Deallocate(hwaddr string) error {
 	return nil
 }
 
-// Directly from packer: github.com/hashicorp/packer
-func runAndLog(cmd *exec.Cmd) (string, string, error) {
+func runAndLog(timeout time.Duration, path string, arg ...string) (string, string, error) {
 	var stdout, stderr bytes.Buffer
+
+	// Running command with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, path, arg...)
 
 	log.Printf("VMX: Executing: %s %s", cmd.Path, strings.Join(cmd.Args[1:], " "))
 	cmd.Stdout = &stdout
@@ -542,7 +539,10 @@ func runAndLog(cmd *exec.Cmd) (string, string, error) {
 	stdoutString := strings.TrimSpace(stdout.String())
 	stderrString := strings.TrimSpace(stderr.String())
 
-	if _, ok := err.(*exec.ExitError); ok {
+	// Check the context error to see if the timeout was executed
+	if ctx.Err() == context.DeadlineExceeded {
+		err = fmt.Errorf("VMware error: Command timed out")
+	} else if _, ok := err.(*exec.ExitError); ok {
 		message := stderrString
 		if message == "" {
 			message = stdoutString
@@ -563,4 +563,25 @@ func runAndLog(cmd *exec.Cmd) (string, string, error) {
 	returnStderr := strings.Replace(stderr.String(), "\r\n", "\n", -1)
 
 	return returnStdout, returnStderr, err
+}
+
+// Will retry on error and store the retry output and errors to return
+func runAndLogRetry(retry int, timeout time.Duration, path string, arg ...string) (stdout string, stderr string, err error) {
+	counter := 0
+	for {
+		counter++
+		rout, rerr, err := runAndLog(timeout, path, arg...)
+		if err != nil {
+			stdout += fmt.Sprintf("\n--- Fish: Command execution attempt %d ---\n", counter)
+			stdout += rout
+			stderr += fmt.Sprintf("\n--- Fish: Command execution attempt %d ---\n", counter)
+			stderr += rerr
+			if counter <= retry {
+				// Give command 5 seconds to rest
+				time.Sleep(5 * time.Second)
+				continue
+			}
+		}
+		return stdout, stderr, err
+	}
 }
