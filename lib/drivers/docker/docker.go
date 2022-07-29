@@ -17,7 +17,6 @@ package docker
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -197,7 +196,7 @@ func (d *Driver) loadImages(def *Definition) (string, error) {
 		items, err := ioutil.ReadDir(image_unpacked)
 		if err != nil {
 			log.Println("DOCKER: ERROR: Unable to read the unpacked directory:", image_unpacked, err)
-			return "", errors.New("DOCKER: The image was unpacked incorrectly, please check log for the errors")
+			return "", fmt.Errorf("DOCKER: The image was unpacked incorrectly, please check log for the errors")
 		}
 		for _, f := range items {
 			if strings.HasPrefix(f.Name(), name) {
@@ -214,7 +213,7 @@ func (d *Driver) loadImages(def *Definition) (string, error) {
 		}
 		if subdir == "" {
 			log.Printf("DOCKER: ERROR: Unpacked image '%s' has no subfolder '%s', only %s:\n", image_unpacked, name, items)
-			return "", errors.New("DOCKER: The image was unpacked incorrectly, please check log for the errors")
+			return "", fmt.Errorf("DOCKER: The image was unpacked incorrectly, please check log for the errors")
 		}
 
 		// Optimization to check if the image exists and not load it again
@@ -254,7 +253,7 @@ func (d *Driver) loadImages(def *Definition) (string, error) {
 		stdout, _, err := runAndLog(5*time.Minute, d.cfg.DockerPath, "image", "load", "-q", "-i", image_archive)
 		if err != nil {
 			log.Println("DOCKER: ERROR: Unable to load the image:", image_archive, err)
-			return "", errors.New("DOCKER: The image was unpacked incorrectly, please check log for the errors")
+			return "", fmt.Errorf("DOCKER: The image was unpacked incorrectly, please check log for the errors")
 		}
 		for _, line := range strings.Split(stdout, "\n") {
 			if !strings.HasPrefix(line, "Loaded image: ") {
@@ -276,7 +275,7 @@ func (d *Driver) loadImages(def *Definition) (string, error) {
 	// Check all the images are in place just by number of them
 	if len(def.Images) != len(loaded_images) {
 		log.Println("DOCKER: The image processes gone wrong, please check log for the errors")
-		return "", errors.New("DOCKER: The image processes gone wrong, please check log for the errors")
+		return "", fmt.Errorf("DOCKER: The image processes gone wrong, please check log for the errors")
 	}
 
 	return target_out, nil
@@ -431,7 +430,7 @@ func (d *Driver) Deallocate(hwaddr string) error {
 	c_id := d.getAllocatedContainer(hwaddr)
 	if len(c_id) == 0 {
 		log.Println("DOCKER: Unable to find container with HW ADDR:", hwaddr)
-		return errors.New(fmt.Sprintf("DOCKER: No container found with HW ADDR: %s", hwaddr))
+		return fmt.Errorf("DOCKER: No container found with HW ADDR: %s", hwaddr)
 	}
 
 	// Getting the mounted volumes

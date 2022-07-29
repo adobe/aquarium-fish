@@ -14,14 +14,14 @@ package util
 
 import (
 	"bytes"
-	"errors"
+	"fmt"
 	"os"
 )
 
 var (
-	ErrFileStartsWithDirectory    = errors.New("FileStartsWith: Unable to check file prefix for directory")
-	ErrFileStartsWithFileTooSmall = errors.New("FileStartsWith: File is too small for prefix")
-	ErrFileStartsWithNotEqual     = errors.New("FileStartsWith: File is not starts with the prefix")
+	ErrFileStartsWithDirectory    = fmt.Errorf("FileStartsWith: Unable to check file prefix for directory")
+	ErrFileStartsWithFileTooSmall = fmt.Errorf("FileStartsWith: File is too small for prefix")
+	ErrFileStartsWithNotEqual     = fmt.Errorf("FileStartsWith: File is not starts with the prefix")
 )
 
 func FileStartsWith(path string, prefix []byte) error {
