@@ -15,7 +15,6 @@ package types
 import (
 	"database/sql/driver"
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/shirou/gopsutil/cpu"
@@ -32,7 +31,7 @@ func (nd NodeDefinition) GormDataType() string {
 func (nd *NodeDefinition) Scan(value interface{}) error {
 	bytes, ok := value.([]byte)
 	if !ok {
-		return errors.New(fmt.Sprint("Failed to unmarshal JSONB value:", value))
+		return fmt.Errorf("Failed to unmarshal JSONB value: %s", value)
 	}
 
 	err := json.Unmarshal(bytes, nd)

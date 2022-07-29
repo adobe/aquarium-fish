@@ -13,7 +13,7 @@
 package fish
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
@@ -70,7 +70,7 @@ func (f *Fish) ApplicationIsAllocated(app_id int64) (err error) {
 	if err != nil {
 		return err
 	} else if state.Status != types.ApplicationStateStatusALLOCATED {
-		return errors.New("Fish: The Application is not allocated")
+		return fmt.Errorf("Fish: The Application is not allocated")
 	}
 	return nil
 }

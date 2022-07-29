@@ -14,7 +14,7 @@ package docker
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
 	"log"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
@@ -58,29 +58,29 @@ func (d *Definition) Apply(definition string) error {
 func (d *Definition) Validate() error {
 	// Check image
 	if d.Image == "" {
-		return errors.New("DOCKER: No image is specified")
+		return fmt.Errorf("DOCKER: No image is specified")
 	}
 
 	// Check the images
 	image_exist := false
 	for name, url := range d.Images {
 		if name == "" {
-			return errors.New("DOCKER: No image name is specified")
+			return fmt.Errorf("DOCKER: No image name is specified")
 		}
 		if url == "" {
-			return errors.New("DOCKER: No image url is specified")
+			return fmt.Errorf("DOCKER: No image url is specified")
 		}
 		if name == d.Image {
 			image_exist = true
 		}
 	}
 	if !image_exist {
-		return errors.New("DOCKER: No image found in the images")
+		return fmt.Errorf("DOCKER: No image found in the images")
 	}
 
 	// Check resources
-	if d.Requirements.Validate([]string{"dir", "hfs+", "exfat", "fat32"}) != nil {
-		return errors.New("DOCKER: Requirements validation failed")
+	if err := d.Requirements.Validate([]string{"dir", "hfs+", "exfat", "fat32"}); err != nil {
+		return fmt.Errorf("DOCKER: Requirements validation failed: %s", err)
 	}
 
 	return nil

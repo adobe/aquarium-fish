@@ -13,7 +13,7 @@
 package fish
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
@@ -29,13 +29,13 @@ func (f *Fish) LabelFind(filter *string) (labels []types.Label, err error) {
 
 func (f *Fish) LabelCreate(l *types.Label) error {
 	if l.Name == "" {
-		return errors.New("Fish: Name can't be empty")
+		return fmt.Errorf("Fish: Name can't be empty")
 	}
 	if l.Driver == "" {
-		return errors.New("Fish: Driver can't be empty")
+		return fmt.Errorf("Fish: Driver can't be empty")
 	}
 	if l.Definition == "" {
-		return errors.New("Fish: Definition can't be empty")
+		return fmt.Errorf("Fish: Definition can't be empty")
 	}
 	if l.Metadata == "" {
 		l.Metadata = "{}"

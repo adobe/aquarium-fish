@@ -18,7 +18,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -264,7 +263,7 @@ func (d *Driver) loadImages(def *Definition, vm_images_dir string) (string, erro
 	vm_images, _ := ioutil.ReadDir(vm_images_dir)
 	if len(def.Images) != len(vm_images) {
 		log.Println("VMX: The image processes gone wrong, please check log for the errors")
-		return "", errors.New("VMX: The image processes gone wrong, please check log for the errors")
+		return "", fmt.Errorf("VMX: The image processes gone wrong, please check log for the errors")
 	}
 
 	return target_path, nil
@@ -497,7 +496,7 @@ func (d *Driver) Deallocate(hwaddr string) error {
 	vmx_path := d.getAllocatedVMX(hwaddr)
 	if len(vmx_path) == 0 {
 		log.Println("VMX: Unable to find VM with HW ADDR:", hwaddr)
-		return errors.New(fmt.Sprintf("VMX: No VM found with HW ADDR: %s", hwaddr))
+		return fmt.Errorf("VMX: No VM found with HW ADDR: %s", hwaddr)
 	}
 
 	// Sometimes it's stuck, so try to stop a bit more than usual

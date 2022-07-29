@@ -13,7 +13,6 @@
 package fish
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -41,11 +40,11 @@ func (f *Fish) ResourceListNode(node_id int64) (rs []types.Resource, err error) 
 
 func (f *Fish) ResourceCreate(r *types.Resource) error {
 	if len(r.HwAddr) == 0 {
-		return errors.New("Fish: HwAddr can't be empty")
+		return fmt.Errorf("Fish: HwAddr can't be empty")
 	}
 	// TODO: check JSON
 	if len(r.Metadata) < 2 {
-		return errors.New("Fish: Metadata can't be empty")
+		return fmt.Errorf("Fish: Metadata can't be empty")
 	}
 	return f.db.Create(r).Error
 }
@@ -130,7 +129,7 @@ func (f *Fish) ResourceGetByIP(ip string) (res *types.Resource, err error) {
 	if err == nil {
 		// Check if the state is allocated to prevent old resources access
 		if f.ApplicationIsAllocated(res.ApplicationID) != nil {
-			return nil, errors.New("Fish: Prohibited to access the Resource of not allocated Application")
+			return nil, fmt.Errorf("Fish: Prohibited to access the Resource of not allocated Application")
 		}
 
 		return res, nil
@@ -139,7 +138,7 @@ func (f *Fish) ResourceGetByIP(ip string) (res *types.Resource, err error) {
 	// Make sure the IP is the controlled network, otherwise someone from outside
 	// could become a local node resource, so let's be careful
 	if !isControlledNetwork(ip) {
-		return nil, errors.New("Fish: Prohibited to serve the Resource IP from not controlled network")
+		return nil, fmt.Errorf("Fish: Prohibited to serve the Resource IP from not controlled network")
 	}
 
 	// Check by MAC and update IP if found
@@ -150,12 +149,12 @@ func (f *Fish) ResourceGetByIP(ip string) (res *types.Resource, err error) {
 	}
 	err = f.db.Where("node_id = ?", f.GetNodeID()).Where("hw_addr = ?", hw_addr).First(res).Error
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("Fish: %s for HW address %s", err, hw_addr))
+		return nil, fmt.Errorf("Fish: %s for HW address %s", err, hw_addr)
 	}
 
 	// Check if the state is allocated to prevent old resources access
 	if f.ApplicationIsAllocated(res.ApplicationID) != nil {
-		return nil, errors.New("Fish: Prohibited to access the Resource of not allocated Application")
+		return nil, fmt.Errorf("Fish: Prohibited to access the Resource of not allocated Application")
 	}
 
 	log.Println("Fish: Update IP address for the Resource of Application", res.ApplicationID, ip)
