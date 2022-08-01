@@ -78,7 +78,7 @@ func (d *Definition) Validate() error {
 	}
 
 	// Check resources
-	if err := d.Requirements.Validate([]string{"hfs+", "exfat", "fat32"}); err != nil {
+	if err := d.Requirements.Validate([]string{"hfs+", "exfat", "fat32"}, true); err != nil {
 		return fmt.Errorf("VMX: Requirements validation failed: %s", err)
 	}
 

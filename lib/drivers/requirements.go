@@ -34,7 +34,7 @@ type Disk struct {
 	Clone string `json:"clone"` // Clone the snapshot of existing disk instead of creating the new one
 }
 
-func (r *Requirements) Validate(disk_types []string) error {
+func (r *Requirements) Validate(disk_types []string, check_net bool) error {
 	// Check resources
 	if r.Cpu < 1 {
 		return fmt.Errorf("Driver: Number of CPU cores is less then 1")
@@ -42,18 +42,18 @@ func (r *Requirements) Validate(disk_types []string) error {
 	if r.Ram < 1 {
 		return fmt.Errorf("Driver: Amount of RAM is less then 1GB")
 	}
-	for name, data := range r.Disks {
+	for name, disk := range r.Disks {
 		if name == "" {
 			return fmt.Errorf("Driver: Disk name can't be empty")
 		}
-		if !util.Contains(disk_types, data.Type) {
+		if !util.Contains(disk_types, disk.Type) {
 			return fmt.Errorf(fmt.Sprintf("Driver: Type of disk must be one of: %+q", disk_types))
 		}
-		if data.Size < 1 {
+		if disk.Size < 1 {
 			return fmt.Errorf("Driver: Size of the disk can't be less than 1GB")
 		}
 	}
-	if r.Network != "" && r.Network != "nat" {
+	if check_net && r.Network != "" && r.Network != "nat" {
 		return fmt.Errorf("Driver: The network configuration must be either '' (empty for hostonly) or 'nat'")
 	}
 
