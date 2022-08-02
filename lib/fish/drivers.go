@@ -17,7 +17,9 @@ import (
 	"log"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
+
 	// Load all the drivers
+	_ "github.com/adobe/aquarium-fish/lib/drivers/aws"
 	_ "github.com/adobe/aquarium-fish/lib/drivers/docker"
 	_ "github.com/adobe/aquarium-fish/lib/drivers/vmx"
 )
