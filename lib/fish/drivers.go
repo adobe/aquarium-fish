@@ -49,6 +49,8 @@ func (f *Fish) DriversSet() error {
 		if en {
 			log.Println("Fish: Resource driver available:", drv.Name())
 			list = append(list, drv)
+		} else {
+			log.Println("Fish: Resource driver disabled:", drv.Name())
 		}
 	}
 

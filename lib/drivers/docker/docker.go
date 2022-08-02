@@ -72,7 +72,7 @@ func (d *Driver) getContainerName(hwaddr string) string {
  * It automatically download the required images, unpack them and runs the container.
  * Using metadata to create env file and pass it to the container.
  */
-func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (string, error) {
+func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (string, string, error) {
 	var def Definition
 	def.Apply(definition)
 
@@ -99,14 +99,14 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 		}
 		net_args = append(net_args, "aquarium-"+c_network)
 		if _, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, net_args...); err != nil {
-			return "", err
+			return "", "", err
 		}
 	}
 
 	// Load the images
 	img_name_version, err := d.loadImages(&def)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	// Set the arguments to run the container
@@ -122,14 +122,14 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 	// Create and connect volumes to container
 	if err := d.disksCreate(c_name, &run_args, def.Requirements.Disks); err != nil {
 		log.Println("DOCKER: Unable to create the required disks")
-		return c_hwaddr, err
+		return c_hwaddr, "", err
 	}
 
 	// Create env file
 	env_path, err := d.envCreate(c_name, metadata)
 	if err != nil {
 		log.Println("DOCKER: Unable to create the required disks")
-		return c_hwaddr, err
+		return c_hwaddr, "", err
 	}
 	// Add env-file to run args
 	run_args = append(run_args, "--env-file", env_path)
@@ -140,12 +140,12 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 	run_args = append(run_args, img_name_version)
 	if _, _, err := runAndLog(30*time.Second, d.cfg.DockerPath, run_args...); err != nil {
 		log.Println("DOCKER: Unable to run container", c_name, err)
-		return c_hwaddr, err
+		return c_hwaddr, "", err
 	}
 
 	log.Println("DOCKER: Allocate of VM", c_hwaddr, c_name, "completed")
 
-	return c_hwaddr, nil
+	return c_hwaddr, "", nil
 }
 
 // Load images and returns the target image name:version to use by container
