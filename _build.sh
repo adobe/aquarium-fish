@@ -18,8 +18,6 @@
 echo "ROOT DIR: ${root_dir}"
 cd "${root_dir}"
 
-./check.sh
-
 
 gopath=$(go env GOPATH)
 cd /tmp  # Don't let go get to modify project go.mod
@@ -61,6 +59,8 @@ echo
 echo "--- BUILD AQUARIUM-FISH ---"
 go build -ldflags="-s -w" -a -o "aquarium-fish.$suffix" ./cmd/fish
 
-
 # Remove debug symbols
 strip "aquarium-fish.$suffix"
+
+# Run additional tests
+./check.sh
