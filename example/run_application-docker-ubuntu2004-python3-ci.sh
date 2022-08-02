@@ -17,7 +17,7 @@
 token=$1
 [ "$token" ] || exit 1
 
-label=ubuntu2004-python3
+label=docker-ubuntu2004-python3
 
 # It's a bit dirty, but works for now - probably better to create API call to find the latest label
 curr_label=$(curl -s -u "admin:$token" -k 'https://127.0.0.1:8001/api/v1/label/?filter=name="'$label'"' | sed 's/},{/},\n{/g' | tail -1)

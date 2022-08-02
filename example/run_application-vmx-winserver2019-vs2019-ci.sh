@@ -17,7 +17,7 @@
 token=$1
 [ "$token" ] || exit 1
 
-label=winserver2019-vs2019
+label=vmx-winserver2019-vs2019
 
 # It's a bit dirty, but works for now - probably better to create API call to find the latest label
 curr_label=$(curl -s -u "admin:$token" -k 'https://127.0.0.1:8001/api/v1/label/?filter=name="'$label'"' | sed 's/},{/},\n{/g' | tail -1)
@@ -34,7 +34,7 @@ echo "Press key to create the Application with label '$label'"
 read w1
 
 app_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/json' -d '{"label_ID":'$curr_label_id', "metadata":{
-    "JENKINS_URL": "http://host.docker.internal:8085/",
+    "JENKINS_URL": "https://jenkins-host.local/",
     "JENKINS_AGENT_SECRET": "03839eabcf945b1e780be8f9488d264c4c57bf388546da9a84588345555f29b0",
     "JENKINS_AGENT_NAME": "test-node"
 }}' https://127.0.0.1:8001/api/v1/application/ | grep -o '"ID": *[0-9]\+,' | tr -dc '0-9')
