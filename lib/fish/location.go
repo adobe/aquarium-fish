@@ -13,7 +13,7 @@
 package fish
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
@@ -29,7 +29,7 @@ func (f *Fish) LocationFind(filter *string) (ls []types.Location, err error) {
 
 func (f *Fish) LocationCreate(l *types.Location) error {
 	if l.Name == "" {
-		return errors.New("Fish: Name can't be empty")
+		return fmt.Errorf("Fish: Name can't be empty")
 	}
 
 	return f.db.Create(l).Error

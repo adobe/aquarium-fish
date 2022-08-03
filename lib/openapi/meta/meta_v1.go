@@ -17,9 +17,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 
-	"github.com/alessio/shellescape"
 	"github.com/labstack/echo/v4"
 
 	"github.com/adobe/aquarium-fish/lib/fish"
@@ -58,60 +56,26 @@ func (e *Processor) AddressAuth(next echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
-func cleanShellKey(in string) []byte {
-	s := []byte(in)
-	j := 0
-	for _, b := range s {
-		if j == 0 && ('0' <= b && b <= '9') {
-			// Skip first numeric symbols
-			continue
-		}
-		if ('a' <= b && b <= 'z') || ('A' <= b && b <= 'Z') || ('0' <= b && b <= '9') || b == '_' {
-			s[j] = b
-			j++
-		}
-	}
-	return s[:j]
-}
-
 func (e *Processor) Return(c echo.Context, code int, obj map[string]interface{}) error {
 	format := c.QueryParam("format")
 	if len(format) == 0 {
 		format = "json"
 	}
-	switch format {
-	case "json": // Default json
-		return c.JSON(code, obj)
-	case "env": // Plain format suitable to use in shell
-		prefix := c.QueryParam("prefix")
-		m := util.DotSerialize(prefix, obj)
-		c.String(code, "")
-		for key, val := range m {
-			line := cleanShellKey(strings.Replace(shellescape.StripUnsafe(key), ".", "_", -1))
-			if len(line) == 0 {
-				continue
-			}
-			value := []byte("=" + shellescape.Quote(val) + "\n")
-			c.Response().Write(append(line, value...))
-		}
-		return nil
-	case "ps1": // Plain format suitable to use in powershell
-		prefix := c.QueryParam("prefix")
-		m := util.DotSerialize(prefix, obj)
-		c.String(code, "")
-		for key, val := range m {
-			line := cleanShellKey(strings.Replace(shellescape.StripUnsafe(key), ".", "_", -1))
-			if len(line) == 0 {
-				continue
-			}
-			// Shell quote is not applicable here, so using the custom one
-			value := []byte("='" + strings.Replace(val, "'", "''", -1) + "'\n")
-			c.Response().Write(append([]byte("$"), append(line, value...)...))
-		}
-		return nil
-	default:
-		return c.JSON(http.StatusBadRequest, H{"message": "Incorrect `format` query param provided: " + format})
+	prefix := c.QueryParam("prefix")
+
+	data, err := util.SerializeMetadata(format, prefix, obj)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to format metadata: %v", err)})
 	}
+
+	mime := echo.MIMETextPlainCharsetUTF8
+	if format == "json" {
+		mime = echo.MIMEApplicationJSONCharsetUTF8
+	}
+
+	c.Blob(code, mime, data)
+
+	return nil
 }
 
 func (e *Processor) DataGetList(c echo.Context, params types.DataGetListParams) error {
@@ -135,6 +99,6 @@ func (e *Processor) DataGetList(c echo.Context, params types.DataGetListParams) 
 
 func (e *Processor) DataGet(c echo.Context, keyPath string, params types.DataGetParams) error {
 	// TODO: implement it
-	e.Return(c, http.StatusNotFound, H{"message": "No data found"})
+	e.Return(c, http.StatusNotFound, H{"message": "TODO: Not implemented"})
 	return fmt.Errorf("TODO: Not implemented")
 }
