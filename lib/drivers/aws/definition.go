@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
+	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 /**
@@ -40,6 +41,9 @@ type Definition struct {
 	Image         string `json:"image"`          // Main image to use as reference
 	InstanceType  string `json:"instance_type"`  // Type of the instance from aws available list
 	SecurityGroup string `json:"security_group"` // ID of the security group to use for the instance
+
+	UserDataFormat string `json:"userdata_format"` // If not empty - will store the resource metadata to userdata in defined format
+	UserDataPrefix string `json:"userdata_prefix"` // Optional if need to add custom prefix to the metadata key during formatting
 
 	Requirements drivers.Requirements `json:"requirements"` // Required resources to allocate
 }
@@ -66,6 +70,10 @@ func (d *Definition) Validate() error {
 
 	if d.SecurityGroup != "" || !strings.HasPrefix(d.SecurityGroup, "sg-") {
 		return fmt.Errorf("AWS: Incorrect EC2 security group provided")
+	}
+
+	if !util.Contains([]string{"", "json", "env", "ps1"}, d.UserDataFormat) {
+		return fmt.Errorf("AWS: Unsupported userdata format: %s", d.UserDataFormat)
 	}
 
 	// Check resources (no disk types supported and no net check)

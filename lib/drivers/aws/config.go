@@ -32,6 +32,7 @@ func (c *Config) Apply(config []byte) error {
 			return err
 		}
 	}
+
 	return nil
 }
 

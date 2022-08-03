@@ -16,15 +16,18 @@ package aws
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
+	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 // Implements drivers.ResourceDriver interface
@@ -74,7 +77,7 @@ func (d *Driver) newConn() *ec2.Client {
  * It automatically download the required images, unpack them and runs the VM.
  * Not using metadata because there is no good interfaces to pass it to VM.
  */
-func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (inst_id string, err error) {
+func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (string, string, error) {
 	var def Definition
 	def.Apply(definition)
 
@@ -82,8 +85,9 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (i
 
 	// Checking the VPC exists or use default one
 	vm_network := def.Requirements.Network
+	var err error
 	if vm_network, err = getSubnetId(conn, vm_network); err != nil {
-		return "", fmt.Errorf("AWS: Unable to get subnet: %v", err)
+		return "", "", fmt.Errorf("AWS: Unable to get subnet: %v", err)
 	}
 	log.Println("AWS: Selected subnet:", vm_network)
 
@@ -91,7 +95,6 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (i
 	input := &ec2.RunInstancesInput{
 		ImageId:      aws.String(def.Image),
 		InstanceType: types.InstanceType(def.InstanceType),
-		UserData:     aws.String("test"),
 
 		NetworkInterfaces: []types.InstanceNetworkInterfaceSpecification{
 			{
@@ -116,6 +119,14 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (i
 
 		MinCount: aws.Int32(1),
 		MaxCount: aws.Int32(1),
+	}
+	if def.UserDataFormat != "" {
+		// Set UserData field
+		userdata, err := util.SerializeMetadata(def.UserDataFormat, def.UserDataPrefix, metadata)
+		if err != nil {
+			return "", "", fmt.Errorf("AWS: Unable to serialize metadata to userdata: %v", err)
+		}
+		input.UserData = aws.String(base64.StdEncoding.EncodeToString([]byte(userdata)))
 	}
 	if def.SecurityGroup != "" {
 		input.NetworkInterfaces[0].Groups = []string{def.SecurityGroup}
@@ -146,12 +157,33 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (i
 	result, err := conn.RunInstances(context.TODO(), input)
 	if err != nil {
 		log.Println("AWS: Unable to run instance", err)
-		return "", err
+		return "", "", err
 	}
 
-	log.Println("AWS: Allocate of instance completed:", result.Instances[0].InstanceId)
+	inst := &result.Instances[0]
 
-	return *result.Instances[0].InstanceId, nil
+	// Wait for IP address to be assigned to the instance
+	timeout := 60
+	for {
+		if inst.PrivateIpAddress != nil {
+			log.Println("AWS: Allocate of instance completed:", *inst.InstanceId, *inst.PrivateIpAddress)
+			return *inst.InstanceId, *inst.PrivateIpAddress, nil
+		}
+
+		timeout -= 5
+		if timeout < 0 {
+			break
+		}
+		time.Sleep(5)
+
+		inst, err = d.getInstance(conn, *inst.InstanceId)
+		if err != nil || inst == nil {
+			log.Println("AWS: Error during getting instance while waiting for IP:", err, *inst.InstanceId)
+			inst = &result.Instances[0]
+		}
+	}
+
+	return *inst.InstanceId, "", fmt.Errorf("AWS: Unable to locate the instance IP: %s", *inst.InstanceId)
 }
 
 // Will verify and return subnet id
