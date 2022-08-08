@@ -46,7 +46,7 @@ func (n *Node) Init(node_address, cert_path string) error {
 	}
 
 	// Update the pubkey once - it can not be changed for the node name for now,
-	// maybe later the process of key interchange will be implemented
+	// maybe later the process of key switch will be implemented
 	if n.Pubkey == nil {
 		// Set the pubkey once
 		n.Pubkey = &pubkey_der

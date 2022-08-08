@@ -74,8 +74,7 @@ func (f *Fish) Init() error {
 		&types.Location{},
 		&types.ServiceMapping{},
 	); err != nil {
-		log.Println("Fish: Unable to apply DB schema:", err)
-		return err
+		return fmt.Errorf("Fish: Unable to apply DB schema: %v", err)
 	}
 
 	// Create admin user and ignore errors if it's existing
@@ -86,15 +85,14 @@ func (f *Fish) Init() error {
 			println("Admin user pass:", pass)
 		}
 	} else if err != nil {
-		log.Println("Fish: Unable to create admin due to err:", err)
-		return err
+		return fmt.Errorf("Fish: Unable to create admin: %v", err)
 	}
 
 	// Init node
 	create_node := false
 	node, err := f.NodeGet(f.cfg.NodeName)
 	if err != nil {
-		log.Println("Create new node:", f.cfg.NodeName, f.cfg.NodeLocation)
+		log.Println("Fish: Create new node:", f.cfg.NodeName, f.cfg.NodeLocation)
 		create_node = true
 		var loc_id int64
 		loc_id = 0
@@ -106,8 +104,7 @@ func (f *Fish) Init() error {
 				loc.Name = f.cfg.NodeLocation
 				loc.Description = fmt.Sprintf("Created automatically during node '%s' startup", f.cfg.NodeName)
 				if f.LocationCreate(loc) != nil {
-					log.Println("Fish: Unable to create new location")
-					return err
+					return fmt.Errorf("Fish: Unable to create new location")
 				}
 			}
 			loc_id = loc.ID
@@ -117,7 +114,7 @@ func (f *Fish) Init() error {
 			LocationID: loc_id,
 		}
 	} else {
-		log.Println("Use existing node:", node.Name, node.LocationID)
+		log.Println("Fish: Use existing node:", node.Name, node.LocationID)
 	}
 
 	cert_path := f.cfg.TLSCrt
@@ -125,20 +122,17 @@ func (f *Fish) Init() error {
 		cert_path = filepath.Join(f.cfg.Directory, cert_path)
 	}
 	if err := node.Init(f.cfg.NodeAddress, cert_path); err != nil {
-		log.Println("Fish: Unable to init node due to err:", err)
-		return err
+		return fmt.Errorf("Fish: Unable to init node: %v", err)
 	}
 
 	f.node = node
 	if create_node {
 		if err = f.NodeCreate(f.node); err != nil {
-			log.Println("Fish: Unable to create node due to err:", err)
-			return err
+			return fmt.Errorf("Fish: Unable to create node: %v", err)
 		}
 	} else {
 		if err = f.NodeSave(f.node); err != nil {
-			log.Println("Fish: Unable to save node due to err:", err)
-			return err
+			return fmt.Errorf("Fish: Unable to save node: %v", err)
 		}
 	}
 

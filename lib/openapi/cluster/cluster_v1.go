@@ -23,6 +23,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
 
+	"github.com/adobe/aquarium-fish/lib/cluster"
 	"github.com/adobe/aquarium-fish/lib/fish"
 )
 
@@ -36,7 +37,7 @@ type Processor struct {
 	hub *Hub
 }
 
-func NewV1Router(e *echo.Echo, fish *fish.Fish) {
+func NewV1Router(e *echo.Echo, fish *fish.Fish, cl *cluster.Cluster) {
 	hub := &Hub{
 		broadcast:  make(chan []byte),
 		register:   make(chan *Client),

@@ -27,6 +27,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
+	"github.com/adobe/aquarium-fish/lib/cluster"
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/openapi"
@@ -122,8 +123,14 @@ func main() {
 				return err
 			}
 
+			log.Println("Fish joining cluster...")
+			cl, err := cluster.New(fish, cfg.ClusterJoin, ca_path, cert_path, key_path)
+			if err != nil {
+				return err
+			}
+
 			log.Println("Fish starting API...")
-			srv, err := openapi.Init(fish, cfg.APIAddress, ca_path, cert_path, key_path)
+			srv, err := openapi.Init(fish, cl, cfg.APIAddress, ca_path, cert_path, key_path)
 			if err != nil {
 				return err
 			}
@@ -142,6 +149,7 @@ func main() {
 				log.Fatal("Fish forced to shutdown:", err)
 			}
 
+			cl.Stop()
 			fish.Close()
 
 			log.Println("Fish exiting...")
