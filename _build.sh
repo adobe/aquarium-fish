@@ -13,22 +13,19 @@
 # Use ./build-linux.sh / ./build-macos.sh instead
 
 [ "x$suffix" != "x" ] || suffix="$1"
-[ "x$suffix" != "x" ] || suffix="$(uname -s)_$(uname -m)"
+[ "x$suffix" != "x" ] || suffix="$(go env GOOS)_$(go env GOARCH)"
 
 echo "ROOT DIR: ${root_dir}"
 cd "${root_dir}"
 
 
 gopath=$(go env GOPATH)
-cd /tmp  # Don't let go get to modify project go.mod
 
 echo "--- PATCH OAPI-CODEGEN ---"
 # Generate the API code patch
 go get -d "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.11.1-0.20220908201945-d1a63c702fd0"
 chmod -R u+w "$gopath/pkg/mod/github.com/deepmap/oapi-codegen@v1.11.1-0.20220908201945-d1a63c702fd0"
 patch -N -p1 -d "$gopath/pkg/mod/github.com/deepmap/oapi-codegen@v1.11.1-0.20220908201945-d1a63c702fd0" < "${root_dir}/deps/oapi-codegen.patch" || true
-
-cd "${root_dir}"
 
 echo "--- GENERATE CODE FOR AQUARIUM-FISH ---"
 find ./lib -name '*.gen.go' -delete
@@ -55,6 +52,3 @@ go build -ldflags="-s -w" -a -o "aquarium-fish.$suffix" ./cmd/fish
 
 # Remove debug symbols
 strip "aquarium-fish.$suffix"
-
-# Run additional tests
-./check.sh

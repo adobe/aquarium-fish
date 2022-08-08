@@ -1,4 +1,4 @@
-#!/bin/sh -e
+#!/bin/bash -e
 # Copyright 2021 Adobe. All rights reserved.
 # This file is licensed to you under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License. You may obtain a copy
@@ -12,11 +12,13 @@
 # Build fish for macos (directly on macos host)
 
 [ "x$suffix" != "x" ] || suffix="$1"
-[ "x$suffix" != "x" ] || suffix="$(uname -s)_$(uname -m)"
+[ "x$suffix" != "x" ] || suffix="$(go env GOOS)_$(go env GOARCH)"
 
 root_dir=$(dirname "`realpath "$0"`")
 
 cd "${root_dir}"
+
+export GOOS=darwin
 
 source _build.sh
 
