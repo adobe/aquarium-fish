@@ -32,9 +32,9 @@ patch -N -p1 -d "$gopath/pkg/mod/github.com/canonical/go-dqlite@v1.8.0" < "${roo
 
 echo "--- PATCH OAPI-CODEGEN ---"
 # Generate the API code patch
-go get -d "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.8.1"
-chmod -R u+w "$gopath/pkg/mod/github.com/deepmap/oapi-codegen@v1.8.1"
-patch -N -p1 -d "$gopath/pkg/mod/github.com/deepmap/oapi-codegen@v1.8.1" < "${root_dir}/deps/oapi-codegen.patch" || true
+go get -d "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.11.1-0.20220908201945-d1a63c702fd0"
+chmod -R u+w "$gopath/pkg/mod/github.com/deepmap/oapi-codegen@v1.11.1-0.20220908201945-d1a63c702fd0"
+patch -N -p1 -d "$gopath/pkg/mod/github.com/deepmap/oapi-codegen@v1.11.1-0.20220908201945-d1a63c702fd0" < "${root_dir}/deps/oapi-codegen.patch" || true
 
 cd "${root_dir}"
 
