@@ -1,95 +1,35 @@
-diff --git a/cmd/oapi-codegen/oapi-codegen.go b/cmd/oapi-codegen/oapi-codegen.go
-index 7496125..2bb041d 100644
---- a/cmd/oapi-codegen/oapi-codegen.go
-+++ b/cmd/oapi-codegen/oapi-codegen.go
-@@ -43,6 +43,7 @@ var (
- 	flagTemplatesDir   string
- 	flagImportMapping  string
- 	flagExcludeSchemas string
-+	flagTypesPackage   string
- 	flagConfigFile     string
- 	flagAliasTypes     bool
- 	flagPrintVersion bool
-@@ -57,6 +58,7 @@ type configuration struct {
- 	TemplatesDir    string            `yaml:"templates"`
- 	ImportMapping   map[string]string `yaml:"import-mapping"`
- 	ExcludeSchemas  []string          `yaml:"exclude-schemas"`
-+	TypesPackage    string            `yaml:"types-package"`
- }
- 
- func main() {
-@@ -70,6 +72,7 @@ func main() {
- 	flag.StringVar(&flagTemplatesDir, "templates", "", "Path to directory containing user templates")
- 	flag.StringVar(&flagImportMapping, "import-mapping", "", "A dict from the external reference to golang package path")
- 	flag.StringVar(&flagExcludeSchemas, "exclude-schemas", "", "A comma separated list of schemas which must be excluded from generation")
-+	flag.StringVar(&flagTypesPackage, "types-package", "", "Package of types if types are generated separately")
- 	flag.StringVar(&flagConfigFile, "config", "", "a YAML config file that controls oapi-codegen behavior")
- 	flag.BoolVar(&flagAliasTypes, "alias-types", false, "Alias type declarations of possible")
- 	flag.BoolVar(&flagPrintVersion, "version", false, "when specified, print version and exit")
-@@ -132,6 +135,7 @@ func main() {
- 	opts.IncludeTags = cfg.IncludeTags
- 	opts.ExcludeTags = cfg.ExcludeTags
- 	opts.ExcludeSchemas = cfg.ExcludeSchemas
-+	opts.TypesPackage = cfg.TypesPackage
- 
- 	if opts.GenerateEchoServer && opts.GenerateChiServer {
- 		errExit("can not specify both server and chi-server targets simultaneously")
-@@ -232,6 +236,9 @@ func configFromFlags() *configuration {
- 	if cfg.ExcludeSchemas == nil {
- 		cfg.ExcludeSchemas = util.ParseCommandLineList(flagExcludeSchemas)
- 	}
-+	if cfg.TypesPackage == "" {
-+		cfg.TypesPackage = flagTypesPackage
-+	}
- 	if cfg.OutputFile == "" {
- 		cfg.OutputFile = flagOutputFile
- 	}
-diff --git a/pkg/codegen/codegen.go b/pkg/codegen/codegen.go
-index b1e318b..760b24f 100644
---- a/pkg/codegen/codegen.go
-+++ b/pkg/codegen/codegen.go
-@@ -45,6 +45,7 @@ type Options struct {
- 	UserTemplates      map[string]string // Override built-in templates from user-provided files
- 	ImportMapping      map[string]string // ImportMapping specifies the golang package path for each external reference
- 	ExcludeSchemas     []string          // Exclude from generation schemas with given names. Ignored when empty.
-+	TypesPackage       string            // Types are placed in a separated package with this name. Ignored when empty.
- }
- 
- // goImport represents a go package to be imported in the generated code
-@@ -131,7 +132,7 @@ func Generate(swagger *openapi3.T, packageName string, opts Options) (string, er
- 		}
- 	}
- 
--	ops, err := OperationDefinitions(swagger)
-+	ops, err := OperationDefinitions(swagger, opts.TypesPackage)
- 	if err != nil {
- 		return "", errors.Wrap(err, "error creating operation definitions")
- 	}
+commit 16e878d121f05a6f391f1d87ce91d87028bbebcd
+Author: Sergei Parshev <parshev@adobe.com>
+Date:   Mon Jun 7 13:30:31 2021 -0700
+
+    Added implementation of x-json-ignore
+
 diff --git a/pkg/codegen/extension.go b/pkg/codegen/extension.go
-index a0d4702..1e21721 100644
+index e986b3f..a9ee43d 100644
 --- a/pkg/codegen/extension.go
 +++ b/pkg/codegen/extension.go
-@@ -8,9 +8,10 @@ import (
+@@ -6,10 +6,11 @@ import (
  )
  
  const (
 -	extPropGoType    = "x-go-type"
+-	extGoName        = "x-go-name"
 -	extPropOmitEmpty = "x-omitempty"
 -	extPropExtraTags = "x-oapi-codegen-extra-tags"
 +	extPropGoType       = "x-go-type"
++	extGoName           = "x-go-name"
++	extPropGoJsonIgnore = "x-go-json-ignore"
 +	extPropOmitEmpty    = "x-omitempty"
 +	extPropExtraTags    = "x-oapi-codegen-extra-tags"
-+	extPropGoJsonIgnore = "x-go-json-ignore"
  )
  
- func extTypeName(extPropValue interface{}) (string, error) {
-@@ -51,3 +52,18 @@ func extExtraTags(extPropValue interface{}) (map[string]string, error) {
+ func extString(extPropValue interface{}) (string, error) {
+@@ -57,3 +58,17 @@ func extExtraTags(extPropValue interface{}) (map[string]string, error) {
  	}
  	return tags, nil
  }
 +
 +func extParseGoJsonIgnore(extPropValue interface{}) (bool, error) {
-+
 +	raw, ok := extPropValue.(json.RawMessage)
 +	if !ok {
 +		return false, fmt.Errorf("failed to convert type: %T", extPropValue)
@@ -97,209 +37,27 @@ index a0d4702..1e21721 100644
 +
 +	var goJsonIgnore bool
 +	if err := json.Unmarshal(raw, &goJsonIgnore); err != nil {
-+		return false, errors.Wrap(err, "failed to unmarshal json")
++		return false, fmt.Errorf("failed to unmarshal json: %w", err)
 +	}
 +
 +	return goJsonIgnore, nil
 +}
-diff --git a/pkg/codegen/operations.go b/pkg/codegen/operations.go
-index 45f92c0..81fee8d 100644
---- a/pkg/codegen/operations.go
-+++ b/pkg/codegen/operations.go
-@@ -203,6 +203,7 @@ type OperationDefinition struct {
- 	QueryParams         []ParameterDefinition // Parameters in the query, /path?param
- 	CookieParams        []ParameterDefinition // Parameters in cookies
- 	TypeDefinitions     []TypeDefinition      // These are all the types we need to define for this operation
-+	TypePackage         string                // Where the type is stored, if empty - the same package
- 	SecurityDefinitions []SecurityDefinition  // These are the security providers
- 	BodyRequired        bool
- 	Bodies              []RequestBodyDefinition // The list of bodies for which to generate handlers.
-@@ -235,6 +236,16 @@ func (o *OperationDefinition) RequiresParamObject() bool {
- 	return len(o.Params()) > 0
- }
- 
-+// If the type are placed in separated module it's a way to get the package
-+// name and prepend to the type in the template.
-+func (o *OperationDefinition) TypePackagePrefix() string {
-+	if len(o.TypePackage) > 0 {
-+		return o.TypePackage + "."
-+	}
-+
-+	return ""
-+}
-+
- // This is called by the template engine to determine whether to generate body
- // marshaling code on the client. This is true for all body types, whether or
- // not we generate types for them.
-@@ -375,7 +386,7 @@ func FilterParameterDefinitionByType(params []ParameterDefinition, in string) []
- }
- 
- // OperationDefinitions returns all operations for a swagger definition.
--func OperationDefinitions(swagger *openapi3.T) ([]OperationDefinition, error) {
-+func OperationDefinitions(swagger *openapi3.T, typesPackage string) ([]OperationDefinition, error) {
- 	var operations []OperationDefinition
- 
- 	for _, requestPath := range SortedPathsKeys(swagger.Paths) {
-@@ -445,6 +456,7 @@ func OperationDefinitions(swagger *openapi3.T) ([]OperationDefinition, error) {
- 				Spec:            op,
- 				Bodies:          bodyDefinitions,
- 				TypeDefinitions: typeDefinitions,
-+				TypePackage:     typesPackage,
- 			}
- 
- 			// check for overrides of SecurityDefinitions.
 diff --git a/pkg/codegen/schema.go b/pkg/codegen/schema.go
-index b1580fe..0375418 100644
+index 8552165..5ae23d1 100644
 --- a/pkg/codegen/schema.go
 +++ b/pkg/codegen/schema.go
-@@ -427,6 +427,8 @@ func GenFieldsFromProperties(props []Property) []string {
- 	var fields []string
- 	for _, p := range props {
- 		field := ""
-+		fieldTags := make(map[string]string)
-+
- 		// Add a comment to a field in case we have one, otherwise skip.
- 		if p.Description != "" {
- 			// Separate the comment from a previous-defined, unrelated field.
-@@ -435,21 +437,26 @@ func GenFieldsFromProperties(props []Property) []string {
- 		}
- 		field += fmt.Sprintf("    %s %s", p.GoFieldName(), p.GoTypeDef())
- 
-+		// Formating go tags
-+		fieldTags["json"] = p.JsonFieldName
-+
- 		// Support x-omitempty
--		omitEmpty := true
- 		if _, ok := p.ExtensionProps.Extensions[extPropOmitEmpty]; ok {
--			if extOmitEmpty, err := extParseOmitEmpty(p.ExtensionProps.Extensions[extPropOmitEmpty]); err == nil {
--				omitEmpty = extOmitEmpty
-+			if extOmitEmpty, err := extParseOmitEmpty(p.ExtensionProps.Extensions[extPropOmitEmpty]); err == nil && extOmitEmpty {
-+				fieldTags["json"] += ",omitempty"
+@@ -609,6 +609,14 @@ func GenFieldsFromProperties(props []Property) []string {
  			}
-+		} else if !p.Required && !p.Nullable { // not required or not nullable needs omitempty
-+			fieldTags["json"] += ",omitempty"
  		}
  
--		fieldTags := make(map[string]string)
--
--		if p.Required || p.Nullable || !omitEmpty {
--			fieldTags["json"] = p.JsonFieldName
--		} else {
--			fieldTags["json"] = p.JsonFieldName + ",omitempty"
 +		// Support x-go-json-ignore
 +		if _, ok := p.ExtensionProps.Extensions[extPropGoJsonIgnore]; ok {
 +			if goJsonIgnore, err := extParseGoJsonIgnore(p.ExtensionProps.Extensions[extPropGoJsonIgnore]); err == nil && goJsonIgnore {
 +				fieldTags["json"] = "-"
 +			}
- 		}
++		}
 +
 +		// Support x-oapi-codegen-extra-tags
  		if extension, ok := p.ExtensionProps.Extensions[extPropExtraTags]; ok {
  			if tags, err := extExtraTags(extension); err == nil {
  				keys := SortedStringKeys(tags)
-@@ -465,6 +472,7 @@ func GenFieldsFromProperties(props []Property) []string {
- 			tags[i] = fmt.Sprintf(`%s:"%s"`, k, fieldTags[k])
- 		}
- 		field += "`" + strings.Join(tags, " ") + "`"
-+
- 		fields = append(fields, field)
- 	}
- 	return fields
-diff --git a/pkg/codegen/templates/chi-interface.tmpl b/pkg/codegen/templates/chi-interface.tmpl
-index 79a51fd..fcb8934 100644
---- a/pkg/codegen/templates/chi-interface.tmpl
-+++ b/pkg/codegen/templates/chi-interface.tmpl
-@@ -2,6 +2,6 @@
- type ServerInterface interface {
- {{range .}}{{.SummaryAsComment }}
- // ({{.Method}} {{.Path}})
--{{.OperationId}}(w http.ResponseWriter, r *http.Request{{genParamArgs .PathParams}}{{if .RequiresParamObject}}, params {{.OperationId}}Params{{end}})
-+{{.OperationId}}(w http.ResponseWriter, r *http.Request{{genParamArgs .PathParams}}{{if .RequiresParamObject}}, params {{.TypePackagePrefix}}{{.OperationId}}Params{{end}})
- {{end}}
- }
-diff --git a/pkg/codegen/templates/server-interface.tmpl b/pkg/codegen/templates/server-interface.tmpl
-index 7380091..30c131a 100644
---- a/pkg/codegen/templates/server-interface.tmpl
-+++ b/pkg/codegen/templates/server-interface.tmpl
-@@ -2,6 +2,6 @@
- type ServerInterface interface {
- {{range .}}{{.SummaryAsComment }}
- // ({{.Method}} {{.Path}})
--{{.OperationId}}(ctx echo.Context{{genParamArgs .PathParams}}{{if .RequiresParamObject}}, params {{.OperationId}}Params{{end}}) error
-+{{.OperationId}}(ctx echo.Context{{genParamArgs .PathParams}}{{if .RequiresParamObject}}, params {{.TypePackagePrefix}}{{.OperationId}}Params{{end}}) error
- {{end}}
- }
-diff --git a/pkg/codegen/templates/templates.gen.go b/pkg/codegen/templates/templates.gen.go
-index f84945a..3f69a72 100644
---- a/pkg/codegen/templates/templates.gen.go
-+++ b/pkg/codegen/templates/templates.gen.go
-@@ -121,7 +121,7 @@ return r
- type ServerInterface interface {
- {{range .}}{{.SummaryAsComment }}
- // ({{.Method}} {{.Path}})
--{{.OperationId}}(w http.ResponseWriter, r *http.Request{{genParamArgs .PathParams}}{{if .RequiresParamObject}}, params {{.OperationId}}Params{{end}})
-+{{.OperationId}}(w http.ResponseWriter, r *http.Request{{genParamArgs .PathParams}}{{if .RequiresParamObject}}, params {{.TypePackagePrefix}}{{.OperationId}}Params{{end}})
- {{end}}
- }
- `,
-@@ -901,7 +901,7 @@ type {{.TypeName}} {{if and (opts.AliasTypes) (.CanAlias)}}={{end}} {{.Schema.Ty
- type ServerInterface interface {
- {{range .}}{{.SummaryAsComment }}
- // ({{.Method}} {{.Path}})
--{{.OperationId}}(ctx echo.Context{{genParamArgs .PathParams}}{{if .RequiresParamObject}}, params {{.OperationId}}Params{{end}}) error
-+{{.OperationId}}(ctx echo.Context{{genParamArgs .PathParams}}{{if .RequiresParamObject}}, params {{.TypePackagePrefix}}{{.OperationId}}Params{{end}}) error
- {{end}}
- }
- `,
-@@ -915,7 +915,7 @@ type ServerInterfaceWrapper struct {
-     Handler ServerInterface
- }
- 
--{{range .}}{{$opid := .OperationId}}// {{$opid}} converts echo context to params.
-+{{range .}}{{$opid := .OperationId}}{{$optpp := .TypePackagePrefix}}// {{$opid}} converts echo context to params.
- func (w *ServerInterfaceWrapper) {{.OperationId}} (ctx echo.Context) error {
-     var err error
- {{range .PathParams}}// ------------- Path parameter "{{.ParamName}}" -------------
-@@ -938,12 +938,12 @@ func (w *ServerInterfaceWrapper) {{.OperationId}} (ctx echo.Context) error {
- {{end}}
- 
- {{range .SecurityDefinitions}}
--    ctx.Set({{.ProviderName | sanitizeGoIdentity | ucFirst}}Scopes, {{toStringArray .Scopes}})
-+    ctx.Set({{$optpp}}{{.ProviderName | sanitizeGoIdentity | ucFirst}}Scopes, {{toStringArray .Scopes}})
- {{end}}
- 
- {{if .RequiresParamObject}}
-     // Parameter object where we will unmarshal all parameters from the context
--    var params {{.OperationId}}Params
-+    var params {{$optpp}}{{.OperationId}}Params
- {{range $paramIdx, $param := .QueryParams}}// ------------- {{if .Required}}Required{{else}}Optional{{end}} query parameter "{{.ParamName}}" -------------
-     {{if .IsStyled}}
-     err = runtime.BindQueryParameter("{{.Style}}", {{.Explode}}, {{.Required}}, "{{.ParamName}}", ctx.QueryParams(), &params.{{.GoName}})
-diff --git a/pkg/codegen/templates/wrappers.tmpl b/pkg/codegen/templates/wrappers.tmpl
-index 537751a..6f175c5 100644
---- a/pkg/codegen/templates/wrappers.tmpl
-+++ b/pkg/codegen/templates/wrappers.tmpl
-@@ -3,7 +3,7 @@ type ServerInterfaceWrapper struct {
-     Handler ServerInterface
- }
- 
--{{range .}}{{$opid := .OperationId}}// {{$opid}} converts echo context to params.
-+{{range .}}{{$opid := .OperationId}}{{$optpp := .TypePackagePrefix}}// {{$opid}} converts echo context to params.
- func (w *ServerInterfaceWrapper) {{.OperationId}} (ctx echo.Context) error {
-     var err error
- {{range .PathParams}}// ------------- Path parameter "{{.ParamName}}" -------------
-@@ -26,12 +26,12 @@ func (w *ServerInterfaceWrapper) {{.OperationId}} (ctx echo.Context) error {
- {{end}}
- 
- {{range .SecurityDefinitions}}
--    ctx.Set({{.ProviderName | sanitizeGoIdentity | ucFirst}}Scopes, {{toStringArray .Scopes}})
-+    ctx.Set({{$optpp}}{{.ProviderName | sanitizeGoIdentity | ucFirst}}Scopes, {{toStringArray .Scopes}})
- {{end}}
- 
- {{if .RequiresParamObject}}
-     // Parameter object where we will unmarshal all parameters from the context
--    var params {{.OperationId}}Params
-+    var params {{$optpp}}{{.OperationId}}Params
- {{range $paramIdx, $param := .QueryParams}}// ------------- {{if .Required}}Required{{else}}Optional{{end}} query parameter "{{.ParamName}}" -------------
-     {{if .IsStyled}}
-     err = runtime.BindQueryParameter("{{.Style}}", {{.Explode}}, {{.Required}}, "{{.ParamName}}", ctx.QueryParams(), &params.{{.GoName}})

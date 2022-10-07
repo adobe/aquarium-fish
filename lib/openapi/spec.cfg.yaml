@@ -2,4 +2,4 @@
 package: openapi
 output: spec.gen.go
 generate:
-  - spec
+  embedded-spec: true

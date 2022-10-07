@@ -10,10 +10,10 @@
  * governing permissions and limitations under the License.
  */
 
-//go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.8.1 -config types.cfg.yaml ../../docs/openapi.yaml
-//go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.8.1 -config meta_v1.cfg.yaml ../../docs/openapi.yaml
-//go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.8.1 -config api_v1.cfg.yaml ../../docs/openapi.yaml
-//go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.8.1 -config spec.cfg.yaml ../../docs/openapi.yaml
+//go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.11.1-0.20220908201945-d1a63c702fd0 -config types.cfg.yaml ../../docs/openapi.yaml
+//go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.11.1-0.20220908201945-d1a63c702fd0 -config meta_v1.cfg.yaml ../../docs/openapi.yaml
+//go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.11.1-0.20220908201945-d1a63c702fd0 -config api_v1.cfg.yaml ../../docs/openapi.yaml
+//go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.11.1-0.20220908201945-d1a63c702fd0 -config spec.cfg.yaml ../../docs/openapi.yaml
 
 package openapi
 
