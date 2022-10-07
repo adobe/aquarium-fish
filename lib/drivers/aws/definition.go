@@ -16,7 +16,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"strings"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/util"
@@ -68,10 +67,6 @@ func (d *Definition) Validate() error {
 		return fmt.Errorf("AWS: No EC2 instance type is specified")
 	}
 
-	if d.SecurityGroup != "" || !strings.HasPrefix(d.SecurityGroup, "sg-") {
-		return fmt.Errorf("AWS: Incorrect EC2 security group provided")
-	}
-
 	if !util.Contains([]string{"", "json", "env", "ps1"}, d.UserDataFormat) {
 		return fmt.Errorf("AWS: Unsupported userdata format: %s", d.UserDataFormat)
 	}
@@ -79,10 +74,6 @@ func (d *Definition) Validate() error {
 	// Check resources (no disk types supported and no net check)
 	if err := d.Requirements.Validate([]string{""}, false); err != nil {
 		return fmt.Errorf("AWS: Requirements validation failed: %s", err)
-	}
-	// Check network in addition
-	if d.Requirements.Network != "" || !strings.HasPrefix(d.Requirements.Network, "subnet-") || !strings.HasPrefix(d.Requirements.Network, "vpc-") {
-		return fmt.Errorf("AWS: Network could contain only empty (default), subnet or vpc ID")
 	}
 
 	return nil

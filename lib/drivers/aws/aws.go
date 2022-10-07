@@ -91,9 +91,15 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 	}
 	log.Println("AWS: Selected subnet:", vm_network)
 
+	vm_image := def.Image
+	if vm_image, err = getImageId(conn, vm_image); err != nil {
+		return "", "", fmt.Errorf("AWS: Unable to get image: %v", err)
+	}
+	log.Println("AWS: Selected image:", vm_image)
+
 	// Prepare Instance request information
 	input := &ec2.RunInstancesInput{
-		ImageId:      aws.String(def.Image),
+		ImageId:      aws.String(vm_image),
 		InstanceType: types.InstanceType(def.InstanceType),
 
 		NetworkInterfaces: []types.InstanceNetworkInterfaceSpecification{
@@ -129,7 +135,12 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 		input.UserData = aws.String(base64.StdEncoding.EncodeToString([]byte(userdata)))
 	}
 	if def.SecurityGroup != "" {
-		input.NetworkInterfaces[0].Groups = []string{def.SecurityGroup}
+		vm_secgroup := def.SecurityGroup
+		if vm_secgroup, err = getSecGroupId(conn, vm_secgroup); err != nil {
+			return "", "", fmt.Errorf("AWS: Unable to get security group: %v", err)
+		}
+		log.Println("AWS: Selected security group:", vm_secgroup)
+		input.NetworkInterfaces[0].Groups = []string{vm_secgroup}
 	}
 
 	// Prepare the device mapping
@@ -144,9 +155,14 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 			}
 			if disk.Clone != "" {
 				// Use snapshot as the disk source
-				mapping.Ebs.SnapshotId = aws.String(disk.Clone)
+				vm_snapshot := disk.Clone
+				if vm_snapshot, err = getSnapshotId(conn, vm_snapshot); err != nil {
+					return "", "", fmt.Errorf("AWS: Unable to get snapshot: %v", err)
+				}
+				log.Println("AWS: Selected snapshot:", vm_snapshot)
+				mapping.Ebs.SnapshotId = aws.String(vm_snapshot)
 			} else {
-				// Just create new disk
+				// Just create a new disk
 				mapping.Ebs.VolumeSize = aws.Int32(int32(disk.Size))
 			}
 			input.BlockDeviceMappings = append(input.BlockDeviceMappings, mapping)
@@ -188,50 +204,90 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 
 // Will verify and return subnet id
 // In case vpc id was provided - will chose the subnet with less used ip's
-func getSubnetId(conn *ec2.Client, id string) (string, error) {
+func getSubnetId(conn *ec2.Client, id_tag string) (string, error) {
 	filter := types.Filter{}
 
-	// If network id is not a subnet - process as vpc
-	if !strings.HasPrefix(id, "subnet-") {
-		if id != "" {
-			// Use VPC to verify it exists in the project
-			filter.Name = aws.String("vpc-id")
-			filter.Values = []string{id}
-		} else {
-			// Locate the default VPC
-			filter.Name = aws.String("is-default")
-			filter.Values = []string{"true"}
-		}
-		// Filter the project vpc's
+	// Check if the tag is provided ("<Key>:<Value>")
+	if strings.Contains(id_tag, ":") {
+		log.Println("AWS: Fetching tag vpc or subnet:", id_tag)
+		tag_key_val := strings.SplitN(id_tag, ":", 2)
+		filter.Name = aws.String("tag:" + tag_key_val[0])
+		filter.Values = []string{tag_key_val[1]}
+
+		// Look for VPC with the defined tag
 		req := &ec2.DescribeVpcsInput{
 			Filters: []types.Filter{
 				filter,
+				types.Filter{
+					Name:   aws.String("owner-id"),
+					Values: []string{"self"},
+				},
 			},
 		}
 		resp, err := conn.DescribeVpcs(context.TODO(), req)
-		if err != nil {
-			return "", fmt.Errorf("AWS: Unable to locate VPC: %v", err)
+		if err != nil || len(resp.Vpcs) == 0 {
+			// Look for Subnet with the defined tag
+			req := &ec2.DescribeSubnetsInput{
+				Filters: []types.Filter{
+					filter,
+					types.Filter{
+						Name:   aws.String("owner-id"),
+						Values: []string{"self"},
+					},
+				},
+			}
+			resp, err := conn.DescribeSubnets(context.TODO(), req)
+			if err != nil || len(resp.Subnets) == 0 {
+				return "", fmt.Errorf("AWS: Unable to locate vpc or subnet with specified tag: %v", err)
+			}
+			id_tag = *resp.Subnets[0].SubnetId
+			return id_tag, nil
 		}
-		if len(resp.Vpcs) == 0 {
-			return "", fmt.Errorf("AWS: No VPCs available in the project")
-		}
+		id_tag = *resp.Vpcs[0].VpcId
+		log.Println("AWS: Found VPC with id:", id_tag)
+	} else {
+		// If network id is not a subnet - process as vpc
+		if !strings.HasPrefix(id_tag, "subnet-") {
+			if id_tag != "" {
+				// Use VPC to verify it exists in the project
+				filter.Name = aws.String("vpc-id")
+				filter.Values = []string{id_tag}
+			} else {
+				// Locate the default VPC
+				filter.Name = aws.String("is-default")
+				filter.Values = []string{"true"}
+			}
+			// Filter the project vpc's
+			req := &ec2.DescribeVpcsInput{
+				Filters: []types.Filter{
+					filter,
+				},
+			}
+			resp, err := conn.DescribeVpcs(context.TODO(), req)
+			if err != nil {
+				return "", fmt.Errorf("AWS: Unable to locate VPC: %v", err)
+			}
+			if len(resp.Vpcs) == 0 {
+				return "", fmt.Errorf("AWS: No VPCs available in the project")
+			}
 
-		if id == "" {
-			id = *resp.Vpcs[0].VpcId
-			log.Println("AWS: Using default VPC:", id)
-		} else if id != *resp.Vpcs[0].VpcId {
-			return "", fmt.Errorf("AWS: Unable to verify the vpc id: %q != %q", id, *resp.Vpcs[0].VpcId)
+			if id_tag == "" {
+				id_tag = *resp.Vpcs[0].VpcId
+				log.Println("AWS: Using default VPC:", id_tag)
+			} else if id_tag != *resp.Vpcs[0].VpcId {
+				return "", fmt.Errorf("AWS: Unable to verify the vpc id: %q != %q", id_tag, *resp.Vpcs[0].VpcId)
+			}
 		}
 	}
 
-	if strings.HasPrefix(id, "vpc-") {
+	if strings.HasPrefix(id_tag, "vpc-") {
 		// Filtering subnets by VPC id
 		filter.Name = aws.String("vpc-id")
-		filter.Values = []string{id}
+		filter.Values = []string{id_tag}
 	} else {
 		// Check subnet exists in the project
 		filter.Name = aws.String("subnet-id")
-		filter.Values = []string{id}
+		filter.Values = []string{id_tag}
 	}
 	req := &ec2.DescribeSubnetsInput{
 		Filters: []types.Filter{
@@ -246,23 +302,111 @@ func getSubnetId(conn *ec2.Client, id string) (string, error) {
 		return "", fmt.Errorf("AWS: No Subnets available in the project")
 	}
 
-	if strings.HasPrefix(id, "vpc-") {
+	if strings.HasPrefix(id_tag, "vpc-") {
 		// Chose the less used subnet in VPC
 		var curr_count int32 = 0
 		for _, subnet := range resp.Subnets {
 			if curr_count < *subnet.AvailableIpAddressCount {
-				id = *subnet.SubnetId
+				id_tag = *subnet.SubnetId
 				curr_count = *subnet.AvailableIpAddressCount
 			}
 		}
 		if curr_count == 0 {
 			return "", fmt.Errorf("AWS: Subnets have no available IP addresses")
 		}
-	} else if id != *resp.Subnets[0].SubnetId {
-		return "", fmt.Errorf("AWS: Unable to verify the subnet id: %q != %q", id, *resp.Subnets[0].SubnetId)
+	} else if id_tag != *resp.Subnets[0].SubnetId {
+		return "", fmt.Errorf("AWS: Unable to verify the subnet id: %q != %q", id_tag, *resp.Subnets[0].SubnetId)
 	}
 
-	return id, nil
+	return id_tag, nil
+}
+
+// Will verify and return image id
+func getImageId(conn *ec2.Client, id_name string) (string, error) {
+	if strings.HasPrefix(id_name, "ami-") {
+		return id_name, nil
+	}
+
+	log.Println("AWS: Looking for image name:", id_name)
+
+	// Look for image with the defined name
+	req := &ec2.DescribeImagesInput{
+		Filters: []types.Filter{
+			types.Filter{
+				Name:   aws.String("name"),
+				Values: []string{id_name},
+			},
+		},
+		Owners: []string{"self"},
+	}
+	resp, err := conn.DescribeImages(context.TODO(), req)
+	if err != nil || len(resp.Images) == 0 {
+		return "", fmt.Errorf("AWS: Unable to locate image with specified name: %v", err)
+	}
+	id_name = *resp.Images[0].ImageId
+
+	return id_name, nil
+}
+
+// Will verify and return security group id
+func getSecGroupId(conn *ec2.Client, id_name string) (string, error) {
+	if strings.HasPrefix(id_name, "sg-") {
+		return id_name, nil
+	}
+
+	log.Println("AWS: Looking for security group name:", id_name)
+
+	// Look for security group with the defined name
+	req := &ec2.DescribeSecurityGroupsInput{
+		Filters: []types.Filter{
+			types.Filter{
+				Name:   aws.String("group-name"),
+				Values: []string{id_name},
+			},
+			types.Filter{
+				Name:   aws.String("owner-id"),
+				Values: []string{"self"},
+			},
+		},
+	}
+	resp, err := conn.DescribeSecurityGroups(context.TODO(), req)
+	if err != nil || len(resp.SecurityGroups) == 0 {
+		return "", fmt.Errorf("AWS: Unable to locate security group with specified name: %v", err)
+	}
+	id_name = *resp.SecurityGroups[0].GroupId
+
+	return id_name, nil
+}
+
+// Will verify and return snapshot id
+func getSnapshotId(conn *ec2.Client, id_tag string) (string, error) {
+	if strings.HasPrefix(id_tag, "snap-") {
+		return id_tag, nil
+	}
+	if !strings.Contains(id_tag, ":") {
+		return "", fmt.Errorf("AWS: Incorrect snapshot tag format: %s", id_tag)
+	}
+
+	log.Println("AWS: Fetching snapshot tag:", id_tag)
+	tag_key_val := strings.SplitN(id_tag, ":", 2)
+
+	// Look for VPC with the defined tag
+	req := &ec2.DescribeSnapshotsInput{
+		Filters: []types.Filter{
+			types.Filter{
+				Name:   aws.String("tag:" + tag_key_val[0]),
+				Values: []string{tag_key_val[1]},
+			},
+		},
+		OwnerIds: []string{"self"},
+	}
+	resp, err := conn.DescribeSnapshots(context.TODO(), req)
+	if err != nil || len(resp.Snapshots) == 0 {
+		return "", fmt.Errorf("AWS: Unable to locate snapshot with specified tag: %v", err)
+	}
+	id_tag = *resp.Snapshots[0].SnapshotId
+
+	return id_tag, nil
 }
 
 func (d *Driver) getInstance(conn *ec2.Client, inst_id string) (*types.Instance, error) {
