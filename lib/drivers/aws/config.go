@@ -13,15 +13,22 @@
 package aws
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
 type Config struct {
 	Region    string `json:"region"`     // AWS Region to connect to
 	KeyID     string `json:"key_id"`     // AWS AMI Key ID
 	SecretKey string `json:"secret_key"` // AWS AMI Secret Key
+
+	// Optional
+	AccountIDs []string `json:"account_ids"` // AWS Trusted account IDs to filter vpc, subnet, sg, images, snapshots...
 }
 
 func (c *Config) Apply(config []byte) error {
@@ -49,7 +56,28 @@ func (c *Config) Validate() (err error) {
 		return fmt.Errorf("AWS: Credentials SecretKey is not set")
 	}
 
-	// TODO: Verify that connection is possible with those creds
+	// Verify that connection is possible with those creds and get the account ID
+	conn := sts.NewFromConfig(aws.Config{
+		Region: c.Region,
+		Credentials: aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
+			return aws.Credentials{
+				AccessKeyID:     c.KeyID,
+				SecretAccessKey: c.SecretKey,
+				Source:          "fish-cfg",
+			}, nil
+		}),
+	})
+	input := &sts.GetCallerIdentityInput{}
+	res, err := conn.GetCallerIdentity(context.TODO(), input)
+	if err != nil {
+		return fmt.Errorf("AWS: Unable to verify connection by calling STS service: %v", err)
+	}
+	if len(c.AccountIDs) > 0 && c.AccountIDs[0] != *res.Account {
+		log.Println("AWS: Using Account IDs:", c.AccountIDs, "(real: ", *res.Account, ")")
+	} else {
+		c.AccountIDs = []string{*res.Account}
+		log.Println("AWS: Using Account IDs:", c.AccountIDs)
+	}
 
 	return nil
 }

@@ -86,13 +86,13 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 	// Checking the VPC exists or use default one
 	vm_network := def.Requirements.Network
 	var err error
-	if vm_network, err = getSubnetId(conn, vm_network); err != nil {
+	if vm_network, err = d.getSubnetId(conn, vm_network); err != nil {
 		return "", "", fmt.Errorf("AWS: Unable to get subnet: %v", err)
 	}
 	log.Println("AWS: Selected subnet:", vm_network)
 
 	vm_image := def.Image
-	if vm_image, err = getImageId(conn, vm_image); err != nil {
+	if vm_image, err = d.getImageId(conn, vm_image); err != nil {
 		return "", "", fmt.Errorf("AWS: Unable to get image: %v", err)
 	}
 	log.Println("AWS: Selected image:", vm_image)
@@ -136,7 +136,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 	}
 	if def.SecurityGroup != "" {
 		vm_secgroup := def.SecurityGroup
-		if vm_secgroup, err = getSecGroupId(conn, vm_secgroup); err != nil {
+		if vm_secgroup, err = d.getSecGroupId(conn, vm_secgroup); err != nil {
 			return "", "", fmt.Errorf("AWS: Unable to get security group: %v", err)
 		}
 		log.Println("AWS: Selected security group:", vm_secgroup)
@@ -156,7 +156,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 			if disk.Clone != "" {
 				// Use snapshot as the disk source
 				vm_snapshot := disk.Clone
-				if vm_snapshot, err = getSnapshotId(conn, vm_snapshot); err != nil {
+				if vm_snapshot, err = d.getSnapshotId(conn, vm_snapshot); err != nil {
 					return "", "", fmt.Errorf("AWS: Unable to get snapshot: %v", err)
 				}
 				log.Println("AWS: Selected snapshot:", vm_snapshot)
@@ -204,7 +204,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 
 // Will verify and return subnet id
 // In case vpc id was provided - will chose the subnet with less used ip's
-func getSubnetId(conn *ec2.Client, id_tag string) (string, error) {
+func (d *Driver) getSubnetId(conn *ec2.Client, id_tag string) (string, error) {
 	filter := types.Filter{}
 
 	// Check if the tag is provided ("<Key>:<Value>")
@@ -220,7 +220,7 @@ func getSubnetId(conn *ec2.Client, id_tag string) (string, error) {
 				filter,
 				types.Filter{
 					Name:   aws.String("owner-id"),
-					Values: []string{"self"},
+					Values: d.cfg.AccountIDs,
 				},
 			},
 		}
@@ -232,13 +232,13 @@ func getSubnetId(conn *ec2.Client, id_tag string) (string, error) {
 					filter,
 					types.Filter{
 						Name:   aws.String("owner-id"),
-						Values: []string{"self"},
+						Values: d.cfg.AccountIDs,
 					},
 				},
 			}
 			resp, err := conn.DescribeSubnets(context.TODO(), req)
 			if err != nil || len(resp.Subnets) == 0 {
-				return "", fmt.Errorf("AWS: Unable to locate vpc or subnet with specified tag: %v", err)
+				return "", fmt.Errorf("AWS: Unable to locate vpc or subnet with specified tag: %s:%v, %v", *filter.Name, filter.Values, err)
 			}
 			id_tag = *resp.Subnets[0].SubnetId
 			return id_tag, nil
@@ -325,7 +325,7 @@ func getSubnetId(conn *ec2.Client, id_tag string) (string, error) {
 }
 
 // Will verify and return image id
-func getImageId(conn *ec2.Client, id_name string) (string, error) {
+func (d *Driver) getImageId(conn *ec2.Client, id_name string) (string, error) {
 	if strings.HasPrefix(id_name, "ami-") {
 		return id_name, nil
 	}
@@ -340,7 +340,7 @@ func getImageId(conn *ec2.Client, id_name string) (string, error) {
 				Values: []string{id_name},
 			},
 		},
-		Owners: []string{"self"},
+		Owners: d.cfg.AccountIDs,
 	}
 	resp, err := conn.DescribeImages(context.TODO(), req)
 	if err != nil || len(resp.Images) == 0 {
@@ -352,7 +352,7 @@ func getImageId(conn *ec2.Client, id_name string) (string, error) {
 }
 
 // Will verify and return security group id
-func getSecGroupId(conn *ec2.Client, id_name string) (string, error) {
+func (d *Driver) getSecGroupId(conn *ec2.Client, id_name string) (string, error) {
 	if strings.HasPrefix(id_name, "sg-") {
 		return id_name, nil
 	}
@@ -368,7 +368,7 @@ func getSecGroupId(conn *ec2.Client, id_name string) (string, error) {
 			},
 			types.Filter{
 				Name:   aws.String("owner-id"),
-				Values: []string{"self"},
+				Values: d.cfg.AccountIDs,
 			},
 		},
 	}
@@ -385,7 +385,7 @@ func getSecGroupId(conn *ec2.Client, id_name string) (string, error) {
 }
 
 // Will verify and return latest snapshot id
-func getSnapshotId(conn *ec2.Client, id_tag string) (string, error) {
+func (d *Driver) getSnapshotId(conn *ec2.Client, id_tag string) (string, error) {
 	if strings.HasPrefix(id_tag, "snap-") {
 		return id_tag, nil
 	}
@@ -404,7 +404,7 @@ func getSnapshotId(conn *ec2.Client, id_tag string) (string, error) {
 				Values: []string{tag_key_val[1]},
 			},
 		},
-		OwnerIds: []string{"self"},
+		OwnerIds: d.cfg.AccountIDs,
 	})
 
 	// Getting the images to find the latest one
@@ -416,7 +416,7 @@ func getSnapshotId(conn *ec2.Client, id_tag string) (string, error) {
 			return "", fmt.Errorf("AWS: Error during requesting snapshot: %v", err)
 		}
 		if len(resp.Snapshots) > 900 {
-			log.Println("AWS: WARNING: Over 900 snapshots is found for tag, check for slowness:", id_tag)
+			log.Println("AWS: WARNING: Over 900 snapshots was found for tag, could be slow:", id_tag)
 		}
 		for _, r := range resp.Snapshots {
 			if found_time.Before(*r.StartTime) {
