@@ -425,6 +425,10 @@ func (d *Driver) Status(hwaddr string) string {
 	return drivers.StatusNone
 }
 
+func (d *Driver) Snapshot(hwaddr string, full bool) error {
+	return fmt.Errorf("DOCKER: Snapshot not implemented")
+}
+
 func (d *Driver) Deallocate(hwaddr string) error {
 	c_name := d.getContainerName(hwaddr)
 	c_id := d.getAllocatedContainer(hwaddr)

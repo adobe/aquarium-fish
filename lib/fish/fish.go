@@ -23,7 +23,6 @@ import (
 	"github.com/mostlygeek/arp"
 	"gorm.io/gorm"
 
-	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
@@ -336,15 +335,7 @@ func (f *Fish) isNodeAvailableForApplication(app_id int64) bool {
 	}
 
 	// Is node supports the required label driver
-	drivers := f.DriversGet()
-	supports_driver := false
-	for _, drv := range drivers {
-		if drv.Name() == label.Driver {
-			supports_driver = true
-			break
-		}
-	}
-	if !supports_driver {
+	if f.DriverGet(label.Driver) == nil {
 		return false
 	}
 
@@ -449,14 +440,7 @@ func (f *Fish) executeApplication(app_id int64) error {
 	}
 
 	// Locate the required driver
-	var driver drivers.ResourceDriver
-	drivers := f.DriversGet()
-	for i, drv := range drivers {
-		if drv.Name() == label.Driver {
-			driver = drivers[i]
-			break
-		}
-	}
+	driver := f.DriverGet(label.Driver)
 	if driver == nil {
 		log.Println("Fish: Unable to locate driver for the Application", app.ID)
 		app_state = &types.ApplicationState{ApplicationID: app.ID, Status: types.ApplicationStateStatusERROR,

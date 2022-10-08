@@ -492,6 +492,10 @@ func (d *Driver) Status(hwaddr string) string {
 	return drivers.StatusNone
 }
 
+func (d *Driver) Snapshot(hwaddr string, full bool) error {
+	return fmt.Errorf("VMX: Snapshot not implemented")
+}
+
 func (d *Driver) Deallocate(hwaddr string) error {
 	vmx_path := d.getAllocatedVMX(hwaddr)
 	if len(vmx_path) == 0 {

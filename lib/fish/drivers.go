@@ -26,8 +26,13 @@ import (
 
 var drivers_enabled_list []drivers.ResourceDriver
 
-func (f *Fish) DriversGet() []drivers.ResourceDriver {
-	return drivers_enabled_list
+func (f *Fish) DriverGet(name string) drivers.ResourceDriver {
+	for _, drv := range drivers_enabled_list {
+		if drv.Name() == name {
+			return drv
+		}
+	}
+	return nil
 }
 
 func (f *Fish) DriversSet() error {

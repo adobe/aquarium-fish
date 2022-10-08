@@ -453,6 +453,43 @@ paths:
       security:
         - basic_auth: []
 
+  /api/v1/application/{id}/snapshot:
+    get:
+      summary: Triggers Application snapshot
+      description: Creates the Application's Resource snapshot
+      operationId: ApplicationSnapshotGet
+      tags:
+        - Application
+      parameters:
+        - name: id
+          in: path
+          description: ID of the Application
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: full
+          in: query
+          description: >
+            Specify in order to include image changes (and memory of VM if posible) into the
+            snapshot. Most of the drivers can at least save the disks state. In better some we can
+            have the entire started VM with memory as it was in time of snapshot taking.
+          required: false
+          schema:
+            type: boolean
+          allowEmptyValue: true
+      responses:
+        '200':
+          description: Successful operation
+        '400':
+          description: Bad parameter or conditions
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Application not found
+      security:
+        - basic_auth: []
+
   /api/v1/application/{id}/deallocate:
     get:
       summary: Triggers Application deallocate

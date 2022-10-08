@@ -37,6 +37,10 @@ type ResourceDriver interface {
 	// Get the status of the resource with given hw address
 	Status(hwaddr string) string
 
+	// Makes environment snapshot of the resource with given hw address
+	// * full - will try it's best to make the complete snapshot of the environment, else just non-image data (attached disks)
+	Snapshot(hwaddr string, full bool) error
+
 	// Deallocate resource with provided hw addr
 	Deallocate(hwaddr string) error
 }

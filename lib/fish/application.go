@@ -74,3 +74,28 @@ func (f *Fish) ApplicationIsAllocated(app_id int64) (err error) {
 	}
 	return nil
 }
+
+func (f *Fish) ApplicationSnapshot(app *types.Application, full bool) error {
+	// Get application label to choose the right driver
+	label, err := f.LabelGet(app.LabelID)
+	if err != nil {
+		return fmt.Errorf("Fish: Label not found: %w", err)
+	}
+
+	driver := f.DriverGet(label.Driver)
+	if driver == nil {
+		return fmt.Errorf("Fish: Driver not available: %s", label.Driver)
+	}
+
+	// Get resource to locate hwaddr
+	res, err := f.ResourceGetByApplication(app.ID)
+	if err != nil {
+		return fmt.Errorf("Fish: Resource not found: %w", err)
+	}
+
+	if driver.Snapshot(res.HwAddr, full) != nil {
+		return fmt.Errorf("Fish: Unable to create snapshot: %w", err)
+	}
+
+	return nil
+}

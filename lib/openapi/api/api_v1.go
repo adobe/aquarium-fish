@@ -266,6 +266,30 @@ func (e *Processor) ApplicationStateGet(c echo.Context, id int64) error {
 	return c.JSON(http.StatusOK, out)
 }
 
+func (e *Processor) ApplicationSnapshotGet(c echo.Context, id int64, params types.ApplicationSnapshotGetParams) error {
+	app, err := e.fish.ApplicationGet(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the application: %d", id)})
+		return fmt.Errorf("Unable to find the application: %d, %w", id, err)
+	}
+
+	// Only the owner of the application (or admin) could take the snapshot of the resource
+	user := c.Get("user")
+	if app.ID != user.(*types.User).ID && user.(*types.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner & admin can take snapshot of the application resource")})
+		return fmt.Errorf("Only the owner & admin can take snapshot of the application resource")
+	}
+
+	// TODO: not working correctly in cluster in case not all the nodes supports the
+	// driver - need to rewrite in cluster way as Resource Tasks.
+	full := params.Full != nil && *params.Full
+	if err = e.fish.ApplicationSnapshot(app, full); err != nil {
+		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Error during creating Application snapshot: %v", err)})
+	}
+
+	return c.JSON(http.StatusOK, H{})
+}
+
 func (e *Processor) ApplicationDeallocateGet(c echo.Context, id int64) error {
 	app, err := e.fish.ApplicationGet(id)
 	if err != nil {

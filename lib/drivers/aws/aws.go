@@ -243,6 +243,9 @@ func getSubnetId(conn *ec2.Client, id_tag string) (string, error) {
 			id_tag = *resp.Subnets[0].SubnetId
 			return id_tag, nil
 		}
+		if len(resp.Vpcs) > 1 {
+			log.Println("AWS: WARNING: There is more than one vpc with the same tag:", id_tag)
+		}
 		id_tag = *resp.Vpcs[0].VpcId
 		log.Println("AWS: Found VPC with id:", id_tag)
 	} else {
@@ -373,12 +376,15 @@ func getSecGroupId(conn *ec2.Client, id_name string) (string, error) {
 	if err != nil || len(resp.SecurityGroups) == 0 {
 		return "", fmt.Errorf("AWS: Unable to locate security group with specified name: %v", err)
 	}
+	if len(resp.SecurityGroups) > 1 {
+		log.Println("AWS: WARNING: There is more than one group with the same name:", id_name)
+	}
 	id_name = *resp.SecurityGroups[0].GroupId
 
 	return id_name, nil
 }
 
-// Will verify and return snapshot id
+// Will verify and return latest snapshot id
 func getSnapshotId(conn *ec2.Client, id_tag string) (string, error) {
 	if strings.HasPrefix(id_tag, "snap-") {
 		return id_tag, nil
@@ -390,8 +396,8 @@ func getSnapshotId(conn *ec2.Client, id_tag string) (string, error) {
 	log.Println("AWS: Fetching snapshot tag:", id_tag)
 	tag_key_val := strings.SplitN(id_tag, ":", 2)
 
-	// Look for VPC with the defined tag
-	req := &ec2.DescribeSnapshotsInput{
+	// Look for VPC with the defined tag over pages
+	p := ec2.NewDescribeSnapshotsPaginator(conn, &ec2.DescribeSnapshotsInput{
 		Filters: []types.Filter{
 			types.Filter{
 				Name:   aws.String("tag:" + tag_key_val[0]),
@@ -399,14 +405,32 @@ func getSnapshotId(conn *ec2.Client, id_tag string) (string, error) {
 			},
 		},
 		OwnerIds: []string{"self"},
-	}
-	resp, err := conn.DescribeSnapshots(context.TODO(), req)
-	if err != nil || len(resp.Snapshots) == 0 {
-		return "", fmt.Errorf("AWS: Unable to locate snapshot with specified tag: %v", err)
-	}
-	id_tag = *resp.Snapshots[0].SnapshotId
+	})
 
-	return id_tag, nil
+	// Getting the images to find the latest one
+	found_id := ""
+	var found_time time.Time
+	for p.HasMorePages() {
+		resp, err := p.NextPage(context.TODO())
+		if err != nil {
+			return "", fmt.Errorf("AWS: Error during requesting snapshot: %v", err)
+		}
+		if len(resp.Snapshots) > 900 {
+			log.Println("AWS: WARNING: Over 900 snapshots is found for tag, check for slowness:", id_tag)
+		}
+		for _, r := range resp.Snapshots {
+			if found_time.Before(*r.StartTime) {
+				found_id = *r.SnapshotId
+				found_time = *r.StartTime
+			}
+		}
+	}
+
+	if found_id == "" {
+		return "", fmt.Errorf("AWS: Unable to locate snapshot with specified tag: %s", id_tag)
+	}
+
+	return found_id, nil
 }
 
 func (d *Driver) getInstance(conn *ec2.Client, inst_id string) (*types.Instance, error) {
@@ -441,6 +465,42 @@ func (d *Driver) Status(inst_id string) string {
 		return drivers.StatusAllocated
 	}
 	return drivers.StatusNone
+}
+
+func (d *Driver) Snapshot(inst_id string, full bool) error {
+	conn := d.newConn()
+
+	input := &ec2.CreateSnapshotsInput{
+		InstanceSpecification: &types.InstanceSpecification{
+			ExcludeBootVolume: aws.Bool(!full),
+			InstanceId:        &inst_id,
+		},
+		Description:        aws.String("Created by AquariumFish"),
+		CopyTagsFromSource: types.CopyTagsFromSourceVolume,
+		TagSpecifications: []types.TagSpecification{{
+			ResourceType: "snapshot",
+			Tags: []types.Tag{{
+				Key:   aws.String("InstanceId"),
+				Value: aws.String(inst_id),
+			}},
+		}},
+	}
+
+	resp, err := conn.CreateSnapshots(context.TODO(), input)
+	if err != nil {
+		return fmt.Errorf("AWS: Unable to create snapshots for instance %s: %v", inst_id, err)
+	}
+	if len(resp.Snapshots) < 1 {
+		return fmt.Errorf("AWS: No snapshots was created for instance %s", inst_id)
+	}
+
+	snapshots := []string{}
+	for _, r := range resp.Snapshots {
+		snapshots = append(snapshots, *r.SnapshotId)
+	}
+	log.Println("AWS: Created snapshots for instance ", inst_id, ": ", strings.Join(snapshots, ", "))
+
+	return nil
 }
 
 func (d *Driver) Deallocate(inst_id string) error {
