@@ -26,6 +26,8 @@ import (
  *   image: ami-abcdef123456
  *   instance_type: c6a.4xlarge
  *   security_group: sg-abcdef123456
+ *   tags:
+ *     somekey: somevalue
  *   requirements:
  *     cpu: 16
  *     ram: 32
@@ -33,13 +35,12 @@ import (
  *       /dev/sdb:
  *         clone: snap-abcdef123456
  *     network: vpc-abcdef123456
- *   metadata:
- *     JENKINS_AGENT_WORKDIR: /mnt/workspace
  */
 type Definition struct {
-	Image         string `json:"image"`          // Main image to use as reference
-	InstanceType  string `json:"instance_type"`  // Type of the instance from aws available list
-	SecurityGroup string `json:"security_group"` // ID of the security group to use for the instance
+	Image         string            `json:"image"`          // Main image to use as reference
+	InstanceType  string            `json:"instance_type"`  // Type of the instance from aws available list
+	SecurityGroup string            `json:"security_group"` // ID of the security group to use for the instance
+	Tags          map[string]string `json:"tags"`           // Tags to add during instance creation
 
 	UserDataFormat string `json:"userdata_format"` // If not empty - will store the resource metadata to userdata in defined format
 	UserDataPrefix string `json:"userdata_prefix"` // Optional if need to add custom prefix to the metadata key during formatting
@@ -72,7 +73,7 @@ func (d *Definition) Validate() error {
 	}
 
 	// Check resources (no disk types supported and no net check)
-	if err := d.Requirements.Validate([]string{""}, false); err != nil {
+	if err := d.Requirements.Validate([]string{}, false); err != nil {
 		return fmt.Errorf("AWS: Requirements validation failed: %s", err)
 	}
 

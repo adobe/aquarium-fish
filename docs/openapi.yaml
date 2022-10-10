@@ -477,7 +477,6 @@ paths:
           required: false
           schema:
             type: boolean
-          allowEmptyValue: true
       responses:
         '200':
           description: Successful operation

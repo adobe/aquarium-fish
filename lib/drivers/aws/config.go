@@ -28,7 +28,8 @@ type Config struct {
 	SecretKey string `json:"secret_key"` // AWS AMI Secret Key
 
 	// Optional
-	AccountIDs []string `json:"account_ids"` // AWS Trusted account IDs to filter vpc, subnet, sg, images, snapshots...
+	AccountIDs   []string          `json:"account_ids"`   // AWS Trusted account IDs to filter vpc, subnet, sg, images, snapshots...
+	InstanceTags map[string]string `json:"instance_tags"` // AWS Instance tags to use when this node provision them
 }
 
 func (c *Config) Apply(config []byte) error {

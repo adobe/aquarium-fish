@@ -19,6 +19,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -111,21 +112,10 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 			},
 		},
 
-		TagSpecifications: []types.TagSpecification{
-			{
-				ResourceType: types.ResourceTypeInstance,
-				Tags: []types.Tag{
-					{
-						Key:   aws.String("ResourceManger"),
-						Value: aws.String("Aquarium Fish"),
-					},
-				},
-			},
-		},
-
 		MinCount: aws.Int32(1),
 		MaxCount: aws.Int32(1),
 	}
+
 	if def.UserDataFormat != "" {
 		// Set UserData field
 		userdata, err := util.SerializeMetadata(def.UserDataFormat, def.UserDataPrefix, metadata)
@@ -134,6 +124,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 		}
 		input.UserData = aws.String(base64.StdEncoding.EncodeToString([]byte(userdata)))
 	}
+
 	if def.SecurityGroup != "" {
 		vm_secgroup := def.SecurityGroup
 		if vm_secgroup, err = d.getSecGroupId(conn, vm_secgroup); err != nil {
@@ -141,6 +132,33 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 		}
 		log.Println("AWS: Selected security group:", vm_secgroup)
 		input.NetworkInterfaces[0].Groups = []string{vm_secgroup}
+	}
+
+	if len(d.cfg.InstanceTags) > 0 || len(def.Tags) > 0 {
+		tags_in := map[string]string{}
+		// Append tags to the map - from def (low priority) and from cfg (high priority)
+		for k, v := range def.Tags {
+			tags_in[k] = v
+		}
+		for k, v := range d.cfg.InstanceTags {
+			tags_in[k] = v
+		}
+
+		tags_out := []types.Tag{}
+		for k, v := range tags_in {
+			tags_out = append(tags_out, types.Tag{
+				Key:   aws.String(k),
+				Value: aws.String(v),
+			})
+		}
+
+		input.TagSpecifications = []types.TagSpecification{
+			{
+				ResourceType: types.ResourceTypeInstance,
+				Tags:         tags_out,
+			},
+		}
+
 	}
 
 	// Prepare the device mapping
@@ -152,6 +170,26 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 					DeleteOnTermination: aws.Bool(true),
 					VolumeType:          types.VolumeTypeGp3,
 				},
+			}
+			if disk.Type != "" {
+				type_data := strings.Split(disk.Type, ":")
+				if len(type_data) > 0 && type_data[0] != "" {
+					mapping.Ebs.VolumeType = types.VolumeType(type_data[0])
+				}
+				if len(type_data) > 1 && type_data[1] != "" {
+					val, err := strconv.ParseInt(type_data[1], 10, 32)
+					if err != nil {
+						return "", "", fmt.Errorf("AWS: Unable to parse EBS IOPS int32 from '%s': %v", type_data[1], err)
+					}
+					mapping.Ebs.Iops = aws.Int32(int32(val))
+				}
+				if len(type_data) > 2 && type_data[2] != "" {
+					val, err := strconv.ParseInt(type_data[2], 10, 32)
+					if err != nil {
+						return "", "", fmt.Errorf("AWS: Unable to parse EBS Throughput int32 from '%s': %v", type_data[1], err)
+					}
+					mapping.Ebs.Throughput = aws.Int32(int32(val))
+				}
 			}
 			if disk.Clone != "" {
 				// Use snapshot as the disk source
@@ -177,6 +215,58 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 	}
 
 	inst := &result.Instances[0]
+
+	// Alter instance volumes tags from defined disk labels
+	if len(def.Requirements.Disks) > 0 {
+		// Wait for the BlockDeviceMappings to be filled with disks
+		timeout := 60
+		for {
+			if len(inst.BlockDeviceMappings) != 0 {
+				break
+			}
+
+			timeout -= 5
+			if timeout < 0 {
+				break
+			}
+			time.Sleep(5)
+
+			inst, err = d.getInstance(conn, *inst.InstanceId)
+			if err != nil || inst == nil {
+				log.Println("AWS: Error during getting instance while waiting for BlockDeviceMappings:", err, *inst.InstanceId)
+				inst = &result.Instances[0]
+			}
+		}
+		for _, bd := range inst.BlockDeviceMappings {
+			disk, ok := def.Requirements.Disks[*bd.DeviceName]
+			log.Println("AWS: DEBUG: Processing volume:", *bd.DeviceName, disk)
+			if !ok || disk.Label == "" {
+				continue
+			}
+
+			tags_input := &ec2.CreateTagsInput{
+				Resources: []string{*bd.Ebs.VolumeId},
+				Tags:      []types.Tag{},
+			}
+
+			tag_vals := strings.Split(disk.Label, ",")
+			for _, tag_val := range tag_vals {
+				key_val := strings.SplitN(tag_val, ":", 2)
+				if len(key_val) < 2 {
+					key_val = append(key_val, "")
+				}
+				tags_input.Tags = append(tags_input.Tags, types.Tag{
+					Key:   aws.String(key_val[0]),
+					Value: aws.String(key_val[1]),
+				})
+				log.Println("AWS: DEBUG: Creating tags for the volume:", *bd.Ebs.VolumeId, key_val[0], key_val[0])
+			}
+			if _, err := conn.CreateTags(context.TODO(), tags_input); err != nil {
+				// Do not fail hard here - the instance is already running
+				log.Println("AWS: WARNING: Unable to set tags for volume:", *bd.Ebs.VolumeId, *bd.DeviceName, err)
+			}
+		}
+	}
 
 	// Wait for IP address to be assigned to the instance
 	timeout := 60

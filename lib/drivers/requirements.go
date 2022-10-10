@@ -46,7 +46,7 @@ func (r *Requirements) Validate(disk_types []string, check_net bool) error {
 		if name == "" {
 			return fmt.Errorf("Driver: Disk name can't be empty")
 		}
-		if !util.Contains(disk_types, disk.Type) {
+		if len(disk_types) > 0 && !util.Contains(disk_types, disk.Type) {
 			return fmt.Errorf(fmt.Sprintf("Driver: Type of disk must be one of: %+q", disk_types))
 		}
 		if disk.Size < 1 {
