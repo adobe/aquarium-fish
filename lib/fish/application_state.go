@@ -13,7 +13,7 @@
 package fish
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
@@ -25,7 +25,7 @@ func (f *Fish) ApplicationStateList() (ass []types.ApplicationState, err error) 
 
 func (f *Fish) ApplicationStateCreate(as *types.ApplicationState) error {
 	if as.Status == "" {
-		return errors.New("Fish: Status can't be empty")
+		return fmt.Errorf("Fish: Status can't be empty")
 	}
 
 	return f.db.Create(as).Error

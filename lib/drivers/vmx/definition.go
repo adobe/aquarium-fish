@@ -14,7 +14,7 @@ package vmx
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
 	"log"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
@@ -57,29 +57,29 @@ func (d *Definition) Apply(definition string) error {
 func (d *Definition) Validate() error {
 	// Check image
 	if d.Image == "" {
-		return errors.New("VMX: No image is specified")
+		return fmt.Errorf("VMX: No image is specified")
 	}
 
 	// Check images
 	image_exist := false
 	for name, url := range d.Images {
 		if name == "" {
-			return errors.New("VMX: No image name is specified")
+			return fmt.Errorf("VMX: No image name is specified")
 		}
 		if url == "" {
-			return errors.New("VMX: No image url is specified")
+			return fmt.Errorf("VMX: No image url is specified")
 		}
 		if name == d.Image {
 			image_exist = true
 		}
 	}
 	if !image_exist {
-		return errors.New("VMX: No image found in the images")
+		return fmt.Errorf("VMX: No image found in the images")
 	}
 
 	// Check resources
-	if d.Requirements.Validate([]string{"hfs+", "exfat", "fat32"}) != nil {
-		return errors.New("VMX: Requirements validation failed")
+	if err := d.Requirements.Validate([]string{"hfs+", "exfat", "fat32"}, true); err != nil {
+		return fmt.Errorf("VMX: Requirements validation failed: %s", err)
 	}
 
 	return nil

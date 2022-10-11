@@ -18,7 +18,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -71,7 +70,7 @@ func (d *Driver) ValidateDefinition(definition string) error {
  * It automatically download the required images, unpack them and runs the VM.
  * Not using metadata because there is no good interfaces to pass it to VM.
  */
-func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (string, error) {
+func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (string, string, error) {
 	var def Definition
 	def.Apply(definition)
 
@@ -92,7 +91,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 	// Load the required images
 	img_path, err := d.loadImages(&def, vm_images_dir)
 	if err != nil {
-		return vm_hwaddr, err
+		return vm_hwaddr, "", err
 	}
 
 	// Clone VM from the image
@@ -103,7 +102,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 		"-cloneName", vm_id,
 	}
 	if _, _, err := runAndLog(120*time.Second, d.cfg.VmrunPath, args...); err != nil {
-		return vm_hwaddr, err
+		return vm_hwaddr, "", err
 	}
 
 	// Change cloned vm configuration
@@ -117,13 +116,13 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 		"memsize =", fmt.Sprintf(`memsize = "%d"`, def.Requirements.Ram*1024),
 	); err != nil {
 		log.Println("VMX: Unable to change cloned VM configuration", vmx_path)
-		return vm_hwaddr, err
+		return vm_hwaddr, "", err
 	}
 
 	// Create and connect disks to vmx
 	if err := d.disksCreate(vmx_path, def.Requirements.Disks); err != nil {
 		log.Println("VMX: Unable create disks for VM", vmx_path)
-		return vm_hwaddr, err
+		return vm_hwaddr, "", err
 	}
 
 	// Run the background monitoring of the vmware log
@@ -136,12 +135,12 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 		log.Println("VMX: Unable to run VM", vmx_path, err)
 		log.Println("VMX: Check the log info:", filepath.Join(filepath.Dir(vmx_path), "vmware.log"),
 			"and directory ~/Library/Logs/VMware/ for additional logs")
-		return vm_hwaddr, err
+		return vm_hwaddr, "", err
 	}
 
 	log.Println("VMX: Allocate of VM", vm_hwaddr, vmx_path, "completed")
 
-	return vm_hwaddr, nil
+	return vm_hwaddr, "", nil
 }
 
 // Load images and returns the target image path for cloning
@@ -264,7 +263,7 @@ func (d *Driver) loadImages(def *Definition, vm_images_dir string) (string, erro
 	vm_images, _ := ioutil.ReadDir(vm_images_dir)
 	if len(def.Images) != len(vm_images) {
 		log.Println("VMX: The image processes gone wrong, please check log for the errors")
-		return "", errors.New("VMX: The image processes gone wrong, please check log for the errors")
+		return "", fmt.Errorf("VMX: The image processes gone wrong, please check log for the errors")
 	}
 
 	return target_path, nil
@@ -493,11 +492,15 @@ func (d *Driver) Status(hwaddr string) string {
 	return drivers.StatusNone
 }
 
+func (d *Driver) Snapshot(hwaddr string, full bool) error {
+	return fmt.Errorf("VMX: Snapshot not implemented")
+}
+
 func (d *Driver) Deallocate(hwaddr string) error {
 	vmx_path := d.getAllocatedVMX(hwaddr)
 	if len(vmx_path) == 0 {
 		log.Println("VMX: Unable to find VM with HW ADDR:", hwaddr)
-		return errors.New(fmt.Sprintf("VMX: No VM found with HW ADDR: %s", hwaddr))
+		return fmt.Errorf("VMX: No VM found with HW ADDR: %s", hwaddr)
 	}
 
 	// Sometimes it's stuck, so try to stop a bit more than usual

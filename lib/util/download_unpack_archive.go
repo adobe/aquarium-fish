@@ -14,7 +14,6 @@ package util
 
 import (
 	"archive/tar"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -62,7 +61,7 @@ func DownloadUnpackArchive(url, out_dir, user, password string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return errors.New(fmt.Sprintf("Util: Unable to download file: %s: %s", resp.Status, url))
+		return fmt.Errorf("Util: Unable to download file: %s: %s", resp.Status, url)
 	}
 
 	// Printing the download progress

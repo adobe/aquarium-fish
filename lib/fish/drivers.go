@@ -17,15 +17,22 @@ import (
 	"log"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
+
 	// Load all the drivers
+	_ "github.com/adobe/aquarium-fish/lib/drivers/aws"
 	_ "github.com/adobe/aquarium-fish/lib/drivers/docker"
 	_ "github.com/adobe/aquarium-fish/lib/drivers/vmx"
 )
 
 var drivers_enabled_list []drivers.ResourceDriver
 
-func (f *Fish) DriversGet() []drivers.ResourceDriver {
-	return drivers_enabled_list
+func (f *Fish) DriverGet(name string) drivers.ResourceDriver {
+	for _, drv := range drivers_enabled_list {
+		if drv.Name() == name {
+			return drv
+		}
+	}
+	return nil
 }
 
 func (f *Fish) DriversSet() error {
@@ -47,6 +54,8 @@ func (f *Fish) DriversSet() error {
 		if en {
 			log.Println("Fish: Resource driver available:", drv.Name())
 			list = append(list, drv)
+		} else {
+			log.Println("Fish: Resource driver disabled:", drv.Name())
 		}
 	}
 

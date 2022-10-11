@@ -13,8 +13,9 @@
 package drivers
 
 import (
-	"errors"
 	"fmt"
+
+	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 // Resource requirements
@@ -30,39 +31,31 @@ type Disk struct {
 	Label string `json:"label"` // Volume name will be given to the disk, empty will use the disk key
 	Size  uint   `json:"size"`  // Amount of disk space in GB
 	Reuse bool   `json:"reuse"` // Do not remove the disk and reuse it for the next resource run
+	Clone string `json:"clone"` // Clone the snapshot of existing disk instead of creating the new one
 }
 
-func (r *Requirements) Validate(disk_types []string) error {
+func (r *Requirements) Validate(disk_types []string, check_net bool) error {
 	// Check resources
 	if r.Cpu < 1 {
-		return errors.New("Driver: Number of CPU cores is less then 1")
+		return fmt.Errorf("Driver: Number of CPU cores is less then 1")
 	}
 	if r.Ram < 1 {
-		return errors.New("Driver: Amount of RAM is less then 1GB")
+		return fmt.Errorf("Driver: Amount of RAM is less then 1GB")
 	}
-	for name, data := range r.Disks {
+	for name, disk := range r.Disks {
 		if name == "" {
-			return errors.New("Driver: Disk name can't be empty")
+			return fmt.Errorf("Driver: Disk name can't be empty")
 		}
-		if !contains(disk_types, data.Type) {
-			return errors.New(fmt.Sprintf("Driver: Type of disk must be one of: %+q", disk_types))
+		if len(disk_types) > 0 && !util.Contains(disk_types, disk.Type) {
+			return fmt.Errorf(fmt.Sprintf("Driver: Type of disk must be one of: %+q", disk_types))
 		}
-		if data.Size < 1 {
-			return errors.New("Driver: Size of the disk can't be less than 1GB")
+		if disk.Size < 1 {
+			return fmt.Errorf("Driver: Size of the disk can't be less than 1GB")
 		}
 	}
-	if r.Network != "" && r.Network != "nat" {
-		return errors.New("Driver: The network configuration must be either '' (empty for hostonly) or 'nat'")
+	if check_net && r.Network != "" && r.Network != "nat" {
+		return fmt.Errorf("Driver: The network configuration must be either '' (empty for hostonly) or 'nat'")
 	}
 
 	return nil
-}
-
-func contains(list []string, value string) bool {
-	for _, v := range list {
-		if v == value {
-			return true
-		}
-	}
-	return false
 }

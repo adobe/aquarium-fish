@@ -13,7 +13,7 @@
 package fish
 
 import (
-	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -34,7 +34,7 @@ func (f *Fish) NodeActiveList() (ns []types.Node, err error) {
 
 func (f *Fish) NodeCreate(n *types.Node) error {
 	if n.Name == "" {
-		return errors.New("Fish: Name can't be empty")
+		return fmt.Errorf("Fish: Name can't be empty")
 	}
 
 	return f.db.Create(n).Error

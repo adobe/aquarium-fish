@@ -13,7 +13,7 @@
 package fish
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
@@ -29,10 +29,10 @@ func (f *Fish) ServiceMappingFind(filter *string) (sms []types.ServiceMapping, e
 
 func (f *Fish) ServiceMappingCreate(sm *types.ServiceMapping) error {
 	if sm.Service == "" {
-		return errors.New("Fish: Service can't be empty")
+		return fmt.Errorf("Fish: Service can't be empty")
 	}
 	if sm.Redirect == "" {
-		return errors.New("Fish: Redirect can't be empty")
+		return fmt.Errorf("Fish: Redirect can't be empty")
 	}
 
 	return f.db.Create(sm).Error

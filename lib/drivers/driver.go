@@ -30,10 +30,16 @@ type ResourceDriver interface {
 	ValidateDefinition(definition string) error
 
 	// Allocate the resource by definition and returns hw address
-	Allocate(definition string, metadata map[string]interface{}) (string, error)
+	// * hwaddr - mandatory, needed to identify the resource. If it's a MAC address - it is used to auth in Meta API
+	// * ipaddr - optional, if driver can provide the assigned IP address of the instance
+	Allocate(definition string, metadata map[string]interface{}) (hwaddr, ipaddr string, err error)
 
 	// Get the status of the resource with given hw address
 	Status(hwaddr string) string
+
+	// Makes environment snapshot of the resource with given hw address
+	// * full - will try it's best to make the complete snapshot of the environment, else just non-image data (attached disks)
+	Snapshot(hwaddr string, full bool) error
 
 	// Deallocate resource with provided hw addr
 	Deallocate(hwaddr string) error

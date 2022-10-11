@@ -13,7 +13,7 @@
 package fish
 
 import (
-	"errors"
+	"fmt"
 	"log"
 
 	"github.com/adobe/aquarium-fish/lib/crypt"
@@ -31,10 +31,10 @@ func (f *Fish) UserFind(filter *string) (us []types.User, err error) {
 
 func (f *Fish) UserCreate(u *types.User) error {
 	if u.Name == "" {
-		return errors.New("Fish: Name can't be empty")
+		return fmt.Errorf("Fish: Name can't be empty")
 	}
 	if u.Hash.IsEmpty() {
-		return errors.New("Fish: Hash can't be empty")
+		return fmt.Errorf("Fish: Hash can't be empty")
 	}
 
 	return f.db.Create(u).Error

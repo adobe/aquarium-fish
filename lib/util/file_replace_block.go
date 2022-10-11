@@ -14,7 +14,7 @@ package util
 
 import (
 	"bufio"
-	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -32,7 +32,7 @@ func FileReplaceBlock(path, block_from, block_to string, lines ...string) error 
 
 	// Check it's not a dir
 	if info, err := in_f.Stat(); err == nil && info.IsDir() {
-		return errors.New("Util: Unable to replace block in directory")
+		return fmt.Errorf("Util: Unable to replace block in directory")
 	}
 
 	// Open output file
