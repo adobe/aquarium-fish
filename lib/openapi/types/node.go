@@ -18,7 +18,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
-	"time"
 )
 
 const NODE_PING_DELAY = 10

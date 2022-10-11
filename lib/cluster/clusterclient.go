@@ -58,8 +58,10 @@ func (conn *ClusterClient) Connect() *websocket.Conn {
 				conn.log(fmt.Sprintf("Cannot connect to websocket: %s", conn.url.String()), err)
 				continue
 			}
+
 			conn.log("Connected to node", err)
 			conn.wsconn = ws
+
 			return conn.wsconn
 		}
 	}
