@@ -41,6 +41,7 @@ type Definition struct {
 	InstanceType  string            `json:"instance_type"`  // Type of the instance from aws available list
 	SecurityGroup string            `json:"security_group"` // ID of the security group to use for the instance
 	Tags          map[string]string `json:"tags"`           // Tags to add during instance creation
+	EncryptKey    string            `json:"encrypt_key"`    // Use specific encryption key for the new disks
 
 	UserDataFormat string `json:"userdata_format"` // If not empty - will store the resource metadata to userdata in defined format
 	UserDataPrefix string `json:"userdata_prefix"` // Optional if need to add custom prefix to the metadata key during formatting
