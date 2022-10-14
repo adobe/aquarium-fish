@@ -7,6 +7,7 @@ require (
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/aws/aws-sdk-go-v2 v1.16.16
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.63.1
+	github.com/aws/aws-sdk-go-v2/service/kms v1.18.12
 	github.com/aws/aws-sdk-go-v2/service/sts v1.16.19
 	github.com/canonical/go-dqlite v1.8.0
 	github.com/deepmap/oapi-codegen v1.11.1-0.20220908201945-d1a63c702fd0

@@ -26,6 +26,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/util"
@@ -61,6 +62,19 @@ func (d *Driver) ValidateDefinition(definition string) error {
 
 func (d *Driver) newConn() *ec2.Client {
 	return ec2.NewFromConfig(aws.Config{
+		Region: d.cfg.Region,
+		Credentials: aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
+			return aws.Credentials{
+				AccessKeyID:     d.cfg.KeyID,
+				SecretAccessKey: d.cfg.SecretKey,
+				Source:          "fish-cfg",
+			}, nil
+		}),
+	})
+}
+
+func (d *Driver) newKMSConn() *kms.Client {
+	return kms.NewFromConfig(aws.Config{
 		Region: d.cfg.Region,
 		Credentials: aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
 			return aws.Credentials{
@@ -202,6 +216,15 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 			} else {
 				// Just create a new disk
 				mapping.Ebs.VolumeSize = aws.Int32(int32(disk.Size))
+				if def.EncryptKey != "" {
+					mapping.Ebs.Encrypted = aws.Bool(true)
+					key_id, err := d.getKeyId(def.EncryptKey)
+					if err != nil {
+						return "", "", fmt.Errorf("AWS: Unable to get encrypt key from KMS: %v", err)
+					}
+					log.Println("AWS: Selected encryption key:", key_id, "for disk:", name)
+					mapping.Ebs.KmsKeyId = aws.String(key_id)
+				}
 			}
 			input.BlockDeviceMappings = append(input.BlockDeviceMappings, mapping)
 		}
@@ -231,10 +254,12 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 			}
 			time.Sleep(5)
 
-			inst, err = d.getInstance(conn, *inst.InstanceId)
-			if err != nil || inst == nil {
+			inst_tmp, err := d.getInstance(conn, *inst.InstanceId)
+			if err == nil && inst_tmp != nil {
+				inst = inst_tmp
+			}
+			if err != nil {
 				log.Println("AWS: Error during getting instance while waiting for BlockDeviceMappings:", err, *inst.InstanceId)
-				inst = &result.Instances[0]
 			}
 		}
 		for _, bd := range inst.BlockDeviceMappings {
@@ -282,10 +307,12 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 		}
 		time.Sleep(5)
 
-		inst, err = d.getInstance(conn, *inst.InstanceId)
-		if err != nil || inst == nil {
+		inst_tmp, err := d.getInstance(conn, *inst.InstanceId)
+		if err == nil && inst_tmp != nil {
+			inst = inst_tmp
+		}
+		if err != nil {
 			log.Println("AWS: Error during getting instance while waiting for IP:", err, *inst.InstanceId)
-			inst = &result.Instances[0]
 		}
 	}
 
@@ -548,7 +575,7 @@ func (d *Driver) Status(inst_id string) string {
 	inst, err := d.getInstance(conn, inst_id)
 	// Potential issue here, it could be a big problem with unstable connection
 	if err != nil {
-		log.Println("AWS: Error during status check for ", inst_id, " - it needs a rewrite", err)
+		log.Println("AWS: Error during status check for", inst_id, "- it needs a rewrite", err)
 		return drivers.StatusNone
 	}
 	if inst != nil && inst.State.Name != types.InstanceStateNameTerminated {
@@ -588,9 +615,43 @@ func (d *Driver) Snapshot(inst_id string, full bool) error {
 	for _, r := range resp.Snapshots {
 		snapshots = append(snapshots, *r.SnapshotId)
 	}
-	log.Println("AWS: Created snapshots for instance ", inst_id, ": ", strings.Join(snapshots, ", "))
+	log.Println("AWS: Created snapshots for instance", inst_id, ":", strings.Join(snapshots, ", "))
 
 	return nil
+}
+
+// Will get the kms key id based on alias if it's specified
+func (d *Driver) getKeyId(id_alias string) (string, error) {
+	if !strings.HasPrefix(id_alias, "alias/") {
+		return id_alias, nil
+	}
+
+	log.Println("AWS: Fetching key alias:", id_alias)
+
+	conn := d.newKMSConn()
+
+	// Look for VPC with the defined tag over pages
+	p := kms.NewListAliasesPaginator(conn, &kms.ListAliasesInput{
+		Limit: aws.Int32(100),
+	})
+
+	// Getting the images to find the latest one
+	for p.HasMorePages() {
+		resp, err := p.NextPage(context.TODO())
+		if err != nil {
+			return "", fmt.Errorf("AWS: Error during requesting alias list: %v", err)
+		}
+		if len(resp.Aliases) > 90 {
+			log.Println("AWS: WARNING: Over 90 aliases was found, could be slow:", id_alias)
+		}
+		for _, r := range resp.Aliases {
+			if id_alias == *r.AliasName {
+				return *r.TargetKeyId, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("AWS: Unable to locate kms key id with specified alias: %s", id_alias)
 }
 
 func (d *Driver) Deallocate(inst_id string) error {
