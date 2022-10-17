@@ -1,6 +1,6 @@
 module github.com/adobe/aquarium-fish
 
-go 1.17
+go 1.18
 
 require (
 	github.com/alessio/shellescape v1.4.1
@@ -9,21 +9,21 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.63.1
 	github.com/aws/aws-sdk-go-v2/service/kms v1.18.12
 	github.com/aws/aws-sdk-go-v2/service/sts v1.16.19
-	github.com/deepmap/oapi-codegen v1.11.1-0.20220908201945-d1a63c702fd0
-	github.com/getkin/kin-openapi v0.97.0
+	github.com/deepmap/oapi-codegen v1.11.1-0.20221010081618-45eb6bdf117a
+	github.com/getkin/kin-openapi v0.104.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/glebarez/sqlite v1.4.3
 	github.com/gorilla/websocket v1.4.0
 	github.com/hpcloud/tail v1.0.0
-	github.com/labstack/echo/v4 v4.7.2
+	github.com/labstack/echo/v4 v4.9.0
 	github.com/mostlygeek/arp v0.0.0-20170424181311-541a2129847a
 	github.com/pkg/errors v0.9.1
 	github.com/shirou/gopsutil v3.21.5+incompatible
 	github.com/spf13/cobra v1.0.0
 	github.com/ulikunitz/xz v0.5.10
 	golang.org/x/crypto v0.0.0-20220513210258-46612604a0f9
-	golang.org/x/net v0.0.0-20220513224357-95641704303c
-	golang.org/x/sys v0.0.0-20220513210249-45d2b4557a2a
+	golang.org/x/net v0.0.0-20220722155237-a158d28d115b
+	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f
 	gorm.io/gorm v1.23.5
 )
 
@@ -50,6 +50,7 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
+	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0 // indirect
 	github.com/spf13/pflag v1.0.3 // indirect
 	github.com/tklauser/go-sysconf v0.3.10 // indirect
