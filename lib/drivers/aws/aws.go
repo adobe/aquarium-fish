@@ -456,6 +456,10 @@ func (d *Driver) getImageId(conn *ec2.Client, id_name string) (string, error) {
 				Name:   aws.String("name"),
 				Values: []string{id_name},
 			},
+			types.Filter{
+				Name:   aws.String("state"),
+				Values: []string{"available"},
+			},
 		},
 		Owners: d.cfg.AccountIDs,
 	}
@@ -519,6 +523,10 @@ func (d *Driver) getSnapshotId(conn *ec2.Client, id_tag string) (string, error) 
 			types.Filter{
 				Name:   aws.String("tag:" + tag_key_val[0]),
 				Values: []string{tag_key_val[1]},
+			},
+			types.Filter{
+				Name:   aws.String("status"),
+				Values: []string{"completed"},
 			},
 		},
 		OwnerIds: d.cfg.AccountIDs,
@@ -584,7 +592,7 @@ func (d *Driver) Status(inst_id string) string {
 	return drivers.StatusNone
 }
 
-func (d *Driver) Snapshot(inst_id string, full bool) error {
+func (d *Driver) Snapshot(inst_id string, full bool) (string, error) {
 	conn := d.newConn()
 
 	input := &ec2.CreateSnapshotsInput{
@@ -605,10 +613,10 @@ func (d *Driver) Snapshot(inst_id string, full bool) error {
 
 	resp, err := conn.CreateSnapshots(context.TODO(), input)
 	if err != nil {
-		return fmt.Errorf("AWS: Unable to create snapshots for instance %s: %v", inst_id, err)
+		return "", fmt.Errorf("AWS: Unable to create snapshots for instance %s: %v", inst_id, err)
 	}
 	if len(resp.Snapshots) < 1 {
-		return fmt.Errorf("AWS: No snapshots was created for instance %s", inst_id)
+		return "", fmt.Errorf("AWS: No snapshots was created for instance %s", inst_id)
 	}
 
 	snapshots := []string{}
@@ -617,7 +625,7 @@ func (d *Driver) Snapshot(inst_id string, full bool) error {
 	}
 	log.Println("AWS: Created snapshots for instance", inst_id, ":", strings.Join(snapshots, ", "))
 
-	return nil
+	return strings.Join(snapshots, ", "), nil
 }
 
 // Will get the kms key id based on alias if it's specified
