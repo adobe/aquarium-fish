@@ -283,11 +283,12 @@ func (e *Processor) ApplicationSnapshotGet(c echo.Context, id int64, params type
 	// TODO: not working correctly in cluster in case not all the nodes supports the
 	// driver - need to rewrite in cluster way as Resource Tasks.
 	full := params.Full != nil && *params.Full
-	if err = e.fish.ApplicationSnapshot(app, full); err != nil {
+	out, err := e.fish.ApplicationSnapshot(app, full)
+	if err != nil {
 		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Error during creating Application snapshot: %v", err)})
 	}
 
-	return c.JSON(http.StatusOK, H{})
+	return c.JSON(http.StatusOK, H{"data": out})
 }
 
 func (e *Processor) ApplicationDeallocateGet(c echo.Context, id int64) error {
