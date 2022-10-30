@@ -13,15 +13,22 @@
 package fish
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"log"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
-func (f *Fish) NodeList() (ns []types.Node, err error) {
-	err = f.db.Find(&ns).Error
+func (f *Fish) NodeFind(filter *string) (ns []types.Node, err error) {
+	db := f.db
+	if filter != nil {
+		db = db.Where(*filter)
+	}
+	err = db.Find(&ns).Error
 	return ns, err
 }
 
@@ -36,7 +43,14 @@ func (f *Fish) NodeCreate(n *types.Node) error {
 	if n.Name == "" {
 		return fmt.Errorf("Fish: Name can't be empty")
 	}
+	if n.Pubkey == nil {
+		return fmt.Errorf("Fish: Node should be initialized before create")
+	}
 
+	// Create node UUID based on the public key
+	hash := sha256.New()
+	hash.Write(*n.Pubkey)
+	n.UID = uuid.NewHash(hash, uuid.UUID{}, *n.Pubkey, 0)
 	return f.db.Create(n).Error
 }
 

@@ -39,9 +39,9 @@ func (f *Fish) LocationSave(l *types.Location) error {
 	return f.db.Save(l).Error
 }
 
-func (f *Fish) LocationGet(id int64) (l *types.Location, err error) {
+func (f *Fish) LocationGet(name types.LocationName) (l *types.Location, err error) {
 	l = &types.Location{}
-	err = f.db.First(l, id).Error
+	err = f.db.First(l, name).Error
 	return l, err
 }
 
@@ -51,6 +51,6 @@ func (f *Fish) LocationGetByName(name string) (l *types.Location, err error) {
 	return l, err
 }
 
-func (f *Fish) LocationDelete(id int64) error {
-	return f.db.Delete(&types.Location{}, id).Error
+func (f *Fish) LocationDelete(name types.LocationName) error {
+	return f.db.Delete(&types.Location{}, name).Error
 }

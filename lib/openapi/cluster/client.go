@@ -18,8 +18,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-
-	"github.com/adobe/aquarium-fish/lib/cluster/msg"
+	//	"github.com/adobe/aquarium-fish/lib/cluster/msg"
 )
 
 const (
@@ -126,9 +125,11 @@ func (c *Client) writePump() {
 }
 
 // Init the connection by send the active data to just connected node
-func (conn *ClusterClient) init() error {
-	active_nodes := msg.NewNodes()
-	active_apps := msg.NewApplications()
-	last_votes := msg.NewVotes()
-	conn.wsconn.Write()
+func (c *Client) init() error {
+	// TODO
+	//active_nodes := msg.NewNodes()
+	//active_apps := msg.NewApplications()
+	//last_votes := msg.NewVotes()
+	//c.conn.Write()
+	return nil
 }

@@ -28,6 +28,7 @@ func (f *Fish) ApplicationStateCreate(as *types.ApplicationState) error {
 		return fmt.Errorf("Fish: Status can't be empty")
 	}
 
+	as.UID = f.NewUID()
 	return f.db.Create(as).Error
 }
 
@@ -36,15 +37,15 @@ func (f *Fish) ApplicationStateCreate(as *types.ApplicationState) error {
 	return f.db.Save(as).Error
 }*/
 
-func (f *Fish) ApplicationStateGet(id int64) (as *types.ApplicationState, err error) {
+func (f *Fish) ApplicationStateGet(uid types.ApplicationStateUID) (as *types.ApplicationState, err error) {
 	as = &types.ApplicationState{}
-	err = f.db.First(as, id).Error
+	err = f.db.First(as, uid).Error
 	return as, err
 }
 
-func (f *Fish) ApplicationStateGetByApplication(app_id int64) (as *types.ApplicationState, err error) {
+func (f *Fish) ApplicationStateGetByApplication(app_uid types.ApplicationUID) (as *types.ApplicationState, err error) {
 	as = &types.ApplicationState{}
-	err = f.db.Where("application_id = ?", app_id).Order("created_at desc").First(as).Error
+	err = f.db.Where("application_uid = ?", app_uid).Order("created_at desc").First(as).Error
 	return as, err
 }
 

@@ -97,17 +97,17 @@ paths:
       security:
         - basic_auth: []
 
-  /api/v1/user/{id}:
+  /api/v1/user/{name}:
     get:
-      summary: Get User by ID
-      description: Returns a single User by it's name (unique ID)
+      summary: Get User by name
+      description: Returns a single User by it's name
       operationId: UserGet
       tags:
         - User
       parameters:
-        - name: id
+        - name: name
           in: path
-          description: ID of the object
+          description: Name of the User
           required: true
           schema:
             type: string
@@ -125,15 +125,15 @@ paths:
       security:
         - basic_auth: []
     delete:
-      summary: Delete the User by ID
-      description: Will remove the User with specified ID
+      summary: Delete the User by name
+      description: Will remove the User with specified name
       operationId: UserDelete
       tags:
         - User
       parameters:
-        - name: id
+        - name: name
           in: path
-          description: ID of the object
+          description: Name of the User
           required: true
           schema:
             type: string
@@ -203,21 +203,21 @@ paths:
       security:
         - basic_auth: []
 
-  /api/v1/label/{id}:
+  /api/v1/label/{uid}:
     get:
-      summary: Get Label by ID
-      description: Returns a single Label by it's ID
+      summary: Get Label by UID
+      description: Returns a single Label by it's UID
       operationId: LabelGet
       tags:
         - Label
       parameters:
-        - name: id
+        - name: uid
           in: path
-          description: ID of the object
+          description: UID of the Label
           required: true
           schema:
-            type: integer
-            format: int64
+            type: string
+            format: uuid
       responses:
         '200':
           description: Successful operation
@@ -232,19 +232,19 @@ paths:
       security:
         - basic_auth: []
     delete:
-      summary: Delete Label by ID
-      description: Deletes the Label by it's ID
+      summary: Delete Label by UID
+      description: Deletes the Label by it's UID
       operationId: LabelDelete
       tags:
         - Label
       parameters:
-        - name: id
+        - name: uid
           in: path
-          description: ID of the object
+          description: UID of the Label
           required: true
           schema:
-            type: integer
-            format: int64
+            type: string
+            format: uuid
       responses:
         '200':
           description: Successful operation
@@ -283,21 +283,21 @@ paths:
       security:
         - basic_auth: []
 
-  /api/v1/resource/{id}:
+  /api/v1/resource/{uid}:
     get:
-      summary: Get Resource by ID
-      description: Returns a single Resource by it's ID
+      summary: Get Resource by UID
+      description: Returns a single Resource by it's UID
       operationId: ResourceGet
       tags:
         - Resource
       parameters:
-        - name: id
+        - name: uid
           in: path
-          description: ID of the object
+          description: UID of the object
           required: true
           schema:
-            type: integer
-            format: int64
+            type: string
+            format: uuid
       responses:
         '200':
           description: Successful operation
@@ -366,21 +366,21 @@ paths:
       security:
         - basic_auth: []
 
-  /api/v1/application/{id}:
+  /api/v1/application/{uid}:
     get:
-      summary: Get Application by ID
-      description: Returns a single Application by it's ID
+      summary: Get Application by UID
+      description: Returns a single Application by it's UID
       operationId: ApplicationGet
       tags:
         - Application
       parameters:
-        - name: id
+        - name: uid
           in: path
-          description: ID of the object
+          description: UID of the object
           required: true
           schema:
-            type: integer
-            format: int64
+            type: string
+            format: uuid
       responses:
         '200':
           description: Successful operation
@@ -395,21 +395,21 @@ paths:
       security:
         - basic_auth: []
 
-  /api/v1/application/{id}/state:
+  /api/v1/application/{uid}/state:
     get:
       summary: Get ApplicationState of the Application
-      description: Returns the current ApplicationState by Application ID
+      description: Returns the current ApplicationState by Application UID
       operationId: ApplicationStateGet
       tags:
         - Application
       parameters:
-        - name: id
+        - name: uid
           in: path
-          description: ID of the Application
+          description: UID of the Application
           required: true
           schema:
-            type: integer
-            format: int64
+            type: string
+            format: uuid
       responses:
         '200':
           description: Successful operation
@@ -424,21 +424,21 @@ paths:
       security:
         - basic_auth: []
 
-  /api/v1/application/{id}/resource:
+  /api/v1/application/{uid}/resource:
     get:
-      summary: Get Resource by Application ID
-      description: Returns a Resource by it's Application ID
+      summary: Get Resource by Application UID
+      description: Returns a Resource by it's Application UID
       operationId: ApplicationResourceGet
       tags:
         - Application
       parameters:
-        - name: id
+        - name: uid
           in: path
-          description: ID of the Application
+          description: UID of the Application
           required: true
           schema:
-            type: integer
-            format: int64
+            type: string
+            format: uuid
       responses:
         '200':
           description: Successful operation
@@ -453,7 +453,7 @@ paths:
       security:
         - basic_auth: []
 
-  /api/v1/application/{id}/snapshot:
+  /api/v1/application/{uid}/snapshot:
     get:
       summary: Triggers Application snapshot
       description: Creates the Application's Resource snapshot
@@ -461,13 +461,13 @@ paths:
       tags:
         - Application
       parameters:
-        - name: id
+        - name: uid
           in: path
-          description: ID of the Application
+          description: UID of the Application
           required: true
           schema:
-            type: integer
-            format: int64
+            type: string
+            format: uuid
         - name: full
           in: query
           description: >
@@ -489,7 +489,7 @@ paths:
       security:
         - basic_auth: []
 
-  /api/v1/application/{id}/deallocate:
+  /api/v1/application/{uid}/deallocate:
     get:
       summary: Triggers Application deallocate
       description: Moves the Application to the DEALLOCATE state
@@ -497,13 +497,13 @@ paths:
       tags:
         - Application
       parameters:
-        - name: id
+        - name: uid
           in: path
-          description: ID of the Application
+          description: UID of the Application
           required: true
           schema:
-            type: integer
-            format: int64
+            type: string
+            format: uuid
       responses:
         '200':
           description: Successful operation
@@ -518,7 +518,7 @@ paths:
 
   /api/v1/vote/:
     get:
-      summary: Get list of votes
+      summary: Get list of Votes
       description: Returns a list of existing Votes
       operationId: VoteListGet
       tags:
@@ -539,6 +539,34 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Vote'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+      security:
+        - basic_auth: []
+
+  /api/v1/node/:
+    get:
+      summary: Get list of Nodes
+      description: Returns a list of existing Nodes
+      operationId: NodeListGet
+      tags:
+        - Node
+      parameters:
+        - name: filter
+          in: query
+          description: SQL `WHERE` filter for the object data
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Node'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
       security:
@@ -652,21 +680,21 @@ paths:
       security:
         - basic_auth: []
 
-  /api/v1/servicemapping/{id}:
+  /api/v1/servicemapping/{uid}:
     get:
-      summary: Get ServiceMapping by ID
-      description: Returns a single ServiceMapping by it's ID
+      summary: Get ServiceMapping by UID
+      description: Returns a single ServiceMapping by it's UID
       operationId: ServiceMappingGet
       tags:
         - ServiceMapping
       parameters:
-        - name: id
+        - name: uid
           in: path
-          description: ID of the object
+          description: UID of the object
           required: true
           schema:
-            type: integer
-            format: int64
+            type: string
+            format: uuid
       responses:
         '200':
           description: Successful operation
@@ -681,19 +709,19 @@ paths:
       security:
         - basic_auth: []
     delete:
-      summary: Delete the ServiceMapping by ID
-      description: Will remove the ServiceMapping with specified ID
+      summary: Delete the ServiceMapping by UID
+      description: Will remove the ServiceMapping with specified UID
       operationId: ServiceMappingDelete
       tags:
         - ServiceMapping
       parameters:
-        - name: id
+        - name: uid
           in: path
-          description: ID of the object
+          description: UID of the object
           required: true
           schema:
-            type: integer
-            format: int64
+            type: string
+            format: uuid
       responses:
         '200':
           description: Successful operation
@@ -819,36 +847,36 @@ paths:
 
 components:
   schemas:
+    ApplicationUID:
+      type: string
+      format: uuid
+      x-oapi-codegen-extra-tags:
+        gorm: primaryKey
     Application:
       type: object
-      x-go-json-ignore: true
       description: >
         Resource request created by the user. Each node votes for the availability to allocate the
         resource and the cluster choose which one node will actually do the work.
       required:
-        - ID
+        - UID
         - created_at
-        - user_ID
-        - label_ID
+        - owner_name
+        - label_UID
         - metadata
       properties:
-        ID:
-          type: integer
-          format: int64
+        UID:
+          $ref: '#/components/schemas/ApplicationUID'
           x-oapi-codegen-extra-tags:
             gorm: primaryKey
         created_at:
           x-go-type: time.Time
-        user_ID:
-          type: integer
-          format: int64
-        user:
-          $ref: '#/components/schemas/User'
-        label_ID:
-          type: integer
-          format: int64
-        label:
-          $ref: '#/components/schemas/Label'
+        owner_name:
+          # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/UserName'
+          type: string
+        label_UID:
+          # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/LabelUID'
+          type: string
+          format: uuid
         metadata:
           x-go-type: util.UnparsedJson
           description: Additional metadata in JSON format (can't override Label metadata)
@@ -857,6 +885,11 @@ components:
             JENKINS_AGENT_SECRET: 03839eabcf945b1e780be8f9488d264c4c57bf388546da9a84588345555f29b0
             JENKINS_AGENT_NAME: test-node
 
+    ApplicationStateUID:
+      type: string
+      format: uuid
+      x-oapi-codegen-extra-tags:
+        gorm: primaryKey
     ApplicationState:
       type: object
       description: >
@@ -864,24 +897,22 @@ components:
         info when the Application comes to this state and the last one describes the current state
         of the Application.
       required:
-        - ID
+        - UID
         - created_at
-        - application_ID
+        - application_UID
         - status
         - description
       properties:
-        ID:
-          type: integer
-          format: int64
+        UID:
+          $ref: '#/components/schemas/ApplicationStateUID'
           x-oapi-codegen-extra-tags:
             gorm: primaryKey
         created_at:
           x-go-type: time.Time
-        application_ID:
-          type: integer
-          format: int64
-        application:
-          $ref: '#/components/schemas/Application'
+        application_UID:
+          # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/ApplicationUID'
+          type: string
+          format: uuid
         status:
           type: string
           enum:
@@ -896,40 +927,41 @@ components:
           type: string
           description: Additional information for the state
 
+    UserName:
+      type: string
+      x-oapi-codegen-extra-tags:
+        gorm: primaryKey
     User:
       type: object
-      x-go-json-ignore: true
       description: >
         Contains limits and hash to login, name is unique, `admin` created during the first cluster
         start and prints it to stderr.
       required:
-        - ID
+        - name
         - created_at
         - updated_at
-        - name
         - hash
       properties:
-        ID:
-          type: integer
-          format: int64
+        name:
+          $ref: '#/components/schemas/UserName'
           x-oapi-codegen-extra-tags:
             gorm: primaryKey
         created_at:
           x-go-type: time.Time
         updated_at:
           x-go-type: time.Time
-        name:
-          type: string
-          x-oapi-codegen-extra-tags:
-            gorm: unique
         hash:
           x-go-type: crypt.Hash
           x-oapi-codegen-extra-tags:
             gorm: embedded
 
+    LabelUID:
+      type: string
+      format: uuid
+      x-oapi-codegen-extra-tags:
+        gorm: primaryKey
     Label:
       type: object
-      x-go-json-ignore: true
       description: >
         This one filled by the cluster admin, depends on the needs. Labels could be implemented in
         different drivers, but it's not recommended to keep the label stable. Version could be used
@@ -947,7 +979,7 @@ components:
         want to use another one - you will need to create another label version and the resource
         requests that uses latest will swith to it.
       required:
-        - ID
+        - UID
         - created_at
         - name
         - version
@@ -955,9 +987,8 @@ components:
         - definition
         - metadata
       properties:
-        ID:
-          type: integer
-          format: int64
+        UID:
+          $ref: '#/components/schemas/LabelUID'
           x-oapi-codegen-extra-tags:
             gorm: primaryKey
         created_at:
@@ -1001,24 +1032,27 @@ components:
           example:
             JENKINS_AGENT_WORKSPACE: /Volumes/xcode122
 
+    NodeUID:
+      type: string
+      format: uuid
+      x-oapi-codegen-extra-tags:
+        gorm: primaryKey
     Node:
       type: object
-      x-go-json-ignore: true
       description: >
         Each node need to report it's status and ensure there is no duplications and to perform the
         cluster worker election process properly.
       required:
-        - ID
+        - UID
         - created_at
         - updated_at
         - name
         - definition
-        - location_ID
+        - location_name
         - address
       properties:
-        ID:
-          type: integer
-          format: int64
+        UID:
+          $ref: '#/components/schemas/NodeUID'
           x-oapi-codegen-extra-tags:
             gorm: primaryKey
         created_at:
@@ -1033,9 +1067,9 @@ components:
           description: Unique name of the Node
         definition:
           $ref: '#/components/schemas/NodeDefinition'
-        location_ID:
-          type: integer
-          format: int64
+        location_name:
+          # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/LocationName'
+          type: string
           description: Where the Node is located
         address:
           type: string
@@ -1072,6 +1106,11 @@ components:
           items:
             x-go-type: net.InterfaceStat
 
+    ResourceUID:
+      type: string
+      format: uuid
+      x-oapi-codegen-extra-tags:
+        gorm: primaryKey
     Resource:
       type: object
       description: >
@@ -1079,34 +1118,31 @@ components:
         restart. Also contains additional info about the resource, for example user requested
         metadata, which is available for the resource through the `Meta API`.
       required:
-        - ID
+        - UID
         - created_at
         - updated_at
-        - application_ID
-        - node_ID
+        - application_UID
+        - node_UID
         - ip_addr
         - hw_addr
         - metadata
       properties:
-        ID:
-          type: integer
-          format: int64
+        UID:
+          $ref: '#/components/schemas/ResourceUID'
           x-oapi-codegen-extra-tags:
             gorm: primaryKey
         created_at:
           x-go-type: time.Time
         updated_at:
           x-go-type: time.Time
-        application_ID:
-          type: integer
-          format: int64
-        application:
-          $ref: '#/components/schemas/Application'
-        node_ID:
-          type: integer
-          format: int64
-        node:
-          $ref: '#/components/schemas/Node'
+        application_UID:
+          # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/ApplicationUID'
+          type: string
+          format: uuid
+        node_UID:
+          # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/NodeUID'
+          type: string
+          format: uuid
         ip_addr:
           type: string
           description: Is a weak current network IP address of the resource, usually gathered based on the `HwAddr`.
@@ -1122,43 +1158,44 @@ components:
             JENKINS_AGENT_NAME: test-node
             JENKINS_AGENT_WORKSPACE: /Volumes/xcode122
 
+    VoteUID:
+      type: string
+      format: uuid
+      x-oapi-codegen-extra-tags:
+        gorm: primaryKey
     Vote:
       type: object
-      x-go-json-ignore: true
       description: >
         When Application becomes available for the node it starts to vote to notify the cluster
         about its availability. Votes are basically "yes" or "no" and could take a number of rounds
         depends on the cluster voting and election rules.
       required:
-        - ID
+        - UID
         - created_at
-        - application_ID
-        - node_ID
+        - application_UID
+        - node_UID
         - round
         - available
         - rand
       properties:
-        ID:
-          type: integer
-          format: int64
+        UID:
+          $ref: '#/components/schemas/VoteUID'
           x-oapi-codegen-extra-tags:
             gorm: primaryKey
         created_at:
           x-go-type: time.Time
-        application_ID:
-          type: integer
-          format: int64
+        application_UID:
+          # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/ApplicationUID'
+          type: string
+          format: uuid
           x-oapi-codegen-extra-tags:
             gorm: uniqueIndex:idx_node_app_round_uniq
-        application:
-          $ref: '#/components/schemas/Application'
-        node_ID:
-          type: integer
-          format: int64
+        node_UID:
+          # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/NodeUID'
+          type: string
+          format: uuid
           x-oapi-codegen-extra-tags:
             gorm: uniqueIndex:idx_node_app_round_uniq
-        node:
-          $ref: '#/components/schemas/Node'
         round:
           x-go-type: uint16
           x-oapi-codegen-extra-tags:
@@ -1175,53 +1212,53 @@ components:
           x-go-type: uint32
           description: The last resort to figure out for the winner.
 
+    LocationName:
+      type: string
+      description: Name of the location
+      x-oapi-codegen-extra-tags:
+        gorm: primaryKey
     Location:
       type: object
-      x-go-json-ignore: true
       description: >
         In order to properly distribute the nodes across locations it's better to have this in
         place to properly redirect the services to the nearest one according to the node location.
       required:
-        - ID
-        - created_at
         - name
+        - created_at
         - description
       properties:
-        ID:
-          type: integer
-          format: int64
+        name:
+          $ref: '#/components/schemas/LocationName'
           x-oapi-codegen-extra-tags:
             gorm: primaryKey
         created_at:
           x-go-type: time.Time
-        name:
-          type: string
-          description: Name of the location
-          x-oapi-codegen-extra-tags:
-            gorm: unique
         description:
           type: string
           description: Additional information about the location
 
+    ServiceMappingUID:
+      type: string
+      format: uuid
+      x-oapi-codegen-extra-tags:
+        gorm: primaryKey
     ServiceMapping:
       type: object
-      x-go-json-ignore: true
       description: >
         Used to properly define the allowed external services and possible redirects for them (
         useful when needed to achive proper bottleneck-free DR). The structure allows to make query
         with finding the most relevant value based on application and location, in case there is no
         specific values - the cluster defaults could be used.
       required:
-        - ID
+        - UID
         - created_at
-        - location_ID
+        - location_name
         - service
         - redirect
-        - application_ID
+        - application_UID
       properties:
-        ID:
-          type: integer
-          format: int64
+        UID:
+          $ref: '#/components/schemas/ServiceMappingUID'
           x-oapi-codegen-extra-tags:
             gorm: primaryKey
         created_at:
@@ -1234,14 +1271,15 @@ components:
         redirect:
           type: string
           description: FQDN or IP address of where to rediect the service request
-        location_ID:
-          type: integer
-          format: int64
+        location_name:
+          # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/LocationName'
+          type: string
           x-oapi-codegen-extra-tags:
             gorm: uniqueIndex:idx_location_service_app_uniq
-        application_ID:
-          type: integer
-          format: int64
+        application_UID:
+          # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/ApplicationUID'
+          type: string
+          format: uuid
           description: Optional, if need to override the cluster-wide redirects
           x-oapi-codegen-extra-tags:
             gorm: uniqueIndex:idx_location_service_app_uniq

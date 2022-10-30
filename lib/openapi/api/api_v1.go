@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
 
@@ -73,14 +74,14 @@ func (e *Processor) UserListGet(c echo.Context, params types.UserListGetParams) 
 	return c.JSON(http.StatusOK, out)
 }
 
-func (e *Processor) UserGet(c echo.Context, id string) error {
+func (e *Processor) UserGet(c echo.Context, name string) error {
 	user := c.Get("user")
 	if user.(*types.User).Name != "admin" {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can get user")})
 		return fmt.Errorf("Only 'admin' user can get user")
 	}
 
-	out, err := e.fish.UserGet(id)
+	out, err := e.fish.UserGet(name)
 	if err != nil {
 		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("User not found: %v", err)})
 		return fmt.Errorf("User not found: %w", err)
@@ -112,7 +113,7 @@ func (e *Processor) UserCreatePost(c echo.Context) error {
 	return c.JSON(http.StatusOK, H{"password": password})
 }
 
-func (e *Processor) UserDelete(c echo.Context, id string) error {
+func (e *Processor) UserDelete(c echo.Context, name string) error {
 	// Only admin can delete user
 	user := c.Get("user")
 	if user.(*types.User).Name != "admin" {
@@ -120,7 +121,7 @@ func (e *Processor) UserDelete(c echo.Context, id string) error {
 		return fmt.Errorf("Only 'admin' user can delete user")
 	}
 
-	if err := e.fish.UserDelete(id); err != nil {
+	if err := e.fish.UserDelete(name); err != nil {
 		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("User delete failed with error: %v", err)})
 		return fmt.Errorf("User delete failed with error: %w", err)
 	}
@@ -145,7 +146,7 @@ func (e *Processor) ResourceListGet(c echo.Context, params types.ResourceListGet
 	return c.JSON(http.StatusOK, out)
 }
 
-func (e *Processor) ResourceGet(c echo.Context, id int64) error {
+func (e *Processor) ResourceGet(c echo.Context, uid types.ResourceUID) error {
 	// Only admin can get the resource directly
 	user := c.Get("user")
 	if user.(*types.User).Name != "admin" {
@@ -153,7 +154,7 @@ func (e *Processor) ResourceGet(c echo.Context, id int64) error {
 		return fmt.Errorf("Only 'admin' user can get resource")
 	}
 
-	out, err := e.fish.ResourceGet(id)
+	out, err := e.fish.ResourceGet(uid)
 	if err != nil {
 		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Resource not found: %v", err)})
 		return fmt.Errorf("Resource not found: %w", err)
@@ -174,7 +175,7 @@ func (e *Processor) ApplicationListGet(c echo.Context, params types.ApplicationL
 	if user.(*types.User).Name != "admin" {
 		var owner_out []types.Application
 		for _, app := range out {
-			if app.ID == user.(*types.User).ID {
+			if app.OwnerName == user.(*types.User).Name {
 				owner_out = append(owner_out, app)
 			}
 		}
@@ -184,8 +185,8 @@ func (e *Processor) ApplicationListGet(c echo.Context, params types.ApplicationL
 	return c.JSON(http.StatusOK, out)
 }
 
-func (e *Processor) ApplicationGet(c echo.Context, id int64) error {
-	out, err := e.fish.ApplicationGet(id)
+func (e *Processor) ApplicationGet(c echo.Context, uid types.ApplicationUID) error {
+	app, err := e.fish.ApplicationGet(uid)
 	if err != nil {
 		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Application not found: %v", err)})
 		return fmt.Errorf("Application not found: %w", err)
@@ -193,12 +194,12 @@ func (e *Processor) ApplicationGet(c echo.Context, id int64) error {
 
 	// Only the owner of the application (or admin) can request it
 	user := c.Get("user")
-	if out.ID != user.(*types.User).ID && user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner and admin can request the application")})
-		return fmt.Errorf("Only the owner and admin can request the application")
+	if app.OwnerName != user.(*types.User).Name && user.(*types.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner and admin can request the Application")})
+		return fmt.Errorf("Only the owner and admin can request the Application")
 	}
 
-	return c.JSON(http.StatusOK, out)
+	return c.JSON(http.StatusOK, app)
 }
 
 func (e *Processor) ApplicationCreatePost(c echo.Context) error {
@@ -210,7 +211,7 @@ func (e *Processor) ApplicationCreatePost(c echo.Context) error {
 
 	// Set the User field out of the authorized user
 	user := c.Get("user")
-	data.User = user.(*types.User)
+	data.OwnerName = user.(*types.User).Name
 
 	if err := e.fish.ApplicationCreate(&data); err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to create application: %v", err)})
@@ -220,21 +221,21 @@ func (e *Processor) ApplicationCreatePost(c echo.Context) error {
 	return c.JSON(http.StatusOK, data)
 }
 
-func (e *Processor) ApplicationResourceGet(c echo.Context, id int64) error {
-	app, err := e.fish.ApplicationGet(id)
+func (e *Processor) ApplicationResourceGet(c echo.Context, uid types.ApplicationUID) error {
+	app, err := e.fish.ApplicationGet(uid)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the application: %d", id)})
-		return fmt.Errorf("Unable to find the application: %d, %w", id, err)
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", uid)})
+		return fmt.Errorf("Unable to find the Application: %s, %w", uid, err)
 	}
 
 	// Only the owner of the application (or admin) can request the resource
 	user := c.Get("user")
-	if app.ID != user.(*types.User).ID && user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner and admin can request the application resource")})
-		return fmt.Errorf("Only the owner and admin can request the application resource")
+	if app.OwnerName != user.(*types.User).Name && user.(*types.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner and admin can request the Application resource")})
+		return fmt.Errorf("Only the owner and admin can request the Application resource")
 	}
 
-	out, err := e.fish.ResourceGetByApplication(id)
+	out, err := e.fish.ResourceGetByApplication(uid)
 	if err != nil {
 		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Resource not found: %v", err)})
 		return fmt.Errorf("Resource not found: %w", err)
@@ -243,21 +244,21 @@ func (e *Processor) ApplicationResourceGet(c echo.Context, id int64) error {
 	return c.JSON(http.StatusOK, out)
 }
 
-func (e *Processor) ApplicationStateGet(c echo.Context, id int64) error {
-	app, err := e.fish.ApplicationGet(id)
+func (e *Processor) ApplicationStateGet(c echo.Context, uid types.ApplicationUID) error {
+	app, err := e.fish.ApplicationGet(uid)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the application: %d", id)})
-		return fmt.Errorf("Unable to find the application: %d, %w", id, err)
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", uid)})
+		return fmt.Errorf("Unable to find the Application: %s, %w", uid, err)
 	}
 
 	// Only the owner of the application (or admin) can request the status
 	user := c.Get("user")
-	if app.ID != user.(*types.User).ID && user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner and admin can request the application status")})
-		return fmt.Errorf("Only the owner and admin can request the application status")
+	if app.OwnerName != user.(*types.User).Name && user.(*types.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner and admin can request the Application status")})
+		return fmt.Errorf("Only the owner and admin can request the Application status")
 	}
 
-	out, err := e.fish.ApplicationStateGetByApplication(id)
+	out, err := e.fish.ApplicationStateGetByApplication(uid)
 	if err != nil {
 		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Application status not found: %v", err)})
 		return fmt.Errorf("Application status not found: %w", err)
@@ -266,18 +267,18 @@ func (e *Processor) ApplicationStateGet(c echo.Context, id int64) error {
 	return c.JSON(http.StatusOK, out)
 }
 
-func (e *Processor) ApplicationSnapshotGet(c echo.Context, id int64, params types.ApplicationSnapshotGetParams) error {
-	app, err := e.fish.ApplicationGet(id)
+func (e *Processor) ApplicationSnapshotGet(c echo.Context, uid types.ApplicationUID, params types.ApplicationSnapshotGetParams) error {
+	app, err := e.fish.ApplicationGet(uid)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the application: %d", id)})
-		return fmt.Errorf("Unable to find the application: %d, %w", id, err)
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", uid)})
+		return fmt.Errorf("Unable to find the Application: %s, %w", uid, err)
 	}
 
 	// Only the owner of the application (or admin) could take the snapshot of the resource
 	user := c.Get("user")
-	if app.ID != user.(*types.User).ID && user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner & admin can take snapshot of the application resource")})
-		return fmt.Errorf("Only the owner & admin can take snapshot of the application resource")
+	if app.OwnerName != user.(*types.User).Name && user.(*types.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner & admin can take snapshot of the Application resource")})
+		return fmt.Errorf("Only the owner & admin can take snapshot of the Application resource")
 	}
 
 	// TODO: not working correctly in cluster in case not all the nodes supports the
@@ -291,28 +292,28 @@ func (e *Processor) ApplicationSnapshotGet(c echo.Context, id int64, params type
 	return c.JSON(http.StatusOK, H{"data": out})
 }
 
-func (e *Processor) ApplicationDeallocateGet(c echo.Context, id int64) error {
-	app, err := e.fish.ApplicationGet(id)
+func (e *Processor) ApplicationDeallocateGet(c echo.Context, uid types.ApplicationUID) error {
+	app, err := e.fish.ApplicationGet(uid)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the application: %d", id)})
-		return fmt.Errorf("Unable to find the application: %d, %w", id, err)
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the application: %s", uid)})
+		return fmt.Errorf("Unable to find the Application: %s, %w", uid, err)
 	}
 
 	// Only the owner of the application (or admin) could deallocate it
 	user := c.Get("user")
-	if app.ID != user.(*types.User).ID && user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner & admin can deallocate the application resource")})
-		return fmt.Errorf("Only the owner & admin can deallocate the application resource")
+	if app.OwnerName != user.(*types.User).Name && user.(*types.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner & admin can deallocate the Application resource")})
+		return fmt.Errorf("Only the owner & admin can deallocate the Application resource")
 	}
 
-	out, err := e.fish.ApplicationStateGetByApplication(id)
+	out, err := e.fish.ApplicationStateGetByApplication(uid)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find status for the application: %d", id)})
-		return fmt.Errorf("Unable to find status for the application: %d, %w", id, err)
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find status for the Application: %s", uid)})
+		return fmt.Errorf("Unable to find status for the Application: %s, %w", uid, err)
 	}
 	if !e.fish.ApplicationStateIsActive(out.Status) {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to deallocate the application with status: %s", out.Status)})
-		return fmt.Errorf("Unable to deallocate the application with status: %s", out.Status)
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to deallocate the Application with status: %s", out.Status)})
+		return fmt.Errorf("Unable to deallocate the Application with status: %s", out.Status)
 	}
 
 	new_status := types.ApplicationStateStatusDEALLOCATE
@@ -320,13 +321,13 @@ func (e *Processor) ApplicationDeallocateGet(c echo.Context, id int64) error {
 		// The Application was not yet Allocated so just mark it as Recalled
 		new_status = types.ApplicationStateStatusRECALLED
 	}
-	as := &types.ApplicationState{ApplicationID: id, Status: new_status,
+	as := &types.ApplicationState{ApplicationUID: uid, Status: new_status,
 		Description: fmt.Sprintf("Requested by user %s", user.(*types.User).Name),
 	}
 	err = e.fish.ApplicationStateCreate(as)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to deallocate the application: %d", id)})
-		return fmt.Errorf("Unable to deallocate the application: %d, %w", id, err)
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to deallocate the Application: %s", uid)})
+		return fmt.Errorf("Unable to deallocate the Application: %s, %w", uid, err)
 	}
 
 	return c.JSON(http.StatusOK, as)
@@ -342,8 +343,8 @@ func (e *Processor) LabelListGet(c echo.Context, params types.LabelListGetParams
 	return c.JSON(http.StatusOK, out)
 }
 
-func (e *Processor) LabelGet(c echo.Context, id int64) error {
-	out, err := e.fish.LabelGet(id)
+func (e *Processor) LabelGet(c echo.Context, uid types.LabelUID) error {
+	out, err := e.fish.LabelGet(uid)
 	if err != nil {
 		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Label not found: %v", err)})
 		return fmt.Errorf("Label not found: %w", err)
@@ -373,21 +374,31 @@ func (e *Processor) LabelCreatePost(c echo.Context) error {
 	return c.JSON(http.StatusOK, data)
 }
 
-func (e *Processor) LabelDelete(c echo.Context, id int64) error {
+func (e *Processor) LabelDelete(c echo.Context, uid types.LabelUID) error {
 	// Only admin can delete label
 	user := c.Get("user")
 	if user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can delete label")})
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can delete Label")})
 		return fmt.Errorf("Only 'admin' user can delete label")
 	}
 
-	err := e.fish.LabelDelete(id)
+	err := e.fish.LabelDelete(uid)
 	if err != nil {
 		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Label delete failed with error: %v", err)})
 		return fmt.Errorf("Label delete failed with error: %w", err)
 	}
 
 	return c.JSON(http.StatusOK, H{"message": "Label removed"})
+}
+
+func (e *Processor) NodeListGet(c echo.Context, params types.NodeListGetParams) error {
+	out, err := e.fish.NodeFind(params.Filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the node list: %v", err)})
+		return fmt.Errorf("Unable to get the node list: %w", err)
+	}
+
+	return c.JSON(http.StatusOK, out)
 }
 
 func (e *Processor) VoteListGet(c echo.Context, params types.VoteListGetParams) error {
@@ -443,14 +454,14 @@ func (e *Processor) LocationCreatePost(c echo.Context) error {
 	return c.JSON(http.StatusOK, data)
 }
 
-func (e *Processor) ServiceMappingGet(c echo.Context, id int64) error {
+func (e *Processor) ServiceMappingGet(c echo.Context, uid types.ServiceMappingUID) error {
 	user := c.Get("user")
 	if user.(*types.User).Name != "admin" {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can get service mapping")})
 		return fmt.Errorf("Only 'admin' user can get service mapping")
 	}
 
-	out, err := e.fish.ServiceMappingGet(id)
+	out, err := e.fish.ServiceMappingGet(uid)
 	if err != nil {
 		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("ServiceMapping not found: %v", err)})
 		return fmt.Errorf("ServiceMapping not found: %w", err)
@@ -483,21 +494,21 @@ func (e *Processor) ServiceMappingCreatePost(c echo.Context) error {
 	}
 
 	user := c.Get("user")
-	if data.ApplicationID != 0 {
+	if data.ApplicationUID != uuid.Nil {
 		// Only the owner and admin can create servicemapping for his application
-		app, err := e.fish.ApplicationGet(data.ApplicationID)
+		app, err := e.fish.ApplicationGet(data.ApplicationUID)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the application: %d", data.ApplicationID)})
-			return fmt.Errorf("Unable to find the application: %d, %w", data.ApplicationID, err)
+			c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", data.ApplicationUID)})
+			return fmt.Errorf("Unable to find the Application: %s, %w", data.ApplicationUID, err)
 		}
 
-		if app.ID != user.(*types.User).ID && user.(*types.User).Name != "admin" {
-			c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner & admin can assign service mapping to the application")})
-			return fmt.Errorf("Only the owner & admin can assign service mapping to the application")
+		if app.OwnerName != user.(*types.User).Name && user.(*types.User).Name != "admin" {
+			c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner & admin can assign service mapping to the Application")})
+			return fmt.Errorf("Only the owner & admin can assign service mapping to the Application")
 		}
 	} else if user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can create service mapping with undefined application")})
-		return fmt.Errorf("Only 'admin' user can create service mapping with undefined application")
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can create service mapping with undefined Application")})
+		return fmt.Errorf("Only 'admin' user can create service mapping with undefined Application")
 	}
 
 	if err := e.fish.ServiceMappingCreate(&data); err != nil {
@@ -508,7 +519,7 @@ func (e *Processor) ServiceMappingCreatePost(c echo.Context) error {
 	return c.JSON(http.StatusOK, data)
 }
 
-func (e *Processor) ServiceMappingDelete(c echo.Context, id int64) error {
+func (e *Processor) ServiceMappingDelete(c echo.Context, uid types.ServiceMappingUID) error {
 	// Only admin can delete ServiceMapping
 	user := c.Get("user")
 	if user.(*types.User).Name != "admin" {
@@ -516,9 +527,9 @@ func (e *Processor) ServiceMappingDelete(c echo.Context, id int64) error {
 		return fmt.Errorf("Only 'admin' user can delete service mapping")
 	}
 
-	if err := e.fish.ServiceMappingDelete(id); err != nil {
-		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("ServiceMapping delete failed with error: %v", err)})
-		return fmt.Errorf("ServiceMapping delete failed with error: %w", err)
+	if err := e.fish.ServiceMappingDelete(uid); err != nil {
+		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("ServiceMapping %s delete failed with error: %v", uid, err)})
+		return fmt.Errorf("ServiceMapping %s delete failed with error: %w", uid, err)
 	}
 
 	return c.JSON(http.StatusOK, H{"message": "ServiceMapping removed"})
