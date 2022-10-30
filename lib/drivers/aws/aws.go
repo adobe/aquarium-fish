@@ -87,10 +87,10 @@ func (d *Driver) newKMSConn() *kms.Client {
 }
 
 /**
- * Allocate VM with provided images
+ * Allocate Instance with provided image
  *
- * It automatically download the required images, unpack them and runs the VM.
- * Not using metadata because there is no good interfaces to pass it to VM.
+ * It selects the AMI and run instance
+ * Uses metadata to fill EC2 instance userdata
  */
 func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (string, string, error) {
 	var def Definition
