@@ -73,7 +73,7 @@ func (c *Client) readPump() {
 			break
 		}
 		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
-		fmt.Printf("Cluster: Client %v readPump: got: %s\n", c.conn.RemoteAddr(), message)
+		//fmt.Printf("Cluster: Client %v readPump: got: %s\n", c.conn.RemoteAddr(), message)
 		c.hub.broadcast <- message
 	}
 }
