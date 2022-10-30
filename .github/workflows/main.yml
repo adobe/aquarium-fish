@@ -35,3 +35,6 @@ jobs:
 
     - name: Build
       run: ./build-linux.sh
+
+    - name: Test
+      run: ./tests/*.sh

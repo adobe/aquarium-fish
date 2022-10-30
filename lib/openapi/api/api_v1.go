@@ -247,7 +247,7 @@ func (e *Processor) ApplicationResourceGet(c echo.Context, uid types.Application
 func (e *Processor) ApplicationStateGet(c echo.Context, uid types.ApplicationUID) error {
 	app, err := e.fish.ApplicationGet(uid)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", uid)})
+		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Unable to find the Application: %s", uid)})
 		return fmt.Errorf("Unable to find the Application: %s, %w", uid, err)
 	}
 
