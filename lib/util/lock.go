@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/bits"
 	"os"
 	"strconv"
 	"strings"
@@ -50,7 +51,7 @@ func WaitLock(lock_path string, clean func()) error {
 			if lock_info, err := ioutil.ReadFile(lock_path); err == nil {
 				// Check the pid is running - because if the app crashes
 				// it can leave the lock file (weak protection but worth it)
-				pid, err := strconv.ParseInt(strings.SplitN(string(lock_info), " ", 2)[0], 10, 64)
+				pid, err := strconv.ParseInt(strings.SplitN(string(lock_info), " ", 2)[0], 10, bits.UintSize)
 				if err != nil {
 					// No pid in the lock file - it's actually a small chance it's create/write
 					// delay, but it's so small I want to ignore it
