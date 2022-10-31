@@ -17,7 +17,7 @@
 token=$1
 [ "$token" ] || exit 1
 
-label=vmx-macos1015-xcode122
+label=winserver2019-vs2019_vmx
 
 # It's a bit dirty, but works for now - probably better to create API call to find the latest label
 curr_label=$(curl -s -u "admin:$token" -k 'https://127.0.0.1:8001/api/v1/label/?filter=name="'$label'"' | sed 's/},{/},\n{/g' | tail -1)
@@ -34,18 +34,18 @@ read w1
 
 label_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/json' -d '{"name":"'$label'", "version":'$new_version', "driver":"vmx",
     "definition": {
-        "image": "macos1015-xcode122-ci",
+        "image": "winserver2019-vs2019-ci",
         "images": {
-            "macos1015":             "https://artifact-storage/aquarium/image/vmx/macos1015-VERSION/macos1015-VERSION.tar.xz",
-            "macos1015-xcode122":    "https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-VERSION/macos1015-xcode122-VERSION.tar.xz",
-            "macos1015-xcode122-ci": "https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-ci-VERSION/macos1015-xcode122-ci-VERSION.tar.xz"
+            "winserver2019":           "https://artifact-storage/aquarium/image/vmx/winserver2019-VERSION/winserver2019-VERSION.tar.xz",
+            "winserver2019-vs2019":    "https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019-VERSION/winserver2019-vs2019-VERSION.tar.xz",
+            "winserver2019-vs2019-ci": "https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019-ci-VERSION/winserver2019-vs2019-ci-VERSION.tar.xz"
         },
         "requirements": {
             "cpu": 14,
             "ram": 12,
             "disks": {
-                "xcode122": {
-                    "type": "hfs+",
+                "vs2019": {
+                    "type": "exfat",
                     "size": 100,
                     "reuse": true
                 }
@@ -53,8 +53,8 @@ label_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/js
         }
     },
     "metadata": {
-        "JENKINS_AGENT_WORKSPACE": "/Volumes/xcode122"
+        "JENKINS_AGENT_WORKSPACE": "D:\\"
     }
-}' https://127.0.0.1:8001/api/v1/label/ | grep -o '"ID": *[0-9]\+,' | tr -dc '0-9')
+}' https://127.0.0.1:8001/api/v1/label/ | grep -o '"UID": *"[^"]\+"' | cut -d':' -f 2 | tr -d ' "')
 
 echo "Created Label ID: ${label_id}"

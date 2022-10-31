@@ -33,8 +33,8 @@ func (f *Fish) ResourceFind(filter *string) (rs []types.Resource, err error) {
 	return rs, err
 }
 
-func (f *Fish) ResourceListNode(node_id int64) (rs []types.Resource, err error) {
-	err = f.db.Where("node_id = ?", node_id).Find(&rs).Error
+func (f *Fish) ResourceListNode(node_uid types.NodeUID) (rs []types.Resource, err error) {
+	err = f.db.Where("node_uid = ?", node_uid).Find(&rs).Error
 	return rs, err
 }
 
@@ -46,20 +46,22 @@ func (f *Fish) ResourceCreate(r *types.Resource) error {
 	if len(r.Metadata) < 2 {
 		return fmt.Errorf("Fish: Metadata can't be empty")
 	}
+
+	r.UID = f.NewUID()
 	return f.db.Create(r).Error
 }
 
-func (f *Fish) ResourceDelete(id int64) error {
-	return f.db.Delete(&types.Resource{}, id).Error
+func (f *Fish) ResourceDelete(uid types.ResourceUID) error {
+	return f.db.Delete(&types.Resource{}, uid).Error
 }
 
 func (f *Fish) ResourceSave(res *types.Resource) error {
 	return f.db.Save(res).Error
 }
 
-func (f *Fish) ResourceGet(id int64) (res *types.Resource, err error) {
+func (f *Fish) ResourceGet(uid types.ResourceUID) (res *types.Resource, err error) {
 	res = &types.Resource{}
-	err = f.db.First(res, id).Error
+	err = f.db.First(res, uid).Error
 	return res, err
 }
 
@@ -125,10 +127,10 @@ func (f *Fish) ResourceGetByIP(ip string) (res *types.Resource, err error) {
 	res = &types.Resource{}
 
 	// Check by IP first
-	err = f.db.Where("node_id = ?", f.GetNodeID()).Where("ip_addr = ?", ip).First(res).Error
+	err = f.db.Where("node_uid = ?", f.GetNodeUID()).Where("ip_addr = ?", ip).First(res).Error
 	if err == nil {
 		// Check if the state is allocated to prevent old resources access
-		if f.ApplicationIsAllocated(res.ApplicationID) != nil {
+		if f.ApplicationIsAllocated(res.ApplicationUID) != nil {
 			return nil, fmt.Errorf("Fish: Prohibited to access the Resource of not allocated Application")
 		}
 
@@ -147,39 +149,40 @@ func (f *Fish) ResourceGetByIP(ip string) (res *types.Resource, err error) {
 	if hw_addr == "" {
 		return nil, gorm.ErrRecordNotFound
 	}
-	err = f.db.Where("node_id = ?", f.GetNodeID()).Where("hw_addr = ?", hw_addr).First(res).Error
+	err = f.db.Where("node_uid = ?", f.GetNodeUID()).Where("hw_addr = ?", hw_addr).First(res).Error
 	if err != nil {
 		return nil, fmt.Errorf("Fish: %s for HW address %s", err, hw_addr)
 	}
 
 	// Check if the state is allocated to prevent old resources access
-	if f.ApplicationIsAllocated(res.ApplicationID) != nil {
+	if f.ApplicationIsAllocated(res.ApplicationUID) != nil {
 		return nil, fmt.Errorf("Fish: Prohibited to access the Resource of not allocated Application")
 	}
 
-	log.Println("Fish: Update IP address for the Resource of Application", res.ApplicationID, ip)
+	log.Println("Fish: Update IP address for the Resource of Application", res.ApplicationUID, ip)
 	res.IpAddr = ip
 	err = f.ResourceSave(res)
 
 	return res, err
 }
 
-func (f *Fish) ResourceGetByApplication(app_id int64) (res *types.Resource, err error) {
+func (f *Fish) ResourceGetByApplication(app_uid types.ApplicationUID) (res *types.Resource, err error) {
 	res = &types.Resource{}
-	err = f.db.Where("application_id = ?", app_id).First(res).Error
+	err = f.db.Where("application_uid = ?", app_uid).First(res).Error
 	return res, err
 }
 
 func (f *Fish) ResourceServiceMapping(res *types.Resource, dest string) string {
 	sm := &types.ServiceMapping{}
 
+	// TODO: rewrite to uid system
 	// Trying to find the record with Application and Location if possible
 	// The application in priority, location - secondary priority, if no such
-	// records found - default (ID 0) will be used
+	// records found - default will be used
 	err := f.db.Where(
-		"application_id IN (?, 0)", res.ApplicationID).Where(
-		"location_id IN (?, 0)", f.GetLocationID()).Where(
-		"service = ?", dest).Order("application_id DESC").Order("location_id DESC").First(sm).Error
+		"application_uid = ?", res.ApplicationUID).Where(
+		"location_uid = ?", f.GetLocationName()).Where(
+		"service = ?", dest).Order("application_uid DESC").Order("location_uid DESC").First(sm).Error
 	if err != nil {
 		return ""
 	}

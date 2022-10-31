@@ -10,15 +10,18 @@
  * governing permissions and limitations under the License.
  */
 
-//go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.11.1-0.20220908201945-d1a63c702fd0 -config types.cfg.yaml ../../docs/openapi.yaml
-//go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.11.1-0.20220908201945-d1a63c702fd0 -config meta_v1.cfg.yaml ../../docs/openapi.yaml
-//go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.11.1-0.20220908201945-d1a63c702fd0 -config api_v1.cfg.yaml ../../docs/openapi.yaml
-//go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.11.1-0.20220908201945-d1a63c702fd0 -config spec.cfg.yaml ../../docs/openapi.yaml
+//go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.2 -config types.cfg.yaml ../../docs/openapi.yaml
+//go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.2 -config meta_v1.cfg.yaml ../../docs/openapi.yaml
+//go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.2 -config api_v1.cfg.yaml ../../docs/openapi.yaml
+//go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.2 -config spec.cfg.yaml ../../docs/openapi.yaml
 
 package openapi
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 
@@ -26,12 +29,14 @@ import (
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
 
+	"github.com/adobe/aquarium-fish/lib/cluster"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/openapi/api"
+	cluster_server "github.com/adobe/aquarium-fish/lib/openapi/cluster"
 	"github.com/adobe/aquarium-fish/lib/openapi/meta"
 )
 
-func Init(fish *fish.Fish, api_address, cert_path, key_path string) (*http.Server, error) {
+func Init(fish *fish.Fish, cl *cluster.Cluster, api_address, ca_path, cert_path, key_path string) (*http.Server, error) {
 	swagger, err := GetSwagger()
 	if err != nil {
 		return nil, fmt.Errorf("Fish OpenAPI: Error loading swagger spec: %w", err)
@@ -46,12 +51,26 @@ func Init(fish *fish.Fish, api_address, cert_path, key_path string) (*http.Serve
 	//router.Use(oapimw.OapiRequestValidator(swagger))
 	router.HideBanner = true
 
+	// TODO: Probably it will be a feature an ability to separate those
+	// routers to independance ports if needed
 	meta.NewV1Router(router, fish)
+	cluster_server.NewV1Router(router, fish, cl)
 	api.NewV1Router(router, fish)
+	// TODO: web UI router
 
 	go func() {
-		err := router.StartTLS(api_address, cert_path, key_path)
-		if err != nil && err != http.ErrServerClosed {
+		ca_pool := x509.NewCertPool()
+		if ca_bytes, err := ioutil.ReadFile(ca_path); err == nil {
+			ca_pool.AppendCertsFromPEM(ca_bytes)
+		}
+		s := router.TLSServer
+		s.Addr = api_address
+		s.TLSConfig = &tls.Config{
+			ClientAuth: tls.RequestClientCert, // Need for the client certificate auth
+			ClientCAs:  ca_pool,               // Verify client certificate with the cluster CA
+		}
+		s.TLSConfig.BuildNameToCertificate()
+		if err := s.ListenAndServeTLS(cert_path, key_path); err != http.ErrServerClosed {
 			log.Fatalf("listen: %s\n", err)
 		}
 	}()

@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/ulikunitz/xz"
 )
@@ -92,6 +93,11 @@ func DownloadUnpackArchive(url, out_dir, user, password string) error {
 		if err != nil {
 			os.RemoveAll(out_dir)
 			return err
+		}
+
+		// Check the name doesn't contain any traversal elements
+		if strings.Contains(hdr.Name, "..") {
+			return fmt.Errorf("Error: The archive filepath contains '..' which is forbidden: %s", hdr.Name)
 		}
 
 		target := filepath.Join(out_dir, hdr.Name)

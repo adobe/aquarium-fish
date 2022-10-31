@@ -35,6 +35,7 @@ func (f *Fish) ServiceMappingCreate(sm *types.ServiceMapping) error {
 		return fmt.Errorf("Fish: Redirect can't be empty")
 	}
 
+	sm.UID = f.NewUID()
 	return f.db.Create(sm).Error
 }
 
@@ -42,12 +43,12 @@ func (f *Fish) ServiceMappingSave(sm *types.ServiceMapping) error {
 	return f.db.Save(sm).Error
 }
 
-func (f *Fish) ServiceMappingGet(id int64) (sm *types.ServiceMapping, err error) {
+func (f *Fish) ServiceMappingGet(uid types.ServiceMappingUID) (sm *types.ServiceMapping, err error) {
 	sm = &types.ServiceMapping{}
-	err = f.db.First(sm, id).Error
+	err = f.db.First(sm, uid).Error
 	return sm, err
 }
 
-func (f *Fish) ServiceMappingDelete(id int64) error {
-	return f.db.Delete(&types.ServiceMapping{}, id).Error
+func (f *Fish) ServiceMappingDelete(uid types.ServiceMappingUID) error {
+	return f.db.Delete(&types.ServiceMapping{}, uid).Error
 }

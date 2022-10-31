@@ -13,32 +13,20 @@
 # Use ./build-linux.sh / ./build-macos.sh instead
 
 [ "x$suffix" != "x" ] || suffix="$1"
-[ "x$suffix" != "x" ] || suffix="$(uname -s)_$(uname -m)"
+[ "x$suffix" != "x" ] || suffix="$(go env GOOS)_$(go env GOARCH)"
 
 echo "ROOT DIR: ${root_dir}"
 cd "${root_dir}"
 
 
 gopath=$(go env GOPATH)
-cd /tmp  # Don't let go get to modify project go.mod
-
-echo "--- PATCH GO-DQLITE ---"
-# Apply a small patch to the go-dqlite go package
-go get -d github.com/canonical/go-dqlite@v1.8.0
-chmod -R u+w "$gopath/pkg/mod/github.com/canonical/go-dqlite@v1.8.0"
-patch -N -p1 -d "$gopath/pkg/mod/github.com/canonical/go-dqlite@v1.8.0" < "${root_dir}/deps/go-dqlite.patch" || true
-
-echo "--- PATCH OAPI-CODEGEN ---"
-# Generate the API code patch
-go get -d "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.11.1-0.20220908201945-d1a63c702fd0"
-chmod -R u+w "$gopath/pkg/mod/github.com/deepmap/oapi-codegen@v1.11.1-0.20220908201945-d1a63c702fd0"
-patch -N -p1 -d "$gopath/pkg/mod/github.com/deepmap/oapi-codegen@v1.11.1-0.20220908201945-d1a63c702fd0" < "${root_dir}/deps/oapi-codegen.patch" || true
-
-cd "${root_dir}"
 
 echo "--- GENERATE CODE FOR AQUARIUM-FISH ---"
 find ./lib -name '*.gen.go' -delete
 go generate -v ./lib/...
+
+# Doing check after generation because generated sources requires additional modules
+./check.sh
 
 if [ "x${RELEASE}" != "x" ]; then
     export GIN_MODE=release
@@ -47,9 +35,6 @@ else
     echo "--- WARNING: build DEBUG mode ---"
 fi
 
-
-export CGO_CFLAGS="${UV_CFLAGS} ${RAFT_CFLAGS} ${SQLITE_CFLAGS} ${DQLITE_CFLAGS}"
-export CGO_LDFLAGS="${SET_CGO_LDFLAGS}"
 
 echo
 echo "--- RUN UNIT TESTS ---"
@@ -61,6 +46,3 @@ go build -ldflags="-s -w" -a -o "aquarium-fish.$suffix" ./cmd/fish
 
 # Remove debug symbols
 strip "aquarium-fish.$suffix"
-
-# Run additional tests
-./check.sh

@@ -52,6 +52,16 @@ mv /tmp/go.mod /tmp/go.sum ./
 
 
 echo
+echo '---------------------- GoVet verify ----------------------'
+echo
+vet=$(go vet ./... 2>&1)
+if [ "${vet}" ]; then
+    echo "Please fix the issues: \n${vet}"
+    errors=$(((${errors}+$(echo "${vet}" | wc -l))/2))
+fi
+
+
+echo
 echo '---------------------- YAML Lint ----------------------'
 echo
 docker run --rm -v "${root_dir}:/data" cytopia/yamllint:1.22 --strict cmd docs lib

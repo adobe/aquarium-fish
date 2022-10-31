@@ -91,7 +91,7 @@ func (e *Processor) DataGetList(c echo.Context, params types.DataGetListParams) 
 	err := json.Unmarshal([]byte(res.Metadata), &metadata)
 	if err != nil {
 		e.Return(c, http.StatusNotFound, H{"message": "Unable to parse metadata json"})
-		return fmt.Errorf("Unable to parse metadata of resource: %d %s: %w", res.ID, res.Metadata, err)
+		return fmt.Errorf("Unable to parse metadata of Resource: %s %s: %w", res.UID, res.Metadata, err)
 	}
 
 	return e.Return(c, http.StatusOK, metadata)

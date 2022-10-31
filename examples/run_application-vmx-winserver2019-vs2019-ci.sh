@@ -17,11 +17,11 @@
 token=$1
 [ "$token" ] || exit 1
 
-label=vmx-winserver2019-vs2019
+label=winserver2019-vs2019_vmx
 
 # It's a bit dirty, but works for now - probably better to create API call to find the latest label
 curr_label=$(curl -s -u "admin:$token" -k 'https://127.0.0.1:8001/api/v1/label/?filter=name="'$label'"' | sed 's/},{/},\n{/g' | tail -1)
-curr_label_id="$(echo "$curr_label" | grep -o '"ID": *[0-9]\+,' | tr -dc '0-9')"
+curr_label_id="$(echo "$curr_label" | grep -o '"UID": *"[^"]\+"' | cut -d':' -f 2 | tr -d ' "')"
 if [ "x$curr_label_id" = "x" ]; then
     echo "ERROR: Unable to find label '$label' - please create one before running the application"
     exit 1
@@ -37,7 +37,7 @@ app_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/json
     "JENKINS_URL": "https://jenkins-host.local/",
     "JENKINS_AGENT_SECRET": "03839eabcf945b1e780be8f9488d264c4c57bf388546da9a84588345555f29b0",
     "JENKINS_AGENT_NAME": "test-node"
-}}' https://127.0.0.1:8001/api/v1/application/ | grep -o '"ID": *[0-9]\+,' | tr -dc '0-9')
+}}' https://127.0.0.1:8001/api/v1/application/ | grep -o '"UID": *"[^"]\+"' | cut -d':' -f 2 | tr -d ' "')
 echo "Application ID: ${app_id}"
 
 echo "Press key to check the application resource"

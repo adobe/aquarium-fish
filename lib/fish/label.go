@@ -41,6 +41,7 @@ func (f *Fish) LabelCreate(l *types.Label) error {
 		l.Metadata = "{}"
 	}
 
+	l.UID = f.NewUID()
 	return f.db.Create(l).Error
 }
 
@@ -50,12 +51,12 @@ func (f *Fish) LabelCreate(l *types.Label) error {
 	return f.db.Save(label).Error
 }*/
 
-func (f *Fish) LabelGet(id int64) (label *types.Label, err error) {
+func (f *Fish) LabelGet(uid types.LabelUID) (label *types.Label, err error) {
 	label = &types.Label{}
-	err = f.db.First(label, id).Error
+	err = f.db.First(label, uid).Error
 	return label, err
 }
 
-func (f *Fish) LabelDelete(id int64) error {
-	return f.db.Delete(&types.Label{}, id).Error
+func (f *Fish) LabelDelete(uid types.LabelUID) error {
+	return f.db.Delete(&types.Label{}, uid).Error
 }
