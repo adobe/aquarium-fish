@@ -95,106 +95,70 @@ func (d *Driver) DefinitionResources(definition string) drivers.Resources {
 	return def.Resources
 }
 
-// Allow Fish to ask the driver about it's capacity (free slots) of a specific definition
-func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition string) int64 {
-	var out_count int64
-
-	var def Definition
-	if err := def.Apply(definition); err != nil {
-		log.Println("AWS: Unable to apply definition:", err)
-		return -1
-	}
-
-	// Finding the total resources to have 1 tenant
-	var total_cpu uint
-	var total_ram uint
+// Returns the total resources available for the node after alteration
+func (d *Driver) getTotalResources() (total_cpu, total_ram uint) {
 	if d.cfg.CpuAlter < 0 {
 		total_cpu = d.node_cpu - uint(-d.cfg.CpuAlter)
 	} else {
 		total_cpu = d.node_cpu + uint(d.cfg.CpuAlter)
 	}
+
 	if d.cfg.RamAlter < 0 {
 		total_ram = d.node_ram - uint(-d.cfg.RamAlter)
 	} else {
 		total_ram = d.node_ram + uint(d.cfg.RamAlter)
 	}
 
-	// Check if the node is not used
-	if node_usage.IsEmpty() {
-		// Just check if the node has the required resources from Definition
-		if def.Resources.Cpu > total_cpu {
-			return 0
-		}
-		if def.Resources.Ram > total_ram {
-			return 0
-		}
-		// TODO: Check disk requirements
+	return
+}
 
-		// Calculate how much of those definitions we could run
-		out_count = int64(total_cpu / def.Resources.Cpu)
-		ram_count := int64(total_ram / def.Resources.Ram)
-		if out_count > ram_count {
-			out_count = ram_count
-		}
-		// TODO: Add disks into equation
-		return out_count
+// Allow Fish to ask the driver about it's capacity (free slots) of a specific definition
+func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition string) int64 {
+	var out_count int64
+
+	var req Definition
+	if err := req.Apply(definition); err != nil {
+		log.Println("VMX: Unable to apply definition:", err)
+		return -1
 	}
 
-	// Current tenant could not like to see new neighbours, or this new one could be picky
-	if !node_usage.Multitenancy || !def.Resources.Multitenancy {
-		// Nope, no deal - not compatible tenants can't share a home
+	total_cpu, total_ram := d.getTotalResources()
+
+	// Check if the node has the required resources - otherwise we can't run it anyhow
+	if req.Resources.Cpu > total_cpu {
 		return 0
 	}
-
-	// The node is actually used already and invites more tenants - if we have enough resources
-	// without overbooking
-	if def.Resources.Cpu <= total_cpu-node_usage.Cpu && def.Resources.Ram <= total_ram-node_usage.Ram {
-		// Here is no overbooking required hey! Let's run the thing
-		out_count = int64((total_cpu - node_usage.Cpu) / def.Resources.Cpu)
-		ram_count := int64((total_ram - node_usage.Ram) / def.Resources.Ram)
-		if out_count > ram_count {
-			out_count = ram_count
-		}
-		// TODO: Add disks into equation
-		return out_count
+	if req.Resources.Ram > total_ram {
+		return 0
 	}
+	// TODO: Check disk requirements
 
-	// To run we will need to overbook something - let's figure out what exactly
-	if def.Resources.Cpu > total_cpu-node_usage.Cpu {
-		// We need to overbook CPU - let's check if it's possible
-		if !node_usage.CpuOverbook || !def.Resources.CpuOverbook {
-			// No luck, someone currently running or a pretendent against it
-			return 0
-		}
-		// Alter the amount of CPU's for overbooking
-		total_cpu += d.cfg.CpuOverbook
-		// Now we can compare again - and if there's some room, then it works for us
-		if def.Resources.Cpu > total_cpu-node_usage.Cpu {
-			// Nope, not enough - so no luck
-			return 0
-		}
+	// Since we have the required resources - let's check if tenancy allows us to expand them to
+	// run more tenants here
+	if node_usage.IsEmpty() {
+		// In case we dealing with the first one - we need to set usage modificators, otherwise
+		// those values will mess up the next calculations
+		node_usage.Multitenancy = req.Resources.Multitenancy
+		node_usage.CpuOverbook = req.Resources.CpuOverbook
+		node_usage.RamOverbook = req.Resources.RamOverbook
 	}
-	if def.Resources.Ram > total_ram-node_usage.Ram {
-		// We need to overbook RAM - let's check if it's possible
-		if !node_usage.RamOverbook || !def.Resources.RamOverbook {
-			// No luck, someone currently running or a pretendent against it
-			return 0
+	if node_usage.Multitenancy && req.Resources.Multitenancy {
+		// Ok we can run more tenants, let's calculate how much
+		if node_usage.CpuOverbook && req.Resources.CpuOverbook {
+			total_cpu += d.cfg.CpuOverbook
 		}
-		// Alter the amount of RAM for overbooking
-		total_ram += d.cfg.RamOverbook
-		// Now we can compare again - and if there's some room, then it works for us
-		if def.Resources.Ram > total_ram-node_usage.Ram {
-			// Nope, not enough - so no luck
-			return 0
+		if node_usage.RamOverbook && req.Resources.RamOverbook {
+			total_ram += d.cfg.RamOverbook
 		}
 	}
 
-	// Here we've passed all the validations and overbooking is available so return it
-	out_count = int64((total_cpu - node_usage.Cpu) / def.Resources.Cpu)
-	ram_count := int64((total_ram - node_usage.Ram) / def.Resources.Ram)
+	// Calculate how much of those definitions we could run
+	out_count = int64((total_cpu - node_usage.Cpu) / req.Resources.Cpu)
+	ram_count := int64((total_ram - node_usage.Ram) / req.Resources.Ram)
 	if out_count > ram_count {
 		out_count = ram_count
 	}
+	// TODO: Add disks into equation
 
 	return out_count
 }
@@ -207,7 +171,10 @@ func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition stri
  */
 func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (string, string, error) {
 	var def Definition
-	def.Apply(definition)
+	if err := def.Apply(definition); err != nil {
+		log.Println("VMX: Unable to apply definition:", err)
+		return "", "", err
+	}
 
 	// Generate unique id from the hw address and required directories
 	buf := crypt.RandBytes(6)

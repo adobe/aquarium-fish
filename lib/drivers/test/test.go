@@ -41,7 +41,7 @@ func (d *Driver) Name() string {
 }
 
 func (d *Driver) IsRemote() bool {
-	return false
+	return d.cfg.IsRemote
 }
 
 func (d *Driver) Prepare(config []byte) error {
@@ -75,11 +75,60 @@ func (d *Driver) DefinitionResources(definition string) drivers.Resources {
 func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition string) int64 {
 	var out_count int64
 
-	var def Definition
-	if err := def.Apply(definition); err != nil {
-		log.Println("AWS: Unable to apply definition:", err)
+	var req Definition
+	if err := req.Apply(definition); err != nil {
+		log.Println("TEST: Unable to apply definition:", err)
 		return -1
 	}
+
+	if err := RandomFail("AvailableCapacity", req.FailAvailableCapacity); err != nil {
+		log.Printf("TEST: RandomFail: %v\n", err)
+		return -1
+	}
+
+	total_cpu := d.cfg.CpuLimit
+	total_ram := d.cfg.RamLimit
+
+	if total_cpu == 0 && total_ram == 0 {
+		// Resources are unlimited
+		return 99999
+	}
+
+	// Check if the node has the required resources - otherwise we can't run it anyhow
+	if req.Resources.Cpu > total_cpu {
+		return 0
+	}
+	if req.Resources.Ram > total_ram {
+		return 0
+	}
+	// TODO: Check disk requirements
+
+	// Since we have the required resources - let's check if tenancy allows us to expand them to
+	// run more tenants here
+	if node_usage.IsEmpty() {
+		// In case we dealing with the first one - we need to set usage modificators, otherwise
+		// those values will mess up the next calculations
+		node_usage.Multitenancy = req.Resources.Multitenancy
+		node_usage.CpuOverbook = req.Resources.CpuOverbook
+		node_usage.RamOverbook = req.Resources.RamOverbook
+	}
+	if node_usage.Multitenancy && req.Resources.Multitenancy {
+		// Ok we can run more tenants, let's calculate how much
+		if node_usage.CpuOverbook && req.Resources.CpuOverbook {
+			total_cpu += d.cfg.CpuOverbook
+		}
+		if node_usage.RamOverbook && req.Resources.RamOverbook {
+			total_ram += d.cfg.RamOverbook
+		}
+	}
+
+	// Calculate how much of those definitions we could run
+	out_count = int64((total_cpu - node_usage.Cpu) / req.Resources.Cpu)
+	ram_count := int64((total_ram - node_usage.Ram) / req.Resources.Ram)
+	if out_count > ram_count {
+		out_count = ram_count
+	}
+	// TODO: Add disks into equation
 
 	return out_count
 }
@@ -89,7 +138,10 @@ func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition stri
  */
 func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (string, string, error) {
 	var def Definition
-	def.Apply(definition)
+	if err := def.Apply(definition); err != nil {
+		log.Println("TEST: Unable to apply definition:", err)
+		return "", "", err
+	}
 
 	if err := RandomFail("Allocate", def.FailAllocate); err != nil {
 		log.Printf("TEST: RandomFail: %v\n", err)
@@ -98,10 +150,6 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 
 	d.resources_lock.Lock()
 	defer d.resources_lock.Unlock()
-
-	if d.cfg.ResourcesLimit != 0 && len(d.resources) >= d.cfg.ResourcesLimit {
-		return "", "", fmt.Errorf("TEST: Reached the resources limit (%d of %d)", len(d.resources), d.cfg.ResourcesLimit)
-	}
 
 	// Generate random resource id and if exists - regenerate
 	var res_id string

@@ -22,6 +22,7 @@ import (
 type Definition struct {
 	FailDefinitionApply    uint8 `json:"fail_definition_apply"`    // Fail on definition Apply (0 - not, 1-254 random, 255-yes)
 	FailDefinitionValidate uint8 `json:"fail_definition_validate"` // Fail on definition Validate (0 - not, 1-254 random, 255-yes)
+	FailAvailableCapacity  uint8 `json:"fail_available_capacity"`  // Fail on executing AvailableCapacity (0 - not, 1-254 random, 255-yes)
 	FailAllocate           uint8 `json:"fail_allocate"`            // Fail on Allocate (0 - not, 1-254 random, 255-yes)
 
 	Resources drivers.Resources `json:"resources"` // Required resources to allocate

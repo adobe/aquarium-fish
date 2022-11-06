@@ -26,7 +26,7 @@ cleanup() {
             sleep 1
         done
         echo "INFO:  stopping tail fish log process"
-        pkill -f "tail -f fish.log" || true
+        pkill -f "tail -f $ws_dir/fish.log" || true
     fi
 
     echo "INFO:  cleaning workspace dir $ws_dir"
@@ -52,9 +52,9 @@ drivers:
 EOF
 
 # Run Aquarium node
-"$curr_dir/aquarium-fish.linux_amd64" -c config.yml > fish.log 2>&1 &
+"$curr_dir"/aquarium-fish.* -c $ws_dir/config.yml > $ws_dir/fish.log 2>&1 &
 aquarium_fish_pid=$!
-tail -f fish.log &
+tail -f $ws_dir/fish.log &
 
 # Getting the admin pass token
 while true; do

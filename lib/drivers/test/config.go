@@ -18,12 +18,19 @@ import (
 )
 
 type Config struct {
+	IsRemote bool `json:"is_remote"` // Pretend to be remote or not to check the local node limits
+
+	CpuLimit uint `json:"cpu_limit"` // Number of available virtual CPUs, 0 - unlimited
+	RamLimit uint `json:"ram_limit"` // Amount of available virtual RAM (MB), 0 - unlimited
+
+	CpuOverbook uint `json:"cpu_overbook"` // How many CPUs available for overbook
+	RamOverbook uint `json:"ram_overbook"` // How much RAM available for overbook
+
 	FailConfigApply    uint8 `json:"fail_config_apply"`    // Fail on config Apply (0 - not, 1-254 random, 255-yes)
 	FailConfigValidate uint8 `json:"fail_config_validate"` // Fail on config Validation (0 - not, 1-254 random, 255-yes)
 	FailStatus         uint8 `json:"fail_status"`          // Fail on Status (0 - not, 1-254 random, 255-yes)
 	FailSnapshot       uint8 `json:"fail_snapshot"`        // Fail on Snapshot (0 - not, 1-254 random, 255-yes)
 	FailDeallocate     uint8 `json:"fail_deallocate"`      // Fail on Deallocate (0 - not, 1-254 random, 255-yes)
-	ResourcesLimit     int   `json:"resources_limit"`      // How many resources available in the driver (0 unlimited, -1 none)
 }
 
 func (c *Config) Apply(config []byte) error {
