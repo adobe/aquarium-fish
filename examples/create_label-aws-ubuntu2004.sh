@@ -38,7 +38,7 @@ label_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/js
         "instance_type": "c6a.4xlarge",
         "security_group": "test-sec-group",
         "userdata_format": "env",
-        "requirements": {
+        "resources": {
             "cpu": 16,
             "ram": 32,
             "disks": {

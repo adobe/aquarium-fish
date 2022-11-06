@@ -40,7 +40,7 @@ label_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/js
             "ubuntu2004-python3":    "https://artifact-storage/aquarium/image/docker/ubuntu2004-python3/ubuntu2004-python3-VERSION.tar.xz",
             "ubuntu2004-python3-ci": "https://artifact-storage/aquarium/image/docker/ubuntu2004-python3-ci/ubuntu2004-python3-ci-VERSION.tar.xz"
         },
-        "requirements": {
+        "resources": {
             "cpu": 4,
             "ram": 4,
             "disks": {

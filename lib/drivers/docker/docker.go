@@ -46,6 +46,10 @@ func (d *Driver) Name() string {
 	return "docker"
 }
 
+func (d *Driver) IsRemote() bool {
+	return false
+}
+
 func (d *Driver) Prepare(config []byte) error {
 	if err := d.cfg.Apply(config); err != nil {
 		return err
@@ -62,8 +66,28 @@ func (d *Driver) ValidateDefinition(definition string) error {
 	return def.Apply(definition)
 }
 
+func (d *Driver) DefinitionResources(definition string) drivers.Resources {
+	var def Definition
+	def.Apply(definition)
+
+	return def.Resources
+}
+
 func (d *Driver) getContainerName(hwaddr string) string {
 	return fmt.Sprintf("fish-%s", strings.ReplaceAll(hwaddr, ":", ""))
+}
+
+// Allow Fish to ask the driver about it's capacity (free slots) of a specific definition
+func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition string) int64 {
+	var out_count int64
+
+	var def Definition
+	if err := def.Apply(definition); err != nil {
+		log.Println("AWS: Unable to apply definition:", err)
+		return -1
+	}
+
+	return out_count
 }
 
 /**
@@ -88,7 +112,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 	// have the separated container `hostonly` which allows only
 	// host.docker.internal access, but others to drop and to use it as
 	// `--net container:hostonly` in other containers in the future.
-	c_network := def.Requirements.Network
+	c_network := def.Resources.Network
 	if c_network == "" {
 		c_network = "hostonly"
 	}
@@ -114,13 +138,13 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 		"--name", c_name,
 		"--mac-address", c_hwaddr,
 		"--network", "aquarium-" + c_network,
-		"--cpus", fmt.Sprintf("%d", def.Requirements.Cpu),
-		"--memory", fmt.Sprintf("%dg", def.Requirements.Ram),
+		"--cpus", fmt.Sprintf("%d", def.Resources.Cpu),
+		"--memory", fmt.Sprintf("%dg", def.Resources.Ram),
 		"--pull", "never",
 	}
 
 	// Create and connect volumes to container
-	if err := d.disksCreate(c_name, &run_args, def.Requirements.Disks); err != nil {
+	if err := d.disksCreate(c_name, &run_args, def.Resources.Disks); err != nil {
 		log.Println("DOCKER: Unable to create the required disks")
 		return c_hwaddr, "", err
 	}

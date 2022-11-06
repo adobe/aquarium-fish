@@ -25,6 +25,7 @@ import (
 	"github.com/mostlygeek/arp"
 	"gorm.io/gorm"
 
+	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
@@ -40,8 +41,12 @@ type Fish struct {
 
 	active_votes_mutex sync.Mutex
 	active_votes       []*types.Vote
+
 	applications_mutex sync.Mutex
 	applications       []types.ApplicationUID
+
+	node_usage_mutex sync.Mutex // Is needed to protect node resources from concurrent allocations
+	node_usage       drivers.Resources
 }
 
 func New(db *gorm.DB, cfg *Config) (*Fish, error) {
@@ -238,7 +243,11 @@ func (f *Fish) voteProcessRound(vote *types.Vote) {
 		log.Println("Fish: Starting election round", vote.Round)
 
 		// Determine answer for this round
+		// We can't run multiple resources check at a time or together with
+		// allocating application so using mutex here
+		f.node_usage_mutex.Lock()
 		vote.Available = f.isNodeAvailableForApplication(vote.ApplicationUID)
+		f.node_usage_mutex.Unlock()
 
 		// Create vote if it's required
 		if vote.UID == uuid.Nil {
@@ -296,7 +305,7 @@ func (f *Fish) voteProcessRound(vote *types.Vote) {
 				s, err := f.ApplicationStateGetByApplication(vote.ApplicationUID)
 				if err != nil {
 					log.Println("Fish: Unable to get the Application state:", err)
-					return
+					continue
 				}
 				if s.Status != types.ApplicationStateStatusNEW {
 					// The Application state was changed by some node, so we can drop the election process
@@ -319,17 +328,6 @@ func (f *Fish) voteProcessRound(vote *types.Vote) {
 }
 
 func (f *Fish) isNodeAvailableForApplication(app_uid types.ApplicationUID) bool {
-	// Is node executing the application right now
-	f.applications_mutex.Lock()
-	{
-		if len(f.applications) >= f.cfg.NodeSlots {
-			log.Println("Fish: All the slots of the Node are busy for Application:", app_uid)
-			f.applications_mutex.Unlock()
-			return false
-		}
-	}
-	f.applications_mutex.Unlock()
-
 	app, err := f.ApplicationGet(app_uid)
 	if err != nil {
 		log.Println("Fish: Unable to find Application", app_uid, err)
@@ -337,19 +335,22 @@ func (f *Fish) isNodeAvailableForApplication(app_uid types.ApplicationUID) bool 
 	}
 	label, err := f.LabelGet(app.LabelUID)
 	if err != nil {
-		log.Println("Fish: Unable to find label", app.LabelUID)
+		log.Println("Fish: Unable to find Label", app.LabelUID)
 		return false
 	}
 
 	// Is node supports the required label driver
-	if f.DriverGet(label.Driver) == nil {
+	driver := f.DriverGet(label.Driver)
+	if driver == nil {
 		return false
 	}
 
-	// TODO: Check with driver if label is capable to be running in parallel on the same
-	// node (in case there is running apps with the same label), because the labels could
-	// contain reuse disks for example which are hard to use by two environments at the same
-	// time.
+	// Check with the driver if it's possible to allocate the Application resource
+	node_usage := f.node_usage
+	if capacity := driver.AvailableCapacity(node_usage, string(label.Definition)); capacity < 1 {
+		log.Printf("Fish: Not enough Driver '%s' capacity to serve the Application: %d, %s", driver.Name(), capacity, app_uid)
+		return false
+	}
 
 	return true
 }
@@ -357,12 +358,7 @@ func (f *Fish) isNodeAvailableForApplication(app_uid types.ApplicationUID) bool 
 func (f *Fish) executeApplication(app_uid types.ApplicationUID) error {
 	f.applications_mutex.Lock()
 	{
-		if len(f.applications) >= f.cfg.NodeSlots {
-			log.Println("Fish: All the slots of the Node are busy for Application:", app_uid)
-			f.applications_mutex.Unlock()
-			return nil
-		}
-		// Check the application is not executed already
+		// Check the application is executed already
 		for _, uid := range f.applications {
 			if uid == app_uid {
 				// Seems the application is already executing
@@ -374,12 +370,21 @@ func (f *Fish) executeApplication(app_uid types.ApplicationUID) error {
 	}
 	f.applications_mutex.Unlock()
 
-	app, _ := f.ApplicationGet(app_uid)
+	// Locking the node resources until the app will be allocated
+	f.node_usage_mutex.Lock()
+
+	app, err := f.ApplicationGet(app_uid)
+	if err != nil {
+		log.Println("Fish: Unable to get the Application:", app_uid, err)
+		f.node_usage_mutex.Unlock()
+		return err
+	}
 
 	// Check current Application state
 	app_state, err := f.ApplicationStateGetByApplication(app.UID)
 	if err != nil {
-		log.Println("Fish: Unable to get the Application state:", err)
+		log.Println("Fish: Unable to get the Application state:", app_uid, err)
+		f.node_usage_mutex.Unlock()
 		return err
 	}
 
@@ -393,6 +398,7 @@ func (f *Fish) executeApplication(app_uid types.ApplicationUID) error {
 		err := f.ApplicationStateCreate(app_state)
 		if err != nil {
 			log.Println("Fish: Unable to set Application state:", app.UID, err)
+			f.node_usage_mutex.Unlock()
 			return err
 		}
 	}
@@ -401,7 +407,23 @@ func (f *Fish) executeApplication(app_uid types.ApplicationUID) error {
 	label, err := f.LabelGet(app.LabelUID)
 	if err != nil {
 		log.Println("Fish: Unable to find label", app.LabelUID)
+		f.node_usage_mutex.Unlock()
 		return err
+	}
+
+	// Locate the required driver
+	driver := f.DriverGet(label.Driver)
+	if driver == nil {
+		log.Println("Fish: Unable to locate driver for the Application", app.UID)
+		app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStateStatusERROR,
+			Description: fmt.Sprintf("No driver found"),
+		}
+		f.ApplicationStateCreate(app_state)
+	}
+
+	if driver.IsRemote() {
+		// We don't need to lock the node resources for remote drivers
+		f.node_usage_mutex.Unlock()
 	}
 
 	// Merge application and label metadata, in this exact order
@@ -446,16 +468,6 @@ func (f *Fish) executeApplication(app_uid types.ApplicationUID) error {
 		}
 	}
 
-	// Locate the required driver
-	driver := f.DriverGet(label.Driver)
-	if driver == nil {
-		log.Println("Fish: Unable to locate driver for the Application", app.UID)
-		app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStateStatusERROR,
-			Description: fmt.Sprintf("No driver found"),
-		}
-		f.ApplicationStateCreate(app_state)
-	}
-
 	// Allocate the resource
 	if app_state.Status == types.ApplicationStateStatusELECTED {
 		// Run the allocation
@@ -478,7 +490,15 @@ func (f *Fish) executeApplication(app_uid types.ApplicationUID) error {
 		f.ApplicationStateCreate(app_state)
 	}
 
+	// If the driver is not using the remote resources - we need to increase the counter
+	if !driver.IsRemote() {
+		f.node_usage.Add(driver.DefinitionResources(string(label.Definition)))
+		// Unlocking the node resources to allow the other Applications allocation
+		f.node_usage_mutex.Unlock()
+	}
+
 	// Run the loop to wait for deallocate request
+	var deallocate_retry uint8 = 1
 	for app_state.Status == types.ApplicationStateStatusALLOCATED {
 		if !f.running {
 			log.Println("Fish: Stopping the Application execution:", app.UID)
@@ -492,24 +512,26 @@ func (f *Fish) executeApplication(app_uid types.ApplicationUID) error {
 			log.Println("Fish: Running Deallocate of the Application:", app.UID)
 			// Deallocating and destroy the resource
 			if err := driver.Deallocate(res.HwAddr); err != nil {
-				log.Println("Fish: Unable to deallocate the Resource of Application:", app.UID, err)
-				// Destroying the resource anyway to not bloat the table - otherwise it will stuck there and
-				// will block the access to IP of the other VM's that will reuse this IP
-				if err := f.ResourceDelete(res.UID); err != nil {
-					log.Println("Fish: Unable to delete Resource for Application:", app.UID, err)
+				log.Printf("Fish: Unable to deallocate the Resource of Application: %s (try: %d): %v\n", app.UID, deallocate_retry, err)
+				// Let's retry to deallocate the resource 10 times before give up
+				if deallocate_retry <= 10 {
+					deallocate_retry += 1
+					time.Sleep(10 * time.Second)
+					continue
 				}
 				app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStateStatusERROR,
 					Description: fmt.Sprintf("Driver deallocate resource error: %s", err),
 				}
 			} else {
 				log.Println("Fish: Successful deallocation of the Application:", app.UID)
-				err := f.ResourceDelete(res.UID)
-				if err != nil {
-					log.Println("Fish: Unable to delete Resource for Application:", app.UID, err)
-				}
 				app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStateStatusDEALLOCATED,
 					Description: fmt.Sprintf("Driver deallocated the resource"),
 				}
+			}
+			// Destroying the resource anyway to not bloat the table - otherwise it will stuck there and
+			// will block the access to IP of the other VM's that will reuse this IP
+			if err := f.ResourceDelete(res.UID); err != nil {
+				log.Println("Fish: Unable to delete Resource for Application:", app.UID, err)
 			}
 			f.ApplicationStateCreate(app_state)
 		} else {
@@ -517,9 +539,16 @@ func (f *Fish) executeApplication(app_uid types.ApplicationUID) error {
 		}
 	}
 
-	// Clean the executing application
 	f.applications_mutex.Lock()
 	{
+		// Decrease the amout of running local apps
+		if !driver.IsRemote() {
+			f.node_usage_mutex.Lock()
+			f.node_usage.Subtract(driver.DefinitionResources(string(label.Definition)))
+			f.node_usage_mutex.Unlock()
+		}
+
+		// Clean the executing application
 		for i, uid := range f.applications {
 			if uid != app_uid {
 				continue

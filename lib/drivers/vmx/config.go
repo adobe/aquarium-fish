@@ -14,10 +14,14 @@ package vmx
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/mem"
 )
 
 type Config struct {
@@ -26,6 +30,24 @@ type Config struct {
 
 	ImagesPath    string `json:"images_path"`    // Where to look/store VM images
 	WorkspacePath string `json:"workspace_path"` // Where to place the cloned VM and disks
+
+	// Alter allows you to control how much resources will be used:
+	// * Negative (<0) value will alter the total resource count before provisioning so you will be
+	//   able to save some resources for the host system (recommended -2 for CPU and -10240 for RAM
+	//   for disk caching)
+	// * Positive (>0) value could also be available (but check it in your vmware dist in advance)
+	//   Please be careful here - noone wants the VM to fail allocation because of that...
+	CpuAlter int `json:"cpu_alter"` // 0 do nothing, <0 reduces number available CPUs, >0 increases it (dangerous)
+	RamAlter int `json:"ram_alter"` // 0 do nothing, <0 reduces amount of available RAM (MB), >0 increases it (dangerous)
+
+	// Overbook options allows tenants to reuse the resources
+	// It will be used only when overbook is allowed by the tenants. It works by just adding those
+	// amounts to the existing total before checking availability. For example if you have 16CPU
+	// and want to run 2 tenants with requirement of 14 CPUs each - you can put 12 in CpuOverbook -
+	// to have virtually 28 CPUs. 3rd will not be running because 2 tenants will eat all 28 virtual
+	// CPUs. Same applies to the RamOverbook.
+	CpuOverbook uint `json:"cpu_overbook"` // How much CPUs could be reused by multiple tenants
+	RamOverbook uint `json:"ram_overbook"` // How much RAM (MB) could be reused by multiple tenants
 
 	DownloadUser     string `json:"download_user"`     // The user will be used in download operations
 	DownloadPassword string `json:"download_password"` // The password will be used in download operations
@@ -85,6 +107,26 @@ func (c *Config) Validate() (err error) {
 	}
 	if err := os.MkdirAll(c.WorkspacePath, 0o750); err != nil {
 		return err
+	}
+
+	// Validating CpuAlter & RamAlter to not be less then the current cpu/ram count
+	cpu_stat, err := cpu.Counts(true)
+	if err != nil {
+		return err
+	}
+
+	if c.CpuAlter < 0 && int(cpu_stat) <= -c.CpuAlter {
+		return fmt.Errorf("VMX: |CpuAlter| can't be more or equal the avaialble Host CPUs: |%d| > %d", c.CpuAlter, cpu_stat)
+	}
+
+	mem_stat, err := mem.VirtualMemory()
+	if err != nil {
+		return err
+	}
+	ram_stat := mem_stat.Total / 1048576 // Getting MB from Bytes
+
+	if c.RamAlter < 0 && int(ram_stat) <= -c.RamAlter {
+		return fmt.Errorf("VMX: |RamAlter| can't be more or equal the avaialble Host RAM: |%d| > %d", c.RamAlter, ram_stat)
 	}
 
 	return nil

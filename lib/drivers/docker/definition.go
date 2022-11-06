@@ -41,9 +41,9 @@ import (
  *     JENKINS_AGENT_WORKDIR: /mnt/workspace
  */
 type Definition struct {
-	Image        string               `json:"image"`        // Image name to use
-	Images       map[string]string    `json:"images"`       // List of image dependencies
-	Requirements drivers.Requirements `json:"requirements"` // Required resources to allocate
+	Image     string            `json:"image"`     // Image name to use
+	Images    map[string]string `json:"images"`    // List of image dependencies
+	Resources drivers.Resources `json:"resources"` // Required resources to allocate
 }
 
 func (d *Definition) Apply(definition string) error {
@@ -79,8 +79,8 @@ func (d *Definition) Validate() error {
 	}
 
 	// Check resources
-	if err := d.Requirements.Validate([]string{"dir", "hfs+", "exfat", "fat32"}, true); err != nil {
-		return fmt.Errorf("DOCKER: Requirements validation failed: %s", err)
+	if err := d.Resources.Validate([]string{"dir", "hfs+", "exfat", "fat32"}, true); err != nil {
+		return fmt.Errorf("DOCKER: Resources validation failed: %s", err)
 	}
 
 	return nil

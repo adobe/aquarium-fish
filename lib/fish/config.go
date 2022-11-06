@@ -34,9 +34,6 @@ type Config struct {
 
 	NodeName     string `json:"node_name"`     // Last resort in case you need to override the default host node name
 	NodeLocation string `json:"node_location"` // Specify cluster node location for multi-dc configurations
-	NodeSlots    int    `json:"node_slots"`    // General definition of available parallel executors (1 by default, -1 to disable)
-	// TODO: NodeSlots need to be replaced by the ElectionRules engine which will allow to distribute
-	// the Applications across the cluster based on available resources and allow overcommit if needed
 
 	Drivers []ConfigDriver `json:"drivers"` // If specified - only the listed plugins will be loaded
 }
@@ -66,10 +63,6 @@ func (c *Config) ReadConfigFile(cfg_path string) error {
 	}
 	if c.TLSCrt == "" {
 		c.TLSCrt = c.NodeName + ".crt"
-	}
-
-	if c.NodeSlots == 0 {
-		c.NodeSlots = 1
 	}
 
 	return nil

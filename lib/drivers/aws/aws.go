@@ -27,6 +27,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
+	"github.com/aws/aws-sdk-go-v2/service/servicequotas"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/util"
@@ -45,6 +46,10 @@ func (d *Driver) Name() string {
 	return "aws"
 }
 
+func (d *Driver) IsRemote() bool {
+	return true
+}
+
 func (d *Driver) Prepare(config []byte) error {
 	if err := d.cfg.Apply(config); err != nil {
 		return err
@@ -58,6 +63,13 @@ func (d *Driver) Prepare(config []byte) error {
 func (d *Driver) ValidateDefinition(definition string) error {
 	var def Definition
 	return def.Apply(definition)
+}
+
+func (d *Driver) DefinitionResources(definition string) drivers.Resources {
+	var def Definition
+	def.Apply(definition)
+
+	return def.Resources
 }
 
 func (d *Driver) newConn() *ec2.Client {
@@ -86,6 +98,134 @@ func (d *Driver) newKMSConn() *kms.Client {
 	})
 }
 
+func (d *Driver) newServiceQuotasConn() *servicequotas.Client {
+	return servicequotas.NewFromConfig(aws.Config{
+		Region: d.cfg.Region,
+		Credentials: aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
+			return aws.Credentials{
+				AccessKeyID:     d.cfg.KeyID,
+				SecretAccessKey: d.cfg.SecretKey,
+				Source:          "fish-cfg",
+			}, nil
+		}),
+	})
+}
+
+// Allow Fish to ask the driver about it's capacity (free slots) of a specific definition
+func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition string) int64 {
+	var out_count int64
+
+	var def Definition
+	if err := def.Apply(definition); err != nil {
+		log.Println("AWS: Unable to apply definition:", err)
+		return -1
+	}
+
+	conn_ec2 := d.newConn()
+
+	if def.InstanceType == "mac1" || def.InstanceType == "mac2" {
+		// Ensure we have the available not busy mac dedicated hosts to use as base for resource.
+		// For now we're not creating new dedicated hosts dynamically because they can be
+		// terminated only after 24h which costs a pretty penny.
+		// Quotas for hosts are: "Running Dedicated mac1 Hosts" & "Running Dedicated mac2 Hosts"
+		p := ec2.NewDescribeHostsPaginator(conn_ec2, &ec2.DescribeHostsInput{
+			Filter: []types.Filter{
+				types.Filter{
+					Name:   aws.String("instance-type"),
+					Values: []string{fmt.Sprintf("%s.metal", def.InstanceType)},
+				},
+				types.Filter{
+					Name:   aws.String("state"),
+					Values: []string{"available"},
+				},
+			},
+		})
+
+		// Processing the received quotas
+		for p.HasMorePages() {
+			resp, err := p.NextPage(context.TODO())
+			if err != nil {
+				log.Println("AWS: Error during requesting hosts:", err)
+				return -1
+			}
+			out_count += int64(len(resp.Hosts))
+		}
+
+		return out_count
+	}
+
+	// Preparing a map of useful quotas for easy access
+	quotas := make(map[string]int64)
+	quotas["Running On-Demand DL instances"] = 0
+	quotas["Running On-Demand F instances"] = 0
+	quotas["Running On-Demand G and VT instances"] = 0
+	quotas["Running On-Demand High Memory instances"] = 0
+	quotas["Running On-Demand HPC instances"] = 0
+	quotas["Running On-Demand Inf instances"] = 0
+	quotas["Running On-Demand P instances"] = 0
+	quotas["Running On-Demand Standard (A, C, D, H, I, M, R, T, Z) instances"] = 0
+	quotas["Running On-Demand Trn instances"] = 0
+	quotas["Running On-Demand X instances"] = 0
+
+	conn_sq := d.newServiceQuotasConn()
+
+	// Get the list of quotas
+	p := servicequotas.NewListAWSDefaultServiceQuotasPaginator(conn_sq, &servicequotas.ListAWSDefaultServiceQuotasInput{
+		ServiceCode: aws.String("ec2"),
+	})
+
+	// Processing the received quotas
+	for p.HasMorePages() {
+		resp, err := p.NextPage(context.TODO())
+		if err != nil {
+			log.Println("AWS: Error during requesting quotas:", err)
+			return -1
+		}
+		for _, r := range resp.Quotas {
+			if _, ok := quotas[aws.ToString(r.QuotaName)]; ok {
+				quotas[aws.ToString(r.QuotaName)] = int64(aws.ToFloat64(r.Value))
+			}
+		}
+	}
+
+	// Check we have enough quotas for specified instance type
+	if strings.HasPrefix(def.InstanceType, "dl") {
+		out_count = quotas["Running On-Demand DL instances"]
+	} else if strings.HasPrefix(def.InstanceType, "u-") {
+		out_count = quotas["Running On-Demand High Memory instances"]
+	} else if strings.HasPrefix(def.InstanceType, "hpc") {
+		out_count = quotas["Running On-Demand HPC instances"]
+	} else if strings.HasPrefix(def.InstanceType, "inf") {
+		out_count = quotas["Running On-Demand Inf instances"]
+	} else if strings.HasPrefix(def.InstanceType, "trn") {
+		out_count = quotas["Running On-Demand Trn instances"]
+	} else if strings.HasPrefix(def.InstanceType, "f") {
+		out_count = quotas["Running On-Demand F instances"]
+	} else if strings.HasPrefix(def.InstanceType, "g") || strings.HasPrefix(def.InstanceType, "vt") {
+		out_count = quotas["Running On-Demand G and VT instances"]
+	} else if strings.HasPrefix(def.InstanceType, "p") {
+		out_count = quotas["Running On-Demand P instances"]
+	} else if strings.HasPrefix(def.InstanceType, "x") {
+		out_count = quotas["Running On-Demand X instances"]
+	} else { // Probably not a good idea and better to fail if the instances are not in the list...
+		out_count = quotas["Running On-Demand Standard (A, C, D, H, I, M, R, T, Z) instances"]
+	}
+
+	// Make sure we have enough IP's in the selected VPC or subnet
+	var ip_count int64
+	var err error
+	if _, ip_count, err = d.getSubnetId(conn_ec2, def.Resources.Network); err != nil {
+		log.Println("AWS: Error during requesting subnet:", err)
+		return -1
+	}
+
+	// Return the most limiting value
+	if ip_count < out_count {
+		return ip_count
+	}
+	return out_count
+}
+
 /**
  * Allocate Instance with provided image
  *
@@ -94,14 +234,16 @@ func (d *Driver) newKMSConn() *kms.Client {
  */
 func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (string, string, error) {
 	var def Definition
-	def.Apply(definition)
+	if err := def.Apply(definition); err != nil {
+		return "", "", fmt.Errorf("AWS: Unable to apply definition: %v", err)
+	}
 
 	conn := d.newConn()
 
 	// Checking the VPC exists or use default one
-	vm_network := def.Requirements.Network
+	vm_network := def.Resources.Network
 	var err error
-	if vm_network, err = d.getSubnetId(conn, vm_network); err != nil {
+	if vm_network, _, err = d.getSubnetId(conn, vm_network); err != nil {
 		return "", "", fmt.Errorf("AWS: Unable to get subnet: %v", err)
 	}
 	log.Println("AWS: Selected subnet:", vm_network)
@@ -176,8 +318,8 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 	}
 
 	// Prepare the device mapping
-	if len(def.Requirements.Disks) > 0 {
-		for name, disk := range def.Requirements.Disks {
+	if len(def.Resources.Disks) > 0 {
+		for name, disk := range def.Resources.Disks {
 			mapping := types.BlockDeviceMapping{
 				DeviceName: aws.String(name),
 				Ebs: &types.EbsBlockDevice{
@@ -240,7 +382,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 	inst := &result.Instances[0]
 
 	// Alter instance volumes tags from defined disk labels
-	if len(def.Requirements.Disks) > 0 {
+	if len(def.Resources.Disks) > 0 {
 		// Wait for the BlockDeviceMappings to be filled with disks
 		timeout := 60
 		for {
@@ -263,7 +405,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 			}
 		}
 		for _, bd := range inst.BlockDeviceMappings {
-			disk, ok := def.Requirements.Disks[*bd.DeviceName]
+			disk, ok := def.Resources.Disks[*bd.DeviceName]
 			log.Println("AWS: DEBUG: Processing volume:", *bd.DeviceName, disk)
 			if !ok || disk.Label == "" {
 				continue
@@ -321,7 +463,8 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 
 // Will verify and return subnet id
 // In case vpc id was provided - will chose the subnet with less used ip's
-func (d *Driver) getSubnetId(conn *ec2.Client, id_tag string) (string, error) {
+// Returns the found subnet_id, total count of available ip's and error if some
+func (d *Driver) getSubnetId(conn *ec2.Client, id_tag string) (string, int64, error) {
 	filter := types.Filter{}
 
 	// Check if the tag is provided ("<Key>:<Value>")
@@ -355,15 +498,15 @@ func (d *Driver) getSubnetId(conn *ec2.Client, id_tag string) (string, error) {
 			}
 			resp, err := conn.DescribeSubnets(context.TODO(), req)
 			if err != nil || len(resp.Subnets) == 0 {
-				return "", fmt.Errorf("AWS: Unable to locate vpc or subnet with specified tag: %s:%v, %v", *filter.Name, filter.Values, err)
+				return "", 0, fmt.Errorf("AWS: Unable to locate vpc or subnet with specified tag: %s:%q, %v", aws.ToString(filter.Name), filter.Values, err)
 			}
-			id_tag = *resp.Subnets[0].SubnetId
-			return id_tag, nil
+			id_tag = aws.ToString(resp.Subnets[0].SubnetId)
+			return id_tag, int64(aws.ToInt32(resp.Subnets[0].AvailableIpAddressCount)), nil
 		}
 		if len(resp.Vpcs) > 1 {
 			log.Println("AWS: WARNING: There is more than one vpc with the same tag:", id_tag)
 		}
-		id_tag = *resp.Vpcs[0].VpcId
+		id_tag = aws.ToString(resp.Vpcs[0].VpcId)
 		log.Println("AWS: Found VPC with id:", id_tag)
 	} else {
 		// If network id is not a subnet - process as vpc
@@ -385,17 +528,17 @@ func (d *Driver) getSubnetId(conn *ec2.Client, id_tag string) (string, error) {
 			}
 			resp, err := conn.DescribeVpcs(context.TODO(), req)
 			if err != nil {
-				return "", fmt.Errorf("AWS: Unable to locate VPC: %v", err)
+				return "", 0, fmt.Errorf("AWS: Unable to locate VPC: %v", err)
 			}
 			if len(resp.Vpcs) == 0 {
-				return "", fmt.Errorf("AWS: No VPCs available in the project")
+				return "", 0, fmt.Errorf("AWS: No VPCs available in the project")
 			}
 
 			if id_tag == "" {
-				id_tag = *resp.Vpcs[0].VpcId
+				id_tag = aws.ToString(resp.Vpcs[0].VpcId)
 				log.Println("AWS: Using default VPC:", id_tag)
-			} else if id_tag != *resp.Vpcs[0].VpcId {
-				return "", fmt.Errorf("AWS: Unable to verify the vpc id: %q != %q", id_tag, *resp.Vpcs[0].VpcId)
+			} else if id_tag != aws.ToString(resp.Vpcs[0].VpcId) {
+				return "", 0, fmt.Errorf("AWS: Unable to verify the vpc id: %q != %q", id_tag, aws.ToString(resp.Vpcs[0].VpcId))
 			}
 		}
 	}
@@ -416,29 +559,32 @@ func (d *Driver) getSubnetId(conn *ec2.Client, id_tag string) (string, error) {
 	}
 	resp, err := conn.DescribeSubnets(context.TODO(), req)
 	if err != nil {
-		return "", fmt.Errorf("AWS: Unable to locate subnet: %v", err)
+		return "", 0, fmt.Errorf("AWS: Unable to locate subnet: %v", err)
 	}
 	if len(resp.Subnets) == 0 {
-		return "", fmt.Errorf("AWS: No Subnets available in the project")
+		return "", 0, fmt.Errorf("AWS: No Subnets available in the project")
 	}
 
 	if strings.HasPrefix(id_tag, "vpc-") {
 		// Chose the less used subnet in VPC
 		var curr_count int32 = 0
+		var total_ip_count int64 = 0
 		for _, subnet := range resp.Subnets {
-			if curr_count < *subnet.AvailableIpAddressCount {
-				id_tag = *subnet.SubnetId
-				curr_count = *subnet.AvailableIpAddressCount
+			total_ip_count += int64(aws.ToInt32(subnet.AvailableIpAddressCount))
+			if curr_count < aws.ToInt32(subnet.AvailableIpAddressCount) {
+				id_tag = aws.ToString(subnet.SubnetId)
+				curr_count = aws.ToInt32(subnet.AvailableIpAddressCount)
 			}
 		}
 		if curr_count == 0 {
-			return "", fmt.Errorf("AWS: Subnets have no available IP addresses")
+			return "", 0, fmt.Errorf("AWS: Subnets have no available IP addresses")
 		}
-	} else if id_tag != *resp.Subnets[0].SubnetId {
-		return "", fmt.Errorf("AWS: Unable to verify the subnet id: %q != %q", id_tag, *resp.Subnets[0].SubnetId)
+		return id_tag, total_ip_count, nil
+	} else if id_tag != aws.ToString(resp.Subnets[0].SubnetId) {
+		return "", 0, fmt.Errorf("AWS: Unable to verify the subnet id: %q != %q", id_tag, aws.ToString(resp.Subnets[0].SubnetId))
 	}
 
-	return id_tag, nil
+	return id_tag, int64(aws.ToInt32(resp.Subnets[0].AvailableIpAddressCount)), nil
 }
 
 // Will verify and return image id

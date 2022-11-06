@@ -19,11 +19,20 @@ import (
 )
 
 // Resource requirements
-type Requirements struct {
+// It's used for 2 purposes: in Label definitions to describe the required amount of resources and
+// in Fish to store the currently used resources, so could add and subtract resources.
+// Modificators are used for parallel node usage by different Applications, they are stored for the
+// first Application and used for the others to determine node tenancy/overbook tolerance.
+type Resources struct {
 	Cpu     uint            `json:"cpu"`     // Number of CPU cores to use
 	Ram     uint            `json:"ram"`     // Amount of memory in GB
 	Disks   map[string]Disk `json:"disks"`   // Disks to create and connect
 	Network string          `json:"network"` // Which network configuration to use for VM
+
+	// The modificators to simultaneous execution
+	Multitenancy bool `json:"multitenancy"` // Tolerate to run along with the others
+	CpuOverbook  bool `json:"cpu_overbook"` // Tolerate to CPU overbooking
+	RamOverbook  bool `json:"ram_overbook"` // Tolerate to RAM overbooking
 }
 
 type Disk struct {
@@ -34,7 +43,7 @@ type Disk struct {
 	Clone string `json:"clone"` // Clone the snapshot of existing disk instead of creating the new one
 }
 
-func (r *Requirements) Validate(disk_types []string, check_net bool) error {
+func (r *Resources) Validate(disk_types []string, check_net bool) error {
 	// Check resources
 	if r.Cpu < 1 {
 		return fmt.Errorf("Driver: Number of CPU cores is less then 1")
@@ -58,4 +67,59 @@ func (r *Requirements) Validate(disk_types []string, check_net bool) error {
 	}
 
 	return nil
+}
+
+// Adds the Resources data to the existing data
+func (r *Resources) Add(res Resources) error {
+	if r.Cpu == 0 && r.Ram == 0 {
+		// Set tenancy modificators for the first resource
+		r.Multitenancy = res.Multitenancy
+		r.CpuOverbook = res.CpuOverbook
+		r.RamOverbook = res.RamOverbook
+	}
+
+	// Set the used CPU & RAM
+	r.Cpu += res.Cpu
+	r.Ram += res.Ram
+
+	// TODO: Process disk too
+	return nil
+}
+
+// Subtracts the Resources data to the existing data
+func (r *Resources) Subtract(res Resources) (err error) {
+	if r.Cpu < res.Cpu {
+		err = fmt.Errorf("Driver: Unable to subtract more CPU than we have: %d < %d", r.Cpu, res.Cpu)
+		r.Cpu = 0
+	} else {
+		r.Cpu -= res.Cpu
+	}
+	if r.Ram < res.Ram {
+		mem_err := fmt.Errorf("Driver: Unable to subtract more RAM than we have: %d < %d", r.Ram, res.Ram)
+		if err != nil {
+			err = fmt.Errorf("%v, %v", err, mem_err)
+		}
+		r.Cpu = 0
+	} else {
+		r.Cpu -= res.Cpu
+	}
+
+	// TODO: Process disk too
+
+	return
+}
+
+// Checks if the Resources are filled with some values
+func (r *Resources) IsEmpty() bool {
+	if r.Cpu != 0 {
+		return false
+	}
+	if r.Ram != 0 {
+		return false
+	}
+	if len(r.Disks) > 0 {
+		return false
+	}
+
+	return true
 }

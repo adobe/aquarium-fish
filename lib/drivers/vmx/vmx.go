@@ -29,6 +29,8 @@ import (
 	"time"
 
 	"github.com/hpcloud/tail"
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/mem"
 
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/drivers"
@@ -38,6 +40,9 @@ import (
 // Implements drivers.ResourceDriver interface
 type Driver struct {
 	cfg Config
+
+	node_cpu uint // In logical threads
+	node_ram uint // In RAM megabytes
 }
 
 func init() {
@@ -48,6 +53,10 @@ func (d *Driver) Name() string {
 	return "vmx"
 }
 
+func (d *Driver) IsRemote() bool {
+	return false
+}
+
 func (d *Driver) Prepare(config []byte) error {
 	if err := d.cfg.Apply(config); err != nil {
 		return err
@@ -55,13 +64,139 @@ func (d *Driver) Prepare(config []byte) error {
 	if err := d.cfg.Validate(); err != nil {
 		return err
 	}
+
+	// Collect node resources status
+	cpu_stat, err := cpu.Counts(true)
+	if err != nil {
+		return err
+	}
+	d.node_cpu = uint(cpu_stat)
+
+	mem_stat, err := mem.VirtualMemory()
+	if err != nil {
+		return err
+	}
+	d.node_ram = uint(mem_stat.Total / 1048576) // Getting MB from Bytes
+
 	// TODO: Cleanup the image directory in case the images are not good
+
 	return nil
 }
 
 func (d *Driver) ValidateDefinition(definition string) error {
 	var def Definition
 	return def.Apply(definition)
+}
+
+func (d *Driver) DefinitionResources(definition string) drivers.Resources {
+	var def Definition
+	def.Apply(definition)
+
+	return def.Resources
+}
+
+// Allow Fish to ask the driver about it's capacity (free slots) of a specific definition
+func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition string) int64 {
+	var out_count int64
+
+	var def Definition
+	if err := def.Apply(definition); err != nil {
+		log.Println("AWS: Unable to apply definition:", err)
+		return -1
+	}
+
+	// Finding the total resources to have 1 tenant
+	var total_cpu uint
+	var total_ram uint
+	if d.cfg.CpuAlter < 0 {
+		total_cpu = d.node_cpu - uint(-d.cfg.CpuAlter)
+	} else {
+		total_cpu = d.node_cpu + uint(d.cfg.CpuAlter)
+	}
+	if d.cfg.RamAlter < 0 {
+		total_ram = d.node_ram - uint(-d.cfg.RamAlter)
+	} else {
+		total_ram = d.node_ram + uint(d.cfg.RamAlter)
+	}
+
+	// Check if the node is not used
+	if node_usage.IsEmpty() {
+		// Just check if the node has the required resources from Definition
+		if def.Resources.Cpu > total_cpu {
+			return 0
+		}
+		if def.Resources.Ram > total_ram {
+			return 0
+		}
+		// TODO: Check disk requirements
+
+		// Calculate how much of those definitions we could run
+		out_count = int64(total_cpu / def.Resources.Cpu)
+		ram_count := int64(total_ram / def.Resources.Ram)
+		if out_count > ram_count {
+			out_count = ram_count
+		}
+		// TODO: Add disks into equation
+		return out_count
+	}
+
+	// Current tenant could not like to see new neighbours, or this new one could be picky
+	if !node_usage.Multitenancy || !def.Resources.Multitenancy {
+		// Nope, no deal - not compatible tenants can't share a home
+		return 0
+	}
+
+	// The node is actually used already and invites more tenants - if we have enough resources
+	// without overbooking
+	if def.Resources.Cpu <= total_cpu-node_usage.Cpu && def.Resources.Ram <= total_ram-node_usage.Ram {
+		// Here is no overbooking required hey! Let's run the thing
+		out_count = int64((total_cpu - node_usage.Cpu) / def.Resources.Cpu)
+		ram_count := int64((total_ram - node_usage.Ram) / def.Resources.Ram)
+		if out_count > ram_count {
+			out_count = ram_count
+		}
+		// TODO: Add disks into equation
+		return out_count
+	}
+
+	// To run we will need to overbook something - let's figure out what exactly
+	if def.Resources.Cpu > total_cpu-node_usage.Cpu {
+		// We need to overbook CPU - let's check if it's possible
+		if !node_usage.CpuOverbook || !def.Resources.CpuOverbook {
+			// No luck, someone currently running or a pretendent against it
+			return 0
+		}
+		// Alter the amount of CPU's for overbooking
+		total_cpu += d.cfg.CpuOverbook
+		// Now we can compare again - and if there's some room, then it works for us
+		if def.Resources.Cpu > total_cpu-node_usage.Cpu {
+			// Nope, not enough - so no luck
+			return 0
+		}
+	}
+	if def.Resources.Ram > total_ram-node_usage.Ram {
+		// We need to overbook RAM - let's check if it's possible
+		if !node_usage.RamOverbook || !def.Resources.RamOverbook {
+			// No luck, someone currently running or a pretendent against it
+			return 0
+		}
+		// Alter the amount of RAM for overbooking
+		total_ram += d.cfg.RamOverbook
+		// Now we can compare again - and if there's some room, then it works for us
+		if def.Resources.Ram > total_ram-node_usage.Ram {
+			// Nope, not enough - so no luck
+			return 0
+		}
+	}
+
+	// Here we've passed all the validations and overbooking is available so return it
+	out_count = int64((total_cpu - node_usage.Cpu) / def.Resources.Cpu)
+	ram_count := int64((total_ram - node_usage.Ram) / def.Resources.Ram)
+	if out_count > ram_count {
+		out_count = ram_count
+	}
+
+	return out_count
 }
 
 /**
@@ -80,7 +215,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 	vm_id := fmt.Sprintf("%02x%02x%02x%02x%02x%02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5])
 	vm_hwaddr := fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5])
 
-	vm_network := def.Requirements.Network
+	vm_network := def.Resources.Network
 	if vm_network == "" {
 		vm_network = "hostonly"
 	}
@@ -111,16 +246,16 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 		"ethernet0.addressType =", `ethernet0.addressType = "static"`,
 		"ethernet0.address =", fmt.Sprintf("ethernet0.address = %q", vm_hwaddr),
 		"ethernet0.connectiontype =", fmt.Sprintf("ethernet0.connectiontype = %q", vm_network),
-		"numvcpus =", fmt.Sprintf(`numvcpus = "%d"`, def.Requirements.Cpu),
-		"cpuid.corespersocket =", fmt.Sprintf(`cpuid.corespersocket = "%d"`, def.Requirements.Cpu),
-		"memsize =", fmt.Sprintf(`memsize = "%d"`, def.Requirements.Ram*1024),
+		"numvcpus =", fmt.Sprintf(`numvcpus = "%d"`, def.Resources.Cpu),
+		"cpuid.corespersocket =", fmt.Sprintf(`cpuid.corespersocket = "%d"`, def.Resources.Cpu),
+		"memsize =", fmt.Sprintf(`memsize = "%d"`, def.Resources.Ram*1024),
 	); err != nil {
 		log.Println("VMX: Unable to change cloned VM configuration", vmx_path)
 		return vm_hwaddr, "", err
 	}
 
 	// Create and connect disks to vmx
-	if err := d.disksCreate(vmx_path, def.Requirements.Disks); err != nil {
+	if err := d.disksCreate(vmx_path, def.Resources.Disks); err != nil {
 		log.Println("VMX: Unable create disks for VM", vmx_path)
 		return vm_hwaddr, "", err
 	}

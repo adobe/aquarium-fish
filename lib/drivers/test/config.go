@@ -10,7 +10,7 @@
  * governing permissions and limitations under the License.
  */
 
-package none
+package test
 
 import (
 	"encoding/json"
@@ -30,7 +30,7 @@ func (c *Config) Apply(config []byte) error {
 	// Parse json
 	if len(config) > 0 {
 		if err := json.Unmarshal(config, c); err != nil {
-			log.Println("NONE: Unable to apply the driver config", err)
+			log.Println("TEST: Unable to apply the driver config", err)
 			return err
 		}
 	}

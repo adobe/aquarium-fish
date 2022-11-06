@@ -48,7 +48,7 @@ node_location: test_loc
 api_address: 127.0.0.1:8001
 
 drivers:
-  - name: none
+  - name: test
 EOF
 
 # Run Aquarium node
@@ -72,9 +72,9 @@ done
 
 echo "INFO: Create the label"
 
-label=test1_none
+label=test1
 label_uid=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/json' \
-    -d '{"name":"'$label'", "version":1, "driver":"none", "definition": {}}' \
+    -d '{"name":"'$label'", "version":1, "driver":"test", "definition": {}}' \
     https://127.0.0.1:8001/api/v1/label/ | grep -o '"UID": *"[^"]\+"' | cut -d':' -f 2 | tr -d ' "')
 echo "INFO: Created Label UID: ${label_uid}"
 
