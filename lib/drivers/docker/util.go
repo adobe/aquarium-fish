@@ -22,6 +22,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -30,6 +31,102 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
+func (d *Driver) getContainersResources(container_ids []string) (drivers.Resources, error) {
+	var out drivers.Resources
+
+	// Getting current running containers info - will return "<ncpu>,<mem_bytes>\n..." for each one
+	docker_args := []string{"inspect", "--format", "{{ .HostConfig.NanoCpus }},{{ .HostConfig.Memory }}"}
+	docker_args = append(docker_args, container_ids...)
+	stdout, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, docker_args...)
+	if err != nil {
+		return out, fmt.Errorf("DOCKER: Unable to inspect the containers to get used resources: %v", err)
+	}
+
+	res_list := strings.Split(strings.TrimSpace(stdout), "\n")
+	for _, res := range res_list {
+		cpu_mem := strings.Split(res, ",")
+		if len(cpu_mem) < 2 {
+			return out, fmt.Errorf("DOCKER: Not enough info values in return: %q", res_list)
+		}
+		res_cpu, err := strconv.ParseUint(cpu_mem[0], 10, 64)
+		if err != nil {
+			return out, fmt.Errorf("DOCKER: Unable to parse CPU uint: %v (%q)", err, cpu_mem[0])
+		}
+		res_ram, err := strconv.ParseUint(cpu_mem[1], 10, 64)
+		if err != nil {
+			return out, fmt.Errorf("DOCKER: Unable to parse RAM uint: %v (%q)", err, cpu_mem[1])
+		}
+		if res_cpu == 0 || res_ram == 0 {
+			return out, fmt.Errorf("DOCKER: The container is non-Fish controlled zero-cpu/ram ones: %q", container_ids)
+		}
+		out.Cpu += uint(res_cpu / 1000000000) // Originallly in NCPU
+		out.Ram += uint(res_ram / 1073741824) // Get in GB
+		// TODO: Add disks too here
+	}
+
+	return out, nil
+}
+
+// In order to recover after restart we need to find the current docker usage
+// There is some evristics to find the modifiers like Multitenancy and the others
+func (d *Driver) getInitialUsage() (drivers.Resources, error) {
+	var out drivers.Resources
+	// The driver is configured as remote so collecting the current remote docker usage
+	// Listing the existing containers ID's to use in inpect command later
+	stdout, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, "ps", "--format", "{{ .ID }}")
+	if err != nil {
+		return out, fmt.Errorf("DOCKER: Unable to list the running containers: %v", err)
+	}
+
+	ids_list := strings.Split(strings.TrimSpace(stdout), "\n")
+	if len(ids_list) == 1 && ids_list[0] == "" {
+		// It's actually empty so skip it
+		return out, nil
+	}
+
+	out, err = d.getContainersResources(ids_list)
+	if err != nil {
+		return out, err
+	}
+
+	if out.IsEmpty() || len(ids_list) == 1 {
+		// There is no or one container is allocated - so for safety use false for modifiers
+		return out, nil
+	}
+
+	// Let's try to find the modificators that is used
+	if len(ids_list) > 1 {
+		// There is more than one container is running so multitenancy is true
+		out.Multitenancy = true
+	}
+	if out.Cpu > d.total_cpu {
+		out.CpuOverbook = true
+	}
+	if out.Ram > d.total_ram {
+		out.RamOverbook = true
+	}
+
+	return out, nil
+}
+
+// Collects the available resource with alteration
+func (d *Driver) getAvailResources() (avail_cpu, avail_ram uint) {
+	if d.cfg.CpuAlter < 0 {
+		avail_cpu = d.total_cpu - uint(-d.cfg.CpuAlter)
+	} else {
+		avail_cpu = d.total_cpu + uint(d.cfg.CpuAlter)
+	}
+
+	if d.cfg.RamAlter < 0 {
+		avail_ram = d.total_ram - uint(-d.cfg.RamAlter)
+	} else {
+		avail_ram = d.total_ram + uint(d.cfg.RamAlter)
+	}
+
+	return
+}
+
+// Returns the standartized container name
 func (d *Driver) getContainerName(hwaddr string) string {
 	return fmt.Sprintf("fish-%s", strings.ReplaceAll(hwaddr, ":", ""))
 }
@@ -109,7 +206,7 @@ func (d *Driver) loadImages(def *Definition) (string, error) {
 			// Search the image by image ID prefix and list the image tags
 			image_tags, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, "image", "inspect",
 				fmt.Sprintf("sha256:%s", subdir[subdir_ver_end+1:]),
-				"--format", "{{ range .RepoTags }}{{ printf \"%s\\n\" . }}{{ end }}",
+				"--format", "{{ range .RepoTags }}{{ println . }}{{ end }}",
 			)
 			if err == nil {
 				// The image could contain a number of tags so check them all
@@ -167,6 +264,7 @@ func (d *Driver) loadImages(def *Definition) (string, error) {
 	return target_out, nil
 }
 
+// Receives the container ID out of the hwaddr unique id
 func (d *Driver) getAllocatedContainer(hwaddr string) string {
 	// Probably it's better to store the current list in the memory
 	stdout, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, "ps", "-a", "-q", "--filter", "name="+d.getContainerName(hwaddr))
@@ -177,6 +275,7 @@ func (d *Driver) getAllocatedContainer(hwaddr string) string {
 	return strings.TrimSpace(stdout)
 }
 
+// Ensures the network is available
 func (d *Driver) isNetworkExists(name string) bool {
 	stdout, stderr, err := runAndLog(5*time.Second, d.cfg.DockerPath, "network", "ls", "-q", "--filter", "name=aquarium-"+name)
 	if err != nil {
@@ -187,6 +286,7 @@ func (d *Driver) isNetworkExists(name string) bool {
 	return len(stdout) > 0
 }
 
+// Creates disks directories described by the disks map
 func (d *Driver) disksCreate(c_name string, run_args *[]string, disks map[string]drivers.Disk) error {
 	// Create disks
 	disk_paths := make(map[string]string, len(disks))
@@ -280,6 +380,7 @@ func (d *Driver) disksCreate(c_name string, run_args *[]string, disks map[string
 	return nil
 }
 
+// Creates the env file for the container out of metadata specification
 func (d *Driver) envCreate(c_name string, metadata map[string]interface{}) (string, error) {
 	env_file_path := filepath.Join(d.cfg.WorkspacePath, c_name, ".env")
 	if err := os.MkdirAll(filepath.Dir(env_file_path), 0o755); err != nil {
@@ -304,6 +405,7 @@ func (d *Driver) envCreate(c_name string, metadata map[string]interface{}) (stri
 	return env_file_path, nil
 }
 
+// Runs & logs the executable command
 func runAndLog(timeout time.Duration, path string, arg ...string) (string, string, error) {
 	var stdout, stderr bytes.Buffer
 

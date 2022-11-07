@@ -19,7 +19,9 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/adobe/aquarium-fish/lib/crypt"
@@ -29,6 +31,12 @@ import (
 // Implements drivers.ResourceDriver interface
 type Driver struct {
 	cfg Config
+
+	total_cpu uint // In logical threads
+	total_ram uint // In RAM megabytes
+
+	docker_usage_mutex sync.Mutex
+	docker_usage       drivers.Resources // Used when the docker is remote
 }
 
 func init() {
@@ -40,7 +48,7 @@ func (d *Driver) Name() string {
 }
 
 func (d *Driver) IsRemote() bool {
-	return false
+	return d.cfg.IsRemote
 }
 
 func (d *Driver) Prepare(config []byte) error {
@@ -50,6 +58,36 @@ func (d *Driver) Prepare(config []byte) error {
 	if err := d.cfg.Validate(); err != nil {
 		return err
 	}
+
+	// Getting info about the docker system - will return "<ncpu>,<mem_bytes>"
+	stdout, _, err := runAndLog(5*time.Second, d.cfg.DockerPath,
+		"system", "info", "--format", "{{ .NCPU }},{{ .MemTotal }}",
+	)
+	if err != nil {
+		return fmt.Errorf("DOCKER: Unable to get system info to find the available resources: %v", err)
+	}
+	cpu_mem := strings.Split(strings.TrimSpace(stdout), ",")
+	if len(cpu_mem) < 2 {
+		return fmt.Errorf("DOCKER: Not enough info values in return: %q", cpu_mem)
+	}
+	parsed_cpu, err := strconv.ParseUint(cpu_mem[0], 10, 64)
+	if err != nil {
+		return fmt.Errorf("DOCKER: Unable to parse CPU uint: %v (%q)", err, cpu_mem[0])
+	}
+	d.total_cpu = uint(parsed_cpu / 1000000000) // Originally in NCPU
+	parsed_ram, err := strconv.ParseUint(cpu_mem[1], 10, 64)
+	if err != nil {
+		return fmt.Errorf("DOCKER: Unable to parse RAM uint: %v (%q)", err, cpu_mem[1])
+	}
+	d.total_ram = uint(parsed_ram / 1073741824) // Get in GB
+
+	// Collect the current state of docker containers for validation (for example not controlled
+	// containers) purposes - it will be actively used if docker driver is remote
+	d.docker_usage, err = d.getInitialUsage()
+	if err != nil {
+		return err
+	}
+
 	// TODO: Cleanup the image directory in case the images are not good
 	return nil
 }
@@ -70,11 +108,56 @@ func (d *Driver) DefinitionResources(definition string) drivers.Resources {
 func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition string) int64 {
 	var out_count int64
 
-	var def Definition
-	if err := def.Apply(definition); err != nil {
+	var req Definition
+	if err := req.Apply(definition); err != nil {
 		log.Println("AWS: Unable to apply definition:", err)
 		return -1
 	}
+
+	if d.cfg.IsRemote {
+		// It's remote so use the driver-calculated usage
+		d.docker_usage_mutex.Lock()
+		node_usage = d.docker_usage
+		d.docker_usage_mutex.Unlock()
+	}
+
+	avail_cpu, avail_ram := d.getAvailResources()
+
+	// Check if the node has the required resources - otherwise we can't run it anyhow
+	if req.Resources.Cpu > avail_cpu {
+		return 0
+	}
+	if req.Resources.Ram > avail_ram {
+		return 0
+	}
+	// TODO: Check disk requirements
+
+	// Since we have the required resources - let's check if tenancy allows us to expand them to
+	// run more tenants here
+	if node_usage.IsEmpty() {
+		// In case we dealing with the first one - we need to set usage modificators, otherwise
+		// those values will mess up the next calculations
+		node_usage.Multitenancy = req.Resources.Multitenancy
+		node_usage.CpuOverbook = req.Resources.CpuOverbook
+		node_usage.RamOverbook = req.Resources.RamOverbook
+	}
+	if node_usage.Multitenancy && req.Resources.Multitenancy {
+		// Ok we can run more tenants, let's calculate how much
+		if node_usage.CpuOverbook && req.Resources.CpuOverbook {
+			avail_cpu += d.cfg.CpuOverbook
+		}
+		if node_usage.RamOverbook && req.Resources.RamOverbook {
+			avail_ram += d.cfg.RamOverbook
+		}
+	}
+
+	// Calculate how much of those definitions we could run
+	out_count = int64((avail_cpu - node_usage.Cpu) / req.Resources.Cpu)
+	ram_count := int64((avail_ram - node_usage.Ram) / req.Resources.Ram)
+	if out_count > ram_count {
+		out_count = ram_count
+	}
+	// TODO: Add disks into equation
 
 	return out_count
 }
@@ -86,6 +169,11 @@ func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition stri
  * Using metadata to create env file and pass it to the container.
  */
 func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (string, string, error) {
+	if d.cfg.IsRemote {
+		// It's remote so let's use docker_usage to store modificators properly
+		d.docker_usage_mutex.Lock()
+		defer d.docker_usage_mutex.Unlock()
+	}
 	var def Definition
 	def.Apply(definition)
 
@@ -156,6 +244,11 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 		return c_hwaddr, "", err
 	}
 
+	if d.cfg.IsRemote {
+		// Locked in the beginning of the function
+		d.docker_usage.Add(def.Resources)
+	}
+
 	log.Println("DOCKER: Allocate of VM", c_hwaddr, c_name, "completed")
 
 	return c_hwaddr, "", nil
@@ -173,6 +266,11 @@ func (d *Driver) Snapshot(hwaddr string, full bool) (string, error) {
 }
 
 func (d *Driver) Deallocate(hwaddr string) error {
+	if d.cfg.IsRemote {
+		// It's remote so let's use docker_usage to store modificators properly
+		d.docker_usage_mutex.Lock()
+		defer d.docker_usage_mutex.Unlock()
+	}
 	c_name := d.getContainerName(hwaddr)
 	c_id := d.getAllocatedContainer(hwaddr)
 	if len(c_id) == 0 {
@@ -182,13 +280,24 @@ func (d *Driver) Deallocate(hwaddr string) error {
 
 	// Getting the mounted volumes
 	stdout, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, "inspect",
-		"--format", "{{ range .Mounts }}{{ printf \"%s\\n\" .Source }}{{ end }}", c_id,
+		"--format", "{{ range .Mounts }}{{ println .Source }}{{ end }}", c_id,
 	)
 	if err != nil {
 		log.Println("DOCKER: Unable to inspect the container:", c_name)
 		return err
 	}
 	c_volumes := strings.Split(strings.TrimSpace(stdout), "\n")
+
+	if d.cfg.IsRemote {
+		// Get the container CPU/RAM to subtract from the docker_usage
+		res, err := d.getContainersResources([]string{c_id})
+		if err != nil {
+			log.Println("DOCKER: Unable to collect the container resources:", c_name)
+			return err
+		}
+		// Locked in the beginning of the function
+		d.docker_usage.Subtract(res)
+	}
 
 	// Stop the container
 	if _, _, err := runAndLogRetry(3, 10*time.Second, d.cfg.DockerPath, "stop", c_id); err != nil {
