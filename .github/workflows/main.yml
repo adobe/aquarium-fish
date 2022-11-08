@@ -37,4 +37,4 @@ jobs:
       run: ./build-linux.sh
 
     - name: Test
-      run: ./tests/*.sh
+      run: FISH_PATH=$PWD/aquarium-fish.linux_amd64 go test -v -failfast -count=1 ./tests/...

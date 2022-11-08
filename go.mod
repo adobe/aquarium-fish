@@ -22,6 +22,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/spf13/cobra v1.0.0
+	github.com/steinfletcher/apitest v1.5.14
 	github.com/ulikunitz/xz v0.5.10
 	golang.org/x/crypto v0.1.0
 	golang.org/x/net v0.1.0
@@ -35,6 +36,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.19 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.9.19 // indirect
 	github.com/aws/smithy-go v1.13.4 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/glebarez/go-sqlite v1.16.0 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect

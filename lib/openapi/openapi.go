@@ -18,12 +18,16 @@
 package openapi
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
+	"strings"
+	"time"
 
 	//oapimw "github.com/deepmap/oapi-codegen/pkg/middleware"
 	"github.com/labstack/echo/v4"
@@ -58,22 +62,59 @@ func Init(fish *fish.Fish, cl *cluster.Cluster, api_address, ca_path, cert_path,
 	api.NewV1Router(router, fish)
 	// TODO: web UI router
 
+	ca_pool := x509.NewCertPool()
+	if ca_bytes, err := ioutil.ReadFile(ca_path); err == nil {
+		ca_pool.AppendCertsFromPEM(ca_bytes)
+	}
+	s := router.TLSServer
+	s.Addr = api_address
+	s.TLSConfig = &tls.Config{
+		ClientAuth: tls.RequestClientCert, // Need for the client certificate auth
+		ClientCAs:  ca_pool,               // Verify client certificate with the cluster CA
+	}
+	s.TLSConfig.BuildNameToCertificate()
+	errChan := make(chan error)
 	go func() {
-		ca_pool := x509.NewCertPool()
-		if ca_bytes, err := ioutil.ReadFile(ca_path); err == nil {
-			ca_pool.AppendCertsFromPEM(ca_bytes)
+		addr := s.Addr
+		if addr == "" {
+			addr = ":https"
 		}
-		s := router.TLSServer
-		s.Addr = api_address
-		s.TLSConfig = &tls.Config{
-			ClientAuth: tls.RequestClientCert, // Need for the client certificate auth
-			ClientCAs:  ca_pool,               // Verify client certificate with the cluster CA
+
+		var err error
+		router.TLSListener, err = net.Listen("tcp", addr)
+		if err != nil {
+			errChan <- err
+			return
 		}
-		s.TLSConfig.BuildNameToCertificate()
-		if err := s.ListenAndServeTLS(cert_path, key_path); err != http.ErrServerClosed {
+
+		defer router.TLSListener.Close()
+
+		if err := s.ServeTLS(router.TLSListener, cert_path, key_path); err != http.ErrServerClosed {
+			errChan <- err
 			log.Fatalf("listen: %s\n", err)
 		}
 	}()
 
-	return router.TLSServer, nil
+	// Wait for server start
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return router.TLSServer, ctx.Err()
+		case <-ticker.C:
+			addr := router.TLSListenerAddr()
+			if addr != nil && strings.Contains(addr.String(), ":") {
+				fmt.Println("API listening on:", addr)
+				return router.TLSServer, nil // Was started
+			}
+		case err := <-errChan:
+			if err == http.ErrServerClosed {
+				return router.TLSServer, nil
+			}
+			return router.TLSServer, err
+		}
+	}
 }

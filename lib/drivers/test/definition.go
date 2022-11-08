@@ -14,6 +14,7 @@ package test
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
@@ -30,7 +31,7 @@ type Definition struct {
 
 func (d *Definition) Apply(definition string) error {
 	if err := json.Unmarshal([]byte(definition), d); err != nil {
-		log.Println("TEST: Unable to apply the driver definition", err)
+		log.Println("TEST: Unable to apply the driver definition:", err)
 		return err
 	}
 
@@ -42,5 +43,10 @@ func (d *Definition) Apply(definition string) error {
 }
 
 func (d *Definition) Validate() error {
+	// Check resources
+	if err := d.Resources.Validate([]string{}, false); err != nil {
+		return fmt.Errorf("TEST: Resources validation failed: %s", err)
+	}
+
 	return RandomFail("DefinitionValidate", d.FailDefinitionValidate)
 }
