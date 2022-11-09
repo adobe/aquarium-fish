@@ -99,9 +99,9 @@ func (r *Resources) Subtract(res Resources) (err error) {
 		if err != nil {
 			err = fmt.Errorf("%v, %v", err, mem_err)
 		}
-		r.Cpu = 0
+		r.Ram = 0
 	} else {
-		r.Cpu -= res.Cpu
+		r.Ram -= res.Ram
 	}
 
 	// TODO: Process disk too

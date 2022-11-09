@@ -16,12 +16,12 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"testing"
 )
 
 var fish_path = os.Getenv("FISH_PATH") // Full path to the aquarium-fish binary
@@ -35,18 +35,14 @@ type AFInstance struct {
 	admin_token string
 }
 
-func RunAquariumFish(cfg string) *AFInstance {
+func RunAquariumFish(t *testing.T, cfg string) *AFInstance {
 	afi := &AFInstance{}
 
-	var err error
-	afi.workspace, err = ioutil.TempDir("", "fishtest-")
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println("INFO: Created workspace:", afi.workspace)
+	afi.workspace = t.TempDir()
+	t.Log("INFO: Created workspace:", afi.workspace)
 
 	os.WriteFile(filepath.Join(afi.workspace, "config.yml"), []byte(cfg), 0644)
-	log.Println("INFO: Stored config:", cfg)
+	t.Log("INFO: Stored config:", cfg)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	afi.fishStop = cancel
@@ -62,7 +58,7 @@ func RunAquariumFish(cfg string) *AFInstance {
 		// Listening for log and scan for token and address
 		for scanner.Scan() {
 			line := scanner.Text()
-			fmt.Println(line)
+			t.Log(line)
 			if afi.admin_token == "" || afi.api_address == "" {
 				if strings.HasPrefix(line, "Admin user pass: ") {
 					val := strings.SplitN(strings.TrimSpace(line), "Admin user pass: ", 2)
@@ -87,7 +83,7 @@ func RunAquariumFish(cfg string) *AFInstance {
 
 	go func() {
 		if err := cmd.Run(); err != nil {
-			log.Println("AquariumFish process was stopped:", err)
+			t.Log("AquariumFish process was stopped:", err)
 		}
 	}()
 

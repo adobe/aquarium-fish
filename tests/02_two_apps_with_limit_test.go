@@ -26,7 +26,8 @@ import (
 )
 
 func Test_two_apps_with_limit(t *testing.T) {
-	afi := RunAquariumFish(`---
+	t.Parallel()
+	afi := RunAquariumFish(t, `---
 node_name: node-1
 node_location: test_loc
 
@@ -52,7 +53,7 @@ drivers:
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	cli := &http.Client{
-		Timeout:   time.Second * 1,
+		Timeout:   time.Second * 5,
 		Transport: tr,
 	}
 
@@ -61,7 +62,7 @@ drivers:
 		apitest.New().
 			EnableNetworking(cli).
 			Post(afi.ApiAddress("api/v1/label/")).
-			JSON(`{"name":"test-label", "version":1, "driver":"test", "definition": {"resources":{"cpu":1,"ram":2}}}`).
+			JSON(`{"name":"test-label", "version":1, "driver":"test", "definition": {"resources":{"cpu":4,"ram":8}}}`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
@@ -100,9 +101,9 @@ drivers:
 			Expect(t).
 			Status(http.StatusOK).
 			End().
-			JSON(&app1)
+			JSON(&app2)
 
-		if app1.UID == uuid.Nil {
+		if app2.UID == uuid.Nil {
 			t.Fatalf("Application 2 UID is incorrect: %v", app2.UID)
 		}
 	})
@@ -185,8 +186,8 @@ drivers:
 		})
 	})
 
-	t.Run("Application 2 should get ALLOCATED in 10 sec", func(t *testing.T) {
-		Retry(&Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *R) {
+	t.Run("Application 2 should get ALLOCATED in 40 sec", func(t *testing.T) {
+		Retry(&Timer{Timeout: 40 * time.Second, Wait: 5 * time.Second}, t, func(r *R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi.ApiAddress("api/v1/application/"+app2.UID.String()+"/state")).

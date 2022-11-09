@@ -26,7 +26,8 @@ import (
 )
 
 func Test_simple_app_create_destroy(t *testing.T) {
-	afi := RunAquariumFish(`---
+	t.Parallel()
+	afi := RunAquariumFish(t, `---
 node_name: node-1
 node_location: test_loc
 
@@ -49,7 +50,7 @@ drivers:
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	cli := &http.Client{
-		Timeout:   time.Second * 1,
+		Timeout:   time.Second * 5,
 		Transport: tr,
 	}
 
