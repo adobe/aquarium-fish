@@ -3,12 +3,13 @@ package: api
 output: api/server_v1.gen.go
 output-options:
   include-tags:
-    - User
-    - Label
-    - Resource
     - Application
+    - Label
     - Location
+    - Node
+    - Resource
     - ServiceMapping
+    - User
 generate:
   echo-server: true
 additional-imports:

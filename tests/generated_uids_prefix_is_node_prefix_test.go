@@ -13,6 +13,7 @@
 package tests
 
 import (
+	"bytes"
 	"crypto/tls"
 	"fmt"
 	"net/http"
@@ -25,7 +26,13 @@ import (
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
-func Test_simple_app_create_destroy(t *testing.T) {
+// The test ensures the Node is actually participate in generating it's data UID's
+// * Checks Label
+// * Checks Application
+// * Checks ApplicationState
+// * Checks Resource
+// * TODO: Other data UIDs
+func Test_generated_uids_prefix_is_node_prefix(t *testing.T) {
 	t.Parallel()
 	afi := RunAquariumFish(t, `---
 node_name: node-1
@@ -54,6 +61,27 @@ drivers:
 		Transport: tr,
 	}
 
+	var nodes []types.Node
+	var node types.Node
+	t.Run("Get node data", func(t *testing.T) {
+		apitest.New().
+			EnableNetworking(cli).
+			Get(afi.ApiAddress("api/v1/node/")).
+			BasicAuth("admin", afi.AdminToken()).
+			Expect(t).
+			Status(http.StatusOK).
+			End().
+			JSON(&nodes)
+
+		if len(nodes) != 1 {
+			t.Fatalf("Nodes list count is not 1: %d", len(nodes))
+		}
+		node = nodes[0]
+		if node.UID == uuid.Nil {
+			t.Fatalf("Node UID is incorrect: %v", node.UID)
+		}
+	})
+
 	var label types.Label
 	t.Run("Create Label", func(t *testing.T) {
 		apitest.New().
@@ -68,6 +96,10 @@ drivers:
 
 		if label.UID == uuid.Nil {
 			t.Fatalf("Label UID is incorrect: %v", label.UID)
+		}
+
+		if !bytes.Equal(label.UID[:6], node.UID[:6]) {
+			t.Fatalf("Label UID prefix != Node UID prefix: %v, %v", label.UID, node.UID)
 		}
 	})
 
@@ -86,6 +118,10 @@ drivers:
 		if app.UID == uuid.Nil {
 			t.Fatalf("Application UID is incorrect: %v", app.UID)
 		}
+
+		if !bytes.Equal(app.UID[:6], node.UID[:6]) {
+			t.Fatalf("Application UID prefix != Node UID prefix: %v, %v", app.UID, node.UID)
+		}
 	})
 
 	var app_state types.ApplicationState
@@ -100,8 +136,16 @@ drivers:
 				End().
 				JSON(&app_state)
 
+			if app_state.UID == uuid.Nil {
+				t.Fatalf("ApplicationState UID is incorrect: %v", app_state.UID)
+			}
+
 			if app_state.Status != types.ApplicationStateStatusALLOCATED {
 				r.Fatalf("Application Status is incorrect: %v", app_state.Status)
+			}
+
+			if !bytes.Equal(app_state.UID[:6], node.UID[:6]) {
+				t.Fatalf("ApplicationState UID prefix != Node UID prefix: %v, %v", app_state.UID, node.UID)
 			}
 		})
 	})
@@ -117,8 +161,16 @@ drivers:
 			End().
 			JSON(&res)
 
+		if res.UID == uuid.Nil {
+			t.Fatalf("Resource UID is incorrect: %v", res.UID)
+		}
+
 		if res.HwAddr == "" {
 			t.Fatalf("Resource hwaddr is incorrect: %v", res.HwAddr)
+		}
+
+		if !bytes.Equal(res.UID[:6], node.UID[:6]) {
+			t.Fatalf("Resource UID prefix != Node UID prefix: %v, %v", res.UID, node.UID)
 		}
 	})
 
