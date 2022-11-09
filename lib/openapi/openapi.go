@@ -10,10 +10,10 @@
  * governing permissions and limitations under the License.
  */
 
-//go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.2 -config types.cfg.yaml ../../docs/openapi.yaml
-//go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.2 -config meta_v1.cfg.yaml ../../docs/openapi.yaml
-//go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.2 -config api_v1.cfg.yaml ../../docs/openapi.yaml
-//go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.2 -config spec.cfg.yaml ../../docs/openapi.yaml
+//go:generate oapi-codegen -config types.cfg.yaml ../../docs/openapi.yaml
+//go:generate oapi-codegen -config meta_v1.cfg.yaml ../../docs/openapi.yaml
+//go:generate oapi-codegen -config api_v1.cfg.yaml ../../docs/openapi.yaml
+//go:generate oapi-codegen -config spec.cfg.yaml ../../docs/openapi.yaml
 
 package openapi
 
