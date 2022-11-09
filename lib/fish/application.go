@@ -59,8 +59,8 @@ func (f *Fish) ApplicationListGetStatusNew() (as []types.Application, err error)
 	//    SELECT application_uid FROM (
 	//        SELECT application_uid, status, max(created_at) FROM application_states GROUP BY application_uid
 	//    ) WHERE status = "NEW"
-	// )
-	err = f.db.Where("UID in (?)",
+	// ) ORDER BY created_at
+	err = f.db.Order("created_at").Where("UID in (?)",
 		f.db.Select("application_uid").Table("(?)",
 			f.db.Model(&types.ApplicationState{}).Select("application_uid, status, max(created_at)").Group("application_uid"),
 		).Where("Status = ?", types.ApplicationStateStatusNEW),

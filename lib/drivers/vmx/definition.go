@@ -36,13 +36,12 @@ import (
  *         size: 100
  *         reuse: true
  *     network: ""
- *   metadata:
- *     JENKINS_AGENT_WORKDIR: /Users/jenkins/workdir
  */
 type Definition struct {
-	Image        string               `json:"image"`        // Main image to use as reference
-	Images       map[string]string    `json:"images"`       // List of image dependencies
-	Requirements drivers.Requirements `json:"requirements"` // Required resources to allocate
+	Image  string            `json:"image"`  // Main image to use as reference
+	Images map[string]string `json:"images"` // List of image dependencies
+
+	Resources drivers.Resources `json:"resources"` // Required resources to allocate
 }
 
 func (d *Definition) Apply(definition string) error {
@@ -78,8 +77,8 @@ func (d *Definition) Validate() error {
 	}
 
 	// Check resources
-	if err := d.Requirements.Validate([]string{"hfs+", "exfat", "fat32"}, true); err != nil {
-		return fmt.Errorf("VMX: Requirements validation failed: %s", err)
+	if err := d.Resources.Validate([]string{"hfs+", "exfat", "fat32"}, true); err != nil {
+		return fmt.Errorf("VMX: Resources validation failed: %s", err)
 	}
 
 	return nil

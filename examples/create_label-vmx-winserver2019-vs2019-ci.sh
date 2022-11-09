@@ -40,7 +40,7 @@ label_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/js
             "winserver2019-vs2019":    "https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019-VERSION/winserver2019-vs2019-VERSION.tar.xz",
             "winserver2019-vs2019-ci": "https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019-ci-VERSION/winserver2019-vs2019-ci-VERSION.tar.xz"
         },
-        "requirements": {
+        "resources": {
             "cpu": 14,
             "ram": 12,
             "disks": {

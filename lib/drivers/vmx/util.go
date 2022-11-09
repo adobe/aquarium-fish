@@ -12,8 +12,6 @@
 
 package vmx
 
-// VMWare VMX (Fusion/Workstation) driver to manage VMs & images
-
 import (
 	"bufio"
 	"bytes"
@@ -30,117 +28,25 @@ import (
 
 	"github.com/hpcloud/tail"
 
-	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
-// Implements drivers.ResourceDriver interface
-type Driver struct {
-	cfg Config
-}
-
-func init() {
-	drivers.DriversList = append(drivers.DriversList, &Driver{})
-}
-
-func (d *Driver) Name() string {
-	return "vmx"
-}
-
-func (d *Driver) Prepare(config []byte) error {
-	if err := d.cfg.Apply(config); err != nil {
-		return err
-	}
-	if err := d.cfg.Validate(); err != nil {
-		return err
-	}
-	// TODO: Cleanup the image directory in case the images are not good
-	return nil
-}
-
-func (d *Driver) ValidateDefinition(definition string) error {
-	var def Definition
-	return def.Apply(definition)
-}
-
-/**
- * Allocate VM with provided images
- *
- * It automatically download the required images, unpack them and runs the VM.
- * Not using metadata because there is no good interfaces to pass it to VM.
- */
-func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (string, string, error) {
-	var def Definition
-	def.Apply(definition)
-
-	// Generate unique id from the hw address and required directories
-	buf := crypt.RandBytes(6)
-	buf[0] = (buf[0] | 2) & 0xfe // Set local bit, ensure unicast address
-	vm_id := fmt.Sprintf("%02x%02x%02x%02x%02x%02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5])
-	vm_hwaddr := fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5])
-
-	vm_network := def.Requirements.Network
-	if vm_network == "" {
-		vm_network = "hostonly"
+// Returns the total resources available for the node after alteration
+func (d *Driver) getAvailResources() (avail_cpu, avail_ram uint) {
+	if d.cfg.CpuAlter < 0 {
+		avail_cpu = d.total_cpu - uint(-d.cfg.CpuAlter)
+	} else {
+		avail_cpu = d.total_cpu + uint(d.cfg.CpuAlter)
 	}
 
-	vm_dir := filepath.Join(d.cfg.WorkspacePath, vm_id)
-	vm_images_dir := filepath.Join(vm_dir, "images")
-
-	// Load the required images
-	img_path, err := d.loadImages(&def, vm_images_dir)
-	if err != nil {
-		return vm_hwaddr, "", err
+	if d.cfg.RamAlter < 0 {
+		avail_ram = d.total_ram - uint(-d.cfg.RamAlter)
+	} else {
+		avail_ram = d.total_ram + uint(d.cfg.RamAlter)
 	}
 
-	// Clone VM from the image
-	vmx_path := filepath.Join(vm_dir, vm_id+".vmx")
-	args := []string{"-T", "fusion", "clone",
-		img_path, vmx_path,
-		"linked", "-snapshot", "original",
-		"-cloneName", vm_id,
-	}
-	if _, _, err := runAndLog(120*time.Second, d.cfg.VmrunPath, args...); err != nil {
-		return vm_hwaddr, "", err
-	}
-
-	// Change cloned vm configuration
-	if err := util.FileReplaceToken(vmx_path,
-		true, true, true,
-		"ethernet0.addressType =", `ethernet0.addressType = "static"`,
-		"ethernet0.address =", fmt.Sprintf("ethernet0.address = %q", vm_hwaddr),
-		"ethernet0.connectiontype =", fmt.Sprintf("ethernet0.connectiontype = %q", vm_network),
-		"numvcpus =", fmt.Sprintf(`numvcpus = "%d"`, def.Requirements.Cpu),
-		"cpuid.corespersocket =", fmt.Sprintf(`cpuid.corespersocket = "%d"`, def.Requirements.Cpu),
-		"memsize =", fmt.Sprintf(`memsize = "%d"`, def.Requirements.Ram*1024),
-	); err != nil {
-		log.Println("VMX: Unable to change cloned VM configuration", vmx_path)
-		return vm_hwaddr, "", err
-	}
-
-	// Create and connect disks to vmx
-	if err := d.disksCreate(vmx_path, def.Requirements.Disks); err != nil {
-		log.Println("VMX: Unable create disks for VM", vmx_path)
-		return vm_hwaddr, "", err
-	}
-
-	// Run the background monitoring of the vmware log
-	if d.cfg.LogMonitor {
-		go d.logMonitor(vmx_path)
-	}
-
-	// Run the VM
-	if _, _, err := runAndLog(120*time.Second, d.cfg.VmrunPath, "start", vmx_path, "nogui"); err != nil {
-		log.Println("VMX: Unable to run VM", vmx_path, err)
-		log.Println("VMX: Check the log info:", filepath.Join(filepath.Dir(vmx_path), "vmware.log"),
-			"and directory ~/Library/Logs/VMware/ for additional logs")
-		return vm_hwaddr, "", err
-	}
-
-	log.Println("VMX: Allocate of VM", vm_hwaddr, vmx_path, "completed")
-
-	return vm_hwaddr, "", nil
+	return
 }
 
 // Load images and returns the target image path for cloning
@@ -269,6 +175,7 @@ func (d *Driver) loadImages(def *Definition, vm_images_dir string) (string, erro
 	return target_path, nil
 }
 
+// Returns the path to VMX file from hwaddr identifier
 func (d *Driver) getAllocatedVMX(hwaddr string) string {
 	// Probably it's better to store the current list in the memory and
 	// update on fnotify or something like that...
@@ -308,6 +215,7 @@ func (d *Driver) getAllocatedVMX(hwaddr string) string {
 	return ""
 }
 
+// Creates VMDK disks described by the disks map
 func (d *Driver) disksCreate(vmx_path string, disks map[string]drivers.Disk) error {
 	// Create disk files
 	var disk_paths []string
@@ -468,6 +376,7 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]drivers.Disk) err
 	return nil
 }
 
+// Ensures the VM is not stale by monitoring the log
 func (d *Driver) logMonitor(vmx_path string) {
 	// Monitor the vmware.log file
 	log_path := filepath.Join(filepath.Dir(vmx_path), "vmware.log")
@@ -485,46 +394,7 @@ func (d *Driver) logMonitor(vmx_path string) {
 	log.Println("VMX: Done monitoring of log:", log_path)
 }
 
-func (d *Driver) Status(hwaddr string) string {
-	if len(d.getAllocatedVMX(hwaddr)) > 0 {
-		return drivers.StatusAllocated
-	}
-	return drivers.StatusNone
-}
-
-func (d *Driver) Snapshot(hwaddr string, full bool) (string, error) {
-	return "", fmt.Errorf("VMX: Snapshot not implemented")
-}
-
-func (d *Driver) Deallocate(hwaddr string) error {
-	vmx_path := d.getAllocatedVMX(hwaddr)
-	if len(vmx_path) == 0 {
-		log.Println("VMX: Unable to find VM with HW ADDR:", hwaddr)
-		return fmt.Errorf("VMX: No VM found with HW ADDR: %s", hwaddr)
-	}
-
-	// Sometimes it's stuck, so try to stop a bit more than usual
-	if _, _, err := runAndLogRetry(3, 60*time.Second, d.cfg.VmrunPath, "stop", vmx_path); err != nil {
-		log.Println("VMX: Unable to deallocate VM:", vmx_path)
-		return err
-	}
-
-	// Delete VM
-	if _, _, err := runAndLogRetry(3, 30*time.Second, d.cfg.VmrunPath, "deleteVM", vmx_path); err != nil {
-		log.Println("VMX: Unable to delete VM:", vmx_path)
-		return err
-	}
-
-	// Cleaning the VM images too
-	if err := os.RemoveAll(filepath.Dir(vmx_path)); err != nil {
-		return err
-	}
-
-	log.Println("VMX: Deallocate of VM", hwaddr, vmx_path, "completed")
-
-	return nil
-}
-
+// Runs & logs the executable command
 func runAndLog(timeout time.Duration, path string, arg ...string) (string, string, error) {
 	var stdout, stderr bytes.Buffer
 

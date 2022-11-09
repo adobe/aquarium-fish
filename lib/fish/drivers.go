@@ -23,7 +23,7 @@ import (
 	_ "github.com/adobe/aquarium-fish/lib/drivers/docker"
 	_ "github.com/adobe/aquarium-fish/lib/drivers/vmx"
 
-	_ "github.com/adobe/aquarium-fish/lib/drivers/none"
+	_ "github.com/adobe/aquarium-fish/lib/drivers/test"
 )
 
 var drivers_enabled_list []drivers.ResourceDriver

@@ -10,22 +10,28 @@
  * governing permissions and limitations under the License.
  */
 
-package none
+package test
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
+
+	"github.com/adobe/aquarium-fish/lib/drivers"
 )
 
 type Definition struct {
 	FailDefinitionApply    uint8 `json:"fail_definition_apply"`    // Fail on definition Apply (0 - not, 1-254 random, 255-yes)
 	FailDefinitionValidate uint8 `json:"fail_definition_validate"` // Fail on definition Validate (0 - not, 1-254 random, 255-yes)
+	FailAvailableCapacity  uint8 `json:"fail_available_capacity"`  // Fail on executing AvailableCapacity (0 - not, 1-254 random, 255-yes)
 	FailAllocate           uint8 `json:"fail_allocate"`            // Fail on Allocate (0 - not, 1-254 random, 255-yes)
+
+	Resources drivers.Resources `json:"resources"` // Required resources to allocate
 }
 
 func (d *Definition) Apply(definition string) error {
 	if err := json.Unmarshal([]byte(definition), d); err != nil {
-		log.Println("NONE: Unable to apply the driver definition", err)
+		log.Println("TEST: Unable to apply the driver definition:", err)
 		return err
 	}
 
@@ -37,5 +43,10 @@ func (d *Definition) Apply(definition string) error {
 }
 
 func (d *Definition) Validate() error {
+	// Check resources
+	if err := d.Resources.Validate([]string{}, false); err != nil {
+		return fmt.Errorf("TEST: Resources validation failed: %s", err)
+	}
+
 	return RandomFail("DefinitionValidate", d.FailDefinitionValidate)
 }

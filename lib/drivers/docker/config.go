@@ -23,8 +23,28 @@ import (
 type Config struct {
 	DockerPath string `json:"docker_path"` // '/Applications/Docker.app/Contents/Resources/bin/docker'
 
+	IsRemote bool `json:"is_remote"` // In case the docker client does not use the local node resources
+
 	ImagesPath    string `json:"images_path"`    // Where to look/store docker file images
 	WorkspacePath string `json:"workspace_path"` // Where to place the disks
+
+	// Alter allows you to control how much resources will be used:
+	// * Negative (<0) value will alter the total resource count before provisioning so you will be
+	//   able to save some resources for the host system (recommended -2 for CPU and -10 for RAM
+	//   for disk caching)
+	// * Positive (>0) value could also be available (but check it in your docker dist in advance)
+	//   Please be careful here - noone wants the container to fail allocation because of that...
+	CpuAlter int `json:"cpu_alter"` // 0 do nothing, <0 reduces number available CPUs, >0 increases it (dangerous)
+	RamAlter int `json:"ram_alter"` // 0 do nothing, <0 reduces amount of available RAM (GB), >0 increases it (dangerous)
+
+	// Overbook options allows tenants to reuse the resources
+	// It will be used only when overbook is allowed by the tenants. It works by just adding those
+	// amounts to the existing total before checking availability. For example if you have 16CPU
+	// and want to run 2 tenants with requirement of 14 CPUs each - you can put 12 in CpuOverbook -
+	// to have virtually 28 CPUs. 3rd will not be running because 2 tenants will eat all 28 virtual
+	// CPUs. Same applies to the RamOverbook.
+	CpuOverbook uint `json:"cpu_overbook"` // How much CPUs could be reused by multiple tenants
+	RamOverbook uint `json:"ram_overbook"` // How much RAM (GB) could be reused by multiple tenants
 
 	DownloadUser     string `json:"download_user"`     // The user will be used in download operations
 	DownloadPassword string `json:"download_password"` // The password will be used in download operations

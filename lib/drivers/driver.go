@@ -23,13 +23,28 @@ type ResourceDriver interface {
 	// Name of the driver
 	Name() string
 
+	// If the driver uses local node resources or a cloud or remote resources
+	// it is used to calculate the slots available for the local drivers
+	IsRemote() bool
+
 	// Give driver configs and check if it's ok
 	// -> config - driver configuration in json format
+	// -> nodedef - information about the node the driver is running on
 	Prepare(config []byte) error
 
-	// Make sure the allocate definition is appropriate
+	// Make sure the allocate definition is appropriate for the driver
 	// -> definition - describes the driver options to allocate the required resource
 	ValidateDefinition(definition string) error
+
+	// Returns the defined Resources structure filled from definition
+	// -> definition - describes the driver options to allocate the required resource
+	DefinitionResources(definition string) Resources
+
+	// Check if the described definition can be running on the current node
+	// -> node_usage - how much of node resources was used by all the drivers. Usually should not be used by the cloud drivers
+	// -> definition - describes the driver options to allocate the required resource
+	// <- capacity - the number of such definitions the driver could run, if -1 - error happened
+	AvailableCapacity(node_usage Resources, definition string) (capacity int64)
 
 	// Allocate the resource by definition and returns hw address
 	// -> definition - describes the driver options to allocate the required resource

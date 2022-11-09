@@ -40,7 +40,7 @@ label_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/js
             "macos1015-xcode122":    "https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-VERSION/macos1015-xcode122-VERSION.tar.xz",
             "macos1015-xcode122-ci": "https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-ci-VERSION/macos1015-xcode122-ci-VERSION.tar.xz"
         },
-        "requirements": {
+        "resources": {
             "cpu": 14,
             "ram": 12,
             "disks": {

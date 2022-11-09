@@ -10,9 +10,9 @@
  * governing permissions and limitations under the License.
  */
 
-package none
+package test
 
-// None driver for tests - actually doing nothing and just pretend to be a real driver
+// Test driver for tests - actually doing nothing and just pretend to be a real driver
 
 import (
 	"fmt"
@@ -37,7 +37,11 @@ func init() {
 }
 
 func (d *Driver) Name() string {
-	return "none"
+	return "test"
+}
+
+func (d *Driver) IsRemote() bool {
+	return d.cfg.IsRemote
 }
 
 func (d *Driver) Prepare(config []byte) error {
@@ -60,29 +64,97 @@ func (d *Driver) ValidateDefinition(definition string) error {
 	return def.Apply(definition)
 }
 
+func (d *Driver) DefinitionResources(definition string) drivers.Resources {
+	var def Definition
+	def.Apply(definition)
+
+	return def.Resources
+}
+
+// Allow Fish to ask the driver about it's capacity (free slots) of a specific definition
+func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition string) int64 {
+	var out_count int64
+
+	var req Definition
+	if err := req.Apply(definition); err != nil {
+		log.Println("TEST: Unable to apply definition:", err)
+		return -1
+	}
+
+	if err := RandomFail("AvailableCapacity", req.FailAvailableCapacity); err != nil {
+		log.Printf("TEST: RandomFail: %v\n", err)
+		return -1
+	}
+
+	total_cpu := d.cfg.CpuLimit
+	total_ram := d.cfg.RamLimit
+
+	if total_cpu == 0 && total_ram == 0 {
+		// Resources are unlimited
+		return 99999
+	}
+
+	// Check if the node has the required resources - otherwise we can't run it anyhow
+	if req.Resources.Cpu > total_cpu {
+		return 0
+	}
+	if req.Resources.Ram > total_ram {
+		return 0
+	}
+	// TODO: Check disk requirements
+
+	// Since we have the required resources - let's check if tenancy allows us to expand them to
+	// run more tenants here
+	if node_usage.IsEmpty() {
+		// In case we dealing with the first one - we need to set usage modificators, otherwise
+		// those values will mess up the next calculations
+		node_usage.Multitenancy = req.Resources.Multitenancy
+		node_usage.CpuOverbook = req.Resources.CpuOverbook
+		node_usage.RamOverbook = req.Resources.RamOverbook
+	}
+	if node_usage.Multitenancy && req.Resources.Multitenancy {
+		// Ok we can run more tenants, let's calculate how much
+		if node_usage.CpuOverbook && req.Resources.CpuOverbook {
+			total_cpu += d.cfg.CpuOverbook
+		}
+		if node_usage.RamOverbook && req.Resources.RamOverbook {
+			total_ram += d.cfg.RamOverbook
+		}
+	}
+
+	// Calculate how much of those definitions we could run
+	out_count = int64((total_cpu - node_usage.Cpu) / req.Resources.Cpu)
+	ram_count := int64((total_ram - node_usage.Ram) / req.Resources.Ram)
+	if out_count > ram_count {
+		out_count = ram_count
+	}
+	// TODO: Add disks into equation
+
+	return out_count
+}
+
 /**
  * Pretend to Allocate (actually not) the Resource
  */
 func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (string, string, error) {
 	var def Definition
-	def.Apply(definition)
+	if err := def.Apply(definition); err != nil {
+		log.Println("TEST: Unable to apply definition:", err)
+		return "", "", err
+	}
 
 	if err := RandomFail("Allocate", def.FailAllocate); err != nil {
-		log.Printf("NONE: RandomFail: %v\n", err)
+		log.Printf("TEST: RandomFail: %v\n", err)
 		return "", "", err
 	}
 
 	d.resources_lock.Lock()
 	defer d.resources_lock.Unlock()
 
-	if d.cfg.ResourcesLimit != 0 && len(d.resources) >= d.cfg.ResourcesLimit {
-		return "", "", fmt.Errorf("NONE: Reached the resources limit (%d of %d)", len(d.resources), d.cfg.ResourcesLimit)
-	}
-
 	// Generate random resource id and if exists - regenerate
 	var res_id string
 	for {
-		res_id = "none-" + crypt.RandString(6)
+		res_id = "test-" + crypt.RandString(6)
 		if _, ok := d.resources[res_id]; !ok {
 			break
 		}
@@ -94,7 +166,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 
 func (d *Driver) Status(res_id string) string {
 	if err := RandomFail(fmt.Sprintf("Status %s", res_id), d.cfg.FailStatus); err != nil {
-		log.Printf("NONE: RandomFail: %v\n", err)
+		log.Printf("TEST: RandomFail: %v\n", err)
 		return drivers.StatusNone
 	}
 
@@ -109,7 +181,7 @@ func (d *Driver) Status(res_id string) string {
 
 func (d *Driver) Snapshot(res_id string, full bool) (string, error) {
 	if err := RandomFail(fmt.Sprintf("Snapshot %s", res_id), d.cfg.FailSnapshot); err != nil {
-		log.Printf("NONE: RandomFail: %v\n", err)
+		log.Printf("TEST: RandomFail: %v\n", err)
 		return "", err
 	}
 
@@ -117,7 +189,7 @@ func (d *Driver) Snapshot(res_id string, full bool) (string, error) {
 	defer d.resources_lock.Unlock()
 
 	if _, ok := d.resources[res_id]; !ok {
-		return "", fmt.Errorf("NONE: Unable to snapshot unavailable resource '%s'", res_id)
+		return "", fmt.Errorf("TEST: Unable to snapshot unavailable resource '%s'", res_id)
 	}
 
 	return "", nil
@@ -125,7 +197,7 @@ func (d *Driver) Snapshot(res_id string, full bool) (string, error) {
 
 func (d *Driver) Deallocate(res_id string) error {
 	if err := RandomFail(fmt.Sprintf("Deallocate %s", res_id), d.cfg.FailDeallocate); err != nil {
-		log.Printf("NONE: RandomFail: %v\n", err)
+		log.Printf("TEST: RandomFail: %v\n", err)
 		return err
 	}
 
@@ -133,7 +205,7 @@ func (d *Driver) Deallocate(res_id string) error {
 	defer d.resources_lock.Unlock()
 
 	if _, ok := d.resources[res_id]; !ok {
-		return fmt.Errorf("NONE: Unable to deallocate unavailable resource '%s'", res_id)
+		return fmt.Errorf("TEST: Unable to deallocate unavailable resource '%s'", res_id)
 	}
 
 	delete(d.resources, res_id)
@@ -149,12 +221,12 @@ func RandomFail(name string, probability uint8) error {
 
 	// Certainly fail on 255
 	if probability == 255 {
-		return fmt.Errorf("NONE: %s failed (%d)", name, probability)
+		return fmt.Errorf("TEST: %s failed (%d)", name, probability)
 	}
 
 	// Fail on probability 1 - low, 254 - high (but still can not fail)
 	if uint8(rand.Intn(254)) < probability {
-		return fmt.Errorf("NONE: %s failed (%d)", name, probability)
+		return fmt.Errorf("TEST: %s failed (%d)", name, probability)
 	}
 
 	return nil
