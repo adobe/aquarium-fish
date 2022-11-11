@@ -82,6 +82,7 @@ func (f *Fish) Init() error {
 		&types.Label{},
 		&types.Application{},
 		&types.ApplicationState{},
+		&types.ApplicationTask{},
 		&types.Resource{},
 		&types.Vote{},
 		&types.Location{},
@@ -96,7 +97,7 @@ func (f *Fish) Init() error {
 	// Create admin user and ignore errors if it's existing
 	_, err := f.UserGet("admin")
 	if err == gorm.ErrRecordNotFound {
-		if pass, _ := f.UserNew("admin", ""); pass != "" {
+		if pass, _, _ := f.UserNew("admin", ""); pass != "" {
 			// Print pass of newly created admin user to stderr
 			println("Admin user pass:", pass)
 		}
@@ -555,6 +556,35 @@ func (f *Fish) executeApplication(app_uid types.ApplicationUID) error {
 			app_state, err = f.ApplicationStateGetByApplication(app.UID)
 			if err != nil {
 				log.Println("Fish: Unable to get status for Application:", app.UID, err)
+			}
+			if app_state.Status == types.ApplicationStateStatusALLOCATED {
+				// Execute the associated ApplicationTasks if there is some
+				tasks, err := f.ApplicationTaskListByApplication(app.UID)
+				if err != nil {
+					log.Println("Fish: Unable to get ApplicationTasks:", app.UID, err)
+				}
+				for _, task := range tasks {
+					// Skipping already executed task
+					if task.Result != "{}" {
+						continue
+					}
+					t := driver.GetTask(task.Task, string(task.Options))
+					if t == nil {
+						log.Println("Fish: Unable to get associated driver task type for Application:", app.UID, task.Task)
+						task.Result = util.UnparsedJson(`{"error":"task not availble in driver"}`)
+					} else {
+						// Executing the task
+						result, err := t.Execute(res.HwAddr)
+						if err != nil {
+							// We're not crashing here because even with error task could have a result
+							log.Println("Fish: Error happened during executing the task:", task.UID, err)
+						}
+						task.Result = util.UnparsedJson(result)
+					}
+					if err := f.ApplicationTaskSave(&task); err != nil {
+						log.Println("Fish: Error during update the task with result:", task.UID, err)
+					}
+				}
 			}
 			if app_state.Status == types.ApplicationStateStatusDEALLOCATE || app_state.Status == types.ApplicationStateStatusRECALLED {
 				log.Println("Fish: Running Deallocate of the Application:", app.UID)

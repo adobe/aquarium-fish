@@ -26,7 +26,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/servicequotas"
 )
 
-func (d *Driver) newConn() *ec2.Client {
+func (d *Driver) newEC2Conn() *ec2.Client {
 	return ec2.NewFromConfig(aws.Config{
 		Region: d.cfg.Region,
 		Credentials: aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {

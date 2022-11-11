@@ -15,6 +15,7 @@ package docker
 // Docker driver to manage container & images
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -31,6 +32,8 @@ import (
 // Implements drivers.ResourceDriver interface
 type Driver struct {
 	cfg Config
+	// Contains the available tasks of the driver
+	tasks_list []drivers.ResourceDriverTask
 
 	total_cpu uint // In logical threads
 	total_ram uint // In RAM megabytes
@@ -261,8 +264,24 @@ func (d *Driver) Status(hwaddr string) string {
 	return drivers.StatusNone
 }
 
-func (d *Driver) Snapshot(hwaddr string, full bool) (string, error) {
-	return "", fmt.Errorf("DOCKER: Snapshot not implemented")
+func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
+	// Look for the specified task name
+	var t drivers.ResourceDriverTask
+	for _, task := range d.tasks_list {
+		if task.Name() == name {
+			t = task.Clone()
+		}
+	}
+
+	// Parse options json into task structure
+	if len(options) > 0 {
+		if err := json.Unmarshal([]byte(options), t); err != nil {
+			log.Println("DOCKER: Unable to apply the task options", err)
+			return nil
+		}
+	}
+
+	return t
 }
 
 func (d *Driver) Deallocate(hwaddr string) error {

@@ -17,6 +17,7 @@ package aws
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strconv"
@@ -35,6 +36,8 @@ import (
 // Implements drivers.ResourceDriver interface
 type Driver struct {
 	cfg Config
+	// Contains the available tasks of the driver
+	tasks_list []drivers.ResourceDriverTask
 }
 
 func init() {
@@ -56,6 +59,10 @@ func (d *Driver) Prepare(config []byte) error {
 	if err := d.cfg.Validate(); err != nil {
 		return err
 	}
+
+	// Fill up the available tasks
+	d.tasks_list = append(d.tasks_list, &TaskSnapshot{driver: d})
+
 	return nil
 }
 
@@ -81,7 +88,7 @@ func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition stri
 		return -1
 	}
 
-	conn_ec2 := d.newConn()
+	conn_ec2 := d.newEC2Conn()
 
 	if def.InstanceType == "mac1" || def.InstanceType == "mac2" {
 		// Ensure we have the available not busy mac dedicated hosts to use as base for resource.
@@ -198,7 +205,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 		return "", "", fmt.Errorf("AWS: Unable to apply definition: %v", err)
 	}
 
-	conn := d.newConn()
+	conn := d.newEC2Conn()
 
 	// Checking the VPC exists or use default one
 	vm_network := def.Resources.Network
@@ -422,7 +429,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 }
 
 func (d *Driver) Status(inst_id string) string {
-	conn := d.newConn()
+	conn := d.newEC2Conn()
 	inst, err := d.getInstance(conn, inst_id)
 	// Potential issue here, it could be a big problem with unstable connection
 	if err != nil {
@@ -435,44 +442,28 @@ func (d *Driver) Status(inst_id string) string {
 	return drivers.StatusNone
 }
 
-func (d *Driver) Snapshot(inst_id string, full bool) (string, error) {
-	conn := d.newConn()
-
-	input := &ec2.CreateSnapshotsInput{
-		InstanceSpecification: &types.InstanceSpecification{
-			ExcludeBootVolume: aws.Bool(!full),
-			InstanceId:        &inst_id,
-		},
-		Description:        aws.String("Created by AquariumFish"),
-		CopyTagsFromSource: types.CopyTagsFromSourceVolume,
-		TagSpecifications: []types.TagSpecification{{
-			ResourceType: "snapshot",
-			Tags: []types.Tag{{
-				Key:   aws.String("InstanceId"),
-				Value: aws.String(inst_id),
-			}},
-		}},
+func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
+	// Look for the specified task name
+	var t drivers.ResourceDriverTask
+	for _, task := range d.tasks_list {
+		if task.Name() == name {
+			t = task.Clone()
+		}
 	}
 
-	resp, err := conn.CreateSnapshots(context.TODO(), input)
-	if err != nil {
-		return "", fmt.Errorf("AWS: Unable to create snapshots for instance %s: %v", inst_id, err)
-	}
-	if len(resp.Snapshots) < 1 {
-		return "", fmt.Errorf("AWS: No snapshots was created for instance %s", inst_id)
+	// Parse options json into task structure
+	if len(options) > 0 {
+		if err := json.Unmarshal([]byte(options), t); err != nil {
+			log.Println("AWS: Unable to apply the task options", err)
+			return nil
+		}
 	}
 
-	snapshots := []string{}
-	for _, r := range resp.Snapshots {
-		snapshots = append(snapshots, *r.SnapshotId)
-	}
-	log.Println("AWS: Created snapshots for instance", inst_id, ":", strings.Join(snapshots, ", "))
-
-	return strings.Join(snapshots, ", "), nil
+	return t
 }
 
 func (d *Driver) Deallocate(inst_id string) error {
-	conn := d.newConn()
+	conn := d.newEC2Conn()
 
 	input := &ec2.TerminateInstancesInput{
 		InstanceIds: []string{inst_id},

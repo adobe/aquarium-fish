@@ -196,11 +196,11 @@ There is a number of ways to communicate with the Fish cluster, and the most imp
 You can use `curl`, for example, to do that:
 ```
 $ curl -u "admin:YOUR_TOKEN" -X GET 127.0.0.1:8001/api/v1/label/
-{"message": "Cluster resources list", "data": [{...}, ...]}
+{...json data...}
 ```
 
 The current API could be found in OpenAPI format here:
  * When the Fish app is running locally: https://0.0.0.0:8001/api/
  * YAML specification: https://github.com/adobe/aquarium-fish/blob/main/docs/openapi.yaml
 
-Also check `example` and `tests` folder to get more info about the API usage.
+Also check `example` and `tests` folder to get more info about the typical API usage.

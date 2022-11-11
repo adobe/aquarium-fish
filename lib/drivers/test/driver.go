@@ -15,6 +15,7 @@ package test
 // Test driver for tests - actually doing nothing and just pretend to be a real driver
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"math/rand"
@@ -27,6 +28,8 @@ import (
 // Implements drivers.ResourceDriver interface
 type Driver struct {
 	cfg Config
+	// Contains the available tasks of the driver
+	tasks_list []drivers.ResourceDriverTask
 
 	resources      map[string]int
 	resources_lock sync.Mutex
@@ -56,6 +59,10 @@ func (d *Driver) Prepare(config []byte) error {
 	if err := d.cfg.Validate(); err != nil {
 		return err
 	}
+
+	// Fill up the available tasks
+	d.tasks_list = append(d.tasks_list, &TaskSnapshot{driver: d})
+
 	return nil
 }
 
@@ -81,7 +88,7 @@ func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition stri
 		return -1
 	}
 
-	if err := RandomFail("AvailableCapacity", req.FailAvailableCapacity); err != nil {
+	if err := randomFail("AvailableCapacity", req.FailAvailableCapacity); err != nil {
 		log.Printf("TEST: RandomFail: %v\n", err)
 		return -1
 	}
@@ -143,7 +150,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 		return "", "", err
 	}
 
-	if err := RandomFail("Allocate", def.FailAllocate); err != nil {
+	if err := randomFail("Allocate", def.FailAllocate); err != nil {
 		log.Printf("TEST: RandomFail: %v\n", err)
 		return "", "", err
 	}
@@ -165,7 +172,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 }
 
 func (d *Driver) Status(res_id string) string {
-	if err := RandomFail(fmt.Sprintf("Status %s", res_id), d.cfg.FailStatus); err != nil {
+	if err := randomFail(fmt.Sprintf("Status %s", res_id), d.cfg.FailStatus); err != nil {
 		log.Printf("TEST: RandomFail: %v\n", err)
 		return drivers.StatusNone
 	}
@@ -179,24 +186,28 @@ func (d *Driver) Status(res_id string) string {
 	return drivers.StatusNone
 }
 
-func (d *Driver) Snapshot(res_id string, full bool) (string, error) {
-	if err := RandomFail(fmt.Sprintf("Snapshot %s", res_id), d.cfg.FailSnapshot); err != nil {
-		log.Printf("TEST: RandomFail: %v\n", err)
-		return "", err
+func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
+	// Look for the specified task name
+	var t drivers.ResourceDriverTask
+	for _, task := range d.tasks_list {
+		if task.Name() == name {
+			t = task.Clone()
+		}
 	}
 
-	d.resources_lock.Lock()
-	defer d.resources_lock.Unlock()
-
-	if _, ok := d.resources[res_id]; !ok {
-		return "", fmt.Errorf("TEST: Unable to snapshot unavailable resource '%s'", res_id)
+	// Parse options json into task structure
+	if t != nil && len(options) > 0 {
+		if err := json.Unmarshal([]byte(options), t); err != nil {
+			log.Println("TEST: Unable to apply the task options", err)
+			return nil
+		}
 	}
 
-	return "", nil
+	return t
 }
 
 func (d *Driver) Deallocate(res_id string) error {
-	if err := RandomFail(fmt.Sprintf("Deallocate %s", res_id), d.cfg.FailDeallocate); err != nil {
+	if err := randomFail(fmt.Sprintf("Deallocate %s", res_id), d.cfg.FailDeallocate); err != nil {
 		log.Printf("TEST: RandomFail: %v\n", err)
 		return err
 	}
@@ -213,7 +224,7 @@ func (d *Driver) Deallocate(res_id string) error {
 	return nil
 }
 
-func RandomFail(name string, probability uint8) error {
+func randomFail(name string, probability uint8) error {
 	// Do not fail on 0
 	if probability == 0 {
 		return nil

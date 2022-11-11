@@ -56,11 +56,10 @@ type ResourceDriver interface {
 	// Get the status of the resource with given hw address
 	Status(hwaddr string) string
 
-	// Makes environment snapshot of the resource with given hw address
-	// -> hwaddr - driver identifier of the resource
-	// -> full - will try it's best to make the complete snapshot of the environment, else just non-image data (attached disks)
-	// <- info - where to find the snapshots
-	Snapshot(hwaddr string, full bool) (info string, err error)
+	// Get task struct with implementation to execute it later
+	// -> task - identifier of the task operation
+	// -> options - additional config options for the task
+	GetTask(task, options string) ResourceDriverTask
 
 	// Deallocate resource with provided hw addr
 	// -> hwaddr - driver identifier of the resource

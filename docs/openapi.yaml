@@ -50,7 +50,7 @@ paths:
         - basic_auth: []
     post:
       summary: Create new User
-      description: Creates & return the created User
+      description: Creates & return the created User, it will generate password if not provided
       operationId: UserCreatePost
       tags:
         - User
@@ -60,14 +60,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/User'
+              $ref: '#/components/schemas/UserAPIPassword'
       responses:
         '200':
           description: Successful operation
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
+                $ref: '#/components/schemas/UserAPIPassword'
         '400':
           description: Bad request
         '401':
@@ -453,11 +453,11 @@ paths:
       security:
         - basic_auth: []
 
-  /api/v1/application/{uid}/snapshot:
+  /api/v1/application/{uid}/task/:
     get:
-      summary: Triggers Application snapshot
-      description: Creates the Application's Resource snapshot
-      operationId: ApplicationSnapshotGet
+      summary: Get list of the ApplicationTasks
+      description: Returns the list of the Application tasks
+      operationId: ApplicationTaskListGet
       tags:
         - Application
       parameters:
@@ -468,24 +468,58 @@ paths:
           schema:
             type: string
             format: uuid
-        - name: full
+        - name: filter
           in: query
-          description: >
-            Specify in order to include image changes (and memory of VM if posible) into the
-            snapshot. Most of the drivers can at least save the disks state. In better some we can
-            have the entire started VM with memory as it was in time of snapshot taking.
+          description: SQL `WHERE` filter for the object data
           required: false
           schema:
-            type: boolean
+            type: string
       responses:
         '200':
           description: Successful operation
-        '400':
-          description: Bad parameter or conditions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApplicationTask'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '404':
           description: Application not found
+      security:
+        - basic_auth: []
+    post:
+      summary: Create new ApplicationTask
+      description: Creates the ApplicationTask for Application
+      operationId: ApplicationTaskCreatePost
+      tags:
+        - Application
+      parameters:
+        - name: uid
+          in: path
+          description: UID of the Application
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplicationTask'
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationTask'
+        '400':
+          description: Bad request
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
       security:
         - basic_auth: []
 
@@ -927,15 +961,65 @@ components:
           type: string
           description: Additional information for the state
 
+    ApplicationTaskUID:
+      type: string
+      format: uuid
+      x-oapi-codegen-extra-tags:
+        gorm: primaryKey
+    ApplicationTask:
+      type: object
+      description: >
+        Is needed to execute some sort of async action on the Application. For example snapshot
+        operation, because the request could get from anywhere. Usually app tasks are not a part of
+        standard Application state graph and could be not executed if the resource is destroyed.
+
+        Results are filled by the executor of the task and really depends on what kind of operation
+        is executed and really depends on the driver - it could support the task or not.
+
+        It could be created by any Node but updated by the one which won the Application execution.
+      required:
+        - UID
+        - created_at
+        - updated_at
+        - application_UID
+        - task
+        - options
+        - result
+      properties:
+        UID:
+          $ref: '#/components/schemas/ApplicationTaskUID'
+          x-oapi-codegen-extra-tags:
+            gorm: primaryKey
+        created_at:
+          x-go-type: time.Time
+        updated_at:
+          x-go-type: time.Time
+        application_UID:
+          # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/ApplicationUID'
+          type: string
+          format: uuid
+        task:
+          type: string
+          description: Identifier of the task
+        options:
+          x-go-type: util.UnparsedJson
+          description: JSON object with additional options
+        result:
+          x-go-type: util.UnparsedJson
+          description: JSON object with the results of task execution
+
     UserName:
       type: string
       x-oapi-codegen-extra-tags:
         gorm: primaryKey
+
     User:
       type: object
       description: >
         Contains limits and hash to login, name is unique, `admin` created during the first cluster
         start and prints it to stderr.
+
+        Could be created by any node and updated by any node.
       required:
         - name
         - created_at
@@ -954,6 +1038,30 @@ components:
           x-go-type: crypt.Hash
           x-oapi-codegen-extra-tags:
             gorm: embedded
+
+    UserAPIPassword:
+      type: object
+      description: >
+        Purely API-only special user object to use during User create operation - it allows to set
+        the required user password or receive the automatically generated one.
+      required:
+        - name
+        - created_at
+        - updated_at
+        - password
+        - hash
+      properties:
+        name:
+          $ref: '#/components/schemas/UserName'
+        created_at:
+          x-go-type: time.Time
+        updated_at:
+          x-go-type: time.Time
+        password:
+          type: string
+          description: Clear-text password to set for new user or to get the autogenerated one
+        hash:
+          x-go-type: crypt.Hash
 
     LabelUID:
       type: string
@@ -1042,6 +1150,8 @@ components:
       description: >
         Each node need to report it's status and ensure there is no duplications and to perform the
         cluster worker election process properly.
+
+        Could be created by the node itself and updated by the same node.
       required:
         - UID
         - created_at
@@ -1117,6 +1227,8 @@ components:
         Active resource definition to be able to properly restore the state during the cluster node
         restart. Also contains additional info about the resource, for example user requested
         metadata, which is available for the resource through the `Meta API`.
+
+        Could be created and updated only by the node which won the Application execution.
       required:
         - UID
         - created_at
