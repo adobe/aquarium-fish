@@ -20,6 +20,7 @@ require (
 	github.com/labstack/echo/v4 v4.9.1
 	github.com/mostlygeek/arp v0.0.0-20170424181311-541a2129847a
 	github.com/pkg/errors v0.9.1
+	github.com/rqlite/sql v0.0.0-20221103124402-8f9ff0ceb8f0
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/spf13/cobra v1.0.0
 	github.com/steinfletcher/apitest v1.5.14

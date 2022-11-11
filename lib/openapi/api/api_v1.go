@@ -37,6 +37,8 @@ func NewV1Router(e *echo.Echo, fish *fish.Fish) {
 	router.Use(
 		// Regular basic auth
 		echomw.BasicAuth(proc.BasicAuth),
+		// Limiting body size for better security, as usual 64KB ought to be enough for anybody
+		echomw.BodyLimit("64KB"),
 	)
 	RegisterHandlers(router, proc)
 }
