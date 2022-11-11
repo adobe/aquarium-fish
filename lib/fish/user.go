@@ -18,12 +18,19 @@ import (
 
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 func (f *Fish) UserFind(filter *string) (us []types.User, err error) {
 	db := f.db
 	if filter != nil {
-		db = db.Where(*filter)
+		secured_filter, err := util.ExpressionSqlFilter(*filter)
+		if err != nil {
+			log.Println("Fish: SECURITY: weird SQL filter received:", err)
+			// We do not fail here because we should not give attacker more information
+			return us, nil
+		}
+		db = db.Where(secured_filter)
 	}
 	err = db.Find(&us).Error
 	return us, err

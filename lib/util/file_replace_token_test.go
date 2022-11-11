@@ -20,7 +20,7 @@ import (
 	"testing"
 )
 
-func TestFileReplaceTokenSimpleProceed(t *testing.T) {
+func Test_file_replace_token_simple_proceed(t *testing.T) {
 	tmp_file := path.Join(t.TempDir(), "test.txt")
 
 	in_data := []byte("" +
@@ -46,7 +46,7 @@ func TestFileReplaceTokenSimpleProceed(t *testing.T) {
 	}
 }
 
-func TestFileReplaceTokenSimpleSkipUppercaseSrc(t *testing.T) {
+func Test_file_replace_token_simple_skip_uppercase_src(t *testing.T) {
 	tmp_file := path.Join(t.TempDir(), "test.txt")
 
 	in_data := []byte("" +
@@ -72,7 +72,7 @@ func TestFileReplaceTokenSimpleSkipUppercaseSrc(t *testing.T) {
 	}
 }
 
-func TestFileReplaceTokenSimpleSkipUppercaseToken(t *testing.T) {
+func Test_file_replace_token_simple_skip_uppercase_token(t *testing.T) {
 	tmp_file := path.Join(t.TempDir(), "test.txt")
 
 	in_data := []byte("" +
@@ -98,7 +98,7 @@ func TestFileReplaceTokenSimpleSkipUppercaseToken(t *testing.T) {
 	}
 }
 
-func TestFileReplaceTokenAnycaseTokenProceed(t *testing.T) {
+func Test_file_replace_token_anycase_token_proceed(t *testing.T) {
 	tmp_file := path.Join(t.TempDir(), "test.txt")
 
 	in_data := []byte("" +
@@ -124,7 +124,7 @@ func TestFileReplaceTokenAnycaseTokenProceed(t *testing.T) {
 	}
 }
 
-func TestFileReplaceTokenAnycaseSrcProceed(t *testing.T) {
+func Test_file_replace_token_anycase_src_proceed(t *testing.T) {
 	tmp_file := path.Join(t.TempDir(), "test.txt")
 
 	in_data := []byte("" +
@@ -150,7 +150,7 @@ func TestFileReplaceTokenAnycaseSrcProceed(t *testing.T) {
 	}
 }
 
-func TestFileReplaceTokenAnycaseMultiple(t *testing.T) {
+func Test_file_replace_token_anycase_multiple(t *testing.T) {
 	tmp_file := path.Join(t.TempDir(), "test.txt")
 
 	in_data := []byte("" +
@@ -176,7 +176,7 @@ func TestFileReplaceTokenAnycaseMultiple(t *testing.T) {
 	}
 }
 
-func TestFileReplaceTokenAdd(t *testing.T) {
+func Test_file_replace_token_add(t *testing.T) {
 	tmp_file := path.Join(t.TempDir(), "test.txt")
 
 	in_data := []byte("" +
@@ -201,7 +201,7 @@ func TestFileReplaceTokenAdd(t *testing.T) {
 	}
 }
 
-func TestFileReplaceTokenDoNotAddIfReplaced(t *testing.T) {
+func Test_file_replace_token_do_not_add_if_replaced(t *testing.T) {
 	tmp_file := path.Join(t.TempDir(), "test.txt")
 
 	in_data := []byte("" +
@@ -227,7 +227,7 @@ func TestFileReplaceTokenDoNotAddIfReplaced(t *testing.T) {
 	}
 }
 
-func TestFileReplaceTokenFullLine(t *testing.T) {
+func Test_file_replace_token_full_line(t *testing.T) {
 	tmp_file := path.Join(t.TempDir(), "test.txt")
 
 	in_data := []byte("" +

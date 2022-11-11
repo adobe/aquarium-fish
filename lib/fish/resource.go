@@ -22,12 +22,19 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 func (f *Fish) ResourceFind(filter *string) (rs []types.Resource, err error) {
 	db := f.db
 	if filter != nil {
-		db = db.Where(*filter)
+		secured_filter, err := util.ExpressionSqlFilter(*filter)
+		if err != nil {
+			log.Println("Fish: SECURITY: weird SQL filter received:", err)
+			// We do not fail here because we should not give attacker more information
+			return rs, nil
+		}
+		db = db.Where(secured_filter)
 	}
 	err = db.Find(&rs).Error
 	return rs, err

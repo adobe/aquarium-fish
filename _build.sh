@@ -19,11 +19,17 @@ echo "ROOT DIR: ${root_dir}"
 cd "${root_dir}"
 
 
-gopath=$(go env GOPATH)
-
 echo "--- GENERATE CODE FOR AQUARIUM-FISH ---"
+# Install oapi-codegen if it's not available or version is not the same with go.mod
+gopath=$(go env GOPATH)
+req_ver=$(grep -F 'github.com/deepmap/oapi-codegen' go.mod | cut -d' ' -f 2)
+curr_ver="$(PATH="$gopath/bin:$PATH" oapi-codegen --version 2>/dev/null | tail -1 || true)"
+if [ "$curr_ver" != "$req_ver" ]; then
+    go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@$req_ver"
+fi
+# Cleanup the old generated files & run the generation
 find ./lib -name '*.gen.go' -delete
-go generate -v ./lib/...
+PATH="$gopath/bin:$PATH" go generate -v ./lib/...
 
 # Doing check after generation because generated sources requires additional modules
 ./check.sh
