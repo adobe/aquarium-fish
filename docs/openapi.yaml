@@ -1079,21 +1079,21 @@ components:
     Label:
       type: object
       description: >
-        This one filled by the cluster admin, depends on the needs. Labels could be implemented in
-        different drivers, but it's not recommended to keep the label stable. Version could be used
-        during request, but by default it's the latest.
+        This one filled by the cluster admin, depends on the needs. Labels could be defined in
+        different drivers and the priority is sequential. Version could be used during request and
+        by default is the latest.
 
         Label - is one of the most important part of the system, because it makes the resources
-        reproducible in time. It contains the driver name and configuration, so can be started
-        again and again as much times we need. Versions make possible to update the labels and
-        store the old ones in case we need to run the same environment 10y from now and rebuild the
-        old code revision for example.
+        reproducible in time. Definitions contains the driver name and configuration, so can be
+        started again and again as much times we need. Versions make possible to update the labels
+        and store the old ones in case we need to run the same environment 10y from now and rebuild
+        the old code revision for example.
 
         Labels can't be updated. Once they are stored - they are here to keep the history of
         environements and make possible to mark build with the specified label version in order to
-        be able to reproduce it later. Also labels can be implemented just by one driver. If you
-        want to use another one - you will need to create another label version and the resource
-        requests that uses latest will swith to it.
+        be able to reproduce it later. Also labels can be implemented just by one or multiple
+        drivers. Sometimes it's useful to switch to another provider in case the previous ones are
+        not available or completely used.
       required:
         - UID
         - created_at
@@ -1122,31 +1122,46 @@ components:
           description: >
             In order to update the labels freely and save the previous Label state for the past
             builds.
-        driver:
-          type: string
-          description: Name of the driver to run the Resource with this Label
-          example: vmx
-        definition:
+        definitions:
           x-go-type: util.UnparsedJson
-          description: Actual Labl definition depends on the used driver
+          description: List of label definitions that describes resources, driver and it's options.
+            The order is sequential - so the priority is to the first driver and if it's not
+            available than the next definitions will be used.
           example:
-            image: macos1015-xcode122-ci
-            images:
-              macos1015: 'https://artifact-storage/aquarium/image/vmx/macos1015-VERSION/macos1015-VERSION.tar.xz'
-              macos1015-xcode122: 'https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-VERSION/macos1015-xcode122-VERSION.tar.xz'
-              macos1015-xcode122-ci: 'https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-ci-VERSION/macos1015-xcode122-ci-VERSION.tar.xz'
-            requirements:
-              cpu: 14
-              ram: 12
-              disks:
-                xcode122:
-                  size: 100
-                  reuse: true
+            - driver: vmx
+              resources:
+                cpu: 16
+                ram: 20
+                disks:
+                  vs2019:
+                    type: exfat
+                    size: 100
+                    reuse: true
+                network: nat
+              options:
+                image: winserver2019-vs2019-ci
+                images:
+                  winserver2019: 'https://artifact-storage/aquarium/image/vmx/winserver2019/winserver2019-VERSION.tar.xz'
+                  winserver2019-vs2019: 'https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019/winserver2019-vs2019-VERSION.tar.xz'
+                  winserver2019-vs2019-ci: 'https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019-ci/winserver2019-vs2019-ci-VERSION.tar.xz'
+            - driver: aws
+              resources:
+                cpu: 16
+                ram: 32
+                disks:
+                  xvdb:
+                    size: 100
+                network: Name:build-vpc
+              options:
+                image: aquarium/winserver2019-vs2019-ci-VERSION
+                instance_type: c6a.4xlarge
+                security_group: jenkins-worker-win
+                userdata_format: ps1
         metadata:
           x-go-type: util.UnparsedJson
           description: Basic metadata to pass to the Resource
           example:
-            JENKINS_AGENT_WORKSPACE: /Volumes/xcode122
+            JENKINS_AGENT_WORKSPACE: D:\
 
     NodeUID:
       type: string
