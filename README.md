@@ -1,6 +1,6 @@
 # [Aquarium Fish](https://github.com/adobe/aquarium-fish)
 
-[![CI](https://github.com/adobe/aquarium-fish/actions/workflows/main.yml/badge.svg)](https://github.com/adobe/aquarium-fish/actions/workflows/main.yml)
+[![CI](https://github.com/adobe/aquarium-fish/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/adobe/aquarium-fish/actions/workflows/main.yml)
 
 Main part of the [Aquarium](https://github.com/adobe/aquarium-fish/wiki/Aquarium) distributed p2p
 system to manage resources. Primarily was developed to manage the dynamic Jenkins CI agents in
