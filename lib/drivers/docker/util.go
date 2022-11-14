@@ -264,10 +264,10 @@ func (d *Driver) loadImages(def *Definition) (string, error) {
 	return target_out, nil
 }
 
-// Receives the container ID out of the hwaddr unique id
-func (d *Driver) getAllocatedContainer(hwaddr string) string {
+// Receives the container ID out of the container name
+func (d *Driver) getAllocatedContainerId(c_name string) string {
 	// Probably it's better to store the current list in the memory
-	stdout, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, "ps", "-a", "-q", "--filter", "name="+d.getContainerName(hwaddr))
+	stdout, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, "ps", "-a", "-q", "--filter", "name="+c_name)
 	if err != nil {
 		return ""
 	}

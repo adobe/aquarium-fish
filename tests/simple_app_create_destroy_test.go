@@ -104,7 +104,7 @@ drivers:
 				End().
 				JSON(&app_state)
 
-			if app_state.Status != types.ApplicationStateStatusALLOCATED {
+			if app_state.Status != types.ApplicationStatusALLOCATED {
 				r.Fatalf("Application Status is incorrect: %v", app_state.Status)
 			}
 		})
@@ -121,8 +121,8 @@ drivers:
 			End().
 			JSON(&res)
 
-		if res.HwAddr == "" {
-			t.Fatalf("Resource hwaddr is incorrect: %v", res.HwAddr)
+		if res.Identifier == "" {
+			t.Fatalf("Resource identifier is incorrect: %v", res.Identifier)
 		}
 	})
 
@@ -147,7 +147,7 @@ drivers:
 				End().
 				JSON(&app_state)
 
-			if app_state.Status != types.ApplicationStateStatusDEALLOCATED {
+			if app_state.Status != types.ApplicationStatusDEALLOCATED {
 				r.Fatalf("Application Status is incorrect: %v", app_state.Status)
 			}
 		})

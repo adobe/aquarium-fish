@@ -100,19 +100,29 @@ func (e *Processor) UserCreatePost(c echo.Context) error {
 		return fmt.Errorf("Only 'admin' user can create user")
 	}
 
-	var data types.User
+	var data types.UserAPIPassword
 	if err := c.Bind(&data); err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Wrong request body: %v", err)})
 		return fmt.Errorf("Wrong request body: %w", err)
 	}
 
-	password, err := e.fish.UserNew(data.Name, "") // Generate new password for now
+	password, new_user, err := e.fish.UserNew(data.Name, data.Password)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to create user: %v", err)})
 		return fmt.Errorf("Unable to create user: %w", err)
 	}
 
-	return c.JSON(http.StatusOK, H{"password": password})
+	// Fill the output values
+	data.CreatedAt = new_user.CreatedAt
+	data.UpdatedAt = new_user.UpdatedAt
+	if data.Password == "" {
+		data.Password = password
+	} else {
+		data.Password = ""
+	}
+	data.Hash = new_user.Hash
+
+	return c.JSON(http.StatusOK, new_user)
 }
 
 func (e *Processor) UserDelete(c echo.Context, name string) error {
@@ -269,29 +279,58 @@ func (e *Processor) ApplicationStateGet(c echo.Context, uid types.ApplicationUID
 	return c.JSON(http.StatusOK, out)
 }
 
-func (e *Processor) ApplicationSnapshotGet(c echo.Context, uid types.ApplicationUID, params types.ApplicationSnapshotGetParams) error {
-	app, err := e.fish.ApplicationGet(uid)
+func (e *Processor) ApplicationTaskListGet(c echo.Context, app_uid types.ApplicationUID, params types.ApplicationTaskListGetParams) error {
+	app, err := e.fish.ApplicationGet(app_uid)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", uid)})
-		return fmt.Errorf("Unable to find the Application: %s, %w", uid, err)
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", app_uid)})
+		return fmt.Errorf("Unable to find the Application: %s, %w", app_uid, err)
 	}
 
-	// Only the owner of the application (or admin) could take the snapshot of the resource
+	// Only the owner of the application (or admin) could get the tasks
 	user := c.Get("user")
 	if app.OwnerName != user.(*types.User).Name && user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner & admin can take snapshot of the Application resource")})
-		return fmt.Errorf("Only the owner & admin can take snapshot of the Application resource")
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner of Application & admin can get the Application Tasks")})
+		return fmt.Errorf("Only the owner of Application & admin can get the Application Tasks")
 	}
 
-	// TODO: not working correctly in cluster in case not all the nodes supports the
-	// driver - need to rewrite in cluster way as Resource Tasks.
-	full := params.Full != nil && *params.Full
-	out, err := e.fish.ApplicationSnapshot(app, full)
+	out, err := e.fish.ApplicationTaskFindByApplication(app_uid, params.Filter)
 	if err != nil {
-		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Error during creating Application snapshot: %v", err)})
+		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the Application Tasks list: %v", err)})
+		return fmt.Errorf("Unable to get the Application Tasks list: %w", err)
 	}
 
-	return c.JSON(http.StatusOK, H{"data": out})
+	return c.JSON(http.StatusOK, out)
+}
+
+func (e *Processor) ApplicationTaskCreatePost(c echo.Context, app_uid types.ApplicationUID) error {
+	app, err := e.fish.ApplicationGet(app_uid)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", app_uid)})
+		return fmt.Errorf("Unable to find the Application: %s, %w", app_uid, err)
+	}
+
+	// Only the owner of the application (or admin) could create the tasks
+	user := c.Get("user")
+	if app.OwnerName != user.(*types.User).Name && user.(*types.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner of Application & admin can create the Application Tasks")})
+		return fmt.Errorf("Only the owner of Application & admin can create the Application Tasks")
+	}
+
+	var data types.ApplicationTask
+	if err := c.Bind(&data); err != nil {
+		c.JSON(http.StatusBadRequest, H{"error": fmt.Sprintf("Wrong request body: %v", err)})
+		return fmt.Errorf("Wrong request body: %w", err)
+	}
+
+	// Set Application UID for the task forcefully to not allow creating tasks for the other Apps
+	data.ApplicationUID = app_uid
+
+	if err := e.fish.ApplicationTaskCreate(&data); err != nil {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to create ApplicationTask: %v", err)})
+		return fmt.Errorf("Unable to create ApplicationTask: %w", err)
+	}
+
+	return c.JSON(http.StatusOK, data)
 }
 
 func (e *Processor) ApplicationDeallocateGet(c echo.Context, uid types.ApplicationUID) error {
@@ -318,10 +357,10 @@ func (e *Processor) ApplicationDeallocateGet(c echo.Context, uid types.Applicati
 		return fmt.Errorf("Unable to deallocate the Application with status: %s", out.Status)
 	}
 
-	new_status := types.ApplicationStateStatusDEALLOCATE
-	if out.Status != types.ApplicationStateStatusALLOCATED {
+	new_status := types.ApplicationStatusDEALLOCATE
+	if out.Status != types.ApplicationStatusALLOCATED {
 		// The Application was not yet Allocated so just mark it as Recalled
-		new_status = types.ApplicationStateStatusRECALLED
+		new_status = types.ApplicationStatusRECALLED
 	}
 	as := &types.ApplicationState{ApplicationUID: uid, Status: new_status,
 		Description: fmt.Sprintf("Requested by user %s", user.(*types.User).Name),

@@ -17,6 +17,7 @@ package aws
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strconv"
@@ -25,16 +26,20 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
-	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	ec2_types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/servicequotas"
 
+	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/drivers"
+	"github.com/adobe/aquarium-fish/lib/openapi/types"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 // Implements drivers.ResourceDriver interface
 type Driver struct {
 	cfg Config
+	// Contains the available tasks of the driver
+	tasks_list []drivers.ResourceDriverTask
 }
 
 func init() {
@@ -56,6 +61,10 @@ func (d *Driver) Prepare(config []byte) error {
 	if err := d.cfg.Validate(); err != nil {
 		return err
 	}
+
+	// Fill up the available tasks
+	d.tasks_list = append(d.tasks_list, &TaskSnapshot{driver: d})
+
 	return nil
 }
 
@@ -81,7 +90,7 @@ func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition stri
 		return -1
 	}
 
-	conn_ec2 := d.newConn()
+	conn_ec2 := d.newEC2Conn()
 
 	if def.InstanceType == "mac1" || def.InstanceType == "mac2" {
 		// Ensure we have the available not busy mac dedicated hosts to use as base for resource.
@@ -89,12 +98,12 @@ func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition stri
 		// terminated only after 24h which costs a pretty penny.
 		// Quotas for hosts are: "Running Dedicated mac1 Hosts" & "Running Dedicated mac2 Hosts"
 		p := ec2.NewDescribeHostsPaginator(conn_ec2, &ec2.DescribeHostsInput{
-			Filter: []types.Filter{
-				types.Filter{
+			Filter: []ec2_types.Filter{
+				ec2_types.Filter{
 					Name:   aws.String("instance-type"),
 					Values: []string{fmt.Sprintf("%s.metal", def.InstanceType)},
 				},
-				types.Filter{
+				ec2_types.Filter{
 					Name:   aws.String("state"),
 					Values: []string{"available"},
 				},
@@ -192,34 +201,38 @@ func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition stri
  * It selects the AMI and run instance
  * Uses metadata to fill EC2 instance userdata
  */
-func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (string, string, error) {
+func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (*types.Resource, error) {
 	var def Definition
 	if err := def.Apply(definition); err != nil {
-		return "", "", fmt.Errorf("AWS: Unable to apply definition: %v", err)
+		return nil, fmt.Errorf("AWS: Unable to apply definition: %v", err)
 	}
 
-	conn := d.newConn()
+	// Generate fish name
+	buf := crypt.RandBytes(6)
+	i_name := fmt.Sprintf("fish-%02x%02x%02x%02x%02x%02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5])
+
+	conn := d.newEC2Conn()
 
 	// Checking the VPC exists or use default one
 	vm_network := def.Resources.Network
 	var err error
 	if vm_network, _, err = d.getSubnetId(conn, vm_network); err != nil {
-		return "", "", fmt.Errorf("AWS: Unable to get subnet: %v", err)
+		return nil, fmt.Errorf("AWS: Unable to get subnet: %v", err)
 	}
-	log.Println("AWS: Selected subnet:", vm_network)
+	log.Println("AWS: Selected subnet:", vm_network, i_name)
 
 	vm_image := def.Image
 	if vm_image, err = d.getImageId(conn, vm_image); err != nil {
-		return "", "", fmt.Errorf("AWS: Unable to get image: %v", err)
+		return nil, fmt.Errorf("AWS: Unable to get image: %v", err)
 	}
-	log.Println("AWS: Selected image:", vm_image)
+	log.Println("AWS: Selected image:", vm_image, i_name)
 
 	// Prepare Instance request information
 	input := &ec2.RunInstancesInput{
 		ImageId:      aws.String(vm_image),
-		InstanceType: types.InstanceType(def.InstanceType),
+		InstanceType: ec2_types.InstanceType(def.InstanceType),
 
-		NetworkInterfaces: []types.InstanceNetworkInterfaceSpecification{
+		NetworkInterfaces: []ec2_types.InstanceNetworkInterfaceSpecification{
 			{
 				AssociatePublicIpAddress: aws.Bool(false),
 				DeleteOnTermination:      aws.Bool(true),
@@ -236,7 +249,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 		// Set UserData field
 		userdata, err := util.SerializeMetadata(def.UserDataFormat, def.UserDataPrefix, metadata)
 		if err != nil {
-			return "", "", fmt.Errorf("AWS: Unable to serialize metadata to userdata: %v", err)
+			return nil, fmt.Errorf("AWS: Unable to serialize metadata to userdata: %v", err)
 		}
 		input.UserData = aws.String(base64.StdEncoding.EncodeToString([]byte(userdata)))
 	}
@@ -244,9 +257,9 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 	if def.SecurityGroup != "" {
 		vm_secgroup := def.SecurityGroup
 		if vm_secgroup, err = d.getSecGroupId(conn, vm_secgroup); err != nil {
-			return "", "", fmt.Errorf("AWS: Unable to get security group: %v", err)
+			return nil, fmt.Errorf("AWS: Unable to get security group: %v", err)
 		}
-		log.Println("AWS: Selected security group:", vm_secgroup)
+		log.Println("AWS: Selected security group:", vm_secgroup, i_name)
 		input.NetworkInterfaces[0].Groups = []string{vm_secgroup}
 	}
 
@@ -260,49 +273,53 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 			tags_in[k] = v
 		}
 
-		tags_out := []types.Tag{}
+		tags_out := []ec2_types.Tag{}
 		for k, v := range tags_in {
-			tags_out = append(tags_out, types.Tag{
+			tags_out = append(tags_out, ec2_types.Tag{
 				Key:   aws.String(k),
 				Value: aws.String(v),
 			})
 		}
+		// Apply name for the instance
+		tags_out = append(tags_out, ec2_types.Tag{
+			Key:   aws.String("Name"),
+			Value: aws.String(i_name),
+		})
 
-		input.TagSpecifications = []types.TagSpecification{
+		input.TagSpecifications = []ec2_types.TagSpecification{
 			{
-				ResourceType: types.ResourceTypeInstance,
+				ResourceType: ec2_types.ResourceTypeInstance,
 				Tags:         tags_out,
 			},
 		}
-
 	}
 
 	// Prepare the device mapping
 	if len(def.Resources.Disks) > 0 {
 		for name, disk := range def.Resources.Disks {
-			mapping := types.BlockDeviceMapping{
+			mapping := ec2_types.BlockDeviceMapping{
 				DeviceName: aws.String(name),
-				Ebs: &types.EbsBlockDevice{
+				Ebs: &ec2_types.EbsBlockDevice{
 					DeleteOnTermination: aws.Bool(true),
-					VolumeType:          types.VolumeTypeGp3,
+					VolumeType:          ec2_types.VolumeTypeGp3,
 				},
 			}
 			if disk.Type != "" {
 				type_data := strings.Split(disk.Type, ":")
 				if len(type_data) > 0 && type_data[0] != "" {
-					mapping.Ebs.VolumeType = types.VolumeType(type_data[0])
+					mapping.Ebs.VolumeType = ec2_types.VolumeType(type_data[0])
 				}
 				if len(type_data) > 1 && type_data[1] != "" {
 					val, err := strconv.ParseInt(type_data[1], 10, 32)
 					if err != nil {
-						return "", "", fmt.Errorf("AWS: Unable to parse EBS IOPS int32 from '%s': %v", type_data[1], err)
+						return nil, fmt.Errorf("AWS: Unable to parse EBS IOPS int32 from '%s': %v", type_data[1], err)
 					}
 					mapping.Ebs.Iops = aws.Int32(int32(val))
 				}
 				if len(type_data) > 2 && type_data[2] != "" {
 					val, err := strconv.ParseInt(type_data[2], 10, 32)
 					if err != nil {
-						return "", "", fmt.Errorf("AWS: Unable to parse EBS Throughput int32 from '%s': %v", type_data[1], err)
+						return nil, fmt.Errorf("AWS: Unable to parse EBS Throughput int32 from '%s': %v", type_data[1], err)
 					}
 					mapping.Ebs.Throughput = aws.Int32(int32(val))
 				}
@@ -311,9 +328,9 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 				// Use snapshot as the disk source
 				vm_snapshot := disk.Clone
 				if vm_snapshot, err = d.getSnapshotId(conn, vm_snapshot); err != nil {
-					return "", "", fmt.Errorf("AWS: Unable to get snapshot: %v", err)
+					return nil, fmt.Errorf("AWS: Unable to get snapshot: %v", err)
 				}
-				log.Println("AWS: Selected snapshot:", vm_snapshot)
+				log.Println("AWS: Selected snapshot:", vm_snapshot, i_name)
 				mapping.Ebs.SnapshotId = aws.String(vm_snapshot)
 			} else {
 				// Just create a new disk
@@ -322,9 +339,9 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 					mapping.Ebs.Encrypted = aws.Bool(true)
 					key_id, err := d.getKeyId(def.EncryptKey)
 					if err != nil {
-						return "", "", fmt.Errorf("AWS: Unable to get encrypt key from KMS: %v", err)
+						return nil, fmt.Errorf("AWS: Unable to get encrypt key from KMS: %v", err)
 					}
-					log.Println("AWS: Selected encryption key:", key_id, "for disk:", name)
+					log.Println("AWS: Selected encryption key:", key_id, "for disk:", name, i_name)
 					mapping.Ebs.KmsKeyId = aws.String(key_id)
 				}
 			}
@@ -335,8 +352,8 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 	// Run the instance
 	result, err := conn.RunInstances(context.TODO(), input)
 	if err != nil {
-		log.Println("AWS: Unable to run instance", err)
-		return "", "", err
+		log.Println("AWS: Unable to run instance", err, i_name)
+		return nil, err
 	}
 
 	inst := &result.Instances[0]
@@ -361,19 +378,18 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 				inst = inst_tmp
 			}
 			if err != nil {
-				log.Println("AWS: Error during getting instance while waiting for BlockDeviceMappings:", err, *inst.InstanceId)
+				log.Println("AWS: Error during getting instance while waiting for BlockDeviceMappings:", err, i_name)
 			}
 		}
 		for _, bd := range inst.BlockDeviceMappings {
 			disk, ok := def.Resources.Disks[*bd.DeviceName]
-			log.Println("AWS: DEBUG: Processing volume:", *bd.DeviceName, disk)
 			if !ok || disk.Label == "" {
 				continue
 			}
 
 			tags_input := &ec2.CreateTagsInput{
 				Resources: []string{*bd.Ebs.VolumeId},
-				Tags:      []types.Tag{},
+				Tags:      []ec2_types.Tag{},
 			}
 
 			tag_vals := strings.Split(disk.Label, ",")
@@ -382,11 +398,10 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 				if len(key_val) < 2 {
 					key_val = append(key_val, "")
 				}
-				tags_input.Tags = append(tags_input.Tags, types.Tag{
+				tags_input.Tags = append(tags_input.Tags, ec2_types.Tag{
 					Key:   aws.String(key_val[0]),
 					Value: aws.String(key_val[1]),
 				})
-				log.Println("AWS: DEBUG: Creating tags for the volume:", *bd.Ebs.VolumeId, key_val[0], key_val[0])
 			}
 			if _, err := conn.CreateTags(context.TODO(), tags_input); err != nil {
 				// Do not fail hard here - the instance is already running
@@ -395,12 +410,16 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 		}
 	}
 
+	res := &types.Resource{}
+
 	// Wait for IP address to be assigned to the instance
 	timeout := 60
 	for {
 		if inst.PrivateIpAddress != nil {
-			log.Println("AWS: Allocate of instance completed:", *inst.InstanceId, *inst.PrivateIpAddress)
-			return *inst.InstanceId, *inst.PrivateIpAddress, nil
+			log.Println("AWS: Allocate of instance completed:", i_name, *inst.InstanceId, *inst.PrivateIpAddress)
+			res.Identifier = *inst.InstanceId
+			res.IpAddr = *inst.PrivateIpAddress
+			return res, nil
 		}
 
 		timeout -= 5
@@ -414,79 +433,71 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 			inst = inst_tmp
 		}
 		if err != nil {
-			log.Println("AWS: Error during getting instance while waiting for IP:", err, *inst.InstanceId)
+			log.Println("AWS: Error during getting instance while waiting for IP:", err, i_name, *inst.InstanceId)
 		}
 	}
 
-	return *inst.InstanceId, "", fmt.Errorf("AWS: Unable to locate the instance IP: %s", *inst.InstanceId)
+	res.Identifier = *inst.InstanceId
+	return res, fmt.Errorf("AWS: Unable to locate the instance IP: %s", *inst.InstanceId)
 }
 
-func (d *Driver) Status(inst_id string) string {
-	conn := d.newConn()
-	inst, err := d.getInstance(conn, inst_id)
-	// Potential issue here, it could be a big problem with unstable connection
-	if err != nil {
-		log.Println("AWS: Error during status check for", inst_id, "- it needs a rewrite", err)
+func (d *Driver) Status(res *types.Resource) string {
+	if res == nil || res.Identifier == "" {
+		log.Println("AWS: Invalid resource:", res)
 		return drivers.StatusNone
 	}
-	if inst != nil && inst.State.Name != types.InstanceStateNameTerminated {
+	conn := d.newEC2Conn()
+	inst, err := d.getInstance(conn, res.Identifier)
+	// Potential issue here, it could be a big problem with unstable connection
+	if err != nil {
+		log.Println("AWS: Error during status check for", res.Identifier, "- it needs a rewrite", err)
+		return drivers.StatusNone
+	}
+	if inst != nil && inst.State.Name != ec2_types.InstanceStateNameTerminated {
 		return drivers.StatusAllocated
 	}
 	return drivers.StatusNone
 }
 
-func (d *Driver) Snapshot(inst_id string, full bool) (string, error) {
-	conn := d.newConn()
-
-	input := &ec2.CreateSnapshotsInput{
-		InstanceSpecification: &types.InstanceSpecification{
-			ExcludeBootVolume: aws.Bool(!full),
-			InstanceId:        &inst_id,
-		},
-		Description:        aws.String("Created by AquariumFish"),
-		CopyTagsFromSource: types.CopyTagsFromSourceVolume,
-		TagSpecifications: []types.TagSpecification{{
-			ResourceType: "snapshot",
-			Tags: []types.Tag{{
-				Key:   aws.String("InstanceId"),
-				Value: aws.String(inst_id),
-			}},
-		}},
+func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
+	// Look for the specified task name
+	var t drivers.ResourceDriverTask
+	for _, task := range d.tasks_list {
+		if task.Name() == name {
+			t = task.Clone()
+		}
 	}
 
-	resp, err := conn.CreateSnapshots(context.TODO(), input)
-	if err != nil {
-		return "", fmt.Errorf("AWS: Unable to create snapshots for instance %s: %v", inst_id, err)
-	}
-	if len(resp.Snapshots) < 1 {
-		return "", fmt.Errorf("AWS: No snapshots was created for instance %s", inst_id)
+	// Parse options json into task structure
+	if len(options) > 0 {
+		if err := json.Unmarshal([]byte(options), t); err != nil {
+			log.Println("AWS: Unable to apply the task options", err)
+			return nil
+		}
 	}
 
-	snapshots := []string{}
-	for _, r := range resp.Snapshots {
-		snapshots = append(snapshots, *r.SnapshotId)
-	}
-	log.Println("AWS: Created snapshots for instance", inst_id, ":", strings.Join(snapshots, ", "))
-
-	return strings.Join(snapshots, ", "), nil
+	return t
 }
 
-func (d *Driver) Deallocate(inst_id string) error {
-	conn := d.newConn()
+func (d *Driver) Deallocate(res *types.Resource) error {
+	if res == nil || res.Identifier == "" {
+		return fmt.Errorf("AWS: Invalid resource: %v", res)
+	}
+	conn := d.newEC2Conn()
 
 	input := &ec2.TerminateInstancesInput{
-		InstanceIds: []string{inst_id},
+		InstanceIds: []string{res.Identifier},
 	}
 
 	result, err := conn.TerminateInstances(context.TODO(), input)
 	if err != nil {
-		return fmt.Errorf("AWS: Error during termianting the instance %s: %s", inst_id, err)
+		return fmt.Errorf("AWS: Error during termianting the instance %s: %s", res.Identifier, err)
 	}
-	if *result.TerminatingInstances[0].InstanceId != inst_id {
-		return fmt.Errorf("AWS: Wrong instance id result %s during terminating of %s", *result.TerminatingInstances[0].InstanceId, inst_id)
+	if *result.TerminatingInstances[0].InstanceId != res.Identifier {
+		return fmt.Errorf("AWS: Wrong instance id result %s during terminating of %s", *result.TerminatingInstances[0].InstanceId, res.Identifier)
 	}
 
-	log.Println("AWS: Deallocate of Instance", inst_id, "completed:", result.TerminatingInstances[0].CurrentState.Name)
+	log.Println("AWS: Deallocate of Instance", res.Identifier, "completed:", result.TerminatingInstances[0].CurrentState.Name)
 
 	return nil
 }

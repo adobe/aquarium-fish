@@ -13,7 +13,6 @@
 package vmx
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -175,44 +174,22 @@ func (d *Driver) loadImages(def *Definition, vm_images_dir string) (string, erro
 	return target_path, nil
 }
 
-// Returns the path to VMX file from hwaddr identifier
-func (d *Driver) getAllocatedVMX(hwaddr string) string {
+// Returns true if the VM with provided identifier is allocated
+func (d *Driver) isAllocated(vmx_path string) bool {
 	// Probably it's better to store the current list in the memory and
 	// update on fnotify or something like that...
 	stdout, _, err := runAndLog(10*time.Second, d.cfg.VmrunPath, "list")
 	if err != nil {
-		return ""
+		return false
 	}
 
 	for _, line := range strings.Split(stdout, "\n") {
-		if !strings.HasSuffix(line, ".vmx") {
-			continue
-		}
-
-		// Read vmx file and filter by ethernet0.address = "${hwaddr}"
-		f, err := os.OpenFile(line, os.O_RDONLY, 0o644)
-		if err != nil {
-			log.Println("VMX: Unable to open .vmx file to check status:", line)
-			continue
-		}
-		defer f.Close()
-
-		scanner := bufio.NewScanner(f)
-		for scanner.Scan() {
-			if !strings.HasPrefix(scanner.Text(), "ethernet0.address =") {
-				continue
-			}
-			if !strings.HasSuffix(strings.ToLower(scanner.Text()), `= "`+hwaddr+`"`) {
-				break
-			}
-			return line
-		}
-
-		if err := scanner.Err(); err != nil {
-			log.Println("VMX: Unable to scan .vmx file for status:", line)
+		if vmx_path == line {
+			return true
 		}
 	}
-	return ""
+
+	return false
 }
 
 // Creates VMDK disks described by the disks map

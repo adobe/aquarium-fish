@@ -1,0 +1,127 @@
+/**
+ * Copyright 2021 Adobe. All rights reserved.
+ * This file is licensed to you under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License. You may obtain a copy
+ * of the License at http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under
+ * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR REPRESENTATIONS
+ * OF ANY KIND, either express or implied. See the License for the specific language
+ * governing permissions and limitations under the License.
+ */
+
+package aws
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"strings"
+	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2_types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+
+	"github.com/adobe/aquarium-fish/lib/drivers"
+	"github.com/adobe/aquarium-fish/lib/openapi/types"
+)
+
+type TaskSnapshot struct {
+	driver *Driver `json:"-"`
+
+	*types.ApplicationTask `json:"-"` // Info about the requested task
+	*types.Resource        `json:"-"` // Info about the processed resource
+
+	Full bool `json:"full"` // Make full (all disks including OS image), or just the additional disks snapshot
+}
+
+func (t *TaskSnapshot) Name() string {
+	return "snapshot"
+}
+
+func (t *TaskSnapshot) Clone() drivers.ResourceDriverTask {
+	n := *t
+	return &n
+}
+
+func (t *TaskSnapshot) SetInfo(task *types.ApplicationTask, res *types.Resource) {
+	t.ApplicationTask = task
+	t.Resource = res
+}
+
+// Snapshot could be executed during ALLOCATED & DEALLOCATE ApplicationStatus
+func (t *TaskSnapshot) Execute() (result []byte, err error) {
+	if t.ApplicationTask == nil {
+		log.Println("AWS: Invalid application task:", t.ApplicationTask)
+		return []byte(`{"error":"internal: invalid application task"}`), fmt.Errorf("AWS: Invalid application task: %v", t.ApplicationTask)
+	}
+	if t.Resource == nil || t.Resource.Identifier == "" {
+		log.Println("AWS: Invalid resource:", t.Resource)
+		return []byte(`{"error":"internal: invalid resource"}`), fmt.Errorf("AWS: Invalid resource: %v", t.Resource)
+	}
+	conn := t.driver.newEC2Conn()
+
+	if t.ApplicationTask.When == types.ApplicationStatusDEALLOCATE {
+		// We need to stop the instance before executing snapshot to ensure it will be consistent
+		input := &ec2.StopInstancesInput{
+			InstanceIds: []string{t.Resource.Identifier},
+		}
+
+		result, err := conn.StopInstances(context.TODO(), input)
+		if err != nil {
+			// Do not fail hard here - it's still possible to take snapshot of the instance
+			log.Println("AWS: Error during stopping the instance:", t.Resource.Identifier, err)
+		}
+		if len(result.StoppingInstances) < 1 || *result.StoppingInstances[0].InstanceId != t.Resource.Identifier {
+			// Do not fail hard here - it's still possible to take snapshot of the instance
+			log.Println("AWS: Wrong instance id result during stopping:", t.Resource.Identifier)
+		}
+
+		// Wait for instance stopped before going forward with snapshot
+		sw := ec2.NewInstanceStoppedWaiter(conn)
+		max_wait := 10 * time.Minute
+		wait_input := ec2.DescribeInstancesInput{
+			InstanceIds: []string{
+				t.Resource.Identifier,
+			},
+		}
+		if err := sw.Wait(context.TODO(), &wait_input, max_wait); err != nil {
+			// Do not fail hard here - it's still possible to take snapshot of the instance
+			log.Println("AWS: Error during wait for instance stop:", t.Resource.Identifier, err)
+		}
+	}
+
+	input := &ec2.CreateSnapshotsInput{
+		InstanceSpecification: &ec2_types.InstanceSpecification{
+			ExcludeBootVolume: aws.Bool(!t.Full),
+			InstanceId:        &t.Resource.Identifier,
+		},
+		Description:        aws.String("Created by AquariumFish"),
+		CopyTagsFromSource: ec2_types.CopyTagsFromSourceVolume,
+		TagSpecifications: []ec2_types.TagSpecification{{
+			ResourceType: "snapshot",
+			Tags: []ec2_types.Tag{{
+				Key:   aws.String("InstanceId"),
+				Value: aws.String(t.Resource.Identifier),
+			}},
+		}},
+	}
+
+	resp, err := conn.CreateSnapshots(context.TODO(), input)
+	if err != nil {
+		return []byte{}, fmt.Errorf("AWS: Unable to create snapshots for instance %s: %v", t.Resource.Identifier, err)
+	}
+	if len(resp.Snapshots) < 1 {
+		return []byte{}, fmt.Errorf("AWS: No snapshots was created for instance %s", t.Resource.Identifier)
+	}
+
+	snapshots := []string{}
+	for _, r := range resp.Snapshots {
+		snapshots = append(snapshots, *r.SnapshotId)
+	}
+	log.Println("AWS: Created snapshots for instance", t.Resource.Identifier, ":", strings.Join(snapshots, ", "))
+
+	return json.Marshal(map[string]any{"snapshots": snapshots})
+}

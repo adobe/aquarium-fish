@@ -42,9 +42,9 @@ func (c *Config) Apply(config []byte) error {
 		}
 	}
 
-	return RandomFail("ConfigApply", c.FailConfigApply)
+	return randomFail("ConfigApply", c.FailConfigApply)
 }
 
 func (c *Config) Validate() (err error) {
-	return RandomFail("ConfigValidate", c.FailConfigValidate)
+	return randomFail("ConfigValidate", c.FailConfigValidate)
 }

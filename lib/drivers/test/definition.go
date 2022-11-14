@@ -39,7 +39,7 @@ func (d *Definition) Apply(definition string) error {
 		return err
 	}
 
-	return RandomFail("DefinitionApply", d.FailDefinitionApply)
+	return randomFail("DefinitionApply", d.FailDefinitionApply)
 }
 
 func (d *Definition) Validate() error {
@@ -48,5 +48,5 @@ func (d *Definition) Validate() error {
 		return fmt.Errorf("TEST: Resources validation failed: %s", err)
 	}
 
-	return RandomFail("DefinitionValidate", d.FailDefinitionValidate)
+	return randomFail("DefinitionValidate", d.FailDefinitionValidate)
 }

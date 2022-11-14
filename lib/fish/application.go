@@ -45,7 +45,7 @@ func (f *Fish) ApplicationCreate(a *types.Application) error {
 
 	// Create ApplicationState NEW too
 	f.ApplicationStateCreate(&types.ApplicationState{
-		ApplicationUID: a.UID, Status: types.ApplicationStateStatusNEW,
+		ApplicationUID: a.UID, Status: types.ApplicationStatusNEW,
 		Description: "Just created by Fish " + f.node.Name,
 	})
 	return err
@@ -71,7 +71,7 @@ func (f *Fish) ApplicationListGetStatusNew() (as []types.Application, err error)
 	err = f.db.Order("created_at").Where("UID in (?)",
 		f.db.Select("application_uid").Table("(?)",
 			f.db.Model(&types.ApplicationState{}).Select("application_uid, status, max(created_at)").Group("application_uid"),
-		).Where("Status = ?", types.ApplicationStateStatusNEW),
+		).Where("Status = ?", types.ApplicationStatusNEW),
 	).Find(&as).Error
 	return as, err
 }
@@ -80,34 +80,8 @@ func (f *Fish) ApplicationIsAllocated(app_uid types.ApplicationUID) (err error) 
 	state, err := f.ApplicationStateGetByApplication(app_uid)
 	if err != nil {
 		return err
-	} else if state.Status != types.ApplicationStateStatusALLOCATED {
+	} else if state.Status != types.ApplicationStatusALLOCATED {
 		return fmt.Errorf("Fish: The Application is not allocated")
 	}
 	return nil
-}
-
-func (f *Fish) ApplicationSnapshot(app *types.Application, full bool) (string, error) {
-	// Get application label to choose the right driver
-	label, err := f.LabelGet(app.LabelUID)
-	if err != nil {
-		return "", fmt.Errorf("Fish: Label not found: %w", err)
-	}
-
-	driver := f.DriverGet(label.Driver)
-	if driver == nil {
-		return "", fmt.Errorf("Fish: Driver not available: %s", label.Driver)
-	}
-
-	// Get resource to locate hwaddr
-	res, err := f.ResourceGetByApplication(app.UID)
-	if err != nil {
-		return "", fmt.Errorf("Fish: Resource not found: %w", err)
-	}
-
-	out, err := driver.Snapshot(res.HwAddr, full)
-	if err != nil {
-		return "", fmt.Errorf("Fish: Unable to create snapshot: %w", err)
-	}
-
-	return out, nil
 }

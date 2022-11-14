@@ -73,7 +73,7 @@ func (f *Fish) UserAuth(name string, password string) *types.User {
 	return user
 }
 
-func (f *Fish) UserNew(name string, password string) (string, error) {
+func (f *Fish) UserNew(name string, password string) (string, *types.User, error) {
 	if password == "" {
 		password = crypt.RandString(64)
 	}
@@ -82,10 +82,10 @@ func (f *Fish) UserNew(name string, password string) (string, error) {
 
 	if err := f.UserCreate(user); err != nil {
 		log.Printf("Fish: Unable to create new user: %s, %s", name, err)
-		return "", err
+		return "", nil, err
 	}
 
-	return password, nil
+	return password, user, nil
 }
 
 func (f *Fish) UserDelete(name string) error {

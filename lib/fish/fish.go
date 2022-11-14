@@ -82,6 +82,7 @@ func (f *Fish) Init() error {
 		&types.Label{},
 		&types.Application{},
 		&types.ApplicationState{},
+		&types.ApplicationTask{},
 		&types.Resource{},
 		&types.Vote{},
 		&types.Location{},
@@ -96,7 +97,7 @@ func (f *Fish) Init() error {
 	// Create admin user and ignore errors if it's existing
 	_, err := f.UserGet("admin")
 	if err == gorm.ErrRecordNotFound {
-		if pass, _ := f.UserNew("admin", ""); pass != "" {
+		if pass, _, _ := f.UserNew("admin", ""); pass != "" {
 			// Print pass of newly created admin user to stderr
 			println("Admin user pass:", pass)
 		}
@@ -169,7 +170,7 @@ func (f *Fish) Init() error {
 			if err := f.ResourceDelete(res.UID); err != nil {
 				log.Println("Fish: Unable to delete Resource of Application:", res.ApplicationUID, err)
 			}
-			app_state := &types.ApplicationState{ApplicationUID: res.ApplicationUID, Status: types.ApplicationStateStatusERROR,
+			app_state := &types.ApplicationState{ApplicationUID: res.ApplicationUID, Status: types.ApplicationStatusERROR,
 				Description: "Found not cleaned up resource",
 			}
 			f.ApplicationStateCreate(app_state)
@@ -348,7 +349,7 @@ func (f *Fish) voteProcessRound(vote *types.Vote) {
 					log.Println("Fish: Unable to get the Application state:", err)
 					continue
 				}
-				if s.Status != types.ApplicationStateStatusNEW {
+				if s.Status != types.ApplicationStatusNEW {
 					// The Application state was changed by some node, so we can drop the election process
 					f.voteActiveRemove(vote.UID)
 					return
@@ -466,9 +467,9 @@ func (f *Fish) executeApplication(app_uid types.ApplicationUID) error {
 	go func() {
 		log.Println("Fish: Start executing Application", app.UID, app_state.Status)
 
-		if app_state.Status == types.ApplicationStateStatusNEW {
+		if app_state.Status == types.ApplicationStatusNEW {
 			// Set Application state as ELECTED
-			app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStateStatusELECTED,
+			app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusELECTED,
 				Description: "Elected node: " + f.node.Name,
 			}
 			err := f.ApplicationStateCreate(app_state)
@@ -486,21 +487,21 @@ func (f *Fish) executeApplication(app_uid types.ApplicationUID) error {
 		var metadata map[string]interface{}
 		if err := json.Unmarshal([]byte(app.Metadata), &metadata); err != nil {
 			log.Println("Fish: Unable to parse the app metadata:", app.UID, err)
-			app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStateStatusERROR,
+			app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
 				Description: fmt.Sprintf("Unable to parse the app metadata: %s", err),
 			}
 			f.ApplicationStateCreate(app_state)
 		}
 		if err := json.Unmarshal([]byte(label.Metadata), &metadata); err != nil {
 			log.Println("Fish: Unable to parse the Label metadata:", label.UID, err)
-			app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStateStatusERROR,
+			app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
 				Description: fmt.Sprintf("Unable to parse the label metadata: %s", err),
 			}
 			f.ApplicationStateCreate(app_state)
 		}
 		if merged_metadata, err = json.Marshal(metadata); err != nil {
 			log.Println("Fish: Unable to merge metadata:", label.UID, err)
-			app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStateStatusERROR,
+			app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
 				Description: fmt.Sprintf("Unable to merge metadata: %s", err),
 			}
 			f.ApplicationStateCreate(app_state)
@@ -512,11 +513,11 @@ func (f *Fish) executeApplication(app_uid types.ApplicationUID) error {
 			NodeUID:        f.node.UID,
 			Metadata:       util.UnparsedJson(merged_metadata),
 		}
-		if app_state.Status == types.ApplicationStateStatusALLOCATED {
+		if app_state.Status == types.ApplicationStatusALLOCATED {
 			res, err = f.ResourceGetByApplication(app.UID)
 			if err != nil {
 				log.Println("Fish: Unable to get the allocated resource for Application:", app.UID, err)
-				app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStateStatusERROR,
+				app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
 					Description: fmt.Sprintf("Unable to find the allocated resource: %s", err),
 				}
 				f.ApplicationStateCreate(app_state)
@@ -524,21 +525,24 @@ func (f *Fish) executeApplication(app_uid types.ApplicationUID) error {
 		}
 
 		// Allocate the resource
-		if app_state.Status == types.ApplicationStateStatusELECTED {
+		if app_state.Status == types.ApplicationStatusELECTED {
 			// Run the allocation
 			log.Println("Fish: Allocate the resource using the driver", driver.Name())
-			res.HwAddr, res.IpAddr, err = driver.Allocate(string(label.Definition), metadata)
+			drv_res, err := driver.Allocate(string(label.Definition), metadata)
 			if err != nil {
 				log.Println("Fish: Unable to allocate resource for the Application:", app.UID, err)
-				app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStateStatusERROR,
+				app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
 					Description: fmt.Sprintf("Driver allocate resource error: %s", err),
 				}
 			} else {
+				res.Identifier = drv_res.Identifier
+				res.HwAddr = drv_res.HwAddr
+				res.IpAddr = drv_res.IpAddr
 				err := f.ResourceCreate(res)
 				if err != nil {
 					log.Println("Fish: Unable to store resource for Application:", app.UID, err)
 				}
-				app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStateStatusALLOCATED,
+				app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusALLOCATED,
 					Description: fmt.Sprintf("Driver allocated the resource"),
 				}
 			}
@@ -547,7 +551,7 @@ func (f *Fish) executeApplication(app_uid types.ApplicationUID) error {
 
 		// Run the loop to wait for deallocate request
 		var deallocate_retry uint8 = 1
-		for app_state.Status == types.ApplicationStateStatusALLOCATED {
+		for app_state.Status == types.ApplicationStatusALLOCATED {
 			if !f.running {
 				log.Println("Fish: Stopping the Application execution:", app.UID)
 				return
@@ -556,10 +560,16 @@ func (f *Fish) executeApplication(app_uid types.ApplicationUID) error {
 			if err != nil {
 				log.Println("Fish: Unable to get status for Application:", app.UID, err)
 			}
-			if app_state.Status == types.ApplicationStateStatusDEALLOCATE || app_state.Status == types.ApplicationStateStatusRECALLED {
+
+			// Execute the existing ApplicationTasks. It will be executed during ALLOCATED or prior
+			// to executing deallocation by DEALLOCATE & RECALLED which right now is useful for
+			// `snapshot` tasks.
+			f.executeApplicationTasks(driver, res, app_state.Status)
+
+			if app_state.Status == types.ApplicationStatusDEALLOCATE || app_state.Status == types.ApplicationStatusRECALLED {
 				log.Println("Fish: Running Deallocate of the Application:", app.UID)
 				// Deallocating and destroy the resource
-				if err := driver.Deallocate(res.HwAddr); err != nil {
+				if err := driver.Deallocate(res); err != nil {
 					log.Printf("Fish: Unable to deallocate the Resource of Application: %s (try: %d): %v\n", app.UID, deallocate_retry, err)
 					// Let's retry to deallocate the resource 10 times before give up
 					if deallocate_retry <= 10 {
@@ -567,12 +577,12 @@ func (f *Fish) executeApplication(app_uid types.ApplicationUID) error {
 						time.Sleep(10 * time.Second)
 						continue
 					}
-					app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStateStatusERROR,
+					app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
 						Description: fmt.Sprintf("Driver deallocate resource error: %s", err),
 					}
 				} else {
 					log.Println("Fish: Successful deallocation of the Application:", app.UID)
-					app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStateStatusDEALLOCATED,
+					app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusDEALLOCATED,
 						Description: fmt.Sprintf("Driver deallocated the resource"),
 					}
 				}
@@ -605,6 +615,37 @@ func (f *Fish) executeApplication(app_uid types.ApplicationUID) error {
 	}()
 
 	return nil
+}
+
+func (f *Fish) executeApplicationTasks(drv drivers.ResourceDriver, res *types.Resource, app_status types.ApplicationStatus) {
+	// Execute the associated ApplicationTasks if there is some
+	tasks, err := f.ApplicationTaskListByApplicationAndWhen(res.ApplicationUID, app_status)
+	if err != nil {
+		log.Println("Fish: Unable to get ApplicationTasks:", res.ApplicationUID, err)
+	}
+	for _, task := range tasks {
+		// Skipping already executed task
+		if task.Result != "{}" {
+			continue
+		}
+		t := drv.GetTask(task.Task, string(task.Options))
+		if t == nil {
+			log.Println("Fish: Unable to get associated driver task type for Application:", res.ApplicationUID, task.Task)
+			task.Result = util.UnparsedJson(`{"error":"task not availble in driver"}`)
+		} else {
+			// Executing the task
+			t.SetInfo(&task, res)
+			result, err := t.Execute()
+			if err != nil {
+				// We're not crashing here because even with error task could have a result
+				log.Println("Fish: Error happened during executing the task:", task.UID, err)
+			}
+			task.Result = util.UnparsedJson(result)
+		}
+		if err := f.ApplicationTaskSave(&task); err != nil {
+			log.Println("Fish: Error during update the task with result:", task.UID, err)
+		}
+	}
 }
 
 func (f *Fish) removeFromExecutingApplincations(app_uid types.ApplicationUID) {
