@@ -27,6 +27,7 @@ import (
 
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/drivers"
+	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
 // Implements drivers.ResourceDriver interface
@@ -171,7 +172,7 @@ func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition stri
  * It automatically download the required images, unpack them and runs the container.
  * Using metadata to create env file and pass it to the container.
  */
-func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (string, string, error) {
+func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (*types.Resource, error) {
 	if d.cfg.IsRemote {
 		// It's remote so let's use docker_usage to store modificators properly
 		d.docker_usage_mutex.Lock()
@@ -203,14 +204,14 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 		}
 		net_args = append(net_args, "aquarium-"+c_network)
 		if _, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, net_args...); err != nil {
-			return "", "", err
+			return nil, err
 		}
 	}
 
 	// Load the images
 	img_name_version, err := d.loadImages(&def)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	// Set the arguments to run the container
@@ -226,14 +227,14 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 	// Create and connect volumes to container
 	if err := d.disksCreate(c_name, &run_args, def.Resources.Disks); err != nil {
 		log.Println("DOCKER: Unable to create the required disks")
-		return c_hwaddr, "", err
+		return nil, err
 	}
 
 	// Create env file
 	env_path, err := d.envCreate(c_name, metadata)
 	if err != nil {
 		log.Println("DOCKER: Unable to create the required disks")
-		return c_hwaddr, "", err
+		return nil, err
 	}
 	// Add env-file to run args
 	run_args = append(run_args, "--env-file", env_path)
@@ -244,7 +245,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 	run_args = append(run_args, img_name_version)
 	if _, _, err := runAndLog(30*time.Second, d.cfg.DockerPath, run_args...); err != nil {
 		log.Println("DOCKER: Unable to run container", c_name, err)
-		return c_hwaddr, "", err
+		return nil, err
 	}
 
 	if d.cfg.IsRemote {
@@ -254,11 +255,15 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 
 	log.Println("DOCKER: Allocate of VM", c_hwaddr, c_name, "completed")
 
-	return c_hwaddr, "", nil
+	return &types.Resource{Identifier: c_name, HwAddr: c_hwaddr}, nil
 }
 
-func (d *Driver) Status(hwaddr string) string {
-	if len(d.getAllocatedContainer(hwaddr)) > 0 {
+func (d *Driver) Status(res *types.Resource) string {
+	if res == nil || res.Identifier == "" {
+		log.Println("DOCKER: Invalid resource:", res)
+		return drivers.StatusNone
+	}
+	if len(d.getAllocatedContainerId(res.Identifier)) > 0 {
 		return drivers.StatusAllocated
 	}
 	return drivers.StatusNone
@@ -284,17 +289,20 @@ func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
 	return t
 }
 
-func (d *Driver) Deallocate(hwaddr string) error {
+func (d *Driver) Deallocate(res *types.Resource) error {
+	if res == nil || res.Identifier == "" {
+		return fmt.Errorf("DOCKER: Invalid resource: %v", res)
+	}
 	if d.cfg.IsRemote {
 		// It's remote so let's use docker_usage to store modificators properly
 		d.docker_usage_mutex.Lock()
 		defer d.docker_usage_mutex.Unlock()
 	}
-	c_name := d.getContainerName(hwaddr)
-	c_id := d.getAllocatedContainer(hwaddr)
+	c_name := d.getContainerName(res.Identifier)
+	c_id := d.getAllocatedContainerId(res.Identifier)
 	if len(c_id) == 0 {
-		log.Println("DOCKER: Unable to find container with HW ADDR:", hwaddr)
-		return fmt.Errorf("DOCKER: No container found with HW ADDR: %s", hwaddr)
+		log.Println("DOCKER: Unable to find container with identifier:", res.Identifier)
+		return fmt.Errorf("DOCKER: No container found with identifier: %s", res.Identifier)
 	}
 
 	// Getting the mounted volumes
@@ -352,7 +360,7 @@ func (d *Driver) Deallocate(hwaddr string) error {
 		}
 	}
 
-	log.Println("DOCKER: Deallocate of container", hwaddr, c_name, "completed")
+	log.Println("DOCKER: Deallocate of container", res.Identifier, c_name, "completed")
 
 	return nil
 }

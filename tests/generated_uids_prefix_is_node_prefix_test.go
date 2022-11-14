@@ -140,7 +140,7 @@ drivers:
 				t.Fatalf("ApplicationState UID is incorrect: %v", app_state.UID)
 			}
 
-			if app_state.Status != types.ApplicationStateStatusALLOCATED {
+			if app_state.Status != types.ApplicationStatusALLOCATED {
 				r.Fatalf("Application Status is incorrect: %v", app_state.Status)
 			}
 
@@ -165,8 +165,8 @@ drivers:
 			t.Fatalf("Resource UID is incorrect: %v", res.UID)
 		}
 
-		if res.HwAddr == "" {
-			t.Fatalf("Resource hwaddr is incorrect: %v", res.HwAddr)
+		if res.Identifier == "" {
+			t.Fatalf("Resource identifier is incorrect: %v", res.Identifier)
 		}
 
 		if !bytes.Equal(res.UID[:6], node.UID[:6]) {
@@ -195,7 +195,7 @@ drivers:
 				End().
 				JSON(&app_state)
 
-			if app_state.Status != types.ApplicationStateStatusDEALLOCATED {
+			if app_state.Status != types.ApplicationStatusDEALLOCATED {
 				r.Fatalf("Application Status is incorrect: %v", app_state.Status)
 			}
 		})

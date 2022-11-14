@@ -109,7 +109,7 @@ drivers:
 			End().
 			JSON(&app_state)
 
-		if app_state.Status != types.ApplicationStateStatusNEW {
+		if app_state.Status != types.ApplicationStatusNEW {
 			t.Fatalf("Application Status is incorrect: %v", app_state.Status)
 		}
 	})
@@ -126,7 +126,7 @@ drivers:
 			End().
 			JSON(&app_state)
 
-		if app_state.Status != types.ApplicationStateStatusNEW {
+		if app_state.Status != types.ApplicationStatusNEW {
 			t.Fatalf("Application Status is incorrect: %v", app_state.Status)
 		}
 	})
@@ -143,7 +143,7 @@ drivers:
 			End().
 			JSON(&app_state)
 
-		if app_state.Status != types.ApplicationStateStatusNEW {
+		if app_state.Status != types.ApplicationStatusNEW {
 			t.Fatalf("Application Status is incorrect: %v", app_state.Status)
 		}
 	})
@@ -160,7 +160,7 @@ drivers:
 			End().
 			JSON(&app_state)
 
-		if app_state.Status != types.ApplicationStateStatusNEW {
+		if app_state.Status != types.ApplicationStatusNEW {
 			t.Fatalf("Application Status is incorrect: %v", app_state.Status)
 		}
 	})
@@ -186,7 +186,7 @@ drivers:
 				End().
 				JSON(&app_state)
 
-			if app_state.Status != types.ApplicationStateStatusRECALLED {
+			if app_state.Status != types.ApplicationStatusRECALLED {
 				r.Fatalf("Application Status is incorrect: %v", app_state.Status)
 			}
 		})

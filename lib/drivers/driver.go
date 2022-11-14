@@ -12,6 +12,10 @@
 
 package drivers
 
+import (
+	"github.com/adobe/aquarium-fish/lib/openapi/types"
+)
+
 const (
 	StatusNone      = "NONE"
 	StatusAllocated = "ALLOCATED"
@@ -49,12 +53,12 @@ type ResourceDriver interface {
 	// Allocate the resource by definition and returns hw address
 	// -> definition - describes the driver options to allocate the required resource
 	// -> metadata - user metadata to use during resource allocation
-	// <- hwaddr - mandatory, needed to identify the resource. If it's a MAC address - it is used to auth in Meta API
-	// <- ipaddr - optional, if driver can provide the assigned IP address of the instance
-	Allocate(definition string, metadata map[string]interface{}) (hwaddr, ipaddr string, err error)
+	// <- res - initial resource information to store driver instance state
+	Allocate(definition string, metadata map[string]interface{}) (res *types.Resource, err error)
 
 	// Get the status of the resource with given hw address
-	Status(hwaddr string) string
+	// -> res - resource information with stored driver instance state
+	Status(res *types.Resource) string
 
 	// Get task struct with implementation to execute it later
 	// -> task - identifier of the task operation
@@ -62,6 +66,6 @@ type ResourceDriver interface {
 	GetTask(task, options string) ResourceDriverTask
 
 	// Deallocate resource with provided hw addr
-	// -> hwaddr - driver identifier of the resource
-	Deallocate(hwaddr string) error
+	// -> res - resource information with stored driver instance state
+	Deallocate(res *types.Resource) error
 }

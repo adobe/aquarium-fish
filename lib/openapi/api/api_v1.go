@@ -357,10 +357,10 @@ func (e *Processor) ApplicationDeallocateGet(c echo.Context, uid types.Applicati
 		return fmt.Errorf("Unable to deallocate the Application with status: %s", out.Status)
 	}
 
-	new_status := types.ApplicationStateStatusDEALLOCATE
-	if out.Status != types.ApplicationStateStatusALLOCATED {
+	new_status := types.ApplicationStatusDEALLOCATE
+	if out.Status != types.ApplicationStatusALLOCATED {
 		// The Application was not yet Allocated so just mark it as Recalled
-		new_status = types.ApplicationStateStatusRECALLED
+		new_status = types.ApplicationStatusRECALLED
 	}
 	as := &types.ApplicationState{ApplicationUID: uid, Status: new_status,
 		Description: fmt.Sprintf("Requested by user %s", user.(*types.User).Name),

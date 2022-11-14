@@ -45,7 +45,7 @@ func (f *Fish) ApplicationCreate(a *types.Application) error {
 
 	// Create ApplicationState NEW too
 	f.ApplicationStateCreate(&types.ApplicationState{
-		ApplicationUID: a.UID, Status: types.ApplicationStateStatusNEW,
+		ApplicationUID: a.UID, Status: types.ApplicationStatusNEW,
 		Description: "Just created by Fish " + f.node.Name,
 	})
 	return err
@@ -71,7 +71,7 @@ func (f *Fish) ApplicationListGetStatusNew() (as []types.Application, err error)
 	err = f.db.Order("created_at").Where("UID in (?)",
 		f.db.Select("application_uid").Table("(?)",
 			f.db.Model(&types.ApplicationState{}).Select("application_uid, status, max(created_at)").Group("application_uid"),
-		).Where("Status = ?", types.ApplicationStateStatusNEW),
+		).Where("Status = ?", types.ApplicationStatusNEW),
 	).Find(&as).Error
 	return as, err
 }
@@ -80,7 +80,7 @@ func (f *Fish) ApplicationIsAllocated(app_uid types.ApplicationUID) (err error) 
 	state, err := f.ApplicationStateGetByApplication(app_uid)
 	if err != nil {
 		return err
-	} else if state.Status != types.ApplicationStateStatusALLOCATED {
+	} else if state.Status != types.ApplicationStatusALLOCATED {
 		return fmt.Errorf("Fish: The Application is not allocated")
 	}
 	return nil

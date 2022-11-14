@@ -924,6 +924,16 @@ components:
       format: uuid
       x-oapi-codegen-extra-tags:
         gorm: primaryKey
+    ApplicationStatus:
+      type: string
+      enum:
+        - NEW          # The Application just created (active)
+        - ELECTED      # Node is elected during the voting process (active)
+        - ALLOCATED    # The Resource is allocated and starting up (active)
+        - DEALLOCATE   # User requested the Application deallocate (not active)
+        - RECALLED     # User requested the Application deallocate, but it was not allocated (not active)
+        - DEALLOCATED  # The Resource is deallocated (not active)
+        - ERROR        # The error happened (not active)
     ApplicationState:
       type: object
       description: >
@@ -948,15 +958,7 @@ components:
           type: string
           format: uuid
         status:
-          type: string
-          enum:
-            - NEW          # The Application just created (active)
-            - ELECTED      # Node is elected during the voting process (active)
-            - ALLOCATED    # The Resource is allocated and starting up (active)
-            - DEALLOCATE   # User requested the Application deallocate (not active)
-            - RECALLED     # User requested the Application deallocate, but it was not allocated (not active)
-            - DEALLOCATED  # The Resource is deallocated (not active)
-            - ERROR        # The error happened (not active)
+          $ref: '#/components/schemas/ApplicationStatus'
         description:
           type: string
           description: Additional information for the state
@@ -983,6 +985,7 @@ components:
         - updated_at
         - application_UID
         - task
+        - when
         - options
         - result
       properties:
@@ -1001,6 +1004,11 @@ components:
         task:
           type: string
           description: Identifier of the task
+        when:
+          $ref: '#/components/schemas/ApplicationStatus'
+          description: |
+            Used to specify when the task should be executed, right now only ALLOCATED, DEALLOCATE
+            and RECALLED (when app is already here) are supported.
         options:
           x-go-type: util.UnparsedJson
           description: JSON object with additional options
@@ -1235,6 +1243,7 @@ components:
         - updated_at
         - application_UID
         - node_UID
+        - identifier
         - ip_addr
         - hw_addr
         - metadata
@@ -1255,15 +1264,25 @@ components:
           # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/NodeUID'
           type: string
           format: uuid
+        identifier:
+          type: string
+          description: |
+            Unique for driver identifier of the resource which can be used to find it later.
         ip_addr:
           type: string
-          description: Is a weak current network IP address of the resource, usually gathered based on the `HwAddr`.
+          description: >
+            Is a weak current network IP address of the resource, usually gathered based on the
+            `hw_addr`.
         hw_addr:
           type: string
-          description: MAC or any other type of network address which will allow to properly identify the node through network interaction.
+          description: >
+            MAC or any other type of network address which will allow to properly identify the node
+            through network interaction.
         metadata:
           x-go-type: util.UnparsedJson
-          description: Combined Application and Label metadata (in this order) to make it available through `Meta API` to the resource.
+          description: >
+            Combined Application and Label metadata (in this order) to make it available through
+            `Meta API` to the resource.
           example:
             JENKINS_URL: 'http://172.16.1.1:8085/'
             JENKINS_AGENT_SECRET: 03839eabcf945b1e780be8f9488d264c4c57bf388546da9a84588345555f29b0

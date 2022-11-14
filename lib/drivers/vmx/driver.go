@@ -27,6 +27,7 @@ import (
 
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/drivers"
+	"github.com/adobe/aquarium-fish/lib/openapi/types"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
@@ -147,11 +148,11 @@ func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition stri
  * It automatically download the required images, unpack them and runs the VM.
  * Not using metadata because there is no good interfaces to pass it to VM.
  */
-func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (string, string, error) {
+func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (*types.Resource, error) {
 	var def Definition
 	if err := def.Apply(definition); err != nil {
 		log.Println("VMX: Unable to apply definition:", err)
-		return "", "", err
+		return nil, err
 	}
 
 	// Generate unique id from the hw address and required directories
@@ -171,7 +172,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 	// Load the required images
 	img_path, err := d.loadImages(&def, vm_images_dir)
 	if err != nil {
-		return vm_hwaddr, "", err
+		return nil, err
 	}
 
 	// Clone VM from the image
@@ -182,7 +183,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 		"-cloneName", vm_id,
 	}
 	if _, _, err := runAndLog(120*time.Second, d.cfg.VmrunPath, args...); err != nil {
-		return vm_hwaddr, "", err
+		return nil, err
 	}
 
 	// Change cloned vm configuration
@@ -196,13 +197,13 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 		"memsize =", fmt.Sprintf(`memsize = "%d"`, def.Resources.Ram*1024),
 	); err != nil {
 		log.Println("VMX: Unable to change cloned VM configuration", vmx_path)
-		return vm_hwaddr, "", err
+		return nil, err
 	}
 
 	// Create and connect disks to vmx
 	if err := d.disksCreate(vmx_path, def.Resources.Disks); err != nil {
 		log.Println("VMX: Unable create disks for VM", vmx_path)
-		return vm_hwaddr, "", err
+		return nil, err
 	}
 
 	// Run the background monitoring of the vmware log
@@ -215,16 +216,20 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (s
 		log.Println("VMX: Unable to run VM", vmx_path, err)
 		log.Println("VMX: Check the log info:", filepath.Join(filepath.Dir(vmx_path), "vmware.log"),
 			"and directory ~/Library/Logs/VMware/ for additional logs")
-		return vm_hwaddr, "", err
+		return nil, err
 	}
 
-	log.Println("VMX: Allocate of VM", vm_hwaddr, vmx_path, "completed")
+	log.Println("VMX: Allocate of VM completed:", vmx_path)
 
-	return vm_hwaddr, "", nil
+	return &types.Resource{Identifier: vmx_path, HwAddr: vm_hwaddr}, nil
 }
 
-func (d *Driver) Status(hwaddr string) string {
-	if len(d.getAllocatedVMX(hwaddr)) > 0 {
+func (d *Driver) Status(res *types.Resource) string {
+	if res == nil || res.Identifier == "" {
+		log.Println("VMX: Invalid resource:", res)
+		return drivers.StatusNone
+	}
+	if d.isAllocated(res.Identifier) {
 		return drivers.StatusAllocated
 	}
 	return drivers.StatusNone
@@ -242,7 +247,7 @@ func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
 	// Parse options json into task structure
 	if len(options) > 0 {
 		if err := json.Unmarshal([]byte(options), t); err != nil {
-			log.Println("TEST: Unable to apply the task options", err)
+			log.Println("VMX: Unable to apply the task options", err)
 			return nil
 		}
 	}
@@ -250,11 +255,14 @@ func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
 	return t
 }
 
-func (d *Driver) Deallocate(hwaddr string) error {
-	vmx_path := d.getAllocatedVMX(hwaddr)
+func (d *Driver) Deallocate(res *types.Resource) error {
+	if res == nil || res.Identifier == "" {
+		return fmt.Errorf("VMX: Invalid resource: %v", res)
+	}
+	vmx_path := res.Identifier
 	if len(vmx_path) == 0 {
-		log.Println("VMX: Unable to find VM with HW ADDR:", hwaddr)
-		return fmt.Errorf("VMX: No VM found with HW ADDR: %s", hwaddr)
+		log.Println("VMX: Unable to find VM:", vmx_path)
+		return fmt.Errorf("VMX: No VM found: %s", vmx_path)
 	}
 
 	// Sometimes it's stuck, so try to stop a bit more than usual
@@ -274,7 +282,7 @@ func (d *Driver) Deallocate(hwaddr string) error {
 		return err
 	}
 
-	log.Println("VMX: Deallocate of VM", hwaddr, vmx_path, "completed")
+	log.Println("VMX: Deallocate of VM completed:", vmx_path)
 
 	return nil
 }

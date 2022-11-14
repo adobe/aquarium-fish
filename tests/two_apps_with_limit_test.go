@@ -126,7 +126,7 @@ drivers:
 				End().
 				JSON(&app_state)
 
-			if app_state.Status != types.ApplicationStateStatusALLOCATED {
+			if app_state.Status != types.ApplicationStatusALLOCATED {
 				r.Fatalf("Application 1 Status is incorrect: %v", app_state.Status)
 			}
 		})
@@ -142,7 +142,7 @@ drivers:
 			End().
 			JSON(&app_state)
 
-		if app_state.Status != types.ApplicationStateStatusNEW {
+		if app_state.Status != types.ApplicationStatusNEW {
 			t.Fatalf("Application 2 Status is incorrect: %v", app_state.Status)
 		}
 	})
@@ -158,8 +158,8 @@ drivers:
 			End().
 			JSON(&res)
 
-		if res.HwAddr == "" {
-			t.Fatalf("Resource 1 hwaddr is incorrect: %v", res.HwAddr)
+		if res.Identifier == "" {
+			t.Fatalf("Resource 1 identifier is incorrect: %v", res.Identifier)
 		}
 	})
 
@@ -184,7 +184,7 @@ drivers:
 				End().
 				JSON(&app_state)
 
-			if app_state.Status != types.ApplicationStateStatusDEALLOCATED {
+			if app_state.Status != types.ApplicationStatusDEALLOCATED {
 				r.Fatalf("Application 1 Status is incorrect: %v", app_state.Status)
 			}
 		})
@@ -201,7 +201,7 @@ drivers:
 				End().
 				JSON(&app_state)
 
-			if app_state.Status != types.ApplicationStateStatusALLOCATED {
+			if app_state.Status != types.ApplicationStatusALLOCATED {
 				r.Fatalf("Application 2 Status is incorrect: %v", app_state.Status)
 			}
 		})
@@ -217,8 +217,8 @@ drivers:
 			End().
 			JSON(&res)
 
-		if res.HwAddr == "" {
-			t.Fatalf("Resource 2 hwaddr is incorrect: %v", res.HwAddr)
+		if res.Identifier == "" {
+			t.Fatalf("Resource 2 identifier is incorrect: %v", res.Identifier)
 		}
 	})
 
@@ -243,7 +243,7 @@ drivers:
 				End().
 				JSON(&app_state)
 
-			if app_state.Status != types.ApplicationStateStatusDEALLOCATED {
+			if app_state.Status != types.ApplicationStatusDEALLOCATED {
 				r.Fatalf("Application 2 Status is incorrect: %v", app_state.Status)
 			}
 		})

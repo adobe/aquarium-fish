@@ -46,8 +46,8 @@ func (f *Fish) ResourceListNode(node_uid types.NodeUID) (rs []types.Resource, er
 }
 
 func (f *Fish) ResourceCreate(r *types.Resource) error {
-	if len(r.HwAddr) == 0 {
-		return fmt.Errorf("Fish: HwAddr can't be empty")
+	if len(r.Identifier) == 0 {
+		return fmt.Errorf("Fish: Identifier can't be empty")
 	}
 	// TODO: check JSON
 	if len(r.Metadata) < 2 {

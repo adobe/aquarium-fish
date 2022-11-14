@@ -13,14 +13,19 @@
 package test
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
+	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
 type TaskSnapshot struct {
 	driver *Driver `json:"-"`
+
+	*types.ApplicationTask `json:"-"` // Info about the requested task
+	*types.Resource        `json:"-"` // Info about the processed resource
 
 	Full bool `json:"full"` // Make full (all disks including OS image), or just the additional disks snapshot
 }
@@ -34,18 +39,33 @@ func (t *TaskSnapshot) Clone() drivers.ResourceDriverTask {
 	return &n
 }
 
-func (t *TaskSnapshot) Execute(res_id string) (result []byte, err error) {
-	if err := randomFail(fmt.Sprintf("Snapshot %s", res_id), t.driver.cfg.FailSnapshot); err != nil {
+func (t *TaskSnapshot) SetInfo(task *types.ApplicationTask, res *types.Resource) {
+	t.ApplicationTask = task
+	t.Resource = res
+}
+
+func (t *TaskSnapshot) Execute() (result []byte, err error) {
+	if t.ApplicationTask == nil {
+		log.Println("AWS: Invalid application task:", t.ApplicationTask)
+		return []byte(`{"error":"internal: invalid application task"}`), fmt.Errorf("TEST: Invalid application task: %v", t.ApplicationTask)
+	}
+	if t.Resource == nil || t.Resource.Identifier == "" {
+		log.Println("TEST: Invalid resource:", t.Resource)
+		return []byte(`{"error":"internal: invalid resource"}`), fmt.Errorf("TEST: Invalid resource: %v", t.Resource)
+	}
+	if err := randomFail(fmt.Sprintf("Snapshot %s", t.Resource.Identifier), t.driver.cfg.FailSnapshot); err != nil {
 		log.Printf("TEST: RandomFail: %v\n", err)
-		return []byte{}, err
+		out, _ := json.Marshal(map[string]any{})
+		return out, err
 	}
 
 	t.driver.resources_lock.Lock()
 	defer t.driver.resources_lock.Unlock()
 
-	if _, ok := t.driver.resources[res_id]; !ok {
-		return []byte{}, fmt.Errorf("TEST: Unable to snapshot unavailable resource '%s'", res_id)
+	if _, ok := t.driver.resources[t.Resource.Identifier]; !ok {
+		out, _ := json.Marshal(map[string]any{})
+		return out, fmt.Errorf("TEST: Unable to snapshot unavailable resource '%s'", t.Resource.Identifier)
 	}
 
-	return []byte(`{"snapshots":["test-snapshot"]}`), nil
+	return json.Marshal(map[string]any{"snapshots": []string{"test-snapshot"}, "when": t.ApplicationTask.When})
 }

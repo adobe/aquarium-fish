@@ -101,7 +101,7 @@ drivers:
 				End().
 				JSON(&app_state)
 
-			if app_state.Status != types.ApplicationStateStatusALLOCATED {
+			if app_state.Status != types.ApplicationStatusALLOCATED {
 				r.Fatalf("Application Status is incorrect: %v", app_state.Status)
 			}
 		})
@@ -112,7 +112,7 @@ drivers:
 		apitest.New().
 			EnableNetworking(cli).
 			Post(afi.ApiAddress("api/v1/application/"+app.UID.String()+"/task/")).
-			JSON(`{"task":"NOTEXISTING_TASK"}`).
+			JSON(map[string]any{"task": "NOTEXISTING_TASK", "when": types.ApplicationStatusALLOCATED}).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
@@ -169,7 +169,7 @@ drivers:
 				End().
 				JSON(&app_state)
 
-			if app_state.Status != types.ApplicationStateStatusDEALLOCATED {
+			if app_state.Status != types.ApplicationStatusDEALLOCATED {
 				r.Fatalf("Application Status is incorrect: %v", app_state.Status)
 			}
 		})

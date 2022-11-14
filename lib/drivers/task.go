@@ -12,6 +12,10 @@
 
 package drivers
 
+import (
+	"github.com/adobe/aquarium-fish/lib/openapi/types"
+)
+
 type ResourceDriverTask interface {
 	// Name of the task
 	Name() string
@@ -20,8 +24,10 @@ type ResourceDriverTask interface {
 	// Will return new not related to the original task structure
 	Clone() ResourceDriverTask
 
-	// Run the task operation over the instance
-	// -> inst_id - driver identifier of the resource
+	// Fish provides the task information about the operated items
+	SetInfo(task *types.ApplicationTask, res *types.Resource)
+
+	// Run the task operation
 	// <- result - json data with results of operation
-	Execute(inst_id string) (result []byte, err error)
+	Execute() (result []byte, err error)
 }

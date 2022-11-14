@@ -50,17 +50,17 @@ func (f *Fish) ApplicationStateGetByApplication(app_uid types.ApplicationUID) (a
 }
 
 // Return false if Status in ERROR, DEALLOCATE or DEALLOCATED state
-func (f *Fish) ApplicationStateIsActive(status types.ApplicationStateStatus) bool {
-	if status == types.ApplicationStateStatusERROR {
+func (f *Fish) ApplicationStateIsActive(status types.ApplicationStatus) bool {
+	if status == types.ApplicationStatusERROR {
 		return false
 	}
-	if status == types.ApplicationStateStatusDEALLOCATE {
+	if status == types.ApplicationStatusDEALLOCATE {
 		return false
 	}
-	if status == types.ApplicationStateStatusRECALLED {
+	if status == types.ApplicationStatusRECALLED {
 		return false
 	}
-	if status == types.ApplicationStateStatusDEALLOCATED {
+	if status == types.ApplicationStatusDEALLOCATED {
 		return false
 	}
 	return true

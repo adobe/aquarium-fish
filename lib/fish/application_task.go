@@ -61,7 +61,7 @@ func (f *Fish) ApplicationTaskGet(uid types.ApplicationTaskUID) (at *types.Appli
 	return at, err
 }
 
-func (f *Fish) ApplicationTaskListByApplication(app_uid types.ApplicationUID) (at []types.ApplicationTask, err error) {
-	err = f.db.Where("application_uid = ?", app_uid).Order("created_at desc").Find(&at).Error
+func (f *Fish) ApplicationTaskListByApplicationAndWhen(app_uid types.ApplicationUID, when types.ApplicationStatus) (at []types.ApplicationTask, err error) {
+	err = f.db.Where(`application_uid = ? AND "when" = ?`, app_uid, when).Order("created_at desc").Find(&at).Error
 	return at, err
 }
