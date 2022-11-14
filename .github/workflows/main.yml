@@ -36,13 +36,19 @@ jobs:
     - name: Build
       run: ./build-linux.sh
 
+    - name: Upload binaries
+      uses: actions/upload-artifact@v3
+      with:
+        name: binaries
+        path: aquarium-fish.*
+
     - name: Test
       run: |
         go install github.com/jstemmer/go-junit-report/v2@latest
-        FISH_PATH=$PWD/aquarium-fish.linux_amd64 go test -failfast -parallel 4 -count=1 ./tests/... | go-junit-report -iocopy -set-exit-code -out report.xml
+        FISH_PATH=$PWD/aquarium-fish.linux_amd64 go test -v -failfast -parallel 4 -count=1 ./tests/... 2>&1 | go-junit-report -iocopy -set-exit-code -out report.xml
 
     - name: Test Summary
-      uses: test-summary/action@v1
+      uses: test-summary/action@v2
       if: always()
       with:
         paths: report.xml
