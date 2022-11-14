@@ -37,4 +37,12 @@ jobs:
       run: ./build-linux.sh
 
     - name: Test
-      run: FISH_PATH=$PWD/aquarium-fish.linux_amd64 go test -v -failfast -parallel 4 -count=1 ./tests/...
+      run: |
+        go install github.com/jstemmer/go-junit-report/v2@latest
+        FISH_PATH=$PWD/aquarium-fish.linux_amd64 go test -failfast -parallel 4 -count=1 ./tests/... | go-junit-report -iocopy -set-exit-code -out report.xml
+
+    - name: Test Summary
+      uses: test-summary/action@v1
+      if: always()
+      with:
+        paths: report.xml
