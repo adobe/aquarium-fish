@@ -10,37 +10,32 @@
  * governing permissions and limitations under the License.
  */
 
-package drivers
+package types
 
 import (
+	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
-// Resource requirements
-// It's used for 2 purposes: in Label definitions to describe the required amount of resources and
-// in Fish to store the currently used resources, so could add and subtract resources.
-// Modificators are used for parallel node usage by different Applications, they are stored for the
-// first Application and used for the others to determine node tenancy/overbook tolerance.
-type Resources struct {
-	Cpu     uint            `json:"cpu"`     // Number of CPU cores to use
-	Ram     uint            `json:"ram"`     // Amount of memory in GB
-	Disks   map[string]Disk `json:"disks"`   // Disks to create and connect
-	Network string          `json:"network"` // Which network configuration to use for VM
-
-	// The modificators to simultaneous execution
-	Multitenancy bool `json:"multitenancy"` // Tolerate to run along with the others
-	CpuOverbook  bool `json:"cpu_overbook"` // Tolerate to CPU overbooking
-	RamOverbook  bool `json:"ram_overbook"` // Tolerate to RAM overbooking
+func (r Resources) GormDataType() string {
+	return "blob"
 }
 
-type Disk struct {
-	Type  string `json:"type"`  // Type of the filesystem to create
-	Label string `json:"label"` // Volume name will be given to the disk, empty will use the disk key
-	Size  uint   `json:"size"`  // Amount of disk space in GB
-	Reuse bool   `json:"reuse"` // Do not remove the disk and reuse it for the next resource run
-	Clone string `json:"clone"` // Clone the snapshot of existing disk instead of creating the new one
+func (r *Resources) Scan(value interface{}) error {
+	bytes, ok := value.([]byte)
+	if !ok {
+		return fmt.Errorf("Failed to unmarshal JSONB value: %s", value)
+	}
+
+	err := json.Unmarshal(bytes, r)
+	return err
+}
+
+func (r Resources) Value() (driver.Value, error) {
+	return json.Marshal(r)
 }
 
 func (r *Resources) Validate(disk_types []string, check_net bool) error {

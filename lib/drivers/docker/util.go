@@ -27,12 +27,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/adobe/aquarium-fish/lib/drivers"
+	"github.com/adobe/aquarium-fish/lib/openapi/types"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
-func (d *Driver) getContainersResources(container_ids []string) (drivers.Resources, error) {
-	var out drivers.Resources
+func (d *Driver) getContainersResources(container_ids []string) (types.Resources, error) {
+	var out types.Resources
 
 	// Getting current running containers info - will return "<ncpu>,<mem_bytes>\n..." for each one
 	docker_args := []string{"inspect", "--format", "{{ .HostConfig.NanoCpus }},{{ .HostConfig.Memory }}"}
@@ -69,8 +69,8 @@ func (d *Driver) getContainersResources(container_ids []string) (drivers.Resourc
 
 // In order to recover after restart we need to find the current docker usage
 // There is some evristics to find the modifiers like Multitenancy and the others
-func (d *Driver) getInitialUsage() (drivers.Resources, error) {
-	var out drivers.Resources
+func (d *Driver) getInitialUsage() (types.Resources, error) {
+	var out types.Resources
 	// The driver is configured as remote so collecting the current remote docker usage
 	// Listing the existing containers ID's to use in inpect command later
 	stdout, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, "ps", "--format", "{{ .ID }}")
@@ -132,10 +132,10 @@ func (d *Driver) getContainerName(hwaddr string) string {
 }
 
 // Load images and returns the target image name:version to use by container
-func (d *Driver) loadImages(def *Definition) (string, error) {
+func (d *Driver) loadImages(opts *Options) (string, error) {
 	// Download the images and unpack them
 	var wg sync.WaitGroup
-	for name, url := range def.Images {
+	for name, url := range opts.Images {
 		archive_name := filepath.Base(url)
 		image_unpacked := filepath.Join(d.cfg.ImagesPath, strings.TrimSuffix(archive_name, ".tar.xz"))
 
@@ -160,9 +160,9 @@ func (d *Driver) loadImages(def *Definition) (string, error) {
 	// They needed to be processed sequentially because the childs does not
 	// contains the parent's layers so parents should be loaded first
 
-	// The def.Images is unsorted map, so need to sort the keys first for proper order of loading
-	image_names := make([]string, 0, len(def.Images))
-	for name, _ := range def.Images {
+	// The opts.Images is unsorted map, so need to sort the keys first for proper order of loading
+	image_names := make([]string, 0, len(opts.Images))
+	for name, _ := range opts.Images {
 		image_names = append(image_names, name)
 	}
 	sort.Strings(image_names)
@@ -170,7 +170,7 @@ func (d *Driver) loadImages(def *Definition) (string, error) {
 	target_out := ""
 	var loaded_images []string
 	for _, name := range image_names {
-		url, _ := def.Images[name]
+		url, _ := opts.Images[name]
 		archive_name := filepath.Base(url)
 		image_unpacked := filepath.Join(d.cfg.ImagesPath, strings.TrimSuffix(archive_name, ".tar.xz"))
 
@@ -216,7 +216,7 @@ func (d *Driver) loadImages(def *Definition) (string, error) {
 						image_found = tag
 						loaded_images = append(loaded_images, image_found)
 
-						if def.Image == name {
+						if opts.Image == name {
 							target_out = image_found
 						}
 						break
@@ -246,7 +246,7 @@ func (d *Driver) loadImages(def *Definition) (string, error) {
 
 			loaded_images = append(loaded_images, image_name_version)
 
-			if def.Image == name {
+			if opts.Image == name {
 				target_out = image_name_version
 			}
 			break
@@ -256,7 +256,7 @@ func (d *Driver) loadImages(def *Definition) (string, error) {
 	log.Println("DOCKER: All the images are processed.")
 
 	// Check all the images are in place just by number of them
-	if len(def.Images) != len(loaded_images) {
+	if len(opts.Images) != len(loaded_images) {
 		log.Println("DOCKER: The image processes gone wrong, please check log for the errors")
 		return "", fmt.Errorf("DOCKER: The image processes gone wrong, please check log for the errors")
 	}
@@ -287,7 +287,7 @@ func (d *Driver) isNetworkExists(name string) bool {
 }
 
 // Creates disks directories described by the disks map
-func (d *Driver) disksCreate(c_name string, run_args *[]string, disks map[string]drivers.Disk) error {
+func (d *Driver) disksCreate(c_name string, run_args *[]string, disks map[string]types.ResourcesDisk) error {
 	// Create disks
 	disk_paths := make(map[string]string, len(disks))
 

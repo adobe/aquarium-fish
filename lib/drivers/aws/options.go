@@ -17,26 +17,18 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 /**
- * Definition example:
+ * Options example:
  *   image: ami-abcdef123456
  *   instance_type: c6a.4xlarge
  *   security_group: sg-abcdef123456
  *   tags:
  *     somekey: somevalue
- *   requirements:
- *     cpu: 16
- *     ram: 32
- *     disks:
- *       /dev/sdb:
- *         clone: snap-abcdef123456
- *     network: vpc-abcdef123456
  */
-type Definition struct {
+type Options struct {
 	Image         string            `json:"image"`          // ID/Name of the image to use
 	InstanceType  string            `json:"instance_type"`  // Type of the instance from aws available list
 	SecurityGroup string            `json:"security_group"` // ID/Name of the security group to use for the instance
@@ -45,37 +37,30 @@ type Definition struct {
 
 	UserDataFormat string `json:"userdata_format"` // If not empty - will store the resource metadata to userdata in defined format
 	UserDataPrefix string `json:"userdata_prefix"` // Optional if need to add custom prefix to the metadata key during formatting
-
-	Resources drivers.Resources `json:"resources"` // Required resources to allocate, disk clone & net could use tags
 }
 
-func (d *Definition) Apply(definition string) error {
-	if err := json.Unmarshal([]byte(definition), d); err != nil {
-		log.Println("AWS: Unable to apply the driver definition", err)
+func (o *Options) Apply(options util.UnparsedJson) error {
+	if err := json.Unmarshal([]byte(options), o); err != nil {
+		log.Println("AWS: Unable to apply the driver options", err)
 		return err
 	}
 
-	return d.Validate()
+	return o.Validate()
 }
 
-func (d *Definition) Validate() error {
+func (o *Options) Validate() error {
 	// Check image
-	if d.Image == "" {
+	if o.Image == "" {
 		return fmt.Errorf("AWS: No EC2 image is specified")
 	}
 
 	// Check instance type
-	if d.InstanceType == "" {
+	if o.InstanceType == "" {
 		return fmt.Errorf("AWS: No EC2 instance type is specified")
 	}
 
-	if !util.Contains([]string{"", "json", "env", "ps1"}, d.UserDataFormat) {
-		return fmt.Errorf("AWS: Unsupported userdata format: %s", d.UserDataFormat)
-	}
-
-	// Check resources (no disk types supported and no net check)
-	if err := d.Resources.Validate([]string{}, false); err != nil {
-		return fmt.Errorf("AWS: Resources validation failed: %s", err)
+	if !util.Contains([]string{"", "json", "env", "ps1"}, o.UserDataFormat) {
+		return fmt.Errorf("AWS: Unsupported userdata format: %s", o.UserDataFormat)
 	}
 
 	return nil

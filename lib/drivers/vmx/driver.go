@@ -79,27 +79,20 @@ func (d *Driver) Prepare(config []byte) error {
 	return nil
 }
 
-func (d *Driver) ValidateDefinition(definition string) error {
-	var def Definition
-	return def.Apply(definition)
-}
+func (d *Driver) ValidateDefinition(def types.LabelDefinition) error {
+	// Check resources
+	if err := def.Resources.Validate([]string{"hfs+", "exfat", "fat32"}, true); err != nil {
+		return fmt.Errorf("VMX: Resources validation failed: %s", err)
+	}
 
-func (d *Driver) DefinitionResources(definition string) drivers.Resources {
-	var def Definition
-	def.Apply(definition)
-
-	return def.Resources
+	// Check options
+	var opts Options
+	return opts.Apply(def.Options)
 }
 
 // Allow Fish to ask the driver about it's capacity (free slots) of a specific definition
-func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition string) int64 {
+func (d *Driver) AvailableCapacity(node_usage types.Resources, req types.LabelDefinition) int64 {
 	var out_count int64
-
-	var req Definition
-	if err := req.Apply(definition); err != nil {
-		log.Println("VMX: Unable to apply definition:", err)
-		return -1
-	}
 
 	avail_cpu, avail_ram := d.getAvailResources()
 
@@ -148,10 +141,10 @@ func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition stri
  * It automatically download the required images, unpack them and runs the VM.
  * Not using metadata because there is no good interfaces to pass it to VM.
  */
-func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (*types.Resource, error) {
-	var def Definition
-	if err := def.Apply(definition); err != nil {
-		log.Println("VMX: Unable to apply definition:", err)
+func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]interface{}) (*types.Resource, error) {
+	var opts Options
+	if err := opts.Apply(def.Options); err != nil {
+		log.Println("VMX: Unable to apply options:", err)
 		return nil, err
 	}
 
@@ -170,7 +163,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (*
 	vm_images_dir := filepath.Join(vm_dir, "images")
 
 	// Load the required images
-	img_path, err := d.loadImages(&def, vm_images_dir)
+	img_path, err := d.loadImages(&opts, vm_images_dir)
 	if err != nil {
 		return nil, err
 	}
@@ -224,15 +217,14 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (*
 	return &types.Resource{Identifier: vmx_path, HwAddr: vm_hwaddr}, nil
 }
 
-func (d *Driver) Status(res *types.Resource) string {
+func (d *Driver) Status(res *types.Resource) (string, error) {
 	if res == nil || res.Identifier == "" {
-		log.Println("VMX: Invalid resource:", res)
-		return drivers.StatusNone
+		return "", fmt.Errorf("VMX: Invalid resource: %v", res)
 	}
 	if d.isAllocated(res.Identifier) {
-		return drivers.StatusAllocated
+		return drivers.StatusAllocated, nil
 	}
-	return drivers.StatusNone
+	return drivers.StatusNone, nil
 }
 
 func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {

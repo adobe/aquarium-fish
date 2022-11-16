@@ -68,31 +68,33 @@ func (d *Driver) Prepare(config []byte) error {
 	return nil
 }
 
-func (d *Driver) ValidateDefinition(definition string) error {
-	var def Definition
-	return def.Apply(definition)
-}
+func (d *Driver) ValidateDefinition(def types.LabelDefinition) error {
+	var opts Options
+	if err := opts.Apply(def.Options); err != nil {
+		return err
+	}
 
-func (d *Driver) DefinitionResources(definition string) drivers.Resources {
-	var def Definition
-	def.Apply(definition)
+	// Check resources (no disk types supported and no net check)
+	if err := def.Resources.Validate([]string{}, false); err != nil {
+		return fmt.Errorf("AWS: Resources validation failed: %s", err)
+	}
 
-	return def.Resources
+	return nil
 }
 
 // Allow Fish to ask the driver about it's capacity (free slots) of a specific definition
-func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition string) int64 {
+func (d *Driver) AvailableCapacity(node_usage types.Resources, def types.LabelDefinition) int64 {
 	var out_count int64
 
-	var def Definition
-	if err := def.Apply(definition); err != nil {
-		log.Println("AWS: Unable to apply definition:", err)
+	var opts Options
+	if err := opts.Apply(def.Options); err != nil {
+		log.Println("AWS: Unable to apply options:", err)
 		return -1
 	}
 
 	conn_ec2 := d.newEC2Conn()
 
-	if def.InstanceType == "mac1" || def.InstanceType == "mac2" {
+	if opts.InstanceType == "mac1" || opts.InstanceType == "mac2" {
 		// Ensure we have the available not busy mac dedicated hosts to use as base for resource.
 		// For now we're not creating new dedicated hosts dynamically because they can be
 		// terminated only after 24h which costs a pretty penny.
@@ -101,7 +103,7 @@ func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition stri
 			Filter: []ec2_types.Filter{
 				ec2_types.Filter{
 					Name:   aws.String("instance-type"),
-					Values: []string{fmt.Sprintf("%s.metal", def.InstanceType)},
+					Values: []string{fmt.Sprintf("%s.metal", opts.InstanceType)},
 				},
 				ec2_types.Filter{
 					Name:   aws.String("state"),
@@ -158,23 +160,23 @@ func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition stri
 	}
 
 	// Check we have enough quotas for specified instance type
-	if strings.HasPrefix(def.InstanceType, "dl") {
+	if strings.HasPrefix(opts.InstanceType, "dl") {
 		out_count = quotas["Running On-Demand DL instances"]
-	} else if strings.HasPrefix(def.InstanceType, "u-") {
+	} else if strings.HasPrefix(opts.InstanceType, "u-") {
 		out_count = quotas["Running On-Demand High Memory instances"]
-	} else if strings.HasPrefix(def.InstanceType, "hpc") {
+	} else if strings.HasPrefix(opts.InstanceType, "hpc") {
 		out_count = quotas["Running On-Demand HPC instances"]
-	} else if strings.HasPrefix(def.InstanceType, "inf") {
+	} else if strings.HasPrefix(opts.InstanceType, "inf") {
 		out_count = quotas["Running On-Demand Inf instances"]
-	} else if strings.HasPrefix(def.InstanceType, "trn") {
+	} else if strings.HasPrefix(opts.InstanceType, "trn") {
 		out_count = quotas["Running On-Demand Trn instances"]
-	} else if strings.HasPrefix(def.InstanceType, "f") {
+	} else if strings.HasPrefix(opts.InstanceType, "f") {
 		out_count = quotas["Running On-Demand F instances"]
-	} else if strings.HasPrefix(def.InstanceType, "g") || strings.HasPrefix(def.InstanceType, "vt") {
+	} else if strings.HasPrefix(opts.InstanceType, "g") || strings.HasPrefix(opts.InstanceType, "vt") {
 		out_count = quotas["Running On-Demand G and VT instances"]
-	} else if strings.HasPrefix(def.InstanceType, "p") {
+	} else if strings.HasPrefix(opts.InstanceType, "p") {
 		out_count = quotas["Running On-Demand P instances"]
-	} else if strings.HasPrefix(def.InstanceType, "x") {
+	} else if strings.HasPrefix(opts.InstanceType, "x") {
 		out_count = quotas["Running On-Demand X instances"]
 	} else { // Probably not a good idea and better to fail if the instances are not in the list...
 		out_count = quotas["Running On-Demand Standard (A, C, D, H, I, M, R, T, Z) instances"]
@@ -201,10 +203,10 @@ func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition stri
  * It selects the AMI and run instance
  * Uses metadata to fill EC2 instance userdata
  */
-func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (*types.Resource, error) {
-	var def Definition
-	if err := def.Apply(definition); err != nil {
-		return nil, fmt.Errorf("AWS: Unable to apply definition: %v", err)
+func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*types.Resource, error) {
+	var opts Options
+	if err := opts.Apply(def.Options); err != nil {
+		return nil, fmt.Errorf("AWS: Unable to apply options: %v", err)
 	}
 
 	// Generate fish name
@@ -221,7 +223,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (*
 	}
 	log.Println("AWS: Selected subnet:", vm_network, i_name)
 
-	vm_image := def.Image
+	vm_image := opts.Image
 	if vm_image, err = d.getImageId(conn, vm_image); err != nil {
 		return nil, fmt.Errorf("AWS: Unable to get image: %v", err)
 	}
@@ -230,7 +232,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (*
 	// Prepare Instance request information
 	input := &ec2.RunInstancesInput{
 		ImageId:      aws.String(vm_image),
-		InstanceType: ec2_types.InstanceType(def.InstanceType),
+		InstanceType: ec2_types.InstanceType(opts.InstanceType),
 
 		NetworkInterfaces: []ec2_types.InstanceNetworkInterfaceSpecification{
 			{
@@ -245,17 +247,17 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (*
 		MaxCount: aws.Int32(1),
 	}
 
-	if def.UserDataFormat != "" {
+	if opts.UserDataFormat != "" {
 		// Set UserData field
-		userdata, err := util.SerializeMetadata(def.UserDataFormat, def.UserDataPrefix, metadata)
+		userdata, err := util.SerializeMetadata(opts.UserDataFormat, opts.UserDataPrefix, metadata)
 		if err != nil {
 			return nil, fmt.Errorf("AWS: Unable to serialize metadata to userdata: %v", err)
 		}
 		input.UserData = aws.String(base64.StdEncoding.EncodeToString([]byte(userdata)))
 	}
 
-	if def.SecurityGroup != "" {
-		vm_secgroup := def.SecurityGroup
+	if opts.SecurityGroup != "" {
+		vm_secgroup := opts.SecurityGroup
 		if vm_secgroup, err = d.getSecGroupId(conn, vm_secgroup); err != nil {
 			return nil, fmt.Errorf("AWS: Unable to get security group: %v", err)
 		}
@@ -263,10 +265,10 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (*
 		input.NetworkInterfaces[0].Groups = []string{vm_secgroup}
 	}
 
-	if len(d.cfg.InstanceTags) > 0 || len(def.Tags) > 0 {
+	if len(d.cfg.InstanceTags) > 0 || len(opts.Tags) > 0 {
 		tags_in := map[string]string{}
-		// Append tags to the map - from def (low priority) and from cfg (high priority)
-		for k, v := range def.Tags {
+		// Append tags to the map - from opts (low priority) and from cfg (high priority)
+		for k, v := range opts.Tags {
 			tags_in[k] = v
 		}
 		for k, v := range d.cfg.InstanceTags {
@@ -335,9 +337,9 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (*
 			} else {
 				// Just create a new disk
 				mapping.Ebs.VolumeSize = aws.Int32(int32(disk.Size))
-				if def.EncryptKey != "" {
+				if opts.EncryptKey != "" {
 					mapping.Ebs.Encrypted = aws.Bool(true)
-					key_id, err := d.getKeyId(def.EncryptKey)
+					key_id, err := d.getKeyId(opts.EncryptKey)
 					if err != nil {
 						return nil, fmt.Errorf("AWS: Unable to get encrypt key from KMS: %v", err)
 					}
@@ -441,22 +443,19 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (*
 	return res, fmt.Errorf("AWS: Unable to locate the instance IP: %s", *inst.InstanceId)
 }
 
-func (d *Driver) Status(res *types.Resource) string {
+func (d *Driver) Status(res *types.Resource) (string, error) {
 	if res == nil || res.Identifier == "" {
-		log.Println("AWS: Invalid resource:", res)
-		return drivers.StatusNone
+		return "", fmt.Errorf("AWS: Invalid resource: %v", res)
 	}
 	conn := d.newEC2Conn()
 	inst, err := d.getInstance(conn, res.Identifier)
-	// Potential issue here, it could be a big problem with unstable connection
 	if err != nil {
-		log.Println("AWS: Error during status check for", res.Identifier, "- it needs a rewrite", err)
-		return drivers.StatusNone
+		return "", fmt.Errorf("AWS: Error during status check for %s: %v", res.Identifier, err)
 	}
 	if inst != nil && inst.State.Name != ec2_types.InstanceStateNameTerminated {
-		return drivers.StatusAllocated
+		return drivers.StatusAllocated, nil
 	}
-	return drivers.StatusNone
+	return drivers.StatusNone, nil
 }
 
 func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {

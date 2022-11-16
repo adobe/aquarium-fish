@@ -40,7 +40,7 @@ type Driver struct {
 	total_ram uint // In RAM megabytes
 
 	docker_usage_mutex sync.Mutex
-	docker_usage       drivers.Resources // Used when the docker is remote
+	docker_usage       types.Resources // Used when the docker is remote
 }
 
 func init() {
@@ -96,27 +96,20 @@ func (d *Driver) Prepare(config []byte) error {
 	return nil
 }
 
-func (d *Driver) ValidateDefinition(definition string) error {
-	var def Definition
-	return def.Apply(definition)
-}
+func (d *Driver) ValidateDefinition(def types.LabelDefinition) error {
+	// Check resources
+	if err := def.Resources.Validate([]string{"dir", "hfs+", "exfat", "fat32"}, true); err != nil {
+		return fmt.Errorf("DOCKER: Resources validation failed: %s", err)
+	}
 
-func (d *Driver) DefinitionResources(definition string) drivers.Resources {
-	var def Definition
-	def.Apply(definition)
-
-	return def.Resources
+	// Check options
+	var opts Options
+	return opts.Apply(def.Options)
 }
 
 // Allow Fish to ask the driver about it's capacity (free slots) of a specific definition
-func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition string) int64 {
+func (d *Driver) AvailableCapacity(node_usage types.Resources, req types.LabelDefinition) int64 {
 	var out_count int64
-
-	var req Definition
-	if err := req.Apply(definition); err != nil {
-		log.Println("AWS: Unable to apply definition:", err)
-		return -1
-	}
 
 	if d.cfg.IsRemote {
 		// It's remote so use the driver-calculated usage
@@ -172,14 +165,16 @@ func (d *Driver) AvailableCapacity(node_usage drivers.Resources, definition stri
  * It automatically download the required images, unpack them and runs the container.
  * Using metadata to create env file and pass it to the container.
  */
-func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (*types.Resource, error) {
+func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*types.Resource, error) {
 	if d.cfg.IsRemote {
 		// It's remote so let's use docker_usage to store modificators properly
 		d.docker_usage_mutex.Lock()
 		defer d.docker_usage_mutex.Unlock()
 	}
-	var def Definition
-	def.Apply(definition)
+	var opts Options
+	if err := opts.Apply(def.Options); err != nil {
+		return nil, err
+	}
 
 	// Generate unique id from the hw address and required directories
 	buf := crypt.RandBytes(6)
@@ -209,7 +204,7 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (*
 	}
 
 	// Load the images
-	img_name_version, err := d.loadImages(&def)
+	img_name_version, err := d.loadImages(&opts)
 	if err != nil {
 		return nil, err
 	}
@@ -258,15 +253,14 @@ func (d *Driver) Allocate(definition string, metadata map[string]interface{}) (*
 	return &types.Resource{Identifier: c_name, HwAddr: c_hwaddr}, nil
 }
 
-func (d *Driver) Status(res *types.Resource) string {
+func (d *Driver) Status(res *types.Resource) (string, error) {
 	if res == nil || res.Identifier == "" {
-		log.Println("DOCKER: Invalid resource:", res)
-		return drivers.StatusNone
+		return "", fmt.Errorf("DOCKER: Invalid resource: %v", res)
 	}
 	if len(d.getAllocatedContainerId(res.Identifier)) > 0 {
-		return drivers.StatusAllocated
+		return drivers.StatusAllocated, nil
 	}
-	return drivers.StatusNone
+	return drivers.StatusNone, nil
 }
 
 func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {

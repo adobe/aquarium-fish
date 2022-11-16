@@ -1076,31 +1076,87 @@ components:
       format: uuid
       x-oapi-codegen-extra-tags:
         gorm: primaryKey
+    LabelDefinitions:
+      type: array
+      items:
+        $ref: '#/components/schemas/LabelDefinition'
+      description: List of label definitions that describes resources, driver and it's options.
+        The order is sequential - so the priority is to the first driver and if it's not
+        available than the next definitions will be used.
+      example:
+        - driver: vmx
+          resources:
+            cpu: 16
+            ram: 20
+            disks:
+              vs2019:
+                type: exfat
+                size: 100
+                reuse: true
+            network: nat
+          options:
+            image: winserver2019-vs2019-ci
+            images:
+              winserver2019: 'https://artifact-storage/aquarium/image/vmx/winserver2019/winserver2019-VERSION.tar.xz'
+              winserver2019-vs2019: 'https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019/winserver2019-vs2019-VERSION.tar.xz'
+              winserver2019-vs2019-ci: 'https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019-ci/winserver2019-vs2019-ci-VERSION.tar.xz'
+        - driver: aws
+          resources:
+            cpu: 16
+            ram: 32
+            disks:
+              xvdb:
+                size: 100
+            network: Name:build-vpc
+          options:
+            image: aquarium/winserver2019-vs2019-ci-VERSION
+            instance_type: c6a.4xlarge
+            security_group: jenkins-worker-win
+            userdata_format: ps1
+    LabelDefinition:
+      type: object
+      description: >
+        Describes Label's ways to provide a Resource - it contains name of the driver, it's
+        resource and additional options.
+      required:
+        - driver
+        - resources
+        - options
+      properties:
+        driver:
+          type: string
+          description: Name of the driver to execute
+        resources:
+          $ref: '#/components/schemas/Resources'
+          description: Resources Driver need to provide for the Label execution
+        options:
+          x-go-type: util.UnparsedJson
+          description: Driver-specific options to execute the environment
     Label:
       type: object
       description: >
-        This one filled by the cluster admin, depends on the needs. Labels could be implemented in
-        different drivers, but it's not recommended to keep the label stable. Version could be used
-        during request, but by default it's the latest.
+        This one filled by the cluster admin, depends on the needs. Labels could be defined in
+        different drivers and the priority is sequential. Version could be used during request and
+        by default is the latest.
 
         Label - is one of the most important part of the system, because it makes the resources
-        reproducible in time. It contains the driver name and configuration, so can be started
-        again and again as much times we need. Versions make possible to update the labels and
-        store the old ones in case we need to run the same environment 10y from now and rebuild the
-        old code revision for example.
+        reproducible in time. Definitions contains the driver name and configuration, so can be
+        started again and again as much times we need. Versions make possible to update the labels
+        and store the old ones in case we need to run the same environment 10y from now and rebuild
+        the old code revision for example.
 
         Labels can't be updated. Once they are stored - they are here to keep the history of
         environements and make possible to mark build with the specified label version in order to
-        be able to reproduce it later. Also labels can be implemented just by one driver. If you
-        want to use another one - you will need to create another label version and the resource
-        requests that uses latest will swith to it.
+        be able to reproduce it later. Also labels can be implemented just by one or multiple
+        drivers. Sometimes it's useful to switch to another provider in case the previous ones are
+        not available or completely used.
       required:
         - UID
         - created_at
         - name
         - version
         - driver
-        - definition
+        - definitions
         - metadata
       properties:
         UID:
@@ -1122,31 +1178,87 @@ components:
           description: >
             In order to update the labels freely and save the previous Label state for the past
             builds.
-        driver:
-          type: string
-          description: Name of the driver to run the Resource with this Label
-          example: vmx
-        definition:
-          x-go-type: util.UnparsedJson
-          description: Actual Labl definition depends on the used driver
-          example:
-            image: macos1015-xcode122-ci
-            images:
-              macos1015: 'https://artifact-storage/aquarium/image/vmx/macos1015-VERSION/macos1015-VERSION.tar.xz'
-              macos1015-xcode122: 'https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-VERSION/macos1015-xcode122-VERSION.tar.xz'
-              macos1015-xcode122-ci: 'https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-ci-VERSION/macos1015-xcode122-ci-VERSION.tar.xz'
-            requirements:
-              cpu: 14
-              ram: 12
-              disks:
-                xcode122:
-                  size: 100
-                  reuse: true
+        definitions:
+          $ref: '#/components/schemas/LabelDefinitions'
         metadata:
           x-go-type: util.UnparsedJson
           description: Basic metadata to pass to the Resource
           example:
-            JENKINS_AGENT_WORKSPACE: /Volumes/xcode122
+            JENKINS_AGENT_WORKSPACE: D:\
+
+    Resources:
+      type: object
+      description: >
+        It's used for 2 purposes, in Label definitions to describe the required amount of resources
+        and in Fish to store the currently used resources, so could add and subtract resources.
+
+        Modificators are used for parallel node usage by different Applications, they are stored
+        for the first Application and used for the others to determine node tenancy/overbook
+        tolerance.
+
+        Different drivers uses it in different ways to provide quite similar functionality, so it's
+        a good idea to check the driver's wiki page to get some clue on how to create Label def.
+      required:
+        - cpu
+        - ram
+        - disks
+        - network
+        - multitenancy
+        - cpu_overbook
+        - ram_overbook
+      properties:
+        cpu:
+          x-go-type: uint
+          type: integer
+          minimum: 0
+        ram:
+          x-go-type: uint
+          type: integer
+          minimum: 0
+        disks:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/ResourcesDisk'
+        network:
+          type: string
+          description: Which network configuration to use for the environment
+        multitenancy:
+          type: boolean
+          description: Tolerate to run along with the other envs on the same node
+        cpu_overbook:
+          type: boolean
+          description: Tolerate to node CPU overbooking when executed together with other envs
+        ram_overbook:
+          type: boolean
+          description: Tolerate to RAM overbooking when executed together with other envs
+
+    ResourcesDisk:
+      type: object
+      description: Defines disk to attach/clone...
+      required:
+        - type
+        - label
+        - size
+        - reuse
+        - clone
+      properties:
+        type:
+          type: string
+          description: Type of the filesystem to create
+        label:
+          type: string
+          description: Volume name will be given to the disk, empty will use the disk key
+        size:
+          x-go-type: uint
+          type: integer
+          minimum: 0
+          description: Amount of disk space in GB
+        reuse:
+          type: boolean
+          description: Do not remove the disk and reuse it for the next resource run
+        clone:
+          type: string
+          description: Clone the snapshot of existing disk instead of creating the new one
 
     NodeUID:
       type: string
@@ -1243,6 +1355,8 @@ components:
         - updated_at
         - application_UID
         - node_UID
+        - label_UID
+        - definition_index
         - identifier
         - ip_addr
         - hw_addr
@@ -1264,6 +1378,12 @@ components:
           # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/NodeUID'
           type: string
           format: uuid
+        label_UID:
+          # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/LabelUID'
+          type: string
+          format: uuid
+        definition_index:
+          type: integer
         identifier:
           type: string
           description: |
@@ -1335,10 +1455,11 @@ components:
             Round of the election, because it can take a number of rounds to figure out the Only
             One.
         available:
-          type: boolean
+          type: integer
           description: >
-            General answer of the node - the cluster will wait until receive answer from each
-            active node.
+            Node places answer to the Vote for the Application's definitions, the number represents
+            the first available index of the definition which fits the node available resources. In
+            case it's `-1` then node can't run any of the definitions.
         rand:
           x-go-type: uint32
           description: The last resort to figure out for the winner.

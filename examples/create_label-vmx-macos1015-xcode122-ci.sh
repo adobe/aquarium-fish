@@ -32,13 +32,16 @@ echo "Create the new version of Label '$label:$new_version' ?"
 echo "Press any key to create or Ctrl-C to abort"
 read w1
 
-label_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/json' -d '{"name":"'$label'", "version":'$new_version', "driver":"vmx",
-    "definition": {
-        "image": "macos1015-xcode122-ci",
-        "images": {
-            "macos1015":             "https://artifact-storage/aquarium/image/vmx/macos1015-VERSION/macos1015-VERSION.tar.xz",
-            "macos1015-xcode122":    "https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-VERSION/macos1015-xcode122-VERSION.tar.xz",
-            "macos1015-xcode122-ci": "https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-ci-VERSION/macos1015-xcode122-ci-VERSION.tar.xz"
+label_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/json' -d '{"name":"'$label'", "version":'$new_version',
+    "definitions": [{
+        "driver":"vmx",
+        "options": {
+            "image": "macos1015-xcode122-ci",
+            "images": {
+                "macos1015":             "https://artifact-storage/aquarium/image/vmx/macos1015-VERSION/macos1015-VERSION.tar.xz",
+                "macos1015-xcode122":    "https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-VERSION/macos1015-xcode122-VERSION.tar.xz",
+                "macos1015-xcode122-ci": "https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-ci-VERSION/macos1015-xcode122-ci-VERSION.tar.xz"
+            }
         },
         "resources": {
             "cpu": 14,
@@ -51,7 +54,7 @@ label_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/js
                 }
             }
         }
-    },
+    }],
     "metadata": {
         "JENKINS_AGENT_WORKSPACE": "/Volumes/xcode122"
     }
