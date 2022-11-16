@@ -65,15 +65,14 @@ func (f *Fish) VoteListGetApplicationRound(app_uid types.ApplicationUID, round u
 }
 
 func (f *Fish) VoteGetElectionWinner(app_uid types.ApplicationUID, round uint16) (v *types.Vote, err error) {
-	// Current rule is simple - sort everyone answered "yes" and the first one wins
+	// Current rule is simple - sort everyone answered smallest available number and the first one wins
 	v = &types.Vote{}
-	err = f.db.Where("application_uid = ?", app_uid).Where("round = ?", round).Where("available = ?", true).
-		Order("created_at ASC").Order("rand ASC").First(&v).Error
+	err = f.db.Where("application_uid = ?", app_uid).Where("round = ?", round).Where("available >= 0").
+		Order("available ASC").Order("created_at ASC").Order("rand ASC").First(&v).Error
 	return v, err
 }
 
 func (f *Fish) VoteGetNodeApplication(node_uid types.NodeUID, app_uid types.ApplicationUID) (v *types.Vote, err error) {
-	// Current rule is simple - sort everyone answered "yes" and the first one wins
 	v = &types.Vote{}
 	err = f.db.Where("application_uid = ?", app_uid).Where("node_uid = ?", node_uid).Order("round DESC").First(&v).Error
 	return v, err

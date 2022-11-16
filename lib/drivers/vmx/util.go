@@ -27,7 +27,7 @@ import (
 
 	"github.com/hpcloud/tail"
 
-	"github.com/adobe/aquarium-fish/lib/drivers"
+	"github.com/adobe/aquarium-fish/lib/openapi/types"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
@@ -49,7 +49,7 @@ func (d *Driver) getAvailResources() (avail_cpu, avail_ram uint) {
 }
 
 // Load images and returns the target image path for cloning
-func (d *Driver) loadImages(def *Definition, vm_images_dir string) (string, error) {
+func (d *Driver) loadImages(opts *Options, vm_images_dir string) (string, error) {
 	if err := os.MkdirAll(vm_images_dir, 0o755); err != nil {
 		log.Println("VMX: Unable to create the vm images dir:", vm_images_dir)
 		return "", err
@@ -57,7 +57,7 @@ func (d *Driver) loadImages(def *Definition, vm_images_dir string) (string, erro
 
 	target_path := ""
 	var wg sync.WaitGroup
-	for name, url := range def.Images {
+	for name, url := range opts.Images {
 		archive_name := filepath.Base(url)
 		image_unpacked := filepath.Join(d.cfg.ImagesPath, strings.TrimSuffix(archive_name, ".tar.xz"))
 
@@ -156,7 +156,7 @@ func (d *Driver) loadImages(def *Definition, vm_images_dir string) (string, erro
 					}
 				}
 			}
-		}(name, url, image_unpacked, def.Image)
+		}(name, url, image_unpacked, opts.Image)
 	}
 
 	log.Println("VMX: Wait for all the background image processes to be done...")
@@ -166,7 +166,7 @@ func (d *Driver) loadImages(def *Definition, vm_images_dir string) (string, erro
 
 	// Check all the images are in place just by number of them
 	vm_images, _ := ioutil.ReadDir(vm_images_dir)
-	if len(def.Images) != len(vm_images) {
+	if len(opts.Images) != len(vm_images) {
 		log.Println("VMX: The image processes gone wrong, please check log for the errors")
 		return "", fmt.Errorf("VMX: The image processes gone wrong, please check log for the errors")
 	}
@@ -193,7 +193,7 @@ func (d *Driver) isAllocated(vmx_path string) bool {
 }
 
 // Creates VMDK disks described by the disks map
-func (d *Driver) disksCreate(vmx_path string, disks map[string]drivers.Disk) error {
+func (d *Driver) disksCreate(vmx_path string, disks map[string]types.ResourcesDisk) error {
 	// Create disk files
 	var disk_paths []string
 	for d_name, disk := range disks {

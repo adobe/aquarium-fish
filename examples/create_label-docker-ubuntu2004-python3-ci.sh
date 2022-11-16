@@ -32,13 +32,16 @@ echo "Create the new version of Label '$label:$new_version' ?"
 echo "Press any key to create or Ctrl-C to abort"
 read w1
 
-label_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/json' -d '{"name":"'$label'", "version":'$new_version', "driver":"docker",
-    "definition": {
-        "image": "ubuntu2004-python3-ci",
-        "images": {
-            "ubuntu2004":            "https://artifact-storage/aquarium/image/docker/ubuntu2004/ubuntu2004-VERSION.tar.xz",
-            "ubuntu2004-python3":    "https://artifact-storage/aquarium/image/docker/ubuntu2004-python3/ubuntu2004-python3-VERSION.tar.xz",
-            "ubuntu2004-python3-ci": "https://artifact-storage/aquarium/image/docker/ubuntu2004-python3-ci/ubuntu2004-python3-ci-VERSION.tar.xz"
+label_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/json' -d '{"name":"'$label'", "version":'$new_version',
+    "definitions": [{
+        "driver":"docker",
+        "options": {
+            "image": "ubuntu2004-python3-ci",
+            "images": {
+                "ubuntu2004":            "https://artifact-storage/aquarium/image/docker/ubuntu2004/ubuntu2004-VERSION.tar.xz",
+                "ubuntu2004-python3":    "https://artifact-storage/aquarium/image/docker/ubuntu2004-python3/ubuntu2004-python3-VERSION.tar.xz",
+                "ubuntu2004-python3-ci": "https://artifact-storage/aquarium/image/docker/ubuntu2004-python3-ci/ubuntu2004-python3-ci-VERSION.tar.xz"
+            }
         },
         "resources": {
             "cpu": 4,
@@ -51,7 +54,7 @@ label_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/js
             },
             "network": "nat"
         }
-    },
+    }],
     "metadata": {
         "JENKINS_AGENT_WORKSPACE": "/mnt/python3"
     }

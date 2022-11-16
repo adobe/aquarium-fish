@@ -52,7 +52,7 @@ func RunAquariumFish(t *testing.T, cfg string) *AFInstance {
 	r, _ := cmd.StdoutPipe()
 	cmd.Stderr = cmd.Stdout
 
-	init_done := make(chan struct{})
+	init_done := make(chan string)
 	scanner := bufio.NewScanner(r)
 	go func() {
 		// Listening for log and scan for token and address
@@ -63,31 +63,42 @@ func RunAquariumFish(t *testing.T, cfg string) *AFInstance {
 				if strings.HasPrefix(line, "Admin user pass: ") {
 					val := strings.SplitN(strings.TrimSpace(line), "Admin user pass: ", 2)
 					if len(val) < 2 {
-						panic("ERROR: No token after 'Admin user pass: '")
+						init_done <- "ERROR: No token after 'Admin user pass: '"
+						break
 					}
 					afi.admin_token = val[1]
 				}
 				if strings.HasPrefix(line, "API listening on: ") {
 					val := strings.SplitN(strings.TrimSpace(line), "API listening on: ", 2)
 					if len(val) < 2 {
-						panic("ERROR: No address after 'API listening on: '")
+						init_done <- "ERROR: No address after 'API listening on: '"
+						break
 					}
 					afi.api_address = val[1]
 				}
 				if afi.admin_token != "" && afi.api_address != "" {
-					init_done <- struct{}{}
+					// Found the needed values and continue to process to print the fish output for
+					// test debugging purposes
+					init_done <- ""
 				}
 			}
 		}
+		t.Log("Reading of AquariumFish output is done")
 	}()
 
 	go func() {
 		if err := cmd.Run(); err != nil {
 			t.Log("AquariumFish process was stopped:", err)
+			init_done <- fmt.Sprintf("ERROR: Fish was stopped with exit code: %v", err)
 		}
+		r.Close()
 	}()
 
-	<-init_done
+	failed := <-init_done
+
+	if failed != "" {
+		t.Fatalf(failed)
+	}
 
 	return afi
 }

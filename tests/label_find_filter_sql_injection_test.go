@@ -63,7 +63,7 @@ drivers:
 		apitest.New().
 			EnableNetworking(cli).
 			Post(afi.ApiAddress("api/v1/label/")).
-			JSON(`{"name":"test-label1", "version":1, "driver":"test", "definition": {"resources":{"cpu":1,"ram":2}}}`).
+			JSON(`{"name":"test-label1", "version":1, "definitions": [{"driver":"test", "resources":{"cpu":1,"ram":2}}]}`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
@@ -80,7 +80,7 @@ drivers:
 		apitest.New().
 			EnableNetworking(cli).
 			Post(afi.ApiAddress("api/v1/label/")).
-			JSON(`{"name":"test-label2", "version":1, "driver":"test", "definition": {"resources":{"cpu":1,"ram":2}}}`).
+			JSON(`{"name":"test-label2", "version":1, "definitions": [{"driver":"test", "resources":{"cpu":1,"ram":2}}]}`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
@@ -105,7 +105,7 @@ drivers:
 			JSON(&labels)
 
 		if len(labels) != 1 {
-			t.Fatalf("Label 1 not found: %q", labels)
+			t.Fatalf("Label 1 not found: %v", labels)
 		}
 		if labels[0].UID != label1.UID {
 			t.Fatalf("Label 1 UID is incorrect: %v != %v", labels[0].UID, label1.UID)
@@ -124,7 +124,7 @@ drivers:
 			JSON(&labels)
 
 		if len(labels) != 0 {
-			t.Fatalf("Labels weirdly found, but should not be: %q", labels)
+			t.Fatalf("Labels weirdly found, but should not be: %v", labels)
 		}
 	})
 
@@ -140,7 +140,7 @@ drivers:
 			JSON(&labels)
 
 		if len(labels) != 0 {
-			t.Fatalf("Labels weirdly found, but should not be: %q", labels)
+			t.Fatalf("Labels weirdly found, but should not be: %v", labels)
 		}
 	})
 
@@ -156,7 +156,7 @@ drivers:
 			JSON(&labels)
 
 		if len(labels) != 1 {
-			t.Fatalf("Label 1 not found: %q", labels)
+			t.Fatalf("Label 1 not found: %v", labels)
 		}
 		if labels[0].UID != label1.UID {
 			t.Fatalf("Label 1 UID is incorrect: %v != %v", labels[0].UID, label1.UID)
@@ -175,7 +175,7 @@ drivers:
 			JSON(&labels)
 
 		if len(labels) != 1 {
-			t.Fatalf("Label 2 not found: %q", labels)
+			t.Fatalf("Label 2 not found: %v", labels)
 		}
 		if labels[0].UID != label2.UID {
 			t.Fatalf("Label 2 UID is incorrect: %v != %v", labels[0].UID, label2.UID)
@@ -194,7 +194,7 @@ drivers:
 			JSON(&labels)
 
 		if len(labels) != 2 {
-			t.Fatalf("Labels not found: %q", labels)
+			t.Fatalf("Labels not found: %v", labels)
 		}
 	})
 
@@ -210,7 +210,7 @@ drivers:
 			JSON(&labels)
 
 		if len(labels) != 2 {
-			t.Fatalf("Labels not found: %q", labels)
+			t.Fatalf("Labels not found: %v", labels)
 		}
 	})
 }

@@ -47,13 +47,13 @@ type Fish struct {
 	applications_mutex sync.Mutex
 	applications       []types.ApplicationUID
 
-	// Used to temporarly store the won Applications
-	won_apps_mutex sync.Mutex
-	won_apps       map[int64]types.ApplicationUID
+	// Used to temporarly store the won Votes by Application create time
+	won_votes_mutex sync.Mutex
+	won_votes       map[int64]types.Vote
 
 	// Stores the current usage of the node resources
 	node_usage_mutex sync.Mutex // Is needed to protect node resources from concurrent allocations
-	node_usage       drivers.Resources
+	node_usage       types.Resources
 }
 
 func New(db *gorm.DB, cfg *Config) (*Fish, error) {
@@ -92,7 +92,7 @@ func (f *Fish) Init() error {
 	}
 
 	// Init variables
-	f.won_apps = make(map[int64]types.ApplicationUID, 5)
+	f.won_votes = make(map[int64]types.Vote, 5)
 
 	// Create admin user and ignore errors if it's existing
 	_, err := f.UserGet("admin")
@@ -162,8 +162,13 @@ func (f *Fish) Init() error {
 	for _, res := range resources {
 		if f.ApplicationIsAllocated(res.ApplicationUID) == nil {
 			log.Println("Fish: Found allocated resource to serve:", res.UID)
-			if err := f.executeApplication(res.ApplicationUID); err != nil {
-				log.Printf("Fish: Can't execute Application %s: %v\n", res.ApplicationUID, err)
+			vote, err := f.VoteGetNodeApplication(f.node.UID, res.ApplicationUID)
+			if err != nil {
+				log.Printf("Fish: Can't find Application vote %s: %v\n", res.ApplicationUID, err)
+				continue
+			}
+			if err := f.executeApplication(*vote); err != nil {
+				log.Printf("Fish: Can't execute Application %s: %v\n", vote.ApplicationUID, err)
 			}
 		} else {
 			log.Println("Fish: WARN: Found not allocated Resource of Application, cleaning up:", res.ApplicationUID)
@@ -248,23 +253,23 @@ func (f *Fish) checkNewApplicationProcess() error {
 			// Check the Applications ready to be allocated
 			// It's needed to be single-threaded to have some order in allocation - FIFO principle,
 			// who requested first should be processed first.
-			f.won_apps_mutex.Lock()
+			f.won_votes_mutex.Lock()
 			{
-				// We need to sort the won_apps by key which is time they was created
-				keys := make([]int64, 0, len(f.won_apps))
-				for k := range f.won_apps {
+				// We need to sort the won_votes by key which is time they was created
+				keys := make([]int64, 0, len(f.won_votes))
+				for k := range f.won_votes {
 					keys = append(keys, k)
 				}
 				sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
 
 				for _, k := range keys {
-					if err := f.executeApplication(f.won_apps[k]); err != nil {
-						log.Printf("Fish: Can't execute Application %s: %v\n", f.won_apps[k], err)
+					if err := f.executeApplication(f.won_votes[k]); err != nil {
+						log.Printf("Fish: Can't execute Application %s: %v\n", f.won_votes[k].ApplicationUID, err)
 					}
-					delete(f.won_apps, k)
+					delete(f.won_votes, k)
 				}
 			}
-			f.won_apps_mutex.Unlock()
+			f.won_votes_mutex.Unlock()
 		}
 	}
 	return nil
@@ -273,15 +278,34 @@ func (f *Fish) checkNewApplicationProcess() error {
 func (f *Fish) voteProcessRound(vote *types.Vote) {
 	vote.Round = f.VoteCurrentRoundGet(vote.ApplicationUID)
 
+	app, err := f.ApplicationGet(vote.ApplicationUID)
+	if err != nil {
+		log.Println("Fish: Vote Fatal: Unable to get the Application:", vote.UID, vote.ApplicationUID, err)
+		return
+	}
+
+	// Get label with the definitions
+	label, err := f.LabelGet(app.LabelUID)
+	if err != nil {
+		log.Println("Fish: Vote Fatal: Unable to find Label:", vote.UID, app.LabelUID, err)
+		return
+	}
+
 	for {
 		start_time := time.Now()
 		log.Printf("Fish: Starting Application %s election round %d\n", vote.ApplicationUID, vote.Round)
 
-		// Determine answer for this round
+		// Determine answer for this round, it will try find the first possible definition to serve
 		// We can't run multiple resources check at a time or together with
 		// allocating application so using mutex here
 		f.node_usage_mutex.Lock()
-		vote.Available = f.isNodeAvailableForApplication(vote.ApplicationUID)
+		vote.Available = -1 // Set "nope" answer by default in case all the definitions are not fit
+		for i, def := range label.Definitions {
+			if f.isNodeAvailableForDefinition(def) {
+				vote.Available = i
+				break
+			}
+		}
 		f.node_usage_mutex.Unlock()
 
 		// Create vote if it's required
@@ -310,7 +334,7 @@ func (f *Fish) voteProcessRound(vote *types.Vote) {
 				// Check if there's yes answers
 				available_exists := false
 				for _, vote := range votes {
-					if vote.Available {
+					if vote.Available >= 0 {
 						available_exists = true
 						break
 					}
@@ -330,9 +354,9 @@ func (f *Fish) voteProcessRound(vote *types.Vote) {
 							log.Println("Fish: Unable to get the Application:", vote.ApplicationUID, err)
 							return
 						}
-						f.won_apps_mutex.Lock()
-						f.won_apps[app.CreatedAt.UnixMicro()] = vote.ApplicationUID
-						f.won_apps_mutex.Unlock()
+						f.won_votes_mutex.Lock()
+						f.won_votes[app.CreatedAt.UnixMicro()] = *vote
+						f.won_votes_mutex.Unlock()
 					} else {
 						log.Println("Fish: I lose the election for Application", vote.ApplicationUID)
 					}
@@ -369,40 +393,28 @@ func (f *Fish) voteProcessRound(vote *types.Vote) {
 	}
 }
 
-func (f *Fish) isNodeAvailableForApplication(app_uid types.ApplicationUID) bool {
-	app, err := f.ApplicationGet(app_uid)
-	if err != nil {
-		log.Println("Fish: Unable to find Application", app_uid, err)
-		return false
-	}
-	label, err := f.LabelGet(app.LabelUID)
-	if err != nil {
-		log.Println("Fish: Unable to find Label", app.LabelUID)
-		return false
-	}
-
+func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 	// Is node supports the required label driver
-	driver := f.DriverGet(label.Driver)
+	driver := f.DriverGet(def.Driver)
 	if driver == nil {
 		return false
 	}
 
 	// Check with the driver if it's possible to allocate the Application resource
 	node_usage := f.node_usage
-	if capacity := driver.AvailableCapacity(node_usage, string(label.Definition)); capacity < 1 {
-		log.Printf("Fish: Not enough Driver '%s' capacity to serve the Application: %s", driver.Name(), app_uid)
+	if capacity := driver.AvailableCapacity(node_usage, def); capacity < 1 {
 		return false
 	}
 
 	return true
 }
 
-func (f *Fish) executeApplication(app_uid types.ApplicationUID) error {
+func (f *Fish) executeApplication(vote types.Vote) error {
+	// Check the application is executed already
 	f.applications_mutex.Lock()
 	{
-		// Check the application is executed already
 		for _, uid := range f.applications {
-			if uid == app_uid {
+			if uid == vote.ApplicationUID {
 				// Seems the application is already executing
 				f.applications_mutex.Unlock()
 				return nil
@@ -411,21 +423,18 @@ func (f *Fish) executeApplication(app_uid types.ApplicationUID) error {
 	}
 	f.applications_mutex.Unlock()
 
+	// Check vote have available field >= 0 means it chose the label definition
+	if vote.Available < 0 {
+		return fmt.Errorf("Fish: The vote for Application %s is negative: %v", vote.ApplicationUID, vote.Available)
+	}
+
 	// Locking the node resources until the app will be allocated
 	f.node_usage_mutex.Lock()
 
-	app, err := f.ApplicationGet(app_uid)
+	app, err := f.ApplicationGet(vote.ApplicationUID)
 	if err != nil {
 		f.node_usage_mutex.Unlock()
 		return fmt.Errorf("Fish: Unable to get the Application: %v", err)
-	}
-
-	// In case there is multiple Applications won the election process on the same node it could
-	// just have not enough resources, so skip it for now to allow the other Nodes to try again.
-	if !f.isNodeAvailableForApplication(app_uid) {
-		log.Println("Fish: Not enough resources to execute the Application", app_uid)
-		f.node_usage_mutex.Unlock()
-		return nil
 	}
 
 	// Check current Application state
@@ -435,23 +444,38 @@ func (f *Fish) executeApplication(app_uid types.ApplicationUID) error {
 		return fmt.Errorf("Fish: Unable to get the Application state: %v", err)
 	}
 
-	// Get label with the definition
+	// Get label with the definitions
 	label, err := f.LabelGet(app.LabelUID)
 	if err != nil {
 		f.node_usage_mutex.Unlock()
 		return fmt.Errorf("Fish: Unable to find Label %s: %v", app.LabelUID, err)
 	}
 
+	// Extract the vote won Label Definition
+	if len(label.Definitions) <= vote.Available {
+		f.node_usage_mutex.Unlock()
+		return fmt.Errorf("Fish: ERROR: The voted Definition not exists in the Label %s: %v (App: %s)", app.LabelUID, vote.Available, app.UID)
+	}
+	label_def := label.Definitions[vote.Available]
+
+	// In case there is multiple Applications won the election process on the same node it could
+	// just have not enough resources, so skip it for now to allow the other Nodes to try again.
+	if !f.isNodeAvailableForDefinition(label_def) {
+		log.Println("Fish: Not enough resources to execute the Application", app.UID)
+		f.node_usage_mutex.Unlock()
+		return nil
+	}
+
 	// Locate the required driver
-	driver := f.DriverGet(label.Driver)
+	driver := f.DriverGet(label_def.Driver)
 	if driver == nil {
 		f.node_usage_mutex.Unlock()
-		return fmt.Errorf("Fish: Unable to locate driver for the Application %v", app.UID)
+		return fmt.Errorf("Fish: Unable to locate driver for the Application %s: %s", app.UID, label_def.Driver)
 	}
 
 	// If the driver is not using the remote resources - we need to increase the counter
 	if !driver.IsRemote() {
-		f.node_usage.Add(driver.DefinitionResources(string(label.Definition)))
+		f.node_usage.Add(label_def.Resources)
 	}
 
 	// Unlocking the node resources to allow the other Applications allocation
@@ -459,7 +483,7 @@ func (f *Fish) executeApplication(app_uid types.ApplicationUID) error {
 
 	// Adding the application to list
 	f.applications_mutex.Lock()
-	f.applications = append(f.applications, app_uid)
+	f.applications = append(f.applications, app.UID)
 	f.applications_mutex.Unlock()
 
 	// The main application processing is executed on background because allocation could take a
@@ -476,7 +500,7 @@ func (f *Fish) executeApplication(app_uid types.ApplicationUID) error {
 			if err != nil {
 				log.Println("Fish: Unable to set Application state:", app.UID, err)
 				f.applications_mutex.Lock()
-				f.removeFromExecutingApplincations(app_uid)
+				f.removeFromExecutingApplincations(app.UID)
 				f.applications_mutex.Unlock()
 				return
 			}
@@ -528,7 +552,7 @@ func (f *Fish) executeApplication(app_uid types.ApplicationUID) error {
 		if app_state.Status == types.ApplicationStatusELECTED {
 			// Run the allocation
 			log.Println("Fish: Allocate the resource using the driver", driver.Name())
-			drv_res, err := driver.Allocate(string(label.Definition), metadata)
+			drv_res, err := driver.Allocate(label_def, metadata)
 			if err != nil {
 				log.Println("Fish: Unable to allocate resource for the Application:", app.UID, err)
 				app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
@@ -538,6 +562,8 @@ func (f *Fish) executeApplication(app_uid types.ApplicationUID) error {
 				res.Identifier = drv_res.Identifier
 				res.HwAddr = drv_res.HwAddr
 				res.IpAddr = drv_res.IpAddr
+				res.LabelUID = label.UID
+				res.DefinitionIndex = vote.Available
 				err := f.ResourceCreate(res)
 				if err != nil {
 					log.Println("Fish: Unable to store resource for Application:", app.UID, err)
@@ -602,12 +628,12 @@ func (f *Fish) executeApplication(app_uid types.ApplicationUID) error {
 			// Decrease the amout of running local apps
 			if !driver.IsRemote() {
 				f.node_usage_mutex.Lock()
-				f.node_usage.Subtract(driver.DefinitionResources(string(label.Definition)))
+				f.node_usage.Subtract(label_def.Resources)
 				f.node_usage_mutex.Unlock()
 			}
 
 			// Clean the executing application
-			f.removeFromExecutingApplincations(app_uid)
+			f.removeFromExecutingApplincations(app.UID)
 		}
 		f.applications_mutex.Unlock()
 

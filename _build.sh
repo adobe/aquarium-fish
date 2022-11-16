@@ -30,6 +30,10 @@ fi
 # Cleanup the old generated files & run the generation
 find ./lib -name '*.gen.go' -delete
 PATH="$gopath/bin:$PATH" go generate -v ./lib/...
+# Making LabelDefinitions an actual type to attach GORM-needed Scanner/Valuer functions to it to
+# make the array a json document and store in the DB row as one item
+# TODO: https://github.com/deepmap/oapi-codegen/issues/859
+sed -i 's/^type LabelDefinitions = /type LabelDefinitions /' lib/openapi/types/types.gen.go
 
 # Doing check after generation because generated sources requires additional modules
 ./check.sh

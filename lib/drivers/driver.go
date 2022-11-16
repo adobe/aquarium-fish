@@ -37,28 +37,25 @@ type ResourceDriver interface {
 	Prepare(config []byte) error
 
 	// Make sure the allocate definition is appropriate for the driver
-	// -> definition - describes the driver options to allocate the required resource
-	ValidateDefinition(definition string) error
-
-	// Returns the defined Resources structure filled from definition
-	// -> definition - describes the driver options to allocate the required resource
-	DefinitionResources(definition string) Resources
+	// -> def - describes the driver options to allocate the required resource
+	ValidateDefinition(def types.LabelDefinition) error
 
 	// Check if the described definition can be running on the current node
 	// -> node_usage - how much of node resources was used by all the drivers. Usually should not be used by the cloud drivers
-	// -> definition - describes the driver options to allocate the required resource
+	// -> req - definition describes requirements for the resource
 	// <- capacity - the number of such definitions the driver could run, if -1 - error happened
-	AvailableCapacity(node_usage Resources, definition string) (capacity int64)
+	AvailableCapacity(node_usage types.Resources, req types.LabelDefinition) (capacity int64)
 
 	// Allocate the resource by definition and returns hw address
-	// -> definition - describes the driver options to allocate the required resource
+	// -> def - describes the driver options to allocate the required resource
 	// -> metadata - user metadata to use during resource allocation
 	// <- res - initial resource information to store driver instance state
-	Allocate(definition string, metadata map[string]interface{}) (res *types.Resource, err error)
+	Allocate(def types.LabelDefinition, metadata map[string]any) (res *types.Resource, err error)
 
 	// Get the status of the resource with given hw address
 	// -> res - resource information with stored driver instance state
-	Status(res *types.Resource) string
+	// <- status - current status of the resource
+	Status(res *types.Resource) (status string, err error)
 
 	// Get task struct with implementation to execute it later
 	// -> task - identifier of the task operation

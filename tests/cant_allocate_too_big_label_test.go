@@ -67,7 +67,7 @@ drivers:
 		apitest.New().
 			EnableNetworking(cli).
 			Post(afi.ApiAddress("api/v1/label/")).
-			JSON(`{"name":"test-label", "version":1, "driver":"test", "definition": {"resources":{"cpu":5,"ram":9}}}`).
+			JSON(`{"name":"test-label", "version":1, "definitions": [{"driver":"test", "resources":{"cpu":5,"ram":9}}]}`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).

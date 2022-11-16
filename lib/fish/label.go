@@ -39,11 +39,19 @@ func (f *Fish) LabelCreate(l *types.Label) error {
 	if l.Name == "" {
 		return fmt.Errorf("Fish: Name can't be empty")
 	}
-	if l.Driver == "" {
-		return fmt.Errorf("Fish: Driver can't be empty")
-	}
-	if l.Definition == "" {
-		return fmt.Errorf("Fish: Definition can't be empty")
+	for i, def := range l.Definitions {
+		if def.Driver == "" {
+			return fmt.Errorf("Fish: Driver can't be empty in Label Definition %d", i)
+		}
+		if def.Resources.Cpu < 1 {
+			return fmt.Errorf("Fish: Resources CPU can't be less than 1 in Label Definition %d", i)
+		}
+		if def.Resources.Ram < 1 {
+			return fmt.Errorf("Fish: Resources RAM can't be less than 1 in Label Definition %d", i)
+		}
+		if def.Options == "" {
+			l.Definitions[i].Options = "{}"
+		}
 	}
 	if l.Metadata == "" {
 		l.Metadata = "{}"

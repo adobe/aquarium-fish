@@ -17,10 +17,10 @@
 token=$1
 [ "$token" ] || exit 1
 
-label=winserver2019-vs2019_vmx
+label=ubuntu2004
 
 # It's a bit dirty, but works for now - probably better to create API call to find the latest label
-curr_label=$(curl -s -u "admin:$token" -k 'https://127.0.0.1:8001/api/v1/label/?filter=name="'$label'"' | sed 's/},{/},\n{/g' | tail -1)
+curr_label=$(curl -s -u "admin:$token" -k 'https://localhost:8001/api/v1/label/?filter=name="'$label'"' | sed 's/},{/},\n{/g' | tail -1)
 curr_version="$(echo "$curr_label" | grep -o '"version": *[0-9]\+' | tr -dc '0-9')"
 echo "Current label '$label:$curr_version': $curr_label"
 
@@ -34,30 +34,49 @@ read w1
 
 label_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/json' -d '{"name":"'$label'", "version":'$new_version',
     "definitions": [{
-        "driver":"vmx",
+        "driver":"docker",
         "options": {
-            "image": "winserver2019-vs2019-ci",
+            "image": "ubuntu2004-python3-ci",
             "images": {
-                "winserver2019":           "https://artifact-storage/aquarium/image/vmx/winserver2019-VERSION/winserver2019-VERSION.tar.xz",
-                "winserver2019-vs2019":    "https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019-VERSION/winserver2019-vs2019-VERSION.tar.xz",
-                "winserver2019-vs2019-ci": "https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019-ci-VERSION/winserver2019-vs2019-ci-VERSION.tar.xz"
+                "ubuntu2004":            "https://artifact-storage/aquarium/image/docker/ubuntu2004/ubuntu2004-VERSION.tar.xz",
+                "ubuntu2004-python3":    "https://artifact-storage/aquarium/image/docker/ubuntu2004-python3/ubuntu2004-python3-VERSION.tar.xz",
+                "ubuntu2004-python3-ci": "https://artifact-storage/aquarium/image/docker/ubuntu2004-python3-ci/ubuntu2004-python3-ci-VERSION.tar.xz"
             }
         },
         "resources": {
-            "cpu": 14,
-            "ram": 12,
+            "cpu": 4,
+            "ram": 8,
             "disks": {
-                "vs2019": {
-                    "type": "exfat",
-                    "size": 100,
-                    "reuse": true
+                "python3": {
+                    "type": "hfs+",
+                    "size": 10
                 }
-            }
+            },
+            "network": "nat"
+        }
+    }, {
+        "driver":"aws",
+        "options": {
+            "image": "ami-0aab355e1bfa1e72e",
+            "instance_type": "c6a.xlarge",
+            "security_group": "test-sec-group",
+            "userdata_format": "env"
+        },
+        "resources": {
+            "cpu": 4,
+            "ram": 8,
+            "disks": {
+                "/dev/sdc": {
+                    "label": "Name:workspace_lin",
+                    "size": 100
+                }
+            },
+            "network": "Name:test-vpc"
         }
     }],
     "metadata": {
-        "JENKINS_AGENT_WORKSPACE": "D:\\"
+        "JENKINS_AGENT_WORKSPACE": "/mnt/workspace"
     }
-}' https://127.0.0.1:8001/api/v1/label/ | grep -o '"UID": *"[^"]\+"' | cut -d':' -f 2 | tr -d ' "')
+}' https://localhost:8001/api/v1/label/ | grep -o '"UID": *"[^"]\+"' | cut -d':' -f 2 | tr -d ' "')
 
 echo "Created Label ID: ${label_id}"

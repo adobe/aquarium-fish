@@ -17,70 +17,52 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/adobe/aquarium-fish/lib/drivers"
+	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 /**
- * Definition example:
+ * Options example:
  *   image: ubuntu2004-python3-ci
  *   images:
  *     ubuntu2004: https://artifact-storage/aquarium/image/docker/ubuntu2004/ubuntu2004-VERSION.tar.xz
  *     ubuntu2004-python3: https://artifact-storage/aquarium/image/docker/ubuntu2004-python3/ubuntu2004-python3-VERSION.tar.xz
  *     ubuntu2004-python3-ci: https://artifact-storage/aquarium/image/docker/ubuntu2004-python3-ci/ubuntu2004-python3-ci-VERSION.tar.xz
- *   requirements:
- *     cpu: 14
- *     ram: 14
- *     disks:
- *       python3_workspace:
- *         label: workspace
- *		   type: dir
- *         size: 100
- *         reuse: true
- *     network: ""
- *   metadata:
- *     JENKINS_AGENT_WORKDIR: /mnt/workspace
  */
-type Definition struct {
-	Image     string            `json:"image"`     // Image name to use
-	Images    map[string]string `json:"images"`    // List of image dependencies
-	Resources drivers.Resources `json:"resources"` // Required resources to allocate
+type Options struct {
+	Image  string            `json:"image"`  // Image name to use
+	Images map[string]string `json:"images"` // List of image dependencies
 }
 
-func (d *Definition) Apply(definition string) error {
-	if err := json.Unmarshal([]byte(definition), d); err != nil {
-		log.Println("DOCKER: Unable to apply the driver definition", err)
+func (o *Options) Apply(options util.UnparsedJson) error {
+	if err := json.Unmarshal([]byte(options), o); err != nil {
+		log.Println("DOCKER: Unable to apply the driver options", err)
 		return err
 	}
 
-	return d.Validate()
+	return o.Validate()
 }
 
-func (d *Definition) Validate() error {
+func (o *Options) Validate() error {
 	// Check image
-	if d.Image == "" {
+	if o.Image == "" {
 		return fmt.Errorf("DOCKER: No image is specified")
 	}
 
 	// Check the images
 	image_exist := false
-	for name, url := range d.Images {
+	for name, url := range o.Images {
 		if name == "" {
 			return fmt.Errorf("DOCKER: No image name is specified")
 		}
 		if url == "" {
 			return fmt.Errorf("DOCKER: No image url is specified")
 		}
-		if name == d.Image {
+		if name == o.Image {
 			image_exist = true
 		}
 	}
 	if !image_exist {
 		return fmt.Errorf("DOCKER: No image found in the images")
-	}
-
-	// Check resources
-	if err := d.Resources.Validate([]string{"dir", "hfs+", "exfat", "fat32"}, true); err != nil {
-		return fmt.Errorf("DOCKER: Resources validation failed: %s", err)
 	}
 
 	return nil

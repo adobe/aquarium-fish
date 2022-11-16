@@ -32,12 +32,15 @@ echo "Create the new version of Label '$label:$new_version' ?"
 echo "Press any key to create or Ctrl-C to abort"
 read w1
 
-label_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/json' -d '{"name":"'$label'", "version":'$new_version', "driver":"aws",
-    "definition": {
-        "image": "ami-0aab355e1bfa1e72e",
-        "instance_type": "c6a.4xlarge",
-        "security_group": "test-sec-group",
-        "userdata_format": "env",
+label_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/json' -d '{"name":"'$label'", "version":'$new_version',
+    "definitions": [{
+        "driver":"aws",
+        "options": {
+            "image": "ami-0aab355e1bfa1e72e",
+            "instance_type": "c6a.4xlarge",
+            "security_group": "test-sec-group",
+            "userdata_format": "env"
+        },
         "resources": {
             "cpu": 16,
             "ram": 32,
@@ -49,7 +52,7 @@ label_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/js
             },
             "network": "Name:test-vpc"
         }
-    },
+    }],
     "metadata": {
         "JENKINS_AGENT_WORKSPACE": "/mnt/workspace"
     }
