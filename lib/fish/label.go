@@ -15,6 +15,7 @@ package fish
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 	"github.com/adobe/aquarium-fish/lib/util"
@@ -48,6 +49,10 @@ func (f *Fish) LabelCreate(l *types.Label) error {
 		}
 		if def.Resources.Ram < 1 {
 			return fmt.Errorf("Fish: Resources RAM can't be less than 1 in Label Definition %d", i)
+		}
+		_, err := time.ParseDuration(def.Resources.Lifetime)
+		if def.Resources.Lifetime != "" && err != nil {
+			return fmt.Errorf("Fish: Resources Lifetime parse error in Label Definition %d: %v", i, err)
 		}
 		if def.Options == "" {
 			l.Definitions[i].Options = "{}"

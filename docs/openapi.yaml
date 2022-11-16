@@ -1206,15 +1206,18 @@ components:
         - multitenancy
         - cpu_overbook
         - ram_overbook
+        - lifetime
       properties:
         cpu:
           x-go-type: uint
           type: integer
           minimum: 0
+          description: Amount of vCPUs (logical CPU with HT enabled will have 2 per core)
         ram:
           x-go-type: uint
           type: integer
           minimum: 0
+          description: Amount of RAM in GB
         disks:
           type: object
           additionalProperties:
@@ -1231,6 +1234,13 @@ components:
         ram_overbook:
           type: boolean
           description: Tolerate to RAM overbooking when executed together with other envs
+        lifetime:
+          type: string
+          description: |
+            Total lifetime of the resource in Time Duration (ex. "1h30m30s"). Begins on Resource
+            create time till deallocate by user or auto deallocate by timeout. If it's empty or "0"
+            then default value from fish node config will be used. If it's negative (ex. "-1s")
+            then the resource will live forever or until the user requests deallocate.
 
     ResourcesDisk:
       type: object

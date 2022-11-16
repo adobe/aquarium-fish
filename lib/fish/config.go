@@ -13,8 +13,10 @@
 package fish
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
+	"time"
 
 	"github.com/adobe/aquarium-fish/lib/util"
 	"github.com/ghodss/yaml"
@@ -34,6 +36,8 @@ type Config struct {
 
 	NodeName     string `json:"node_name"`     // Last resort in case you need to override the default host node name
 	NodeLocation string `json:"node_location"` // Specify cluster node location for multi-dc configurations
+
+	DefaultResourceLifetime string `json:"default_resource_lifetime"` // Sets the lifetime of the resource which will be used if label definition one is not set
 
 	Drivers []ConfigDriver `json:"drivers"` // If specified - only the listed plugins will be loaded
 }
@@ -63,6 +67,11 @@ func (c *Config) ReadConfigFile(cfg_path string) error {
 	}
 	if c.TLSCrt == "" {
 		c.TLSCrt = c.NodeName + ".crt"
+	}
+
+	_, err := time.ParseDuration(c.DefaultResourceLifetime)
+	if c.DefaultResourceLifetime != "" && err != nil {
+		return fmt.Errorf("Fish: Default Resource Lifetime parse error: %v", err)
 	}
 
 	return nil

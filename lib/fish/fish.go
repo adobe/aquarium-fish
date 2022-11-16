@@ -575,6 +575,25 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 			f.ApplicationStateCreate(app_state)
 		}
 
+		// Getting the resource lifetime to know how much time it will live
+		resource_lifetime, err := time.ParseDuration(label_def.Resources.Lifetime)
+		if label_def.Resources.Lifetime != "" && err != nil {
+			log.Println("Fish: Error: Can't parse the Lifetime from Label Definition:", label.UID, res.DefinitionIndex)
+			// Trying to get default value from fish config
+			resource_lifetime, err = time.ParseDuration(f.cfg.DefaultResourceLifetime)
+			if f.cfg.DefaultResourceLifetime != "" && err != nil {
+				// Not fatal error - in worst case the resource will just sit there but at least will
+				// not ruin the workload execution
+				log.Println("Fish: Error: Can't parse the Default Resource Lifetime from fish config")
+			}
+		}
+		resource_timeout := res.CreatedAt.Add(resource_lifetime)
+		if resource_lifetime > 0 {
+			log.Printf("Fish: Resource %s will be deallocated by timeout in %s (%s)", app.UID, resource_lifetime, resource_timeout)
+		} else {
+			log.Println("Fish: Warning: Resource have no lifetime set and will live until deallocated by user:", app.UID)
+		}
+
 		// Run the loop to wait for deallocate request
 		var deallocate_retry uint8 = 1
 		for app_state.Status == types.ApplicationStatusALLOCATED {
@@ -585,6 +604,18 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 			app_state, err = f.ApplicationStateGetByApplication(app.UID)
 			if err != nil {
 				log.Println("Fish: Unable to get status for Application:", app.UID, err)
+			}
+
+			// Check if it's life timeout for the resource
+			if resource_lifetime > 0 {
+				// The time limit is set - so let's use resource create time and find out timeout
+				if resource_timeout.Before(time.Now()) {
+					// Seems the timeout has come, so fish asks for application deallocate
+					app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusDEALLOCATE,
+						Description: fmt.Sprintf("Resource lifetime timeout reached: %s", resource_lifetime),
+					}
+					f.ApplicationStateCreate(app_state)
+				}
 			}
 
 			// Execute the existing ApplicationTasks. It will be executed during ALLOCATED or prior
