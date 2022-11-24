@@ -579,9 +579,11 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 		resource_lifetime, err := time.ParseDuration(label_def.Resources.Lifetime)
 		if label_def.Resources.Lifetime != "" && err != nil {
 			log.Println("Fish: Error: Can't parse the Lifetime from Label Definition:", label.UID, res.DefinitionIndex)
-			// Trying to get default value from fish config
+		}
+		if err != nil {
+			// Try to get default value from fish config
 			resource_lifetime, err = time.ParseDuration(f.cfg.DefaultResourceLifetime)
-			if f.cfg.DefaultResourceLifetime != "" && err != nil {
+			if err != nil {
 				// Not fatal error - in worst case the resource will just sit there but at least will
 				// not ruin the workload execution
 				log.Println("Fish: Error: Can't parse the Default Resource Lifetime from fish config")
