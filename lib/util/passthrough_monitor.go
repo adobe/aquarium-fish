@@ -14,8 +14,9 @@ package util
 
 import (
 	"io"
-	"log"
 	"time"
+
+	"github.com/adobe/aquarium-fish/lib/log"
 )
 
 // Wraps an existing io.Reader to monitor the stream
@@ -42,7 +43,7 @@ func (pt *PassThruMonitor) Read(p []byte) (int, error) {
 		percentage := float64(pt.total) / float64(pt.length) * float64(100)
 		if percentage-pt.progress > 10 || time.Now().Sub(pt.print_ts) > 30*time.Second {
 			// Show status every 10% or 30 sec
-			log.Printf("%s: %v%%\n", pt.name, int(percentage))
+			log.Infof("%s: %v%%", pt.name, int(percentage))
 			pt.progress = percentage
 			pt.print_ts = time.Now()
 		}

@@ -15,11 +15,11 @@ package fish
 import (
 	"crypto/sha256"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/google/uuid"
 
+	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
@@ -29,7 +29,7 @@ func (f *Fish) NodeFind(filter *string) (ns []types.Node, err error) {
 	if filter != nil {
 		secured_filter, err := util.ExpressionSqlFilter(*filter)
 		if err != nil {
-			log.Println("Fish: SECURITY: weird SQL filter received:", err)
+			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
 			// We do not fail here because we should not give attacker more information
 			return ns, nil
 		}
@@ -84,7 +84,7 @@ func (f *Fish) pingProcess() error {
 		}
 		select {
 		case <-ping_ticker.C:
-			log.Println("Fish Node: ping")
+			log.Debug("Fish Node: ping")
 			f.NodePing(f.node)
 		}
 	}

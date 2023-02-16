@@ -15,10 +15,11 @@ package crypt
 import (
 	"bytes"
 	"crypto/rand"
-	"log"
 	"math/big"
 
 	"golang.org/x/crypto/argon2"
+
+	"github.com/adobe/aquarium-fish/lib/log"
 )
 
 const (
@@ -44,7 +45,7 @@ type Hash struct {
 func RandBytes(size int) (data []byte) {
 	data = make([]byte, size)
 	if _, err := rand.Read(data); err != nil {
-		log.Panic("Err generating random bytes", err)
+		log.Error("Crypt: Unable to generate random bytes:", err)
 	}
 	return
 }
@@ -56,7 +57,7 @@ func RandString(size int) string {
 	for i := range data {
 		charset_pos, err := rand.Int(rand.Reader, charset_len)
 		if err != nil {
-			log.Panic("Err generating random string", err)
+			log.Error("Crypt: Failed to generate random string:", err)
 		}
 		data[i] = rand_string_charset[charset_pos.Int64()]
 	}

@@ -17,7 +17,6 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,6 +26,7 @@ import (
 
 	"github.com/hpcloud/tail"
 
+	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
@@ -51,8 +51,7 @@ func (d *Driver) getAvailResources() (avail_cpu, avail_ram uint) {
 // Load images and returns the target image path for cloning
 func (d *Driver) loadImages(opts *Options, vm_images_dir string) (string, error) {
 	if err := os.MkdirAll(vm_images_dir, 0o755); err != nil {
-		log.Println("VMX: Unable to create the vm images dir:", vm_images_dir)
-		return "", err
+		return "", log.Error("VMX: Unable to create the VM images dir:", vm_images_dir, err)
 	}
 
 	target_path := ""
@@ -61,31 +60,29 @@ func (d *Driver) loadImages(opts *Options, vm_images_dir string) (string, error)
 		archive_name := filepath.Base(url)
 		image_unpacked := filepath.Join(d.cfg.ImagesPath, strings.TrimSuffix(archive_name, ".tar.xz"))
 
-		log.Println("VMX: Loading the required image:", name, url)
+		log.Info("VMX: Loading the required image:", name, url)
 
 		// Running the background routine to download, unpack and process the image
 		// Success will be checked later by existance of the copied image in the vm directory
 		wg.Add(1)
-		go func(name, url, unpack_dir, target_image string) {
+		go func(name, url, unpack_dir, target_image string) error {
 			defer wg.Done()
 			if err := util.DownloadUnpackArchive(url, unpack_dir, d.cfg.DownloadUser, d.cfg.DownloadPassword); err != nil {
-				log.Println("VMX: ERROR: Unable to download and unpack the image:", name, url, err)
-				return
+				return log.Error("VMX: Unable to download and unpack the image:", name, url, err)
 			}
 
 			// Getting the image subdir name in the unpacked dir
 			subdir := ""
 			items, err := ioutil.ReadDir(image_unpacked)
 			if err != nil {
-				log.Println("VMX: ERROR: Unable to read the unpacked directory:", image_unpacked, err)
-				return
+				return log.Error("VMX: Unable to read the unpacked directory:", image_unpacked, err)
 			}
 			for _, f := range items {
 				if strings.HasPrefix(f.Name(), name) {
 					if f.Mode()&os.ModeSymlink != 0 {
 						// Potentially it can be a symlink (like used in local tests)
 						if _, err := os.Stat(filepath.Join(image_unpacked, f.Name())); err != nil {
-							log.Println("VMX: WARN: The image symlink is broken:", f.Name(), err)
+							log.Warn("VMX: The image symlink is broken:", f.Name(), err)
 							continue
 						}
 					}
@@ -94,8 +91,7 @@ func (d *Driver) loadImages(opts *Options, vm_images_dir string) (string, error)
 				}
 			}
 			if subdir == "" {
-				log.Printf("VMX: ERROR: Unpacked image '%s' has no subfolder '%s', only %s:\n", image_unpacked, name, items)
-				return
+				return log.Errorf("VMX: Unpacked image '%s' has no subfolder '%s', only: %q", image_unpacked, name, items)
 			}
 
 			// Unfortunately the clone operation modifies the image snapshots description
@@ -107,15 +103,13 @@ func (d *Driver) loadImages(opts *Options, vm_images_dir string) (string, error)
 				target_path = filepath.Join(out_dir, name+".vmx")
 			}
 			if err := os.MkdirAll(out_dir, 0o755); err != nil {
-				log.Println("VMX: ERROR: Unable to create the vm image dir:", out_dir, err)
-				return
+				return log.Error("VMX: Unable to create the vm image dir:", out_dir, err)
 			}
 
 			tocopy_list, err := os.ReadDir(root_dir)
 			if err != nil {
-				log.Println("VMX: ERROR: Unable to list the image directory:", root_dir, err)
 				os.RemoveAll(out_dir)
-				return
+				return log.Error("VMX: Unable to list the image directory:", root_dir, err)
 			}
 
 			for _, entry := range tocopy_list {
@@ -126,18 +120,16 @@ func (d *Driver) loadImages(opts *Options, vm_images_dir string) (string, error)
 				if strings.HasSuffix(entry.Name(), ".vmdk") && util.FileStartsWith(in_path, []byte("# Disk DescriptorFile")) != nil {
 					// Just link the disk image to the vm image dir - we will not modify it anyway
 					if err := os.Symlink(in_path, out_path); err != nil {
-						log.Println("VMX: ERROR: Unable to symlink the image file", in_path, out_path, err)
 						os.RemoveAll(out_dir)
-						return
+						return log.Error("VMX: Unable to symlink the image file:", in_path, out_path, err)
 					}
 					continue
 				}
 
 				// Copy VM file in order to prevent the image modification
 				if err := util.FileCopy(in_path, out_path); err != nil {
-					log.Println("VMX: ERROR: Unable to copy the image file", in_path, out_path, err)
 					os.RemoveAll(out_dir)
-					return
+					return log.Error("VMX: Unable to copy the image file:", in_path, out_path, err)
 				}
 
 				// Deprecated functionality
@@ -150,25 +142,24 @@ func (d *Driver) loadImages(opts *Options, vm_images_dir string) (string, error)
 						false, false, false,
 						"<REPLACE_PARENT_VM_FULL_PATH>", vm_images_dir,
 					); err != nil {
-						log.Println("VMX: ERROR: Unable to replace full path token in vmsd", name, err)
 						os.RemoveAll(out_dir)
-						return
+						return log.Error("VMX: Unable to replace full path token in vmsd:", name, err)
 					}
 				}
 			}
+			return nil
 		}(name, url, image_unpacked, opts.Image)
 	}
 
-	log.Println("VMX: Wait for all the background image processes to be done...")
+	log.Debug("VMX: Wait for all the background image processes to be done...")
 	wg.Wait()
 
-	log.Println("VMX: The images are processed.")
+	log.Info("VMX: The images are processed.")
 
 	// Check all the images are in place just by number of them
 	vm_images, _ := ioutil.ReadDir(vm_images_dir)
 	if len(opts.Images) != len(vm_images) {
-		log.Println("VMX: The image processes gone wrong, please check log for the errors")
-		return "", fmt.Errorf("VMX: The image processes gone wrong, please check log for the errors")
+		return "", log.Error("VMX: The image processes gone wrong, please check log for the errors")
 	}
 
 	return target_path, nil
@@ -206,11 +197,11 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]types.ResourcesDi
 		}
 
 		rel_path, err := filepath.Rel(filepath.Dir(vmx_path), disk_path+".vmdk")
-		if err == nil {
-			disk_paths = append(disk_paths, rel_path)
-		} else {
-			log.Println("VMX: Unable to get relative path for disk:", disk_path+".vmdk")
+		if err != nil {
+			log.Warn("VMX: Unable to get relative path for disk:", disk_path+".vmdk", err)
 			disk_paths = append(disk_paths, disk_path)
+		} else {
+			disk_paths = append(disk_paths, rel_path)
 		}
 
 		if _, err := os.Stat(disk_path + ".vmdk"); !os.IsNotExist(err) {
@@ -243,8 +234,7 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]types.ResourcesDi
 			"-size", fmt.Sprintf("%dm", disk.Size*1024),
 		}
 		if _, _, err := runAndLog(10*time.Minute, "/usr/bin/hdiutil", args...); err != nil {
-			log.Println("VMX: Unable to create dmg disk", dmg_path, err)
-			return err
+			return log.Error("VMX: Unable to create dmg disk:", dmg_path, err)
 		}
 
 		vm_name := strings.TrimSuffix(filepath.Base(vmx_path), ".vmx")
@@ -253,8 +243,7 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]types.ResourcesDi
 		// Attach & mount disk
 		stdout, _, err := runAndLog(10*time.Second, "/usr/bin/hdiutil", "attach", dmg_path, "-mountpoint", mount_point)
 		if err != nil {
-			log.Println("VMX: Unable to attach dmg disk", err)
-			return err
+			return log.Error("VMX: Unable to attach dmg disk:", dmg_path, mount_point, err)
 		}
 
 		// Get attached disk device
@@ -262,21 +251,18 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]types.ResourcesDi
 
 		// Allow anyone to modify the disk content
 		if err := os.Chmod(mount_point, 0o777); err != nil {
-			log.Println("VMX: Unable to change the disk access rights", err)
-			return err
+			return log.Error("VMX: Unable to change the disk access rights:", mount_point, err)
 		}
 
 		// Umount disk (use diskutil to umount for sure)
 		stdout, _, err = runAndLog(10*time.Second, "/usr/sbin/diskutil", "umount", mount_point)
 		if err != nil {
-			log.Println("VMX: Unable to umount dmg disk", err)
-			return err
+			return log.Error("VMX: Unable to umount dmg disk:", mount_point, err)
 		}
 
 		// Detach disk
 		if _, _, err := runAndLog(10*time.Second, "/usr/bin/hdiutil", "detach", dev_path); err != nil {
-			log.Println("VMX: Unable to detach dmg disk", err)
-			return err
+			return log.Error("VMX: Unable to detach dmg disk:", dev_path, err)
 		}
 
 		// Create vmdk by using the pregenerated vmdk template
@@ -309,21 +295,18 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]types.ResourcesDi
 		}, "\n")
 
 		if err := os.WriteFile(disk_path+"_tmp.vmdk", []byte(vmdk_tempalte), 0640); err != nil {
-			log.Println("VMX: Unable to place the template vmdk file", disk_path+"_tmp.vmdk")
-			return err
+			return log.Error("VMX: Unable to place the template vmdk file:", disk_path+"_tmp.vmdk", err)
 		}
 
 		// Convert linked vmdk to standalone vmdk
 		if _, _, err := runAndLog(10*time.Minute, d.cfg.VdiskmanagerPath, "-r", disk_path+"_tmp.vmdk", "-t", "0", disk_path+".vmdk"); err != nil {
-			log.Println("VMX: Unable to create vmdk disk", err)
-			return err
+			return log.Error("VMX: Unable to create vmdk disk:", disk_path+".vmdk", err)
 		}
 
 		// Remove temp files
 		for _, path := range []string{dmg_path, disk_path + "_tmp.vmdk"} {
 			if err := os.Remove(path); err != nil {
-				log.Println("VMX: Unable to remove file", path, err)
-				return err
+				return log.Error("VMX: Unable to remove tmp disk files:", path, err)
 			}
 		}
 	}
@@ -346,8 +329,7 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]types.ResourcesDi
 		)
 	}
 	if err := util.FileReplaceToken(vmx_path, true, true, true, to_replace...); err != nil {
-		log.Println("VMX: Unable to add disks to VM configuration", vmx_path)
-		return err
+		return log.Error("VMX: Unable to add disks to the VM configuration:", vmx_path, err)
 	}
 
 	return nil
@@ -358,17 +340,17 @@ func (d *Driver) logMonitor(vmx_path string) {
 	// Monitor the vmware.log file
 	log_path := filepath.Join(filepath.Dir(vmx_path), "vmware.log")
 	t, _ := tail.TailFile(log_path, tail.Config{Follow: true, Poll: true})
-	log.Println("VMX: Start monitoring of log:", log_path)
+	log.Debug("VMX: Start monitoring of log:", log_path)
 	for line := range t.Lines {
 		// Send reset if the VM is switched to 0 status
 		if strings.Contains(line.Text, "Tools: Changing running status: 1 => 0") {
-			log.Println("VMX: Resetting the stale VM", vmx_path)
+			log.Warn("VMX: Resetting the stale VM", vmx_path)
 			// We should not spend much time here, because we can miss
 			// the file delete so running in a separated thread
 			go runAndLog(10*time.Second, d.cfg.VmrunPath, "reset", vmx_path)
 		}
 	}
-	log.Println("VMX: Done monitoring of log:", log_path)
+	log.Debug("VMX: Done monitoring of log:", log_path)
 }
 
 // Runs & logs the executable command
@@ -381,7 +363,7 @@ func runAndLog(timeout time.Duration, path string, arg ...string) (string, strin
 
 	cmd := exec.CommandContext(ctx, path, arg...)
 
-	log.Printf("VMX: Executing: %s %s", cmd.Path, strings.Join(cmd.Args[1:], " "))
+	log.Debug("VMX: Executing:", cmd.Path, strings.Join(cmd.Args[1:], " "))
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
@@ -402,10 +384,10 @@ func runAndLog(timeout time.Duration, path string, arg ...string) (string, strin
 	}
 
 	if len(stdoutString) > 0 {
-		log.Printf("VMX: stdout: %s", stdoutString)
+		log.Debug("VMX: stdout:", stdoutString)
 	}
 	if len(stderrString) > 0 {
-		log.Printf("VMX: stderr: %s", stderrString)
+		log.Debug("VMX: stderr:", stderrString)
 	}
 
 	// Replace these for Windows, we only want to deal with Unix style line endings.

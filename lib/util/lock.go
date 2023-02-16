@@ -15,21 +15,22 @@ package util
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
+	"math"
 	"math/bits"
 	"os"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/adobe/aquarium-fish/lib/log"
 )
 
 // The function creates the lock file, notice - remove it yourself
 func CreateLock(lock_path string) error {
 	lock_file, err := os.Create(lock_path)
 	if err != nil {
-		log.Println("Util: Unable to create the lock file:", lock_path)
-		return err
+		return log.Error("Util: Unable to create the lock file:", lock_path)
 	}
 
 	// Writing pid into the file for additional info
@@ -52,21 +53,21 @@ func WaitLock(lock_path string, clean func()) error {
 				// Check the pid is running - because if the app crashes
 				// it can leave the lock file (weak protection but worth it)
 				pid, err := strconv.ParseInt(strings.SplitN(string(lock_info), " ", 2)[0], 10, bits.UintSize)
-				if err != nil {
-					// No pid in the lock file - it's actually a small chance it's create/write
-					// delay, but it's so small I want to ignore it
-					log.Printf("Util: Lock file doesn't contain pid of the process '%s': %s\n", lock_path, lock_info)
+				if err != nil || pid < 0 || pid > math.MaxInt32 {
+					// No valid pid in the lock file - it's actually a small chance it's create or
+					// write delay, but it's so small I want to ignore it
+					log.Warnf("Util: Lock file doesn't contain pid of the process '%s': %s - %v", lock_path, lock_info, err)
 					clean()
 					os.Remove(lock_path)
 					break
 				}
 				if proc, err := os.FindProcess(int(pid)); err != nil || proc.Signal(syscall.Signal(0)) != nil {
-					log.Printf("Util: No process running for lock file '%s': %s\n", lock_path, lock_info)
+					log.Warnf("Util: No process running for lock file '%s': %s", lock_path, lock_info)
 					clean()
 					os.Remove(lock_path)
 					break
 				}
-				log.Printf("Util: Waiting for '%s', pid %s\n", lock_path, lock_info)
+				log.Debugf("Util: Waiting for '%s', pid %s", lock_path, lock_info)
 			}
 		}
 

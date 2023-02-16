@@ -17,7 +17,6 @@ package vmx
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -27,6 +26,7 @@ import (
 
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/drivers"
+	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
@@ -144,8 +144,7 @@ func (d *Driver) AvailableCapacity(node_usage types.Resources, req types.LabelDe
 func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]interface{}) (*types.Resource, error) {
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
-		log.Println("VMX: Unable to apply options:", err)
-		return nil, err
+		return nil, log.Error("VMX: Unable to apply options:", err)
 	}
 
 	// Generate unique id from the hw address and required directories
@@ -189,14 +188,12 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]interfa
 		"cpuid.corespersocket =", fmt.Sprintf(`cpuid.corespersocket = "%d"`, def.Resources.Cpu),
 		"memsize =", fmt.Sprintf(`memsize = "%d"`, def.Resources.Ram*1024),
 	); err != nil {
-		log.Println("VMX: Unable to change cloned VM configuration", vmx_path)
-		return nil, err
+		return nil, log.Error("VMX: Unable to change cloned VM configuration:", vmx_path, err)
 	}
 
 	// Create and connect disks to vmx
 	if err := d.disksCreate(vmx_path, def.Resources.Disks); err != nil {
-		log.Println("VMX: Unable create disks for VM", vmx_path)
-		return nil, err
+		return nil, log.Error("VMX: Unable create disks for VM:", vmx_path, err)
 	}
 
 	// Run the background monitoring of the vmware log
@@ -206,13 +203,12 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]interfa
 
 	// Run the VM
 	if _, _, err := runAndLog(120*time.Second, d.cfg.VmrunPath, "start", vmx_path, "nogui"); err != nil {
-		log.Println("VMX: Unable to run VM", vmx_path, err)
-		log.Println("VMX: Check the log info:", filepath.Join(filepath.Dir(vmx_path), "vmware.log"),
+		log.Error("VMX: Check the log info:", filepath.Join(filepath.Dir(vmx_path), "vmware.log"),
 			"and directory ~/Library/Logs/VMware/ for additional logs")
-		return nil, err
+		return nil, log.Error("VMX: Unable to run VM", vmx_path, err)
 	}
 
-	log.Println("VMX: Allocate of VM completed:", vmx_path)
+	log.Info("VMX: Allocate of VM completed:", vmx_path)
 
 	return &types.Resource{Identifier: vmx_path, HwAddr: vm_hwaddr}, nil
 }
@@ -239,7 +235,7 @@ func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
 	// Parse options json into task structure
 	if len(options) > 0 {
 		if err := json.Unmarshal([]byte(options), t); err != nil {
-			log.Println("VMX: Unable to apply the task options", err)
+			log.Error("VMX: Unable to apply the task options:", err)
 			return nil
 		}
 	}
@@ -253,20 +249,17 @@ func (d *Driver) Deallocate(res *types.Resource) error {
 	}
 	vmx_path := res.Identifier
 	if len(vmx_path) == 0 {
-		log.Println("VMX: Unable to find VM:", vmx_path)
-		return fmt.Errorf("VMX: No VM found: %s", vmx_path)
+		return log.Error("VMX: Unable to find VM:", vmx_path)
 	}
 
 	// Sometimes it's stuck, so try to stop a bit more than usual
 	if _, _, err := runAndLogRetry(3, 60*time.Second, d.cfg.VmrunPath, "stop", vmx_path); err != nil {
-		log.Println("VMX: Unable to deallocate VM:", vmx_path)
-		return err
+		return log.Error("VMX: Unable to deallocate VM:", vmx_path, err)
 	}
 
 	// Delete VM
 	if _, _, err := runAndLogRetry(3, 30*time.Second, d.cfg.VmrunPath, "deleteVM", vmx_path); err != nil {
-		log.Println("VMX: Unable to delete VM:", vmx_path)
-		return err
+		return log.Error("VMX: Unable to delete VM:", vmx_path, err)
 	}
 
 	// Cleaning the VM images too
@@ -274,7 +267,7 @@ func (d *Driver) Deallocate(res *types.Resource) error {
 		return err
 	}
 
-	log.Println("VMX: Deallocate of VM completed:", vmx_path)
+	log.Info("VMX: Deallocate of VM completed:", vmx_path)
 
 	return nil
 }

@@ -15,8 +15,6 @@ package aws
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -25,6 +23,7 @@ import (
 	ec2_types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
+	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
@@ -54,12 +53,10 @@ func (t *TaskSnapshot) SetInfo(task *types.ApplicationTask, res *types.Resource)
 // Snapshot could be executed during ALLOCATED & DEALLOCATE ApplicationStatus
 func (t *TaskSnapshot) Execute() (result []byte, err error) {
 	if t.ApplicationTask == nil {
-		log.Println("AWS: Invalid application task:", t.ApplicationTask)
-		return []byte(`{"error":"internal: invalid application task"}`), fmt.Errorf("AWS: Invalid application task: %v", t.ApplicationTask)
+		return []byte(`{"error":"internal: invalid application task"}`), log.Error("AWS: Invalid application task:", t.ApplicationTask)
 	}
 	if t.Resource == nil || t.Resource.Identifier == "" {
-		log.Println("AWS: Invalid resource:", t.Resource)
-		return []byte(`{"error":"internal: invalid resource"}`), fmt.Errorf("AWS: Invalid resource: %v", t.Resource)
+		return []byte(`{"error":"internal: invalid resource"}`), log.Error("AWS: Invalid resource:", t.Resource)
 	}
 	conn := t.driver.newEC2Conn()
 
@@ -72,11 +69,11 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 		result, err := conn.StopInstances(context.TODO(), input)
 		if err != nil {
 			// Do not fail hard here - it's still possible to take snapshot of the instance
-			log.Println("AWS: Error during stopping the instance:", t.Resource.Identifier, err)
+			log.Error("AWS: Error during stopping the instance:", t.Resource.Identifier, err)
 		}
 		if len(result.StoppingInstances) < 1 || *result.StoppingInstances[0].InstanceId != t.Resource.Identifier {
 			// Do not fail hard here - it's still possible to take snapshot of the instance
-			log.Println("AWS: Wrong instance id result during stopping:", t.Resource.Identifier)
+			log.Error("AWS: Wrong instance id result during stopping:", t.Resource.Identifier)
 		}
 
 		// Wait for instance stopped before going forward with snapshot
@@ -89,7 +86,7 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 		}
 		if err := sw.Wait(context.TODO(), &wait_input, max_wait); err != nil {
 			// Do not fail hard here - it's still possible to take snapshot of the instance
-			log.Println("AWS: Error during wait for instance stop:", t.Resource.Identifier, err)
+			log.Error("AWS: Error during wait for instance stop:", t.Resource.Identifier, err)
 		}
 	}
 
@@ -111,17 +108,17 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 
 	resp, err := conn.CreateSnapshots(context.TODO(), input)
 	if err != nil {
-		return []byte{}, fmt.Errorf("AWS: Unable to create snapshots for instance %s: %v", t.Resource.Identifier, err)
+		return []byte{}, log.Errorf("AWS: Unable to create snapshots for instance %s: %v", t.Resource.Identifier, err)
 	}
 	if len(resp.Snapshots) < 1 {
-		return []byte{}, fmt.Errorf("AWS: No snapshots was created for instance %s", t.Resource.Identifier)
+		return []byte{}, log.Errorf("AWS: No snapshots was created for instance %s", t.Resource.Identifier)
 	}
 
 	snapshots := []string{}
 	for _, r := range resp.Snapshots {
 		snapshots = append(snapshots, *r.SnapshotId)
 	}
-	log.Println("AWS: Created snapshots for instance", t.Resource.Identifier, ":", strings.Join(snapshots, ", "))
+	log.Infof("AWS: Created snapshots for instance %s: %s", t.Resource.Identifier, strings.Join(snapshots, ", "))
 
 	return json.Marshal(map[string]any{"snapshots": snapshots})
 }

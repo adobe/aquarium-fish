@@ -14,7 +14,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -30,6 +29,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/cluster"
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/fish"
+	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi"
 	"github.com/adobe/aquarium-fish/lib/proxy"
 )
@@ -41,19 +41,29 @@ func main() {
 	var cluster_join *[]string
 	var cfg_path string
 	var dir string
-	var verbose bool
+	var log_verbosity string
+	var log_timestamp bool
 
 	cmd := &cobra.Command{
 		Use:   "aquarium-fish",
 		Short: "Aquarium fish",
 		Long:  `Part of the Aquarium suite - a distributed resources manager`,
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			err := log.SetVerbosity(log_verbosity)
+			if err != nil {
+				return err
+			}
+			log.UseTimestamp = log_timestamp
+
+			return log.InitLoggers()
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			log.Println("Fish running...")
+
+			log.Info("Fish running...")
 
 			cfg := &fish.Config{}
 			if err := cfg.ReadConfigFile(cfg_path); err != nil {
-				log.Println("Fish: Unable to apply config file:", cfg_path, err)
-				return err
+				return log.Error("Fish: Unable to apply config file:", cfg_path, err)
 			}
 			if api_address != "" {
 				cfg.APIAddress = api_address
@@ -76,7 +86,7 @@ func main() {
 				return errors.Wrapf(err, "can't create %s", dir)
 			}
 
-			log.Println("Fish init TLS...")
+			log.Info("Fish init TLS...")
 			ca_path := cfg.TLSCaCrt
 			if !filepath.IsAbs(ca_path) {
 				ca_path = filepath.Join(cfg.Directory, ca_path)
@@ -93,13 +103,13 @@ func main() {
 				return err
 			}
 
-			log.Println("Fish starting ORM...")
+			log.Info("Fish starting ORM...")
 			db, err := gorm.Open(sqlite.Open(filepath.Join(dir, "sqlite.db")), &gorm.Config{
-				Logger: logger.New(log.New(os.Stdout, "\n", log.LstdFlags), logger.Config{
+				Logger: logger.New(log.ErrorLogger, logger.Config{
 					SlowThreshold:             500 * time.Millisecond,
 					LogLevel:                  logger.Error,
 					IgnoreRecordNotFoundError: true,
-					Colorful:                  true,
+					Colorful:                  false,
 				}),
 			})
 			if err != nil {
@@ -111,31 +121,31 @@ func main() {
 			sql_db.SetMaxOpenConns(1)
 			sql_db.Exec("PRAGMA journal_mode=WAL;")
 
-			log.Println("Fish starting node...")
+			log.Info("Fish starting node...")
 			fish, err := fish.New(db, cfg)
 			if err != nil {
 				return err
 			}
 
-			log.Println("Fish starting socks5 proxy...")
+			log.Info("Fish starting socks5 proxy...")
 			err = proxy.Init(fish, cfg.ProxyAddress)
 			if err != nil {
 				return err
 			}
 
-			log.Println("Fish joining cluster...")
+			log.Info("Fish joining cluster...")
 			cl, err := cluster.New(fish, cfg.ClusterJoin, ca_path, cert_path, key_path)
 			if err != nil {
 				return err
 			}
 
-			log.Println("Fish starting API...")
+			log.Info("Fish starting API...")
 			srv, err := openapi.Init(fish, cl, cfg.APIAddress, ca_path, cert_path, key_path)
 			if err != nil {
 				return err
 			}
 
-			log.Println("Fish initialized")
+			log.Info("Fish initialized")
 			quit := make(chan os.Signal, 1)
 			signal.Notify(quit, unix.SIGINT)
 			signal.Notify(quit, unix.SIGQUIT)
@@ -146,13 +156,15 @@ func main() {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			if err := srv.Shutdown(ctx); err != nil {
-				log.Fatal("Fish forced to shutdown:", err)
+				log.Error("Fish forced to shutdown:", err)
 			}
+
+			log.Info("Fish stopping...")
 
 			cl.Stop()
 			fish.Close()
 
-			log.Println("Fish exiting...")
+			log.Info("Fish stopped")
 
 			return nil
 		},
@@ -165,7 +177,9 @@ func main() {
 	cluster_join = flags.StringSliceP("join", "j", nil, "addresses of existing cluster nodes to join, comma separated")
 	flags.StringVarP(&cfg_path, "cfg", "c", "", "yaml configuration file")
 	flags.StringVarP(&dir, "dir", "D", "", "database and other fish files directory")
-	flags.BoolVarP(&verbose, "verbose", "v", false, "verbose logging")
+	flags.StringVarP(&log_verbosity, "verbosity", "v", "info", "log level (debug, info, warn, error")
+	flags.BoolVar(&log_timestamp, "timestamp", true, "prepend timestamps for each log line")
+	flags.Lookup("timestamp").NoOptDefVal = "false"
 
 	if err := cmd.Execute(); err != nil {
 		os.Exit(1)

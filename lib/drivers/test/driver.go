@@ -17,12 +17,12 @@ package test
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"math/rand"
 	"sync"
 
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/drivers"
+	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
@@ -78,12 +78,12 @@ func (d *Driver) AvailableCapacity(node_usage types.Resources, req types.LabelDe
 
 	var opts Options
 	if err := opts.Apply(req.Options); err != nil {
-		log.Println("TEST: Unable to apply options:", err)
+		log.Error("TEST: Unable to apply options:", err)
 		return -1
 	}
 
 	if err := randomFail("AvailableCapacity", opts.FailAvailableCapacity); err != nil {
-		log.Printf("TEST: RandomFail: %v\n", err)
+		log.Error("TEST: RandomFail:", err)
 		return -1
 	}
 
@@ -140,13 +140,11 @@ func (d *Driver) AvailableCapacity(node_usage types.Resources, req types.LabelDe
 func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*types.Resource, error) {
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
-		log.Println("TEST: Unable to apply options:", err)
-		return nil, err
+		return nil, log.Error("TEST: Unable to apply options:", err)
 	}
 
 	if err := randomFail("Allocate", opts.FailAllocate); err != nil {
-		log.Printf("TEST: RandomFail: %v\n", err)
-		return nil, err
+		return nil, log.Error("TEST: RandomFail:", err)
 	}
 
 	d.resources_lock.Lock()
@@ -194,7 +192,7 @@ func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
 	// Parse options json into task structure
 	if t != nil && len(options) > 0 {
 		if err := json.Unmarshal([]byte(options), t); err != nil {
-			log.Println("TEST: Unable to apply the task options", err)
+			log.Error("TEST: Unable to apply the task options:", err)
 			return nil
 		}
 	}
@@ -204,11 +202,10 @@ func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
 
 func (d *Driver) Deallocate(res *types.Resource) error {
 	if res == nil || res.Identifier == "" {
-		return fmt.Errorf("TEST: Invalid resource: %v", res)
+		return log.Error("TEST: Invalid resource:", res)
 	}
 	if err := randomFail(fmt.Sprintf("Deallocate %s", res.Identifier), d.cfg.FailDeallocate); err != nil {
-		log.Printf("TEST: RandomFail: %v\n", err)
-		return err
+		return log.Error("TEST: RandomFail:", err)
 	}
 
 	d.resources_lock.Lock()

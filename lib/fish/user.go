@@ -14,9 +14,9 @@ package fish
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/adobe/aquarium-fish/lib/crypt"
+	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
@@ -26,7 +26,7 @@ func (f *Fish) UserFind(filter *string) (us []types.User, err error) {
 	if filter != nil {
 		secured_filter, err := util.ExpressionSqlFilter(*filter)
 		if err != nil {
-			log.Println("Fish: SECURITY: weird SQL filter received:", err)
+			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
 			// We do not fail here because we should not give attacker more information
 			return us, nil
 		}
@@ -61,12 +61,12 @@ func (f *Fish) UserAuth(name string, password string) *types.User {
 	// TODO: Make auth process to take constant time in case of failure
 	user, err := f.UserGet(name)
 	if err != nil {
-		log.Printf("Fish: User not exists: %s", name)
+		log.Warn("Fish: User not exists:", name)
 		return nil
 	}
 
 	if !user.Hash.IsEqual(password) {
-		log.Printf("Fish: Incorrect user password: %s", name)
+		log.Warn("Fish: Incorrect user password:", name)
 		return nil
 	}
 
@@ -81,8 +81,7 @@ func (f *Fish) UserNew(name string, password string) (string, *types.User, error
 	user := &types.User{Name: name, Hash: crypt.Generate(password, nil)}
 
 	if err := f.UserCreate(user); err != nil {
-		log.Printf("Fish: Unable to create new user: %s, %s", name, err)
-		return "", nil, err
+		return "", nil, log.Error("Fish: Unable to create new user:", name, err)
 	}
 
 	return password, user, nil

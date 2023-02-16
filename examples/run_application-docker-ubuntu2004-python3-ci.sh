@@ -33,7 +33,7 @@ echo
 echo "Press key to create the Application with label '$label'"
 read w1
 
-app_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/json' -d '{"label_ID":'$curr_label_id', "metadata":{
+app_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/json' -d '{"label_UID":"'$curr_label_id'", "metadata":{
     "JENKINS_URL": "http://host.docker.internal:8085/",
     "JENKINS_AGENT_SECRET": "03839eabcf945b1e780be8f9488d264c4c57bf388546da9a84588345555f29b0",
     "JENKINS_AGENT_NAME": "test-node"

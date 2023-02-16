@@ -15,8 +15,8 @@ package docker
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 
+	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
@@ -35,8 +35,7 @@ type Options struct {
 
 func (o *Options) Apply(options util.UnparsedJson) error {
 	if err := json.Unmarshal([]byte(options), o); err != nil {
-		log.Println("DOCKER: Unable to apply the driver options", err)
-		return err
+		return log.Error("DOCKER: Unable to apply the driver options:", err)
 	}
 
 	return o.Validate()

@@ -14,7 +14,8 @@ package test
 
 import (
 	"encoding/json"
-	"log"
+
+	"github.com/adobe/aquarium-fish/lib/log"
 )
 
 type Config struct {
@@ -37,8 +38,7 @@ func (c *Config) Apply(config []byte) error {
 	// Parse json
 	if len(config) > 0 {
 		if err := json.Unmarshal(config, c); err != nil {
-			log.Println("TEST: Unable to apply the driver config", err)
-			return err
+			return log.Error("TEST: Unable to apply the driver config:", err)
 		}
 	}
 

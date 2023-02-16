@@ -14,10 +14,11 @@ package docker
 
 import (
 	"encoding/json"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/adobe/aquarium-fish/lib/log"
 )
 
 type Config struct {
@@ -53,8 +54,7 @@ type Config struct {
 func (c *Config) Apply(config []byte) error {
 	if len(config) > 0 {
 		if err := json.Unmarshal(config, c); err != nil {
-			log.Println("DOCKER: Unable to apply the driver config", err)
-			return err
+			return log.Error("DOCKER: Unable to apply the driver config", err)
 		}
 	}
 	return nil
@@ -65,8 +65,7 @@ func (c *Config) Validate() (err error) {
 	if c.DockerPath == "" {
 		// Look in the PATH
 		if c.DockerPath, err = exec.LookPath("docker"); err != nil {
-			log.Println("DOCKER: Unable to locate `docker` path", err)
-			return err
+			return log.Error("DOCKER: Unable to locate `docker` path", err)
 		}
 	}
 
@@ -85,7 +84,7 @@ func (c *Config) Validate() (err error) {
 		return err
 	}
 
-	log.Println("DOCKER: Creating working directories:", c.ImagesPath, c.WorkspacePath)
+	log.Info("DOCKER: Creating working directories:", c.ImagesPath, c.WorkspacePath)
 	if err := os.MkdirAll(c.ImagesPath, 0o750); err != nil {
 		return err
 	}

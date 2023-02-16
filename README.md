@@ -189,6 +189,13 @@ The election process:
 
 Simplify the cluster management, for example adding labels or check the status [#8](https://github.com/adobe/aquarium-fish/issues/8).
 
+## Integration tests
+
+To verify that everything works as expected you can run integration tests like that:
+```sh
+$ FISH_PATH=$PWD/aquarium-fish.darwin_amd64 go test -v -failfast -parallel 4 ./tests/...
+```
+
 ## API
 
 There is a number of ways to communicate with the Fish cluster, and the most important one is API.
