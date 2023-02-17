@@ -15,9 +15,9 @@ package test
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
+	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
@@ -46,17 +46,14 @@ func (t *TaskSnapshot) SetInfo(task *types.ApplicationTask, res *types.Resource)
 
 func (t *TaskSnapshot) Execute() (result []byte, err error) {
 	if t.ApplicationTask == nil {
-		log.Println("AWS: Invalid application task:", t.ApplicationTask)
-		return []byte(`{"error":"internal: invalid application task"}`), fmt.Errorf("TEST: Invalid application task: %v", t.ApplicationTask)
+		return []byte(`{"error":"internal: invalid application task"}`), log.Error("TEST: Invalid application task:", t.ApplicationTask)
 	}
 	if t.Resource == nil || t.Resource.Identifier == "" {
-		log.Println("TEST: Invalid resource:", t.Resource)
-		return []byte(`{"error":"internal: invalid resource"}`), fmt.Errorf("TEST: Invalid resource: %v", t.Resource)
+		return []byte(`{"error":"internal: invalid resource"}`), log.Error("TEST: Invalid resource:", t.Resource)
 	}
 	if err := randomFail(fmt.Sprintf("Snapshot %s", t.Resource.Identifier), t.driver.cfg.FailSnapshot); err != nil {
-		log.Printf("TEST: RandomFail: %v\n", err)
 		out, _ := json.Marshal(map[string]any{})
-		return out, err
+		return out, log.Error("TEST: RandomFail:", err)
 	}
 
 	t.driver.resources_lock.Lock()

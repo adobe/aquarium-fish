@@ -15,13 +15,14 @@ package vmx
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/mem"
+
+	"github.com/adobe/aquarium-fish/lib/log"
 )
 
 type Config struct {
@@ -62,8 +63,7 @@ func (c *Config) Apply(config []byte) error {
 	// Parse json
 	if len(config) > 0 {
 		if err := json.Unmarshal(config, c); err != nil {
-			log.Println("VMX: Unable to apply the driver config", err)
-			return err
+			return log.Error("VMX: Unable to apply the driver config:", err)
 		}
 	}
 	return nil
@@ -74,16 +74,14 @@ func (c *Config) Validate() (err error) {
 	if c.VmrunPath == "" {
 		// Look in the PATH
 		if c.VmrunPath, err = exec.LookPath("vmrun"); err != nil {
-			log.Println("VMX: Unable to locate `vmrun` path", err)
-			return err
+			return log.Error("VMX: Unable to locate `vmrun` path:", err)
 		}
 	}
 	if c.VdiskmanagerPath == "" {
 		// Use VmrunPath to get the path
 		c.VdiskmanagerPath = filepath.Join(filepath.Dir(filepath.Dir(c.VmrunPath)), "Library", "vmware-vdiskmanager")
 		if _, err := os.Stat(c.VdiskmanagerPath); os.IsNotExist(err) {
-			log.Println("VMX: Unable to locate `vmware-vdiskmanager` path", err)
-			return err
+			return log.Error("VMX: Unable to locate `vmware-vdiskmanager` path:", err)
 		}
 	}
 	if c.ImagesPath == "" {
@@ -101,7 +99,7 @@ func (c *Config) Validate() (err error) {
 		return err
 	}
 
-	log.Println("VMX: Creating working directories:", c.ImagesPath, c.WorkspacePath)
+	log.Info("VMX: Creating working directories:", c.ImagesPath, c.WorkspacePath)
 	if err := os.MkdirAll(c.ImagesPath, 0o750); err != nil {
 		return err
 	}

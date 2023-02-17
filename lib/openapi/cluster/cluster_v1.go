@@ -15,7 +15,6 @@ package cluster
 import (
 	"crypto/x509"
 	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/gorilla/websocket"
@@ -23,6 +22,7 @@ import (
 
 	"github.com/adobe/aquarium-fish/lib/cluster"
 	"github.com/adobe/aquarium-fish/lib/fish"
+	"github.com/adobe/aquarium-fish/lib/log"
 )
 
 // H is a shortcut for map[string]interface{}
@@ -77,18 +77,18 @@ func (e *Processor) ClientCertAuth(next echo.HandlerFunc) echo.HandlerFunc {
 			}
 			_, err := crt.Verify(opts)
 			if err != nil {
-				log.Println(fmt.Sprintf("Cluster: Client %s (%s) certificate CA verify failed:",
+				log.Warn(fmt.Sprintf("Cluster: Client %s (%s) certificate CA verify failed:",
 					crt.Subject.CommonName, c.RealIP()), err)
 				continue
 			}
 
 			// TODO: Check the node in db by CA as NodeName and if exists compare the pubkey
-			log.Println("DEBUG: Client certificate CN: ", crt.Subject.CommonName)
+			log.Debug("Cluster: Client certificate CN:", crt.Subject.CommonName)
 			der, err := x509.MarshalPKIXPublicKey(crt.PublicKey)
 			if err != nil {
 				continue
 			}
-			log.Println("DEBUG: Client certificate pubkey der: ", der)
+			log.Debug("Cluster: Client certificate pubkey der:", der)
 
 			valid_client_cert = crt
 		}

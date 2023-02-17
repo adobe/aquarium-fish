@@ -19,18 +19,18 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2_types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	"github.com/aws/aws-sdk-go-v2/service/servicequotas"
 
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/drivers"
+	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
@@ -40,6 +40,11 @@ type Driver struct {
 	cfg Config
 	// Contains the available tasks of the driver
 	tasks_list []drivers.ResourceDriverTask
+
+	// Contains quotas cache to not load them for every sneeze
+	quotas             map[string]int64
+	quotas_mutex       sync.Mutex
+	quotas_next_update time.Time
 }
 
 func init() {
@@ -65,6 +70,23 @@ func (d *Driver) Prepare(config []byte) error {
 	// Fill up the available tasks
 	d.tasks_list = append(d.tasks_list, &TaskSnapshot{driver: d})
 
+	d.quotas_mutex.Lock()
+	{
+		// Preparing a map of useful quotas for easy access and update it
+		d.quotas = make(map[string]int64)
+		d.quotas["Running On-Demand DL instances"] = 0
+		d.quotas["Running On-Demand F instances"] = 0
+		d.quotas["Running On-Demand G and VT instances"] = 0
+		d.quotas["Running On-Demand High Memory instances"] = 0
+		d.quotas["Running On-Demand HPC instances"] = 0
+		d.quotas["Running On-Demand Inf instances"] = 0
+		d.quotas["Running On-Demand P instances"] = 0
+		d.quotas["Running On-Demand Standard (A, C, D, H, I, M, R, T, Z) instances"] = 0
+		d.quotas["Running On-Demand Trn instances"] = 0
+		d.quotas["Running On-Demand X instances"] = 0
+	}
+	d.quotas_mutex.Unlock()
+
 	return nil
 }
 
@@ -88,7 +110,7 @@ func (d *Driver) AvailableCapacity(node_usage types.Resources, def types.LabelDe
 
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
-		log.Println("AWS: Unable to apply options:", err)
+		log.Error("AWS: Unable to apply options:", err)
 		return -1
 	}
 
@@ -112,83 +134,59 @@ func (d *Driver) AvailableCapacity(node_usage types.Resources, def types.LabelDe
 			},
 		})
 
-		// Processing the received quotas
+		// Processing the received hosts
 		for p.HasMorePages() {
 			resp, err := p.NextPage(context.TODO())
 			if err != nil {
-				log.Println("AWS: Error during requesting hosts:", err)
+				log.Error("AWS: Error during requesting hosts:", err)
 				return -1
 			}
 			out_count += int64(len(resp.Hosts))
 		}
 
+		log.Debug("AWS: AvailableCapacity for dedicated Mac:", opts.InstanceType, out_count)
+
 		return out_count
 	}
 
-	// Preparing a map of useful quotas for easy access
-	quotas := make(map[string]int64)
-	quotas["Running On-Demand DL instances"] = 0
-	quotas["Running On-Demand F instances"] = 0
-	quotas["Running On-Demand G and VT instances"] = 0
-	quotas["Running On-Demand High Memory instances"] = 0
-	quotas["Running On-Demand HPC instances"] = 0
-	quotas["Running On-Demand Inf instances"] = 0
-	quotas["Running On-Demand P instances"] = 0
-	quotas["Running On-Demand Standard (A, C, D, H, I, M, R, T, Z) instances"] = 0
-	quotas["Running On-Demand Trn instances"] = 0
-	quotas["Running On-Demand X instances"] = 0
+	d.updateQuotas(false)
 
-	conn_sq := d.newServiceQuotasConn()
-
-	// Get the list of quotas
-	p := servicequotas.NewListAWSDefaultServiceQuotasPaginator(conn_sq, &servicequotas.ListAWSDefaultServiceQuotasInput{
-		ServiceCode: aws.String("ec2"),
-	})
-
-	// Processing the received quotas
-	for p.HasMorePages() {
-		resp, err := p.NextPage(context.TODO())
-		if err != nil {
-			log.Println("AWS: Error during requesting quotas:", err)
-			return -1
-		}
-		for _, r := range resp.Quotas {
-			if _, ok := quotas[aws.ToString(r.QuotaName)]; ok {
-				quotas[aws.ToString(r.QuotaName)] = int64(aws.ToFloat64(r.Value))
-			}
+	d.quotas_mutex.Lock()
+	{
+		// Check we have enough quotas for specified instance type
+		if strings.HasPrefix(opts.InstanceType, "dl") {
+			out_count = d.quotas["Running On-Demand DL instances"]
+		} else if strings.HasPrefix(opts.InstanceType, "u-") {
+			out_count = d.quotas["Running On-Demand High Memory instances"]
+		} else if strings.HasPrefix(opts.InstanceType, "hpc") {
+			out_count = d.quotas["Running On-Demand HPC instances"]
+		} else if strings.HasPrefix(opts.InstanceType, "inf") {
+			out_count = d.quotas["Running On-Demand Inf instances"]
+		} else if strings.HasPrefix(opts.InstanceType, "trn") {
+			out_count = d.quotas["Running On-Demand Trn instances"]
+		} else if strings.HasPrefix(opts.InstanceType, "f") {
+			out_count = d.quotas["Running On-Demand F instances"]
+		} else if strings.HasPrefix(opts.InstanceType, "g") || strings.HasPrefix(opts.InstanceType, "vt") {
+			out_count = d.quotas["Running On-Demand G and VT instances"]
+		} else if strings.HasPrefix(opts.InstanceType, "p") {
+			out_count = d.quotas["Running On-Demand P instances"]
+		} else if strings.HasPrefix(opts.InstanceType, "x") {
+			out_count = d.quotas["Running On-Demand X instances"]
+		} else { // Probably not a good idea and better to fail if the instances are not in the list...
+			out_count = d.quotas["Running On-Demand Standard (A, C, D, H, I, M, R, T, Z) instances"]
 		}
 	}
-
-	// Check we have enough quotas for specified instance type
-	if strings.HasPrefix(opts.InstanceType, "dl") {
-		out_count = quotas["Running On-Demand DL instances"]
-	} else if strings.HasPrefix(opts.InstanceType, "u-") {
-		out_count = quotas["Running On-Demand High Memory instances"]
-	} else if strings.HasPrefix(opts.InstanceType, "hpc") {
-		out_count = quotas["Running On-Demand HPC instances"]
-	} else if strings.HasPrefix(opts.InstanceType, "inf") {
-		out_count = quotas["Running On-Demand Inf instances"]
-	} else if strings.HasPrefix(opts.InstanceType, "trn") {
-		out_count = quotas["Running On-Demand Trn instances"]
-	} else if strings.HasPrefix(opts.InstanceType, "f") {
-		out_count = quotas["Running On-Demand F instances"]
-	} else if strings.HasPrefix(opts.InstanceType, "g") || strings.HasPrefix(opts.InstanceType, "vt") {
-		out_count = quotas["Running On-Demand G and VT instances"]
-	} else if strings.HasPrefix(opts.InstanceType, "p") {
-		out_count = quotas["Running On-Demand P instances"]
-	} else if strings.HasPrefix(opts.InstanceType, "x") {
-		out_count = quotas["Running On-Demand X instances"]
-	} else { // Probably not a good idea and better to fail if the instances are not in the list...
-		out_count = quotas["Running On-Demand Standard (A, C, D, H, I, M, R, T, Z) instances"]
-	}
+	d.quotas_mutex.Unlock()
 
 	// Make sure we have enough IP's in the selected VPC or subnet
 	var ip_count int64
 	var err error
 	if _, ip_count, err = d.getSubnetId(conn_ec2, def.Resources.Network); err != nil {
-		log.Println("AWS: Error during requesting subnet:", err)
+		log.Error("AWS: Error during requesting subnet:", err)
 		return -1
 	}
+
+	log.Debugf("AWS: AvailableCapacity: Quotas: %d, IP's: %d", out_count, ip_count)
 
 	// Return the most limiting value
 	if ip_count < out_count {
@@ -221,13 +219,13 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 	if vm_network, _, err = d.getSubnetId(conn, vm_network); err != nil {
 		return nil, fmt.Errorf("AWS: Unable to get subnet: %v", err)
 	}
-	log.Println("AWS: Selected subnet:", vm_network, i_name)
+	log.Info("AWS: Selected subnet:", vm_network, i_name)
 
 	vm_image := opts.Image
 	if vm_image, err = d.getImageId(conn, vm_image); err != nil {
 		return nil, fmt.Errorf("AWS: Unable to get image: %v", err)
 	}
-	log.Println("AWS: Selected image:", vm_image, i_name)
+	log.Info("AWS: Selected image:", vm_image, i_name)
 
 	// Prepare Instance request information
 	input := &ec2.RunInstancesInput{
@@ -261,7 +259,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 		if vm_secgroup, err = d.getSecGroupId(conn, vm_secgroup); err != nil {
 			return nil, fmt.Errorf("AWS: Unable to get security group: %v", err)
 		}
-		log.Println("AWS: Selected security group:", vm_secgroup, i_name)
+		log.Info("AWS: Selected security group:", vm_secgroup, i_name)
 		input.NetworkInterfaces[0].Groups = []string{vm_secgroup}
 	}
 
@@ -332,7 +330,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 				if vm_snapshot, err = d.getSnapshotId(conn, vm_snapshot); err != nil {
 					return nil, fmt.Errorf("AWS: Unable to get snapshot: %v", err)
 				}
-				log.Println("AWS: Selected snapshot:", vm_snapshot, i_name)
+				log.Info("AWS: Selected snapshot:", vm_snapshot, i_name)
 				mapping.Ebs.SnapshotId = aws.String(vm_snapshot)
 			} else {
 				// Just create a new disk
@@ -343,7 +341,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 					if err != nil {
 						return nil, fmt.Errorf("AWS: Unable to get encrypt key from KMS: %v", err)
 					}
-					log.Println("AWS: Selected encryption key:", key_id, "for disk:", name, i_name)
+					log.Info("AWS: Selected encryption key:", key_id, "for disk:", name, i_name)
 					mapping.Ebs.KmsKeyId = aws.String(key_id)
 				}
 			}
@@ -354,8 +352,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 	// Run the instance
 	result, err := conn.RunInstances(context.TODO(), input)
 	if err != nil {
-		log.Println("AWS: Unable to run instance", err, i_name)
-		return nil, err
+		return nil, log.Error("AWS: Unable to run instance:", i_name, err)
 	}
 
 	inst := &result.Instances[0]
@@ -380,7 +377,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 				inst = inst_tmp
 			}
 			if err != nil {
-				log.Println("AWS: Error during getting instance while waiting for BlockDeviceMappings:", err, i_name)
+				log.Error("AWS: Error during getting instance while waiting for BlockDeviceMappings:", err, i_name)
 			}
 		}
 		for _, bd := range inst.BlockDeviceMappings {
@@ -407,7 +404,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 			}
 			if _, err := conn.CreateTags(context.TODO(), tags_input); err != nil {
 				// Do not fail hard here - the instance is already running
-				log.Println("AWS: WARNING: Unable to set tags for volume:", *bd.Ebs.VolumeId, *bd.DeviceName, err)
+				log.Warn("AWS: Unable to set tags for volume:", *bd.Ebs.VolumeId, *bd.DeviceName, err)
 			}
 		}
 	}
@@ -418,7 +415,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 	timeout := 60
 	for {
 		if inst.PrivateIpAddress != nil {
-			log.Println("AWS: Allocate of instance completed:", i_name, *inst.InstanceId, *inst.PrivateIpAddress)
+			log.Info("AWS: Allocate of instance completed:", i_name, *inst.InstanceId, *inst.PrivateIpAddress)
 			res.Identifier = *inst.InstanceId
 			res.IpAddr = *inst.PrivateIpAddress
 			return res, nil
@@ -435,12 +432,12 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 			inst = inst_tmp
 		}
 		if err != nil {
-			log.Println("AWS: Error during getting instance while waiting for IP:", err, i_name, *inst.InstanceId)
+			log.Error("AWS: Error during getting instance while waiting for IP:", err, i_name, *inst.InstanceId)
 		}
 	}
 
 	res.Identifier = *inst.InstanceId
-	return res, fmt.Errorf("AWS: Unable to locate the instance IP: %s", *inst.InstanceId)
+	return res, log.Error("AWS: Unable to locate the instance IP:", *inst.InstanceId)
 }
 
 func (d *Driver) Status(res *types.Resource) (string, error) {
@@ -470,7 +467,7 @@ func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
 	// Parse options json into task structure
 	if len(options) > 0 {
 		if err := json.Unmarshal([]byte(options), t); err != nil {
-			log.Println("AWS: Unable to apply the task options", err)
+			log.Error("AWS: Unable to apply the task options", err)
 			return nil
 		}
 	}
@@ -496,7 +493,7 @@ func (d *Driver) Deallocate(res *types.Resource) error {
 		return fmt.Errorf("AWS: Wrong instance id result %s during terminating of %s", *result.TerminatingInstances[0].InstanceId, res.Identifier)
 	}
 
-	log.Println("AWS: Deallocate of Instance", res.Identifier, "completed:", result.TerminatingInstances[0].CurrentState.Name)
+	log.Infof("AWS: Deallocate of Instance %s completed: %s", res.Identifier, result.TerminatingInstances[0].CurrentState.Name)
 
 	return nil
 }

@@ -23,7 +23,6 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"strings"
@@ -35,6 +34,7 @@ import (
 
 	"github.com/adobe/aquarium-fish/lib/cluster"
 	"github.com/adobe/aquarium-fish/lib/fish"
+	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/api"
 	cluster_server "github.com/adobe/aquarium-fish/lib/openapi/cluster"
 	"github.com/adobe/aquarium-fish/lib/openapi/meta"
@@ -91,7 +91,7 @@ func Init(fish *fish.Fish, cl *cluster.Cluster, api_address, ca_path, cert_path,
 
 		if err := s.ServeTLS(router.TLSListener, cert_path, key_path); err != http.ErrServerClosed {
 			errChan <- err
-			log.Fatalf("listen: %s\n", err)
+			log.Error("API: Unable to start listener:", err)
 		}
 	}()
 
@@ -107,7 +107,7 @@ func Init(fish *fish.Fish, cl *cluster.Cluster, api_address, ca_path, cert_path,
 		case <-ticker.C:
 			addr := router.TLSListenerAddr()
 			if addr != nil && strings.Contains(addr.String(), ":") {
-				fmt.Println("API listening on:", addr)
+				log.Info("API listening on:", addr)
 				return router.TLSServer, nil // Was started
 			}
 		case err := <-errChan:

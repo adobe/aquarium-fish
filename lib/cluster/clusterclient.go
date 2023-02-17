@@ -5,13 +5,14 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
+
+	"github.com/adobe/aquarium-fish/lib/log"
 )
 
 // Send pings to peer with this period
@@ -55,11 +56,11 @@ func (conn *ClusterClient) Connect() *websocket.Conn {
 			}
 			ws, _, err := dialer.Dial(conn.url.String(), nil)
 			if err != nil {
-				log.Printf("ClusterClient %s: Cannot connect to websocket: %s: %v\n", conn.url.Host, conn.url.String(), err)
+				log.Errorf("ClusterClient %s: Cannot connect to websocket: %s: %v", conn.url.Host, conn.url.String(), err)
 				continue
 			}
 
-			log.Printf("ClusterClient %s: Connected to node\n", conn.url.Host)
+			log.Infof("ClusterClient %s: Connected to node", conn.url.Host)
 			conn.wsconn = ws
 
 			return conn.wsconn
@@ -68,7 +69,7 @@ func (conn *ClusterClient) Connect() *websocket.Conn {
 }
 
 func (conn *ClusterClient) listen() {
-	log.Printf("ClusterClient %s: Listen for the messages\n", conn.url.Host)
+	log.Infof("ClusterClient %s: Listen for the messages", conn.url.Host)
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {
@@ -83,7 +84,7 @@ func (conn *ClusterClient) listen() {
 				}
 				_, _ /*msg*/, err := ws.ReadMessage()
 				if err != nil {
-					log.Printf("ClusterClient %s: Cannot read websocket message: %v\n", conn.url.Host, err)
+					log.Errorf("ClusterClient %s: Cannot read websocket message: %v", conn.url.Host, err)
 					conn.closeWs()
 					break
 				}
@@ -117,7 +118,7 @@ func (conn *ClusterClient) listenWrite() {
 	for data := range conn.send_buf {
 		ws := conn.Connect()
 		if ws == nil {
-			log.Printf("ClusterClient %s: No websocket connection: %v\n", conn.url.Host, fmt.Errorf("ws is nil"))
+			log.Errorf("ClusterClient %s: No websocket connection: %v", conn.url.Host, fmt.Errorf("ws is nil"))
 			continue
 		}
 
@@ -125,7 +126,7 @@ func (conn *ClusterClient) listenWrite() {
 			websocket.TextMessage,
 			data,
 		); err != nil {
-			log.Printf("ClusterClient %s: Write error: %v\n", conn.url.Host, err)
+			log.Errorf("ClusterClient %s: Write error: %v", conn.url.Host, err)
 		}
 	}
 }
@@ -148,7 +149,7 @@ func (conn *ClusterClient) closeWs() {
 }
 
 func (conn *ClusterClient) ping() {
-	log.Printf("ClusterClient %s: Ping started\n", conn.url.Host)
+	log.Infof("ClusterClient %s: Ping started", conn.url.Host)
 	ticker := time.NewTicker(ping_period)
 	defer ticker.Stop()
 	for {

@@ -68,7 +68,7 @@ func RunAquariumFish(t *testing.T, cfg string) *AFInstance {
 					}
 					afi.admin_token = val[1]
 				}
-				if strings.HasPrefix(line, "API listening on: ") {
+				if strings.Contains(line, "API listening on: ") {
 					val := strings.SplitN(strings.TrimSpace(line), "API listening on: ", 2)
 					if len(val) < 2 {
 						init_done <- "ERROR: No address after 'API listening on: '"

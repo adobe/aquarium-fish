@@ -16,25 +16,26 @@ import (
 	"archive/tar"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/ulikunitz/xz"
+
+	"github.com/adobe/aquarium-fish/lib/log"
 )
 
 // Stream function to download and unpack archive without
 // using a storage file to make it as quick as possible
 func DownloadUnpackArchive(url, out_dir, user, password string) error {
-	log.Printf("Util: Downloading & Unpacking archive: %s\n", url)
+	log.Debug("Util: Downloading & Unpacking archive:", url)
 	lock_path := out_dir + ".lock"
 
 	// Wait for another process to download and unpack the archive
 	// In case it failed to download - will be redownloaded further
 	WaitLock(lock_path, func() {
-		log.Println("Util: Cleaning the abandoned files and begin redownloading:", out_dir)
+		log.Debug("Util: Cleaning the abandoned files and begin redownloading:", out_dir)
 		os.RemoveAll(out_dir)
 	})
 
@@ -76,8 +77,7 @@ func DownloadUnpackArchive(url, out_dir, user, password string) error {
 	r, err := xz.NewReader(bodypt)
 	if err != nil {
 		os.RemoveAll(out_dir)
-		log.Println("Util: Unable to create XZ reader:", err)
-		return err
+		return log.Error("Util: Unable to create XZ reader:", err)
 	}
 
 	// Untar the stream
@@ -112,7 +112,7 @@ func DownloadUnpackArchive(url, out_dir, user, password string) error {
 			}
 		case tar.TypeReg, tar.TypeRegA:
 			// Write a file
-			log.Printf("Extracting '%s': %s\n", out_dir, hdr.Name)
+			log.Debugf("Util: Extracting '%s': %s", out_dir, hdr.Name)
 			err = os.MkdirAll(filepath.Dir(target), 0750)
 			if err != nil {
 				os.RemoveAll(out_dir)

@@ -16,10 +16,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+
+	"github.com/adobe/aquarium-fish/lib/log"
 )
 
 type Config struct {
@@ -36,8 +37,7 @@ func (c *Config) Apply(config []byte) error {
 	// Parse json
 	if len(config) > 0 {
 		if err := json.Unmarshal(config, c); err != nil {
-			log.Println("AWS: Unable to apply the driver config", err)
-			return err
+			return log.Error("AWS: Unable to apply the driver config:", err)
 		}
 	}
 
@@ -74,10 +74,10 @@ func (c *Config) Validate() (err error) {
 		return fmt.Errorf("AWS: Unable to verify connection by calling STS service: %v", err)
 	}
 	if len(c.AccountIDs) > 0 && c.AccountIDs[0] != *res.Account {
-		log.Println("AWS: Using Account IDs:", c.AccountIDs, "(real: ", *res.Account, ")")
+		log.Debug("AWS: Using Account IDs:", c.AccountIDs, "(real: ", *res.Account, ")")
 	} else {
 		c.AccountIDs = []string{*res.Account}
-		log.Println("AWS: Using Account IDs:", c.AccountIDs)
+		log.Debug("AWS: Using Account IDs:", c.AccountIDs)
 	}
 
 	return nil

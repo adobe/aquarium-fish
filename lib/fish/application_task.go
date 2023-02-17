@@ -14,8 +14,8 @@ package fish
 
 import (
 	"fmt"
-	"log"
 
+	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
@@ -25,7 +25,7 @@ func (f *Fish) ApplicationTaskFindByApplication(uid types.ApplicationUID, filter
 	if filter != nil {
 		secured_filter, err := util.ExpressionSqlFilter(*filter)
 		if err != nil {
-			log.Println("Fish: SECURITY: weird SQL filter received", err)
+			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
 			// We do not fail here because we should not give attacker more information
 			return at, nil
 		}

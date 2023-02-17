@@ -15,7 +15,6 @@ package aws
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -24,6 +23,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/servicequotas"
+
+	"github.com/adobe/aquarium-fish/lib/log"
 )
 
 func (d *Driver) newEC2Conn() *ec2.Client {
@@ -73,7 +74,7 @@ func (d *Driver) getSubnetId(conn *ec2.Client, id_tag string) (string, int64, er
 
 	// Check if the tag is provided ("<Key>:<Value>")
 	if strings.Contains(id_tag, ":") {
-		log.Println("AWS: Fetching tag vpc or subnet:", id_tag)
+		log.Debug("AWS: Fetching tag vpc or subnet:", id_tag)
 		tag_key_val := strings.SplitN(id_tag, ":", 2)
 		filter.Name = aws.String("tag:" + tag_key_val[0])
 		filter.Values = []string{tag_key_val[1]}
@@ -108,10 +109,10 @@ func (d *Driver) getSubnetId(conn *ec2.Client, id_tag string) (string, int64, er
 			return id_tag, int64(aws.ToInt32(resp.Subnets[0].AvailableIpAddressCount)), nil
 		}
 		if len(resp.Vpcs) > 1 {
-			log.Println("AWS: WARNING: There is more than one vpc with the same tag:", id_tag)
+			log.Warn("AWS: There is more than one vpc with the same tag:", id_tag)
 		}
 		id_tag = aws.ToString(resp.Vpcs[0].VpcId)
-		log.Println("AWS: Found VPC with id:", id_tag)
+		log.Debug("AWS: Found VPC with id:", id_tag)
 	} else {
 		// If network id is not a subnet - process as vpc
 		if !strings.HasPrefix(id_tag, "subnet-") {
@@ -140,7 +141,7 @@ func (d *Driver) getSubnetId(conn *ec2.Client, id_tag string) (string, int64, er
 
 			if id_tag == "" {
 				id_tag = aws.ToString(resp.Vpcs[0].VpcId)
-				log.Println("AWS: Using default VPC:", id_tag)
+				log.Debug("AWS: Using default VPC:", id_tag)
 			} else if id_tag != aws.ToString(resp.Vpcs[0].VpcId) {
 				return "", 0, fmt.Errorf("AWS: Unable to verify the vpc id: %q != %q", id_tag, aws.ToString(resp.Vpcs[0].VpcId))
 			}
@@ -197,7 +198,7 @@ func (d *Driver) getImageId(conn *ec2.Client, id_name string) (string, error) {
 		return id_name, nil
 	}
 
-	log.Println("AWS: Looking for image name:", id_name)
+	log.Debug("AWS: Looking for image name:", id_name)
 
 	// Look for image with the defined name
 	req := &ec2.DescribeImagesInput{
@@ -228,7 +229,7 @@ func (d *Driver) getSecGroupId(conn *ec2.Client, id_name string) (string, error)
 		return id_name, nil
 	}
 
-	log.Println("AWS: Looking for security group name:", id_name)
+	log.Debug("AWS: Looking for security group name:", id_name)
 
 	// Look for security group with the defined name
 	req := &ec2.DescribeSecurityGroupsInput{
@@ -248,7 +249,7 @@ func (d *Driver) getSecGroupId(conn *ec2.Client, id_name string) (string, error)
 		return "", fmt.Errorf("AWS: Unable to locate security group with specified name: %v", err)
 	}
 	if len(resp.SecurityGroups) > 1 {
-		log.Println("AWS: WARNING: There is more than one group with the same name:", id_name)
+		log.Warn("AWS: There is more than one group with the same name:", id_name)
 	}
 	id_name = *resp.SecurityGroups[0].GroupId
 
@@ -264,7 +265,7 @@ func (d *Driver) getSnapshotId(conn *ec2.Client, id_tag string) (string, error) 
 		return "", fmt.Errorf("AWS: Incorrect snapshot tag format: %s", id_tag)
 	}
 
-	log.Println("AWS: Fetching snapshot tag:", id_tag)
+	log.Debug("AWS: Fetching snapshot tag:", id_tag)
 	tag_key_val := strings.SplitN(id_tag, ":", 2)
 
 	// Look for VPC with the defined tag over pages
@@ -291,7 +292,7 @@ func (d *Driver) getSnapshotId(conn *ec2.Client, id_tag string) (string, error) 
 			return "", fmt.Errorf("AWS: Error during requesting snapshot: %v", err)
 		}
 		if len(resp.Snapshots) > 900 {
-			log.Println("AWS: WARNING: Over 900 snapshots was found for tag, could be slow:", id_tag)
+			log.Warn("AWS: Over 900 snapshots was found for tag, could be slow:", id_tag)
 		}
 		for _, r := range resp.Snapshots {
 			if found_time.Before(*r.StartTime) {
@@ -334,7 +335,7 @@ func (d *Driver) getKeyId(id_alias string) (string, error) {
 		return id_alias, nil
 	}
 
-	log.Println("AWS: Fetching key alias:", id_alias)
+	log.Debug("AWS: Fetching key alias:", id_alias)
 
 	conn := d.newKMSConn()
 
@@ -350,7 +351,7 @@ func (d *Driver) getKeyId(id_alias string) (string, error) {
 			return "", fmt.Errorf("AWS: Error during requesting alias list: %v", err)
 		}
 		if len(resp.Aliases) > 90 {
-			log.Println("AWS: WARNING: Over 90 aliases was found, could be slow:", id_alias)
+			log.Warn("AWS: Over 90 aliases was found, could be slow:", id_alias)
 		}
 		for _, r := range resp.Aliases {
 			if id_alias == *r.AliasName {
@@ -360,4 +361,42 @@ func (d *Driver) getKeyId(id_alias string) (string, error) {
 	}
 
 	return "", fmt.Errorf("AWS: Unable to locate kms key id with specified alias: %s", id_alias)
+}
+
+func (d *Driver) updateQuotas(force bool) error {
+	d.quotas_mutex.Lock()
+	defer d.quotas_mutex.Unlock()
+
+	if !force && d.quotas_next_update.After(time.Now()) {
+		return nil
+	}
+
+	log.Debug("AWS: Updating quotas...")
+
+	// Update the cache
+	conn_sq := d.newServiceQuotasConn()
+
+	// Get the list of quotas
+	p := servicequotas.NewListServiceQuotasPaginator(conn_sq, &servicequotas.ListServiceQuotasInput{
+		ServiceCode: aws.String("ec2"),
+	})
+
+	// Processing the received quotas
+	for p.HasMorePages() {
+		resp, err := p.NextPage(context.TODO())
+		if err != nil {
+			return log.Error("AWS: Error during requesting quotas:", err)
+		}
+		for _, r := range resp.Quotas {
+			if _, ok := d.quotas[aws.ToString(r.QuotaName)]; ok {
+				d.quotas[aws.ToString(r.QuotaName)] = int64(aws.ToFloat64(r.Value))
+			}
+		}
+	}
+
+	log.Debug("AWS: Quotas:", d.quotas)
+
+	d.quotas_next_update = time.Now().Add(time.Minute * 30)
+
+	return nil
 }

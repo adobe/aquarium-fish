@@ -13,13 +13,13 @@
 package proxy
 
 import (
-	"log"
 	"net"
 
 	"github.com/armon/go-socks5"
 	"golang.org/x/net/context"
 
 	"github.com/adobe/aquarium-fish/lib/fish"
+	"github.com/adobe/aquarium-fish/lib/log"
 )
 
 type ResolverSkip struct{}
@@ -35,12 +35,12 @@ type ProxyAccess struct {
 }
 
 func (p *ProxyAccess) Allow(ctx context.Context, req *socks5.Request) (context.Context, bool) {
-	log.Println("Proxy: Requested proxy from", req.RemoteAddr, "to", req.DestAddr)
+	log.Debug("Proxy: Requested proxy from", req.RemoteAddr, "to", req.DestAddr)
 
 	// Only the existing node resource can use the proxy
 	res, err := p.fish.ResourceGetByIP(req.RemoteAddr.IP.String())
 	if err != nil {
-		log.Println("Proxy: Denied proxy from the unauthorized client", req.RemoteAddr)
+		log.Warn("Proxy: Denied proxy from the unauthorized client:", req.RemoteAddr, err)
 		return ctx, false
 	}
 
@@ -51,7 +51,7 @@ func (p *ProxyAccess) Allow(ctx context.Context, req *socks5.Request) (context.C
 	}
 	over_dest := p.fish.ResourceServiceMapping(res, dest)
 	if over_dest == "" {
-		log.Println("Proxy: Denied proxy from", req.RemoteAddr, "to", req.DestAddr)
+		log.Warn("Proxy: Denied proxy from", req.RemoteAddr, "to", req.DestAddr)
 		return ctx, false
 	}
 
@@ -66,7 +66,7 @@ func (p *ProxyAccess) Allow(ctx context.Context, req *socks5.Request) (context.C
 		req.DestAddr.IP = addr.IP
 	}
 
-	log.Println("Proxy: Allowed proxy from", req.RemoteAddr, "to", req.DestAddr)
+	log.Debug("Proxy: Allowed proxy from", req.RemoteAddr, "to", req.DestAddr)
 
 	return ctx, true
 }

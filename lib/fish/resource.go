@@ -14,13 +14,13 @@ package fish
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"strings"
 
 	"github.com/mostlygeek/arp"
 	"gorm.io/gorm"
 
+	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
@@ -30,7 +30,7 @@ func (f *Fish) ResourceFind(filter *string) (rs []types.Resource, err error) {
 	if filter != nil {
 		secured_filter, err := util.ExpressionSqlFilter(*filter)
 		if err != nil {
-			log.Println("Fish: SECURITY: weird SQL filter received:", err)
+			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
 			// We do not fail here because we should not give attacker more information
 			return rs, nil
 		}
@@ -107,14 +107,14 @@ func isControlledNetwork(ip string) bool {
 
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		log.Print(fmt.Errorf("Unable to get the available network interfaces: %+v\n", err.Error()))
+		log.Errorf("Unable to get the available network interfaces: %+v\n", err.Error())
 		return false
 	}
 
 	for _, i := range ifaces {
 		addrs, err := i.Addrs()
 		if err != nil {
-			log.Print(fmt.Errorf("Unable to get available addresses of the interface %s: %+v\n", i.Name, err.Error()))
+			log.Errorf("Unable to get available addresses of the interface %s: %+v\n", i.Name, err.Error())
 			continue
 		}
 
@@ -166,7 +166,7 @@ func (f *Fish) ResourceGetByIP(ip string) (res *types.Resource, err error) {
 		return nil, fmt.Errorf("Fish: Prohibited to access the Resource of not allocated Application")
 	}
 
-	log.Println("Fish: Update IP address for the Resource of Application", res.ApplicationUID, ip)
+	log.Debug("Fish: Update IP address for the Resource of Application", res.ApplicationUID, ip)
 	res.IpAddr = ip
 	err = f.ResourceSave(res)
 

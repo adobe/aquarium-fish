@@ -14,9 +14,9 @@ package fish
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
+	"github.com/adobe/aquarium-fish/lib/log"
 
 	// Load all the drivers
 	_ "github.com/adobe/aquarium-fish/lib/drivers/aws"
@@ -54,10 +54,10 @@ func (f *Fish) DriversSet() error {
 			}
 		}
 		if en {
-			log.Println("Fish: Resource driver available:", drv.Name())
+			log.Info("Fish: Resource driver enabled:", drv.Name())
 			list = append(list, drv)
 		} else {
-			log.Println("Fish: Resource driver disabled:", drv.Name())
+			log.Info("Fish: Resource driver disabled:", drv.Name())
 		}
 	}
 
@@ -83,9 +83,9 @@ func (f *Fish) DriversPrepare(configs []ConfigDriver) (errs []error) {
 
 		if err := drv.Prepare(json_cfg); err != nil {
 			errs = append(errs, err)
-			log.Println("Fish: Resource driver skipped:", drv.Name())
+			log.Info("Fish: Resource driver skipped:", drv.Name())
 		} else {
-			log.Println("Fish: Resource driver activated:", drv.Name())
+			log.Info("Fish: Resource driver activated:", drv.Name())
 		}
 	}
 	return errs
