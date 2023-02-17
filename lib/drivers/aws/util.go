@@ -362,3 +362,41 @@ func (d *Driver) getKeyId(id_alias string) (string, error) {
 
 	return "", fmt.Errorf("AWS: Unable to locate kms key id with specified alias: %s", id_alias)
 }
+
+func (d *Driver) updateQuotas(force bool) error {
+	d.quotas_mutex.Lock()
+	defer d.quotas_mutex.Unlock()
+
+	if !force && d.quotas_next_update.After(time.Now()) {
+		return nil
+	}
+
+	log.Debug("AWS: Updating quotas...")
+
+	// Update the cache
+	conn_sq := d.newServiceQuotasConn()
+
+	// Get the list of quotas
+	p := servicequotas.NewListServiceQuotasPaginator(conn_sq, &servicequotas.ListServiceQuotasInput{
+		ServiceCode: aws.String("ec2"),
+	})
+
+	// Processing the received quotas
+	for p.HasMorePages() {
+		resp, err := p.NextPage(context.TODO())
+		if err != nil {
+			return log.Error("AWS: Error during requesting quotas:", err)
+		}
+		for _, r := range resp.Quotas {
+			if _, ok := d.quotas[aws.ToString(r.QuotaName)]; ok {
+				d.quotas[aws.ToString(r.QuotaName)] = int64(aws.ToFloat64(r.Value))
+			}
+		}
+	}
+
+	log.Debug("AWS: Quotas:", d.quotas)
+
+	d.quotas_next_update = time.Now().Add(time.Minute * 30)
+
+	return nil
+}

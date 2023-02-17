@@ -21,12 +21,12 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2_types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	"github.com/aws/aws-sdk-go-v2/service/servicequotas"
 
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/drivers"
@@ -40,6 +40,11 @@ type Driver struct {
 	cfg Config
 	// Contains the available tasks of the driver
 	tasks_list []drivers.ResourceDriverTask
+
+	// Contains quotas cache to not load them for every sneeze
+	quotas             map[string]int64
+	quotas_mutex       sync.Mutex
+	quotas_next_update time.Time
 }
 
 func init() {
@@ -64,6 +69,23 @@ func (d *Driver) Prepare(config []byte) error {
 
 	// Fill up the available tasks
 	d.tasks_list = append(d.tasks_list, &TaskSnapshot{driver: d})
+
+	d.quotas_mutex.Lock()
+	{
+		// Preparing a map of useful quotas for easy access and update it
+		d.quotas = make(map[string]int64)
+		d.quotas["Running On-Demand DL instances"] = 0
+		d.quotas["Running On-Demand F instances"] = 0
+		d.quotas["Running On-Demand G and VT instances"] = 0
+		d.quotas["Running On-Demand High Memory instances"] = 0
+		d.quotas["Running On-Demand HPC instances"] = 0
+		d.quotas["Running On-Demand Inf instances"] = 0
+		d.quotas["Running On-Demand P instances"] = 0
+		d.quotas["Running On-Demand Standard (A, C, D, H, I, M, R, T, Z) instances"] = 0
+		d.quotas["Running On-Demand Trn instances"] = 0
+		d.quotas["Running On-Demand X instances"] = 0
+	}
+	d.quotas_mutex.Unlock()
 
 	return nil
 }
@@ -112,7 +134,7 @@ func (d *Driver) AvailableCapacity(node_usage types.Resources, def types.LabelDe
 			},
 		})
 
-		// Processing the received quotas
+		// Processing the received hosts
 		for p.HasMorePages() {
 			resp, err := p.NextPage(context.TODO())
 			if err != nil {
@@ -122,67 +144,39 @@ func (d *Driver) AvailableCapacity(node_usage types.Resources, def types.LabelDe
 			out_count += int64(len(resp.Hosts))
 		}
 
-		log.Debugf("AWS: AvailableCapacity: Dedicated Mac %s: %d", opts.InstanceType, out_count)
+		log.Debug("AWS: AvailableCapacity for dedicated Mac:", opts.InstanceType, out_count)
 
 		return out_count
 	}
 
-	// Preparing a map of useful quotas for easy access
-	quotas := make(map[string]int64)
-	quotas["Running On-Demand DL instances"] = 0
-	quotas["Running On-Demand F instances"] = 0
-	quotas["Running On-Demand G and VT instances"] = 0
-	quotas["Running On-Demand High Memory instances"] = 0
-	quotas["Running On-Demand HPC instances"] = 0
-	quotas["Running On-Demand Inf instances"] = 0
-	quotas["Running On-Demand P instances"] = 0
-	quotas["Running On-Demand Standard (A, C, D, H, I, M, R, T, Z) instances"] = 0
-	quotas["Running On-Demand Trn instances"] = 0
-	quotas["Running On-Demand X instances"] = 0
+	d.updateQuotas(false)
 
-	conn_sq := d.newServiceQuotasConn()
-
-	// Get the list of quotas
-	p := servicequotas.NewListAWSDefaultServiceQuotasPaginator(conn_sq, &servicequotas.ListAWSDefaultServiceQuotasInput{
-		ServiceCode: aws.String("ec2"),
-	})
-
-	// Processing the received quotas
-	for p.HasMorePages() {
-		resp, err := p.NextPage(context.TODO())
-		if err != nil {
-			log.Error("AWS: Error during requesting quotas:", err)
-			return -1
-		}
-		for _, r := range resp.Quotas {
-			if _, ok := quotas[aws.ToString(r.QuotaName)]; ok {
-				quotas[aws.ToString(r.QuotaName)] = int64(aws.ToFloat64(r.Value))
-			}
+	d.quotas_mutex.Lock()
+	{
+		// Check we have enough quotas for specified instance type
+		if strings.HasPrefix(opts.InstanceType, "dl") {
+			out_count = d.quotas["Running On-Demand DL instances"]
+		} else if strings.HasPrefix(opts.InstanceType, "u-") {
+			out_count = d.quotas["Running On-Demand High Memory instances"]
+		} else if strings.HasPrefix(opts.InstanceType, "hpc") {
+			out_count = d.quotas["Running On-Demand HPC instances"]
+		} else if strings.HasPrefix(opts.InstanceType, "inf") {
+			out_count = d.quotas["Running On-Demand Inf instances"]
+		} else if strings.HasPrefix(opts.InstanceType, "trn") {
+			out_count = d.quotas["Running On-Demand Trn instances"]
+		} else if strings.HasPrefix(opts.InstanceType, "f") {
+			out_count = d.quotas["Running On-Demand F instances"]
+		} else if strings.HasPrefix(opts.InstanceType, "g") || strings.HasPrefix(opts.InstanceType, "vt") {
+			out_count = d.quotas["Running On-Demand G and VT instances"]
+		} else if strings.HasPrefix(opts.InstanceType, "p") {
+			out_count = d.quotas["Running On-Demand P instances"]
+		} else if strings.HasPrefix(opts.InstanceType, "x") {
+			out_count = d.quotas["Running On-Demand X instances"]
+		} else { // Probably not a good idea and better to fail if the instances are not in the list...
+			out_count = d.quotas["Running On-Demand Standard (A, C, D, H, I, M, R, T, Z) instances"]
 		}
 	}
-
-	// Check we have enough quotas for specified instance type
-	if strings.HasPrefix(opts.InstanceType, "dl") {
-		out_count = quotas["Running On-Demand DL instances"]
-	} else if strings.HasPrefix(opts.InstanceType, "u-") {
-		out_count = quotas["Running On-Demand High Memory instances"]
-	} else if strings.HasPrefix(opts.InstanceType, "hpc") {
-		out_count = quotas["Running On-Demand HPC instances"]
-	} else if strings.HasPrefix(opts.InstanceType, "inf") {
-		out_count = quotas["Running On-Demand Inf instances"]
-	} else if strings.HasPrefix(opts.InstanceType, "trn") {
-		out_count = quotas["Running On-Demand Trn instances"]
-	} else if strings.HasPrefix(opts.InstanceType, "f") {
-		out_count = quotas["Running On-Demand F instances"]
-	} else if strings.HasPrefix(opts.InstanceType, "g") || strings.HasPrefix(opts.InstanceType, "vt") {
-		out_count = quotas["Running On-Demand G and VT instances"]
-	} else if strings.HasPrefix(opts.InstanceType, "p") {
-		out_count = quotas["Running On-Demand P instances"]
-	} else if strings.HasPrefix(opts.InstanceType, "x") {
-		out_count = quotas["Running On-Demand X instances"]
-	} else { // Probably not a good idea and better to fail if the instances are not in the list...
-		out_count = quotas["Running On-Demand Standard (A, C, D, H, I, M, R, T, Z) instances"]
-	}
+	d.quotas_mutex.Unlock()
 
 	// Make sure we have enough IP's in the selected VPC or subnet
 	var ip_count int64
