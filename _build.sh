@@ -27,8 +27,10 @@ curr_ver="$(PATH="$gopath/bin:$PATH" oapi-codegen --version 2>/dev/null | tail -
 if [ "$curr_ver" != "$req_ver" ]; then
     go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@$req_ver"
 fi
-# Cleanup the old generated files & run the generation
+# Cleanup the old generated files
 find ./lib -name '*.gen.go' -delete
+
+# Run code generation
 PATH="$gopath/bin:$PATH" go generate -v ./lib/...
 # Making LabelDefinitions an actual type to attach GORM-needed Scanner/Valuer functions to it to
 # make the array a json document and store in the DB row as one item
@@ -45,14 +47,19 @@ else
     echo "--- WARNING: build DEBUG mode ---"
 fi
 
+# Prepare version number as overrides during link
+mod_name=$(grep '^module' "${root_dir}/go.mod" | cut -d' ' -f 2)
+git_version="$(git describe --tags --match 'v*')$([ "$(git diff)" = '' ] || echo '-dirty')"
+version_flags="-X '$mod_name/lib/build.Version=${git_version}' -X '$mod_name/lib/build.Time=$(date -u +%y%m%d.%H%M%S)'"
+
 
 echo
 echo "--- RUN UNIT TESTS ---"
-go test -v ./lib/... ./cmd/...
+go test -ldflags="$version_flags" -v ./lib/...
 
 echo
-echo "--- BUILD AQUARIUM-FISH ---"
-go build -ldflags="-s -w" -a -o "aquarium-fish.$suffix" ./cmd/fish
+echo "--- BUILD AQUARIUM-FISH ${git_version} ---"
+go build -ldflags="-s -w $version_flags" -a -o "aquarium-fish.$suffix" ./cmd/fish
 
 # Remove debug symbols
 strip "aquarium-fish.$suffix"

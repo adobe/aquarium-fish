@@ -107,7 +107,7 @@ func Init(fish *fish.Fish, cl *cluster.Cluster, api_address, ca_path, cert_path,
 		case <-ticker.C:
 			addr := router.TLSListenerAddr()
 			if addr != nil && strings.Contains(addr.String(), ":") {
-				fmt.Println("API listening on:", addr)
+				log.Info("API listening on:", addr)
 				return router.TLSServer, nil // Was started
 			}
 		case err := <-errChan:

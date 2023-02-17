@@ -26,6 +26,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
+	"github.com/adobe/aquarium-fish/lib/build"
 	"github.com/adobe/aquarium-fish/lib/cluster"
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/fish"
@@ -58,8 +59,7 @@ func main() {
 			return log.InitLoggers()
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-
-			log.Info("Fish running...")
+			log.Infof("Aquarium Fish %s (%s)", build.Version, build.Time)
 
 			cfg := &fish.Config{}
 			if err := cfg.ReadConfigFile(cfg_path); err != nil {
