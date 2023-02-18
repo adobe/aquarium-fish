@@ -27,6 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Get tags for proper versioning
+        run: git fetch --tags origin
 
       - name: Set up Go
         uses: actions/setup-go@v3
@@ -34,18 +36,18 @@ jobs:
           go-version: 1.18
 
       - name: Build
-        run: ./build-linux.sh
+        run: RELEASE=1 ./build.sh
 
       - name: Upload binaries
         uses: actions/upload-artifact@v3
         with:
           name: binaries
-          path: aquarium-fish.*
+          path: aquarium-fish*.tar.xz
 
       - name: Test
         run: |
           go install github.com/jstemmer/go-junit-report/v2@latest
-          FISH_PATH=$PWD/aquarium-fish.linux_amd64 go test -v -failfast -parallel 4 -count=1 ./tests/... 2>&1 | go-junit-report -iocopy -set-exit-code -out report.xml
+          FISH_PATH=$PWD/aquarium-fish-*.linux_amd64 go test -v -failfast -parallel 4 -count=1 ./tests/... 2>&1 | go-junit-report -iocopy -set-exit-code -out report.xml
 
       - name: Test Summary
         uses: test-summary/action@v2
