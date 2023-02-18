@@ -49,7 +49,7 @@ echo "--- RUN UNIT TESTS ---"
 go test -ldflags="$version_flags" -v ./lib/...
 
 echo
-echo "--- BUILD ${BINARY_NAME} ---"
+echo "--- BUILD ${BINARY_NAME} ($MAXJOBS in parallel) ---"
 
 if [ "x${RELEASE}" != "x" ]; then
     export GIN_MODE=release
@@ -64,7 +64,9 @@ fi
 
 # Run parallel builds but no more than limit (gox doesn't support all the os/archs we need)
 pwait() {
-    while [ $(jobs -p | wc -l) -ge $1 ]; do
+    # Note: Dash really don't like jobs to be executed in a pipe or in other shell, soooo...
+    while jobs > /tmp/jobs_list.tmp; do
+        [ $(cat /tmp/jobs_list.tmp | wc -l) -ge $1 ] || break
         sleep 1
     done
 }
@@ -111,7 +113,7 @@ done
 [ $errorcount -eq 0 ] || exit $errorcount
 
 echo
-echo "--- ARCHIVE ${BINARY_NAME} ---"
+echo "--- ARCHIVE ${BINARY_NAME} ($MAXJOBS in parallel) ---"
 
 # Pack the artifact archives
 for GOOS in $os_list; do
