@@ -64,7 +64,12 @@ fi
 echo
 echo '---------------------- YAML Lint ----------------------'
 echo
-docker run --rm -v "${root_dir}:/data" cytopia/yamllint:1.22 --strict cmd docs lib
-errors=$((${errors}+$?))
+if command -v docker >/dev/null; then
+    docker run --rm -v "${root_dir}:/data" cytopia/yamllint:1.22 --strict cmd docs lib
+    errors=$((${errors}+$?))
+else
+    # TODO: Find some useful yaml lint in go ecosystem
+    echo 'WARN: Skipping, no docker installed'
+fi
 
 exit ${errors}

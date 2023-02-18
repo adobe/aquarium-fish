@@ -17,12 +17,12 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/glebarez/sqlite"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"golang.org/x/sys/unix"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
@@ -147,9 +147,7 @@ func main() {
 
 			log.Info("Fish initialized")
 			quit := make(chan os.Signal, 1)
-			signal.Notify(quit, unix.SIGINT)
-			signal.Notify(quit, unix.SIGQUIT)
-			signal.Notify(quit, unix.SIGTERM)
+			signal.Notify(quit, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 
 			<-quit
 

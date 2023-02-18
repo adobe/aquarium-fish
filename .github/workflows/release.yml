@@ -1,0 +1,30 @@
+---
+name: Handle Release
+
+on:
+  release:
+    types: [ "created" ]
+
+jobs:
+  generate:
+    name: Create release artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # To get all the tags for versioning
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.18
+
+      - name: Build
+        run: RELEASE=1 ./build.sh
+
+      - name: Upload the artifacts
+        uses: skx/github-action-publish-binaries@release-2.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: 'aquarium-fish*.tar.xz aquarium-fish*.zip'
