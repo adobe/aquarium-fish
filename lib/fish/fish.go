@@ -582,10 +582,12 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 			}
 		}
 		resource_timeout := res.CreatedAt.Add(resource_lifetime)
-		if resource_lifetime > 0 {
-			log.Infof("Fish: Resource %s will be deallocated by timeout in %s (%s)", app.UID, resource_lifetime, resource_timeout)
-		} else {
-			log.Warn("Fish: Resource have no lifetime set and will live until deallocated by user:", app.UID)
+		if app_state.Status == types.ApplicationStatusALLOCATED {
+			if resource_lifetime > 0 {
+				log.Infof("Fish: Resource %s will be deallocated by timeout in %s (%s)", app.UID, resource_lifetime, resource_timeout)
+			} else {
+				log.Warn("Fish: Resource have no lifetime set and will live until deallocated by user:", app.UID)
+			}
 		}
 
 		// Run the loop to wait for deallocate request
