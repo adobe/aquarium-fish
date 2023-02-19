@@ -15,8 +15,10 @@
 
 token=$1
 [ "$token" ] || exit 1
+hostport=$2
+[ "$hostport" ] || hostport=localhost:8001
 
-label_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/json' -d '{
+curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/json' -d '{
     "name":"test-user",
     "password":"test-user-password"
-}' https://localhost:8001/api/v1/user/)
+}' "https://$hostport/api/v1/user/"

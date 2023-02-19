@@ -16,11 +16,13 @@
 
 token=$1
 [ "$token" ] || exit 1
+hostport=$2
+[ "$hostport" ] || hostport=localhost:8001
 
 label=macos1015-xcode122_vmx
 
 # It's a bit dirty, but works for now - probably better to create API call to find the latest label
-curr_label=$(curl -s -u "admin:$token" -k 'https://127.0.0.1:8001/api/v1/label/?filter=name="'$label'"' | sed 's/},{/},\n{/g' | tail -1)
+curr_label=$(curl -s -u "admin:$token" -k "https://$hostport/api/v1/label/?filter=name=\"$label\"" | sed 's/},{/},\n{/g' | tail -1)
 curr_label_id="$(echo "$curr_label" | grep -o '"UID": *"[^"]\+"' | cut -d':' -f 2 | tr -d ' "')"
 if [ "x$curr_label_id" = "x" ]; then
     echo "ERROR: Unable to find label '$label' - please create one before running the application"
@@ -37,15 +39,15 @@ app_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/json
     "JENKINS_URL": "https://jenkins-host.local/",
     "JENKINS_AGENT_SECRET": "03839eabcf945b1e780be8f9488d264c4c57bf388546da9a84588345555f29b0",
     "JENKINS_AGENT_NAME": "test-node"
-}}' https://127.0.0.1:8001/api/v1/application/ | grep -o '"UID": *"[^"]\+"' | cut -d':' -f 2 | tr -d ' "')
+}}' "https://$hostport/api/v1/application/" | grep -o '"UID": *"[^"]\+"' | cut -d':' -f 2 | tr -d ' "')
 echo "Application ID: ${app_id}"
 
 echo "Press key to check the application resource"
 read w1
 
-curl -u "admin:$token" -k https://127.0.0.1:8001/api/v1/application/$app_id/resource
+curl -u "admin:$token" -k "https://$hostport/api/v1/application/$app_id/resource"
 
 echo "Press key to deallocate the application resource"
 read w1
 
-curl -u "admin:$token" -k https://127.0.0.1:8001/api/v1/application/$app_id/deallocate
+curl -u "admin:$token" -k "https://$hostport/api/v1/application/$app_id/deallocate"
