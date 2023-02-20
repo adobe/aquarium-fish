@@ -70,11 +70,15 @@ pwait() {
         sleep 1
     done
 }
+
+# If use it directly - it causes "go tool dist: signal: broken pipe"
+go tool dist list > /tmp/go_tool_dist_list.txt
+
 for GOOS in $os_list; do
     for GOARCH in $arch_list; do
         name="$BINARY_NAME.${GOOS}_${GOARCH}"
 
-        if ! go tool dist list | grep -q "^${GOOS}/${GOARCH}$"; then
+        if ! grep -q "^${GOOS}/${GOARCH}$" /tmp/go_tool_dist_list.txt; then
             echo "Skipping: $name as not supported by go"
             continue
         fi

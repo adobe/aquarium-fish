@@ -16,11 +16,13 @@
 
 token=$1
 [ "$token" ] || exit 1
+hostport=$2
+[ "$hostport" ] || hostport=localhost:8001
 
 label=ubuntu2004
 
 # It's a bit dirty, but works for now - probably better to create API call to find the latest label
-curr_label=$(curl -s -u "admin:$token" -k 'https://localhost:8001/api/v1/label/?filter=name="'$label'"' | sed 's/},{/},\n{/g' | tail -1)
+curr_label=$(curl -s -u "admin:$token" -k "https://$hostport/api/v1/label/?filter=name=\"$label\"" | sed 's/},{/},\n{/g' | tail -1)
 curr_version="$(echo "$curr_label" | grep -o '"version": *[0-9]\+' | tr -dc '0-9')"
 echo "Current label '$label:$curr_version': $curr_label"
 
@@ -77,6 +79,6 @@ label_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/js
     "metadata": {
         "JENKINS_AGENT_WORKSPACE": "/mnt/workspace"
     }
-}' https://localhost:8001/api/v1/label/ | grep -o '"UID": *"[^"]\+"' | cut -d':' -f 2 | tr -d ' "')
+}' "https://$hostport/api/v1/label/" | grep -o '"UID": *"[^"]\+"' | cut -d':' -f 2 | tr -d ' "')
 
 echo "Created Label ID: ${label_id}"

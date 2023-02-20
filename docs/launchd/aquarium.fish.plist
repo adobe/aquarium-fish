@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>aquarium.fish</string>
+
+    <key>UserName</key>
+    <string>_aquarium-fish</string>
+    <key>GroupName</key>
+    <string>_aquarium-fish</string>
+
+    <key>Program</key>
+    <string>/opt/aquarium-fish/aquarium-fish</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>--timestamp</string>
+        <string>false</string>
+        <string>-c</string>
+        <string>/opt/aquarium-fish/config.yml</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/opt/aquarium-fish/ws</string>
+
+    <key>SessionCreate</key>
+    <true/>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>NumberOfFiles</key>
+    <integer>10240</integer>
+
+    <key>StandardOutPath</key>
+    <string>/opt/aquarium-fish/fish.log</string>
+    <key>StandardErrorPath</key>
+    <string>/opt/aquarium-fish/fish.log</string>
+</dict>
+</plist>

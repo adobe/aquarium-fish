@@ -26,28 +26,30 @@ for each step and adjust for your system.
 
 4. Copy aquarium-fish binary to the right place:
    ```sh
-   cp aquarium-fish.linux_amd64 /srv/aquarium-fish/aquarium-fish
+   tar xf aquarium-fish-v*.linux_amd64.tar.xz
+   mv aquarium-fish /srv/aquarium-fish/aquarium-fish
    chmod +x /srv/aquarium-fish/aquarium-fish
    ```
 
 5. Create config file to define the node:
    ```yaml
    ---
-    node_name: test-node.corp.example.com
-    node_location: us-west-2a
-    default_resource_lifetime: 1h30m
+   node_name: test-node-lin.corp.example.com
+   node_location: us-west-2a
+   default_resource_lifetime: 1h30m
 
-    # In case you configure the drivers - only the defined drivers will be activated
-    drivers:
-      # Configure docker here for example
-      - name: docker
-        cfg:
-          download_user: user
-          download_password: password
+   # In case you configure the drivers - only the defined drivers will be activated
+   drivers:
+     # Configure docker here for example
+     - name: docker
+       cfg:
+         download_user: user
+         download_password: password
    ```
    ```sh
    vim /srv/aquarium-fish/config.yml
-   chown root:aquarium-fish config.yml
+   chown root:aquarium-fish /srv/aquarium-fish/config.yml
+   chmod 640 /opt/aquarium-fish/config.yml
    ```
 
 6. Run aquarium-fish first time to get admin creds, then press Ctrl-C to stop it:
