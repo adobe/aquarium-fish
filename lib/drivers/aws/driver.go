@@ -106,7 +106,7 @@ func (d *Driver) ValidateDefinition(def types.LabelDefinition) error {
 
 // Allow Fish to ask the driver about it's capacity (free slots) of a specific definition
 func (d *Driver) AvailableCapacity(node_usage types.Resources, def types.LabelDefinition) int64 {
-	var out_count int64
+	var inst_count int64
 
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
@@ -116,8 +116,10 @@ func (d *Driver) AvailableCapacity(node_usage types.Resources, def types.LabelDe
 
 	conn_ec2 := d.newEC2Conn()
 
+	// Dedicated hosts
+	// For now operated only on pre-created dedicated machines pool
 	if opts.InstanceType == "mac1" || opts.InstanceType == "mac2" {
-		// Ensure we have the available not busy mac dedicated hosts to use as base for resource.
+		// Ensure we have the available (not busy) dedicated hosts to use as base for resource.
 		// For now we're not creating new dedicated hosts dynamically because they can be
 		// terminated only after 24h which costs a pretty penny.
 		// Quotas for hosts are: "Running Dedicated mac1 Hosts" & "Running Dedicated mac2 Hosts"
@@ -141,40 +143,67 @@ func (d *Driver) AvailableCapacity(node_usage types.Resources, def types.LabelDe
 				log.Error("AWS: Error during requesting hosts:", err)
 				return -1
 			}
-			out_count += int64(len(resp.Hosts))
+			inst_count += int64(len(resp.Hosts))
 		}
 
-		log.Debug("AWS: AvailableCapacity for dedicated Mac:", opts.InstanceType, out_count)
+		log.Debug("AWS: AvailableCapacity for dedicated Mac:", opts.InstanceType, inst_count)
 
-		return out_count
+		return inst_count
 	}
 
+	// On-Demand hosts
 	d.updateQuotas(false)
 
 	d.quotas_mutex.Lock()
 	{
+		// All the "Running On-Demand" quotas are per vCPU (for ex. 64 means 4 instances)
+		var cpu_quota int64
+		inst_types := []string{}
+
 		// Check we have enough quotas for specified instance type
-		if strings.HasPrefix(opts.InstanceType, "dl") {
-			out_count = d.quotas["Running On-Demand DL instances"]
-		} else if strings.HasPrefix(opts.InstanceType, "u-") {
-			out_count = d.quotas["Running On-Demand High Memory instances"]
-		} else if strings.HasPrefix(opts.InstanceType, "hpc") {
-			out_count = d.quotas["Running On-Demand HPC instances"]
-		} else if strings.HasPrefix(opts.InstanceType, "inf") {
-			out_count = d.quotas["Running On-Demand Inf instances"]
-		} else if strings.HasPrefix(opts.InstanceType, "trn") {
-			out_count = d.quotas["Running On-Demand Trn instances"]
-		} else if strings.HasPrefix(opts.InstanceType, "f") {
-			out_count = d.quotas["Running On-Demand F instances"]
-		} else if strings.HasPrefix(opts.InstanceType, "g") || strings.HasPrefix(opts.InstanceType, "vt") {
-			out_count = d.quotas["Running On-Demand G and VT instances"]
-		} else if strings.HasPrefix(opts.InstanceType, "p") {
-			out_count = d.quotas["Running On-Demand P instances"]
-		} else if strings.HasPrefix(opts.InstanceType, "x") {
-			out_count = d.quotas["Running On-Demand X instances"]
-		} else { // Probably not a good idea and better to fail if the instances are not in the list...
-			out_count = d.quotas["Running On-Demand Standard (A, C, D, H, I, M, R, T, Z) instances"]
+		if awsInstTypeAny(opts.InstanceType, "dl") {
+			cpu_quota = d.quotas["Running On-Demand DL instances"]
+			inst_types = append(inst_types, "dl")
+		} else if awsInstTypeAny(opts.InstanceType, "u-") {
+			cpu_quota = d.quotas["Running On-Demand High Memory instances"]
+			inst_types = append(inst_types, "u-")
+		} else if awsInstTypeAny(opts.InstanceType, "hpc") {
+			cpu_quota = d.quotas["Running On-Demand HPC instances"]
+			inst_types = append(inst_types, "hpc")
+		} else if awsInstTypeAny(opts.InstanceType, "inf") {
+			cpu_quota = d.quotas["Running On-Demand Inf instances"]
+			inst_types = append(inst_types, "inf")
+		} else if awsInstTypeAny(opts.InstanceType, "trn") {
+			cpu_quota = d.quotas["Running On-Demand Trn instances"]
+			inst_types = append(inst_types, "trn")
+		} else if awsInstTypeAny(opts.InstanceType, "f") {
+			cpu_quota = d.quotas["Running On-Demand F instances"]
+			inst_types = append(inst_types, "f")
+		} else if awsInstTypeAny(opts.InstanceType, "g", "vt") {
+			cpu_quota = d.quotas["Running On-Demand G and VT instances"]
+			inst_types = append(inst_types, "g", "vt")
+		} else if awsInstTypeAny(opts.InstanceType, "p") {
+			cpu_quota = d.quotas["Running On-Demand P instances"]
+			inst_types = append(inst_types, "p")
+		} else if awsInstTypeAny(opts.InstanceType, "x") {
+			cpu_quota = d.quotas["Running On-Demand X instances"]
+			inst_types = append(inst_types, "x")
+		} else if awsInstTypeAny(opts.InstanceType, "a", "c", "d", "h", "i", "m", "r", "t", "z") {
+			cpu_quota = d.quotas["Running On-Demand Standard (A, C, D, H, I, M, R, T, Z) instances"]
+			inst_types = append(inst_types, "a", "c", "d", "h", "i", "m", "r", "t", "z")
+		} else {
+			log.Error("AWS: Driver does not support instance type:", opts.InstanceType)
+			return -1
 		}
+
+		// Checking the current usage of CPU's of this project and subtracting it from quota value
+		cpu_usage, err := d.getProjectCpuUsage(conn_ec2, inst_types)
+		if err != nil {
+			return -1
+		}
+
+		// To get the available instances we need to divide free cpu's by requested Definition CPU amount
+		inst_count = (cpu_quota - cpu_usage) / int64(def.Resources.Cpu)
 	}
 	d.quotas_mutex.Unlock()
 
@@ -186,13 +215,13 @@ func (d *Driver) AvailableCapacity(node_usage types.Resources, def types.LabelDe
 		return -1
 	}
 
-	log.Debugf("AWS: AvailableCapacity: Quotas: %d, IP's: %d", out_count, ip_count)
+	log.Debugf("AWS: AvailableCapacity: Quotas: %d, IP's: %d", inst_count, ip_count)
 
 	// Return the most limiting value
-	if ip_count < out_count {
+	if ip_count < inst_count {
 		return ip_count
 	}
-	return out_count
+	return inst_count
 }
 
 /**
