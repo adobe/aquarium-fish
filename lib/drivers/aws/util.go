@@ -21,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	ec2_types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/servicequotas"
 
@@ -309,6 +310,40 @@ func (d *Driver) getSnapshotId(conn *ec2.Client, id_tag string) (string, error) 
 	return found_id, nil
 }
 
+func (d *Driver) getProjectCpuUsage(conn *ec2.Client, inst_types []string) (int64, error) {
+	var cpu_count int64
+
+	// Here is no way to use some filter, so we're getting them all and after that
+	// checking if the instance is actually starts with type+number.
+	p := ec2.NewDescribeInstancesPaginator(conn, &ec2.DescribeInstancesInput{
+		Filters: []types.Filter{
+			ec2_types.Filter{
+				Name: aws.String("instance-state-name"),
+				// TODO: Confirm: Ensure we're listing only the active instances which consuming the resources
+				Values: []string{"pending", "running", "shutting-down", "stopping"},
+			},
+		},
+	})
+
+	// Processing the received instances
+	for p.HasMorePages() {
+		resp, err := p.NextPage(context.TODO())
+		if err != nil {
+			return -1, log.Error("AWS: Error during requesting instances:", err)
+		}
+		for _, res := range resp.Reservations {
+			for _, inst := range res.Instances {
+				if awsInstTypeAny(string(inst.InstanceType), inst_types...) {
+					// Maybe it is a better idea to check the instance type vCPU's...
+					cpu_count += int64(aws.ToInt32(inst.CpuOptions.CoreCount) * aws.ToInt32(inst.CpuOptions.ThreadsPerCore))
+				}
+			}
+		}
+	}
+
+	return cpu_count, nil
+}
+
 func (d *Driver) getInstance(conn *ec2.Client, inst_id string) (*types.Instance, error) {
 	input := &ec2.DescribeInstancesInput{
 		Filters: []types.Filter{
@@ -399,4 +434,21 @@ func (d *Driver) updateQuotas(force bool) error {
 	d.quotas_next_update = time.Now().Add(time.Minute * 30)
 
 	return nil
+}
+
+// Checks if the value starts with any of the options and followed by digit
+func awsInstTypeAny(val string, options ...string) bool {
+	var char_after_opt byte
+	for _, opt := range options {
+		// Here we check that strings starts with the prefix in options
+		if strings.HasPrefix(val, opt) {
+			// And followed by a digit from 1 to 9 (otherwise type "h" could be mixed with "hpc")
+			// We're not expecting unicode chars here so byte comparison works just well
+			char_after_opt = val[len(opt)]
+			if char_after_opt >= '1' && char_after_opt <= '9' {
+				return true
+			}
+		}
+	}
+	return false
 }
