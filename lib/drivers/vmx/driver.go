@@ -17,7 +17,6 @@ package vmx
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"time"
 
@@ -164,7 +163,8 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]interfa
 	// Load the required images
 	img_path, err := d.loadImages(&opts, vm_images_dir)
 	if err != nil {
-		return nil, err
+		d.cleanupVm(vm_dir)
+		return nil, log.Error("VMX: Unable to load the required images:", err)
 	}
 
 	// Clone VM from the image
@@ -175,7 +175,8 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]interfa
 		"-cloneName", vm_id,
 	}
 	if _, _, err := runAndLog(120*time.Second, d.cfg.VmrunPath, args...); err != nil {
-		return nil, err
+		d.cleanupVm(vm_dir)
+		return nil, log.Error("VMX: Unable to clone the target image:", img_path, err)
 	}
 
 	// Change cloned vm configuration
@@ -188,24 +189,26 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]interfa
 		"cpuid.corespersocket =", fmt.Sprintf(`cpuid.corespersocket = "%d"`, def.Resources.Cpu),
 		"memsize =", fmt.Sprintf(`memsize = "%d"`, def.Resources.Ram*1024),
 	); err != nil {
+		d.cleanupVm(vm_dir)
 		return nil, log.Error("VMX: Unable to change cloned VM configuration:", vmx_path, err)
 	}
 
 	// Create and connect disks to vmx
 	if err := d.disksCreate(vmx_path, def.Resources.Disks); err != nil {
+		d.cleanupVm(vm_dir)
 		return nil, log.Error("VMX: Unable create disks for VM:", vmx_path, err)
 	}
 
 	// Run the background monitoring of the vmware log
 	if d.cfg.LogMonitor {
-		go d.logMonitor(vmx_path)
+		go d.logMonitor(vm_id, vmx_path)
 	}
 
 	// Run the VM
 	if _, _, err := runAndLog(120*time.Second, d.cfg.VmrunPath, "start", vmx_path, "nogui"); err != nil {
-		log.Error("VMX: Check the log info:", filepath.Join(filepath.Dir(vmx_path), "vmware.log"),
-			"and directory ~/Library/Logs/VMware/ for additional logs")
-		return nil, log.Error("VMX: Unable to run VM", vmx_path, err)
+		log.Error("VMX: Check logs in ~/Library/Logs/VMware/ or enable debug to see vmware.log")
+		d.cleanupVm(vm_dir)
+		return nil, log.Error("VMX: Unable to run VM:", vmx_path, err)
 	}
 
 	log.Info("VMX: Allocate of VM completed:", vmx_path)
@@ -263,9 +266,7 @@ func (d *Driver) Deallocate(res *types.Resource) error {
 	}
 
 	// Cleaning the VM images too
-	if err := os.RemoveAll(filepath.Dir(vmx_path)); err != nil {
-		return err
-	}
+	d.cleanupVm(filepath.Dir(vmx_path))
 
 	log.Info("VMX: Deallocate of VM completed:", vmx_path)
 
