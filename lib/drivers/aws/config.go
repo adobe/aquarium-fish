@@ -16,6 +16,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
@@ -69,14 +70,33 @@ func (c *Config) Validate() (err error) {
 		}),
 	})
 	input := &sts.GetCallerIdentityInput{}
-	res, err := conn.GetCallerIdentity(context.TODO(), input)
-	if err != nil {
-		return fmt.Errorf("AWS: Unable to verify connection by calling STS service: %v", err)
+
+	// Checking the connection for 1 minute in case network is unavailable
+	// It helps with the machines where internet is not available right away
+	retries := 6
+	counter := 0
+	account := ""
+	for {
+		res, err := conn.GetCallerIdentity(context.TODO(), input)
+		counter++
+		if err != nil {
+			if counter > retries {
+				log.Warn("AWS: Retry after credentials validation error:", err)
+				// Give command 5 seconds to rest
+				time.Sleep(10 * time.Second)
+				continue
+			}
+		}
+		if err != nil {
+			return fmt.Errorf("AWS: Unable to verify connection by calling STS service: %v", err)
+		}
+		account = *res.Account
+		break
 	}
-	if len(c.AccountIDs) > 0 && c.AccountIDs[0] != *res.Account {
-		log.Debug("AWS: Using Account IDs:", c.AccountIDs, "(real: ", *res.Account, ")")
+	if len(c.AccountIDs) > 0 && c.AccountIDs[0] != account {
+		log.Debug("AWS: Using Account IDs:", c.AccountIDs, "(real: ", account, ")")
 	} else {
-		c.AccountIDs = []string{*res.Account}
+		c.AccountIDs = []string{account}
 		log.Debug("AWS: Using Account IDs:", c.AccountIDs)
 	}
 

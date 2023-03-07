@@ -46,7 +46,7 @@ func DownloadUnpackArchive(url, out_dir, user, password string) error {
 
 	// Creating lock file in order to not screw it up in multiprocess system
 	if err := CreateLock(lock_path); err != nil {
-		return err
+		return log.Error("Util: Unable to create lock file:", err)
 	}
 	defer os.Remove(lock_path)
 
@@ -58,12 +58,13 @@ func DownloadUnpackArchive(url, out_dir, user, password string) error {
 	resp, err := client.Do(req)
 	if err != nil {
 		os.RemoveAll(out_dir)
-		return err
+		return log.Error("Util: Unable to request url:", url, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("Util: Unable to download file: %s: %s", resp.Status, url)
+		os.RemoveAll(out_dir)
+		return log.Error("Util: Unable to download file:", url, resp.StatusCode, resp.Status)
 	}
 
 	// Printing the download progress
@@ -92,12 +93,13 @@ func DownloadUnpackArchive(url, out_dir, user, password string) error {
 		}
 		if err != nil {
 			os.RemoveAll(out_dir)
-			return err
+			return log.Error("Util: Tar archive failed to iterate next file:", err)
 		}
 
 		// Check the name doesn't contain any traversal elements
 		if strings.Contains(hdr.Name, "..") {
-			return fmt.Errorf("Error: The archive filepath contains '..' which is forbidden: %s", hdr.Name)
+			os.RemoveAll(out_dir)
+			return log.Error("Util: The archive filepath contains '..' which is security forbidden:", hdr.Name)
 		}
 
 		target := filepath.Join(out_dir, hdr.Name)
@@ -108,7 +110,7 @@ func DownloadUnpackArchive(url, out_dir, user, password string) error {
 			err = os.MkdirAll(target, os.FileMode(hdr.Mode))
 			if err != nil {
 				os.RemoveAll(out_dir)
-				return err
+				return log.Error("Util: Unable to create directory:", target, err)
 			}
 		case tar.TypeReg, tar.TypeRegA:
 			// Write a file
@@ -116,12 +118,12 @@ func DownloadUnpackArchive(url, out_dir, user, password string) error {
 			err = os.MkdirAll(filepath.Dir(target), 0750)
 			if err != nil {
 				os.RemoveAll(out_dir)
-				return err
+				return log.Error("Util: Unable to create directory for file:", target, err)
 			}
 			w, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(hdr.Mode))
 			if err != nil {
 				os.RemoveAll(out_dir)
-				return err
+				return log.Error("Util: Unable to open file for unpack:", target, err)
 			}
 			defer w.Close()
 
@@ -129,7 +131,7 @@ func DownloadUnpackArchive(url, out_dir, user, password string) error {
 			_, err = io.Copy(w, tr)
 			if err != nil {
 				os.RemoveAll(out_dir)
-				return err
+				return log.Error("Util: Unable to unpack content to file:", target, err)
 			}
 		}
 	}

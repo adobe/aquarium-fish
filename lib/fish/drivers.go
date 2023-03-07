@@ -71,6 +71,7 @@ func (f *Fish) DriversSet() error {
 }
 
 func (f *Fish) DriversPrepare(configs []ConfigDriver) (errs []error) {
+	not_skipped_drivers := drivers_enabled_list[:0]
 	for _, drv := range drivers_enabled_list {
 		// Looking for the driver config
 		var json_cfg []byte
@@ -83,10 +84,14 @@ func (f *Fish) DriversPrepare(configs []ConfigDriver) (errs []error) {
 
 		if err := drv.Prepare(json_cfg); err != nil {
 			errs = append(errs, err)
-			log.Info("Fish: Resource driver skipped:", drv.Name())
+			log.Warn("Fish: Resource driver prepare failed:", drv.Name(), err)
 		} else {
+			not_skipped_drivers = append(not_skipped_drivers, drv)
 			log.Info("Fish: Resource driver activated:", drv.Name())
 		}
 	}
+
+	drivers_enabled_list = not_skipped_drivers
+
 	return errs
 }

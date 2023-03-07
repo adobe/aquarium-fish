@@ -336,21 +336,32 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]types.ResourcesDi
 }
 
 // Ensures the VM is not stale by monitoring the log
-func (d *Driver) logMonitor(vmx_path string) {
+func (d *Driver) logMonitor(vm_id, vmx_path string) {
 	// Monitor the vmware.log file
 	log_path := filepath.Join(filepath.Dir(vmx_path), "vmware.log")
 	t, _ := tail.TailFile(log_path, tail.Config{Follow: true, Poll: true})
-	log.Debug("VMX: Start monitoring of log:", log_path)
+	log.Debug("VMX: Start monitoring of log:", vm_id, log_path)
 	for line := range t.Lines {
+		log.Debug("VMX:", vm_id, "vmware.log:", line)
 		// Send reset if the VM is switched to 0 status
 		if strings.Contains(line.Text, "Tools: Changing running status: 1 => 0") {
-			log.Warn("VMX: Resetting the stale VM", vmx_path)
+			log.Warn("VMX: Resetting the stale VM", vm_id, vmx_path)
 			// We should not spend much time here, because we can miss
 			// the file delete so running in a separated thread
 			go runAndLog(10*time.Second, d.cfg.VmrunPath, "reset", vmx_path)
 		}
 	}
-	log.Debug("VMX: Done monitoring of log:", log_path)
+	log.Debug("VMX: Done monitoring of log:", vm_id, log_path)
+}
+
+// Removes the entire directory for clean up purposes
+func (d *Driver) cleanupVm(vm_dir string) error {
+	if err := os.RemoveAll(vm_dir); err != nil {
+		log.Warn("VMX: Unable to clean up the vm directory:", vm_dir, err)
+		return err
+	}
+
+	return nil
 }
 
 // Runs & logs the executable command
