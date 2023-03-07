@@ -399,7 +399,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 			if timeout < 0 {
 				break
 			}
-			time.Sleep(5)
+			time.Sleep(5 * time.Second)
 
 			inst_tmp, err := d.getInstance(conn, *inst.InstanceId)
 			if err == nil && inst_tmp != nil {
@@ -454,7 +454,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 		if timeout < 0 {
 			break
 		}
-		time.Sleep(5)
+		time.Sleep(5 * time.Second)
 
 		inst_tmp, err := d.getInstance(conn, *inst.InstanceId)
 		if err == nil && inst_tmp != nil {
@@ -466,7 +466,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 	}
 
 	res.Identifier = *inst.InstanceId
-	return res, log.Error("AWS: Unable to locate the instance IP:", *inst.InstanceId)
+	return res, log.Error("AWS: Unable to locate the instance IP:", i_name, *inst.InstanceId)
 }
 
 func (d *Driver) Status(res *types.Resource) (string, error) {
