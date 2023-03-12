@@ -14,7 +14,6 @@ package vmx
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -99,7 +98,7 @@ func (c *Config) Validate() (err error) {
 		return err
 	}
 
-	log.Info("VMX: Creating working directories:", c.ImagesPath, c.WorkspacePath)
+	log.Debug("VMX: Creating working directories:", c.ImagesPath, c.WorkspacePath)
 	if err := os.MkdirAll(c.ImagesPath, 0o750); err != nil {
 		return err
 	}
@@ -114,7 +113,7 @@ func (c *Config) Validate() (err error) {
 	}
 
 	if c.CpuAlter < 0 && int(cpu_stat) <= -c.CpuAlter {
-		return fmt.Errorf("VMX: |CpuAlter| can't be more or equal the avaialble Host CPUs: |%d| > %d", c.CpuAlter, cpu_stat)
+		return log.Errorf("VMX: |CpuAlter| can't be more or equal the avaialble Host CPUs: |%d| > %d", c.CpuAlter, cpu_stat)
 	}
 
 	mem_stat, err := mem.VirtualMemory()
@@ -124,7 +123,7 @@ func (c *Config) Validate() (err error) {
 	ram_stat := mem_stat.Total / 1073741824 // Getting GB from Bytes
 
 	if c.RamAlter < 0 && int(ram_stat) <= -c.RamAlter {
-		return fmt.Errorf("VMX: |RamAlter| can't be more or equal the avaialble Host RAM: |%d| > %d", c.RamAlter, ram_stat)
+		return log.Errorf("VMX: |RamAlter| can't be more or equal the avaialble Host RAM: |%d| > %d", c.RamAlter, ram_stat)
 	}
 
 	return nil

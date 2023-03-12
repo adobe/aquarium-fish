@@ -14,54 +14,44 @@ package docker
 
 import (
 	"encoding/json"
-	"fmt"
 
+	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 /**
  * Options example:
- *   image: ubuntu2004-python3-ci
  *   images:
- *     ubuntu2004: https://artifact-storage/aquarium/image/docker/ubuntu2004/ubuntu2004-VERSION.tar.xz
- *     ubuntu2004-python3: https://artifact-storage/aquarium/image/docker/ubuntu2004-python3/ubuntu2004-python3-VERSION.tar.xz
- *     ubuntu2004-python3-ci: https://artifact-storage/aquarium/image/docker/ubuntu2004-python3-ci/ubuntu2004-python3-ci-VERSION.tar.xz
+ *     - url: https://artifact-storage/aquarium/image/docker/ubuntu2004/ubuntu2004-VERSION.tar.xz
+ *       sum: sha256:1234567890abcdef1234567890abcdef1
+ *     - url: https://artifact-storage/aquarium/image/docker/ubuntu2004-python3/ubuntu2004-python3-VERSION.tar.xz
+ *       sum: sha256:1234567890abcdef1234567890abcdef2
+ *     - url: https://artifact-storage/aquarium/image/docker/ubuntu2004-python3-ci/ubuntu2004-python3-ci-VERSION.tar.xz
+ *       sum: sha256:1234567890abcdef1234567890abcdef3
  */
 type Options struct {
-	Image  string            `json:"image"`  // Image name to use
-	Images map[string]string `json:"images"` // List of image dependencies
+	Images []drivers.Image `json:"images"` // List of image dependencies, last one is running one
 }
 
 func (o *Options) Apply(options util.UnparsedJson) error {
 	if err := json.Unmarshal([]byte(options), o); err != nil {
-		return log.Error("DOCKER: Unable to apply the driver options:", err)
+		return log.Error("Docker: Unable to apply the driver options:", err)
 	}
 
 	return o.Validate()
 }
 
 func (o *Options) Validate() error {
-	// Check image
-	if o.Image == "" {
-		return fmt.Errorf("DOCKER: No image is specified")
-	}
-
-	// Check the images
-	image_exist := false
-	for name, url := range o.Images {
-		if name == "" {
-			return fmt.Errorf("DOCKER: No image name is specified")
-		}
-		if url == "" {
-			return fmt.Errorf("DOCKER: No image url is specified")
-		}
-		if name == o.Image {
-			image_exist = true
+	// Check images
+	var img_err error
+	for _, image := range o.Images {
+		if err := image.Validate(); err != nil {
+			img_err = log.Error("Docker: Error during image validation:", err)
 		}
 	}
-	if !image_exist {
-		return fmt.Errorf("DOCKER: No image found in the images")
+	if img_err != nil {
+		return img_err
 	}
 
 	return nil

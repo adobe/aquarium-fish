@@ -21,7 +21,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	ec2_types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/servicequotas"
 
@@ -317,10 +316,10 @@ func (d *Driver) getProjectCpuUsage(conn *ec2.Client, inst_types []string) (int6
 	// checking if the instance is actually starts with type+number.
 	p := ec2.NewDescribeInstancesPaginator(conn, &ec2.DescribeInstancesInput{
 		Filters: []types.Filter{
-			ec2_types.Filter{
+			types.Filter{
 				Name: aws.String("instance-state-name"),
-				// TODO: Confirm: Ensure we're listing only the active instances which consuming the resources
-				Values: []string{"pending", "running", "shutting-down", "stopping"},
+				// Confirmed by AWS eng: only terminated instances are not counting in utilization
+				Values: []string{"pending", "running", "shutting-down", "stopping", "stopped"},
 			},
 		},
 	})

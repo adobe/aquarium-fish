@@ -82,7 +82,7 @@ func (f *Fish) DriversPrepare(configs []ConfigDriver) (errs []error) {
 			}
 		}
 
-		if err := drv.Prepare(json_cfg); err != nil {
+		if err := drv.Prepare(json_cfg, f.node); err != nil {
 			errs = append(errs, err)
 			log.Warn("Fish: Resource driver prepare failed:", drv.Name(), err)
 		} else {

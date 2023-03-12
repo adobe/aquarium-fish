@@ -37,7 +37,7 @@ type Driver struct {
 	tasks_list []drivers.ResourceDriverTask
 
 	total_cpu uint // In logical threads
-	total_ram uint // In RAM megabytes
+	total_ram uint // In RAM GB
 }
 
 func init() {
@@ -52,7 +52,7 @@ func (d *Driver) IsRemote() bool {
 	return false
 }
 
-func (d *Driver) Prepare(config []byte) error {
+func (d *Driver) Prepare(config []byte, node *types.Node) error {
 	if err := d.cfg.Apply(config); err != nil {
 		return err
 	}
@@ -81,7 +81,7 @@ func (d *Driver) Prepare(config []byte) error {
 func (d *Driver) ValidateDefinition(def types.LabelDefinition) error {
 	// Check resources
 	if err := def.Resources.Validate([]string{"hfs+", "exfat", "fat32"}, true); err != nil {
-		return fmt.Errorf("VMX: Resources validation failed: %s", err)
+		return log.Error("VMX: Resources validation failed:", err)
 	}
 
 	// Check options

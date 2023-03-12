@@ -20,15 +20,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
-	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 func (d *Driver) getContainersResources(container_ids []string) (types.Resources, error) {
@@ -39,25 +38,25 @@ func (d *Driver) getContainersResources(container_ids []string) (types.Resources
 	docker_args = append(docker_args, container_ids...)
 	stdout, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, docker_args...)
 	if err != nil {
-		return out, fmt.Errorf("DOCKER: Unable to inspect the containers to get used resources: %v", err)
+		return out, fmt.Errorf("Docker: Unable to inspect the containers to get used resources: %v", err)
 	}
 
 	res_list := strings.Split(strings.TrimSpace(stdout), "\n")
 	for _, res := range res_list {
 		cpu_mem := strings.Split(res, ",")
 		if len(cpu_mem) < 2 {
-			return out, fmt.Errorf("DOCKER: Not enough info values in return: %q", res_list)
+			return out, fmt.Errorf("Docker: Not enough info values in return: %q", res_list)
 		}
 		res_cpu, err := strconv.ParseUint(cpu_mem[0], 10, 64)
 		if err != nil {
-			return out, fmt.Errorf("DOCKER: Unable to parse CPU uint: %v (%q)", err, cpu_mem[0])
+			return out, fmt.Errorf("Docker: Unable to parse CPU uint: %v (%q)", err, cpu_mem[0])
 		}
 		res_ram, err := strconv.ParseUint(cpu_mem[1], 10, 64)
 		if err != nil {
-			return out, fmt.Errorf("DOCKER: Unable to parse RAM uint: %v (%q)", err, cpu_mem[1])
+			return out, fmt.Errorf("Docker: Unable to parse RAM uint: %v (%q)", err, cpu_mem[1])
 		}
 		if res_cpu == 0 || res_ram == 0 {
-			return out, fmt.Errorf("DOCKER: The container is non-Fish controlled zero-cpu/ram ones: %q", container_ids)
+			return out, fmt.Errorf("Docker: The container is non-Fish controlled zero-cpu/ram ones: %q", container_ids)
 		}
 		out.Cpu += uint(res_cpu / 1000000000) // Originallly in NCPU
 		out.Ram += uint(res_ram / 1073741824) // Get in GB
@@ -75,7 +74,7 @@ func (d *Driver) getInitialUsage() (types.Resources, error) {
 	// Listing the existing containers ID's to use in inpect command later
 	stdout, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, "ps", "--format", "{{ .ID }}")
 	if err != nil {
-		return out, fmt.Errorf("DOCKER: Unable to list the running containers: %v", err)
+		return out, fmt.Errorf("Docker: Unable to list the running containers: %v", err)
 	}
 
 	ids_list := strings.Split(strings.TrimSpace(stdout), "\n")
@@ -135,57 +134,49 @@ func (d *Driver) getContainerName(hwaddr string) string {
 func (d *Driver) loadImages(opts *Options) (string, error) {
 	// Download the images and unpack them
 	var wg sync.WaitGroup
-	for name, url := range opts.Images {
-		archive_name := filepath.Base(url)
+	for _, image := range opts.Images {
+		archive_name := filepath.Base(image.Url)
 		image_unpacked := filepath.Join(d.cfg.ImagesPath, strings.TrimSuffix(archive_name, ".tar.xz"))
 
-		log.Info("DOCKER: Loading the required image:", name, url)
+		log.Info("Docker: Loading the required image:", image.Name, image.Url)
 
 		// Running the background routine to download, unpack and process the image
 		// Success will be checked later by existance of the image in local docker registry
 		wg.Add(1)
-		go func(name, url, unpack_dir string) {
+		go func(image drivers.Image, unpack_dir string) {
 			defer wg.Done()
-			if err := util.DownloadUnpackArchive(url, unpack_dir, d.cfg.DownloadUser, d.cfg.DownloadPassword); err != nil {
-				log.Error("DOCKER: Unable to download and unpack the image:", name, url, err)
+			if err := image.DownloadUnpack(unpack_dir, d.cfg.DownloadUser, d.cfg.DownloadPassword); err != nil {
+				log.Error("Docker: Unable to download and unpack the image:", image.Name, image.Url, err)
 			}
-		}(name, url, image_unpacked)
+		}(image, image_unpacked)
 	}
 
-	log.Debug("DOCKER: Wait for all the background image processes to be done...")
+	log.Debug("Docker: Wait for all the background image processes to be done...")
 	wg.Wait()
 
 	// Loading the image layers tar archive into the local docker registry
 	// They needed to be processed sequentially because the childs does not
 	// contains the parent's layers so parents should be loaded first
 
-	// The opts.Images is unsorted map, so need to sort the keys first for proper order of loading
-	image_names := make([]string, 0, len(opts.Images))
-	for name, _ := range opts.Images {
-		image_names = append(image_names, name)
-	}
-	sort.Strings(image_names)
-
 	target_out := ""
 	var loaded_images []string
-	for _, name := range image_names {
-		url, _ := opts.Images[name]
-		archive_name := filepath.Base(url)
+	for image_index, image := range opts.Images {
+		archive_name := filepath.Base(image.Url)
 		image_unpacked := filepath.Join(d.cfg.ImagesPath, strings.TrimSuffix(archive_name, ".tar.xz"))
 
 		// Getting the image subdir name in the unpacked dir
 		subdir := ""
 		items, err := ioutil.ReadDir(image_unpacked)
 		if err != nil {
-			log.Error("DOCKER: Unable to read the unpacked directory:", image_unpacked, err)
-			return "", fmt.Errorf("DOCKER: The image was unpacked incorrectly, please check log for the errors")
+			log.Error("Docker: Unable to read the unpacked directory:", image_unpacked, err)
+			return "", fmt.Errorf("Docker: The image was unpacked incorrectly, please check log for the errors")
 		}
 		for _, f := range items {
-			if strings.HasPrefix(f.Name(), name) {
+			if strings.HasPrefix(f.Name(), image.Name) {
 				if f.Mode()&os.ModeSymlink != 0 {
 					// Potentially it can be a symlink (like used in local tests)
 					if _, err := os.Stat(filepath.Join(image_unpacked, f.Name())); err != nil {
-						log.Warn("DOCKER: The image symlink is broken:", f.Name(), err)
+						log.Warn("Docker: The image symlink is broken:", f.Name(), err)
 						continue
 					}
 				}
@@ -194,8 +185,8 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 			}
 		}
 		if subdir == "" {
-			log.Errorf("DOCKER: Unpacked image '%s' has no subfolder '%s', only: %q", image_unpacked, name, items)
-			return "", fmt.Errorf("DOCKER: The image was unpacked incorrectly, please check log for the errors")
+			log.Errorf("Docker: Unpacked image '%s' has no subfolder '%s', only: %q", image_unpacked, image.Name, items)
+			return "", fmt.Errorf("Docker: The image was unpacked incorrectly, please check log for the errors")
 		}
 
 		// Optimization to check if the image exists and not load it again
@@ -215,7 +206,8 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 						image_found = tag
 						loaded_images = append(loaded_images, image_found)
 
-						if opts.Image == name {
+						// If it's the last image then it's the target one
+						if image_index+1 == len(opts.Images) {
 							target_out = image_found
 						}
 						break
@@ -224,18 +216,18 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 			}
 
 			if image_found != "" {
-				log.Debug("DOCKER: The image was found in the local docker registry:", image_found)
+				log.Debug("Docker: The image was found in the local docker registry:", image_found)
 				continue
 			}
 		}
 
 		// Load the docker image
 		// sha256 prefix the same
-		image_archive := filepath.Join(image_unpacked, subdir, name+".tar")
+		image_archive := filepath.Join(image_unpacked, subdir, image.Name+".tar")
 		stdout, _, err := runAndLog(5*time.Minute, d.cfg.DockerPath, "image", "load", "-q", "-i", image_archive)
 		if err != nil {
-			log.Error("DOCKER: Unable to load the image:", image_archive, err)
-			return "", fmt.Errorf("DOCKER: The image was unpacked incorrectly, please check log for the errors")
+			log.Error("Docker: Unable to load the image:", image_archive, err)
+			return "", fmt.Errorf("Docker: The image was unpacked incorrectly, please check log for the errors")
 		}
 		for _, line := range strings.Split(stdout, "\n") {
 			if !strings.HasPrefix(line, "Loaded image: ") {
@@ -245,18 +237,19 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 
 			loaded_images = append(loaded_images, image_name_version)
 
-			if opts.Image == name {
+			// If it's the last image then it's the target one
+			if image_index+1 == len(opts.Images) {
 				target_out = image_name_version
 			}
 			break
 		}
 	}
 
-	log.Info("DOCKER: All the images are processed.")
+	log.Info("Docker: All the images are processed.")
 
 	// Check all the images are in place just by number of them
 	if len(opts.Images) != len(loaded_images) {
-		return "", log.Errorf("DOCKER: Not all the images are ok (%d out of %d), please check log for the errors", len(loaded_images), len(opts.Images))
+		return "", log.Errorf("Docker: Not all the images are ok (%d out of %d), please check log for the errors", len(loaded_images), len(opts.Images))
 	}
 
 	return target_out, nil
@@ -277,7 +270,7 @@ func (d *Driver) getAllocatedContainerId(c_name string) string {
 func (d *Driver) isNetworkExists(name string) bool {
 	stdout, stderr, err := runAndLog(5*time.Second, d.cfg.DockerPath, "network", "ls", "-q", "--filter", "name=aquarium-"+name)
 	if err != nil {
-		log.Error("DOCKER: Unable to list the docker network:", stdout, stderr, err)
+		log.Error("Docker: Unable to list the docker network:", stdout, stderr, err)
 		return false
 	}
 
@@ -340,7 +333,7 @@ func (d *Driver) disksCreate(c_name string, run_args *[]string, disks map[string
 				"-size", fmt.Sprintf("%dm", disk.Size*1024),
 			}
 			if _, _, err := runAndLog(10*time.Minute, "/usr/bin/hdiutil", args...); err != nil {
-				return log.Error("DOCKER: Unable to create dmg disk:", dmg_path, err)
+				return log.Error("Docker: Unable to create dmg disk:", dmg_path, err)
 			}
 		}
 
@@ -348,12 +341,12 @@ func (d *Driver) disksCreate(c_name string, run_args *[]string, disks map[string
 
 		// Attach & mount disk
 		if _, _, err := runAndLog(10*time.Second, "/usr/bin/hdiutil", "attach", dmg_path, "-mountpoint", mount_point); err != nil {
-			return log.Error("DOCKER: Unable to attach dmg disk:", dmg_path, mount_point, err)
+			return log.Error("Docker: Unable to attach dmg disk:", dmg_path, mount_point, err)
 		}
 
 		// Allow anyone to modify the disk content
 		if err := os.Chmod(mount_point, 0o777); err != nil {
-			return log.Error("DOCKER: Unable to change the disk access rights:", mount_point, err)
+			return log.Error("Docker: Unable to change the disk access rights:", mount_point, err)
 		}
 
 		disk_paths[mount_point] = disk.Label
@@ -379,18 +372,18 @@ func (d *Driver) disksCreate(c_name string, run_args *[]string, disks map[string
 func (d *Driver) envCreate(c_name string, metadata map[string]interface{}) (string, error) {
 	env_file_path := filepath.Join(d.cfg.WorkspacePath, c_name, ".env")
 	if err := os.MkdirAll(filepath.Dir(env_file_path), 0o755); err != nil {
-		return "", log.Error("DOCKER: Unable to create the container directory:", filepath.Dir(env_file_path), err)
+		return "", log.Error("Docker: Unable to create the container directory:", filepath.Dir(env_file_path), err)
 	}
 	fd, err := os.OpenFile(env_file_path, os.O_WRONLY|os.O_CREATE, 0640)
 	if err != nil {
-		return "", log.Error("DOCKER: Unable to create env file:", env_file_path, err)
+		return "", log.Error("Docker: Unable to create env file:", env_file_path, err)
 	}
 	defer fd.Close()
 
 	// Write env file line by line
 	for key, value := range metadata {
 		if _, err := fd.Write([]byte(fmt.Sprintf("%s=%s\n", key, value))); err != nil {
-			return "", log.Error("DOCKER: Unable to write env file data:", env_file_path, err)
+			return "", log.Error("Docker: Unable to write env file data:", env_file_path, err)
 		}
 	}
 
@@ -407,7 +400,7 @@ func runAndLog(timeout time.Duration, path string, arg ...string) (string, strin
 
 	cmd := exec.CommandContext(ctx, path, arg...)
 
-	log.Debug("DOCKER: Executing:", cmd.Path, strings.Join(cmd.Args[1:], " "))
+	log.Debug("Docker: Executing:", cmd.Path, strings.Join(cmd.Args[1:], " "))
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
@@ -428,10 +421,10 @@ func runAndLog(timeout time.Duration, path string, arg ...string) (string, strin
 	}
 
 	if len(stdoutString) > 0 {
-		log.Debug("DOCKER: stdout:", stdoutString)
+		log.Debug("Docker: stdout:", stdoutString)
 	}
 	if len(stderrString) > 0 {
-		log.Debug("DOCKER: stderr:", stderrString)
+		log.Debug("Docker: stderr:", stderrString)
 	}
 
 	// Replace these for Windows, we only want to deal with Unix style line endings.
