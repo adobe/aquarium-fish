@@ -42,9 +42,14 @@ type Image struct {
 }
 
 func (i *Image) Validate() error {
-	// Check if url is defined
-	if len(i.Url) < 1 {
+	// Check url is defined
+	if i.Url == "" {
 		return fmt.Errorf("Image: Url is not provided")
+	}
+
+	// Check url schema is supported
+	if !(strings.HasPrefix(i.Url, "http://") || strings.HasPrefix(i.Url, "https://")) {
+		return fmt.Errorf("Image: Url schema is not supported: %q", i.Url)
 	}
 
 	// Fill name out of image url
@@ -69,11 +74,11 @@ func (i *Image) Validate() error {
 	if i.Sum != "" {
 		sum_split := strings.SplitN(i.Sum, ":", 2)
 		if len(i.Sum) > 0 && len(sum_split) != 2 {
-			return log.Error("Image: Checksum should be in format '<algo>:<checksum>':", i.Sum)
+			return fmt.Errorf("Image: Checksum should be in format '<algo>:<checksum>': %q", i.Sum)
 		}
 		algo := sum_split[0]
 		if algo != "md5" && algo != "sha1" && algo != "sha256" && algo != "sha512" {
-			return log.Error("Image: Checksum with not supported algorithm (md5, sha1, sha256, sha512):", algo)
+			return fmt.Errorf("Image: Checksum with not supported algorithm (md5, sha1, sha256, sha512): %q", algo)
 		}
 		if algo == "md5" || algo == "sha1" {
 			log.Debug("Image: Insecure algorithm is used, please consider moving to sha256 or sha512:", algo)
@@ -103,7 +108,7 @@ func (i *Image) DownloadUnpack(out_dir, user, password string) error {
 
 	// Creating lock file in order to not screw it up in multiprocess system
 	if err := util.CreateLock(lock_path); err != nil {
-		return log.Error("Util: Unable to create lock file:", err)
+		return fmt.Errorf("Util: Unable to create lock file: %v", err)
 	}
 	defer os.Remove(lock_path)
 
@@ -115,13 +120,13 @@ func (i *Image) DownloadUnpack(out_dir, user, password string) error {
 	resp, err := client.Do(req)
 	if err != nil {
 		os.RemoveAll(out_dir)
-		return log.Error("Image: Unable to request url:", i.Url, err)
+		return fmt.Errorf("Image: Unable to request url %q: %v", i.Url, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		os.RemoveAll(out_dir)
-		return log.Error("Image: Unable to download file:", i.Url, resp.StatusCode, resp.Status)
+		return fmt.Errorf("Image: Unable to download file %q: %d %s", i.Url, resp.StatusCode, resp.Status)
 	}
 
 	// Printing the download progress
@@ -152,7 +157,7 @@ func (i *Image) DownloadUnpack(out_dir, user, password string) error {
 			hasher = sha512.New()
 		default:
 			os.RemoveAll(out_dir)
-			return log.Error("Image: Not recognized checksum algorithm (md5, sha1, sha256, sha512):", algo_sum[0])
+			return fmt.Errorf("Image: Not recognized checksum algorithm (md5, sha1, sha256, sha512): %q", algo_sum[0])
 		}
 
 		data_reader = io.TeeReader(bodypt, hasher)
@@ -164,7 +169,7 @@ func (i *Image) DownloadUnpack(out_dir, user, password string) error {
 			// Server returned mathing header, so compare it's value to our checksum
 			if remote_sum != algo_sum[1] {
 				os.RemoveAll(out_dir)
-				return log.Errorf("Image: The remote checksum (from header X-Checksum-%s) doesn't equal the desired one: %q != %q for %q",
+				return fmt.Errorf("Image: The remote checksum (from header X-Checksum-%s) doesn't equal the desired one: %q != %q for %q",
 					strings.Title(algo_sum[0]), remote_sum, algo_sum[1], i.Url)
 			}
 		}
@@ -174,7 +179,7 @@ func (i *Image) DownloadUnpack(out_dir, user, password string) error {
 	r, err := xz.NewReader(data_reader)
 	if err != nil {
 		os.RemoveAll(out_dir)
-		return log.Error("Image: Unable to create XZ reader:", err)
+		return fmt.Errorf("Image: Unable to create XZ reader: %v", err)
 	}
 
 	// Untar the stream
@@ -189,13 +194,13 @@ func (i *Image) DownloadUnpack(out_dir, user, password string) error {
 		}
 		if err != nil {
 			os.RemoveAll(out_dir)
-			return log.Error("Image: Tar archive failed to iterate next file:", err)
+			return fmt.Errorf("Image: Tar archive failed to iterate next file: %v", err)
 		}
 
 		// Check the name doesn't contain any traversal elements
 		if strings.Contains(hdr.Name, "..") {
 			os.RemoveAll(out_dir)
-			return log.Error("Image: The archive filepath contains '..' which is security forbidden:", hdr.Name)
+			return fmt.Errorf("Image: The archive filepath contains '..' which is security forbidden: %q", hdr.Name)
 		}
 
 		target := filepath.Join(out_dir, hdr.Name)
@@ -206,7 +211,7 @@ func (i *Image) DownloadUnpack(out_dir, user, password string) error {
 			err = os.MkdirAll(target, os.FileMode(hdr.Mode))
 			if err != nil {
 				os.RemoveAll(out_dir)
-				return log.Error("Image: Unable to create directory:", target, err)
+				return fmt.Errorf("Image: Unable to create directory %q: %v", target, err)
 			}
 		case tar.TypeReg, tar.TypeRegA:
 			// Write a file
@@ -214,12 +219,12 @@ func (i *Image) DownloadUnpack(out_dir, user, password string) error {
 			err = os.MkdirAll(filepath.Dir(target), 0750)
 			if err != nil {
 				os.RemoveAll(out_dir)
-				return log.Error("Image: Unable to create directory for file:", target, err)
+				return fmt.Errorf("Image: Unable to create directory for file %q: %v", target, err)
 			}
 			w, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(hdr.Mode))
 			if err != nil {
 				os.RemoveAll(out_dir)
-				return log.Error("Image: Unable to open file for unpack:", target, err)
+				return fmt.Errorf("Image: Unable to open file %q for unpack: %v", target, err)
 			}
 			defer w.Close()
 
@@ -227,7 +232,7 @@ func (i *Image) DownloadUnpack(out_dir, user, password string) error {
 			_, err = io.Copy(w, tr)
 			if err != nil {
 				os.RemoveAll(out_dir)
-				return log.Error("Image: Unable to unpack content to file:", target, err)
+				return fmt.Errorf("Image: Unable to unpack content to file %q: %v", target, err)
 			}
 		}
 	}
@@ -238,7 +243,7 @@ func (i *Image) DownloadUnpack(out_dir, user, password string) error {
 		calculated_sum := hex.EncodeToString(hasher.Sum(nil))
 		if calculated_sum != algo_sum[1] {
 			os.RemoveAll(out_dir)
-			return log.Errorf("Image: The calculated checksum doesn't equal the desired one: %q != %q for %q",
+			return fmt.Errorf("Image: The calculated checksum doesn't equal the desired one: %q != %q for %q",
 				calculated_sum, algo_sum[1], i.Url)
 		}
 	}
