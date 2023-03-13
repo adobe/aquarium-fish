@@ -406,14 +406,14 @@ func runAndLog(timeout time.Duration, path string, arg ...string) (string, strin
 
 	// Check the context error to see if the timeout was executed
 	if ctx.Err() == context.DeadlineExceeded {
-		err = fmt.Errorf("Docker error: Command timed out")
+		err = fmt.Errorf("Docker: Command timed out")
 	} else if _, ok := err.(*exec.ExitError); ok {
 		message := stderrString
 		if message == "" {
 			message = stdoutString
 		}
 
-		err = fmt.Errorf("Docker error: %s", message)
+		err = fmt.Errorf("Docker: Command exited with error: %v: %s", err, message)
 	}
 
 	if len(stdoutString) > 0 {

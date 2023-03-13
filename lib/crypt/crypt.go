@@ -31,8 +31,9 @@ const (
 	Argon2_SaltBytes  = 8
 	Argon2_StrBytes   = 128
 
-	rand_string_charset = "abcdefghijkmnopqrstuvwxyz" +
+	RandStringCharsetB58 = "abcdefghijkmnopqrstuvwxyz" +
 		"ABCDEFGHJKLMNPQRSTUVWXYZ123456789" // Base58
+	RandStringCharsetAZ = "abcdefghijklmnopqrstuvwxyz" // Only a-z
 )
 
 type Hash struct {
@@ -50,16 +51,21 @@ func RandBytes(size int) (data []byte) {
 	return
 }
 
-// Create random string of specified size
+// By default use base58
 func RandString(size int) string {
+	return RandStringCharset(size, RandStringCharsetB58)
+}
+
+// Create random string of specified size
+func RandStringCharset(size int, charset string) string {
 	data := make([]byte, size)
-	charset_len := big.NewInt(int64(len(rand_string_charset)))
+	charset_len := big.NewInt(int64(len(charset)))
 	for i := range data {
 		charset_pos, err := rand.Int(rand.Reader, charset_len)
 		if err != nil {
 			log.Error("Crypt: Failed to generate random string:", err)
 		}
-		data[i] = rand_string_charset[charset_pos.Int64()]
+		data[i] = charset[charset_pos.Int64()]
 	}
 	return string(data)
 }

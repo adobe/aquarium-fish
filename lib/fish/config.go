@@ -34,8 +34,9 @@ type Config struct {
 	TLSCrt   string `json:"tls_crt"`    // TLS PEM public certificate (if relative - to directory)
 	TLSCaCrt string `json:"tls_ca_crt"` // TLS PEM certificate authority certificate (if relative - to directory)
 
-	NodeName     string `json:"node_name"`     // Last resort in case you need to override the default host node name
-	NodeLocation string `json:"node_location"` // Specify cluster node location for multi-dc configurations
+	NodeName        string   `json:"node_name"`        // Last resort in case you need to override the default host node name
+	NodeLocation    string   `json:"node_location"`    // Specify cluster node location for multi-dc configurations
+	NodeIdentifiers []string `json:"node_identifiers"` // The list of node identifiers which could be used to find the right Node for Resource
 
 	DefaultResourceLifetime string `json:"default_resource_lifetime"` // Sets the lifetime of the resource which will be used if label definition one is not set
 

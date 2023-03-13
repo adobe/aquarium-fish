@@ -1284,6 +1284,7 @@ components:
         - ram
         - disks
         - network
+        - node_filter
         - multitenancy
         - cpu_overbook
         - ram_overbook
@@ -1306,6 +1307,15 @@ components:
         network:
           type: string
           description: Which network configuration to use for the environment
+        node_filter:
+          type: array
+          items:
+            type: string
+          description: The list of the Node identifiers to run resource on, supports path wildcards
+          example:
+            - OS:darwin
+            - OSVersion:12.*
+            - Arch:x86_64
         multitenancy:
           type: boolean
           description: Tolerate to run along with the other envs on the same node

@@ -41,6 +41,8 @@ type Image struct {
 
 	Name    string `json:"name"`    // Optional name of the image, if not set will use a part of the Url file name prior to last minus ("-") or ext
 	Version string `json:"version"` // Optional version of the image, if not set will use a part of the Url file name after the last minus ("-") to ext
+
+	Tag string `json:"tag"` // Optional identifier used by drivers to make sure the images will be processed properly
 }
 
 func (i *Image) Validate() error {

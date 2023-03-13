@@ -84,7 +84,7 @@ func (c *Config) Validate() (err error) {
 		return err
 	}
 
-	log.Info("Docker: Creating working directories:", c.ImagesPath, c.WorkspacePath)
+	log.Debug("Docker: Creating working directories:", c.ImagesPath, c.WorkspacePath)
 	if err := os.MkdirAll(c.ImagesPath, 0o750); err != nil {
 		return err
 	}

@@ -21,6 +21,7 @@ import (
 	// Load all the drivers
 	_ "github.com/adobe/aquarium-fish/lib/drivers/aws"
 	_ "github.com/adobe/aquarium-fish/lib/drivers/docker"
+	_ "github.com/adobe/aquarium-fish/lib/drivers/native"
 	_ "github.com/adobe/aquarium-fish/lib/drivers/vmx"
 
 	_ "github.com/adobe/aquarium-fish/lib/drivers/test"
@@ -82,7 +83,7 @@ func (f *Fish) DriversPrepare(configs []ConfigDriver) (errs []error) {
 			}
 		}
 
-		if err := drv.Prepare(json_cfg, f.node); err != nil {
+		if err := drv.Prepare(json_cfg); err != nil {
 			errs = append(errs, err)
 			log.Warn("Fish: Resource driver prepare failed:", drv.Name(), err)
 		} else {

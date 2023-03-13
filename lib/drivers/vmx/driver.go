@@ -52,7 +52,7 @@ func (d *Driver) IsRemote() bool {
 	return false
 }
 
-func (d *Driver) Prepare(config []byte, node *types.Node) error {
+func (d *Driver) Prepare(config []byte) error {
 	if err := d.cfg.Apply(config); err != nil {
 		return err
 	}
