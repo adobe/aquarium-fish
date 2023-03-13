@@ -58,22 +58,20 @@ func (d *Driver) loadImages(opts *Options, vm_images_dir string) (string, error)
 	target_path := ""
 	var wg sync.WaitGroup
 	for image_index, image := range opts.Images {
-		archive_name := filepath.Base(image.Url)
-		image_unpacked := filepath.Join(d.cfg.ImagesPath, strings.TrimSuffix(archive_name, ".tar.xz"))
-
-		log.Info("VMX: Loading the required image:", image.Name, image.Url)
+		log.Info("VMX: Loading the required image:", image.Name, image.Version, image.Url)
 
 		// Running the background routine to download, unpack and process the image
 		// Success will be checked later by existance of the copied image in the vm directory
 		wg.Add(1)
-		go func(image drivers.Image, unpack_dir string, index int) error {
+		go func(image drivers.Image, index int) error {
 			defer wg.Done()
-			if err := image.DownloadUnpack(unpack_dir, d.cfg.DownloadUser, d.cfg.DownloadPassword); err != nil {
+			if err := image.DownloadUnpack(d.cfg.ImagesPath, d.cfg.DownloadUser, d.cfg.DownloadPassword); err != nil {
 				return log.Error("VMX: Unable to download and unpack the image:", image.Name, image.Url, err)
 			}
 
 			// Getting the image subdir name in the unpacked dir
 			subdir := ""
+			image_unpacked := filepath.Join(d.cfg.ImagesPath, image.Name+"-"+image.Version)
 			items, err := ioutil.ReadDir(image_unpacked)
 			if err != nil {
 				return log.Error("VMX: Unable to read the unpacked directory:", image_unpacked, err)
@@ -150,7 +148,7 @@ func (d *Driver) loadImages(opts *Options, vm_images_dir string) (string, error)
 				}
 			}
 			return nil
-		}(image, image_unpacked, image_index)
+		}(image, image_index)
 	}
 
 	log.Debug("VMX: Wait for all the background image processes to be done...")

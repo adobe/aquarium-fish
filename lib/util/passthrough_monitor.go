@@ -43,7 +43,7 @@ func (pt *PassThruMonitor) Read(p []byte) (int, error) {
 		percentage := float64(pt.total) / float64(pt.Length) * float64(100)
 		if percentage-pt.progress > 10 || time.Now().Sub(pt.print_ts) > 30*time.Second {
 			// Show status every 10% or 30 sec
-			log.Infof("%s: %v%%", pt.Name, int(percentage))
+			log.Infof("%s: %v%% (%dB)", pt.Name, int(percentage), pt.total)
 			pt.progress = percentage
 			pt.print_ts = time.Now()
 		}

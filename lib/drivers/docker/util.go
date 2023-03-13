@@ -135,20 +135,17 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 	// Download the images and unpack them
 	var wg sync.WaitGroup
 	for _, image := range opts.Images {
-		archive_name := filepath.Base(image.Url)
-		image_unpacked := filepath.Join(d.cfg.ImagesPath, strings.TrimSuffix(archive_name, ".tar.xz"))
-
-		log.Info("Docker: Loading the required image:", image.Name, image.Url)
+		log.Info("Docker: Loading the required image:", image.Name, image.Version, image.Url)
 
 		// Running the background routine to download, unpack and process the image
 		// Success will be checked later by existance of the image in local docker registry
 		wg.Add(1)
-		go func(image drivers.Image, unpack_dir string) {
+		go func(image drivers.Image) {
 			defer wg.Done()
-			if err := image.DownloadUnpack(unpack_dir, d.cfg.DownloadUser, d.cfg.DownloadPassword); err != nil {
+			if err := image.DownloadUnpack(d.cfg.ImagesPath, d.cfg.DownloadUser, d.cfg.DownloadPassword); err != nil {
 				log.Error("Docker: Unable to download and unpack the image:", image.Name, image.Url, err)
 			}
-		}(image, image_unpacked)
+		}(image)
 	}
 
 	log.Debug("Docker: Wait for all the background image processes to be done...")
@@ -161,8 +158,7 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 	target_out := ""
 	var loaded_images []string
 	for image_index, image := range opts.Images {
-		archive_name := filepath.Base(image.Url)
-		image_unpacked := filepath.Join(d.cfg.ImagesPath, strings.TrimSuffix(archive_name, ".tar.xz"))
+		image_unpacked := filepath.Join(d.cfg.ImagesPath, image.Name+"-"+image.Version)
 
 		// Getting the image subdir name in the unpacked dir
 		subdir := ""
