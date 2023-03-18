@@ -257,7 +257,11 @@ func (d *Driver) Deallocate(res *types.Resource) error {
 
 	// Sometimes it's stuck, so try to stop a bit more than usual
 	if _, _, err := runAndLogRetry(3, 60*time.Second, d.cfg.VmrunPath, "stop", vmx_path); err != nil {
-		return log.Error("VMX: Unable to deallocate VM:", vmx_path, err)
+		log.Warn("VMX: Unable to soft stop the VM:", vmx_path, err)
+		// Ok, it doesn't want to stop, so stopping it hard
+		if _, _, err := runAndLogRetry(3, 60*time.Second, d.cfg.VmrunPath, "stop", vmx_path, "hard"); err != nil {
+			return log.Error("VMX: Unable to deallocate VM:", vmx_path, err)
+		}
 	}
 
 	// Delete VM
