@@ -16,7 +16,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -44,6 +43,38 @@ func RunAquariumFish(t *testing.T, cfg string) *AFInstance {
 	os.WriteFile(filepath.Join(afi.workspace, "config.yml"), []byte(cfg), 0644)
 	t.Log("INFO: Stored config:", cfg)
 
+	afi.fishStart(t)
+
+	return afi
+}
+
+// Will return url to access API of AquariumFish
+func (afi *AFInstance) ApiAddress(path string) string {
+	return fmt.Sprintf("https://%s/%s", afi.api_address, path)
+}
+
+// Returns admin token
+func (afi *AFInstance) AdminToken() string {
+	return afi.admin_token
+}
+
+// Restart the application
+func (afi *AFInstance) Restart(t *testing.T) error {
+	t.Log("INFO: Restarting:", afi.workspace)
+	afi.fishStop()
+	afi.fishStart(t)
+	return nil
+}
+
+// Cleanup after the test execution
+func (afi *AFInstance) Cleanup(t *testing.T) error {
+	t.Log("INFO: Cleaning up:", afi.workspace)
+	afi.fishStop()
+	os.RemoveAll(afi.workspace)
+	return nil
+}
+
+func (afi *AFInstance) fishStart(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	afi.fishStop = cancel
 
@@ -59,28 +90,26 @@ func RunAquariumFish(t *testing.T, cfg string) *AFInstance {
 		for scanner.Scan() {
 			line := scanner.Text()
 			t.Log(line)
-			if afi.admin_token == "" || afi.api_address == "" {
-				if strings.HasPrefix(line, "Admin user pass: ") {
-					val := strings.SplitN(strings.TrimSpace(line), "Admin user pass: ", 2)
-					if len(val) < 2 {
-						init_done <- "ERROR: No token after 'Admin user pass: '"
-						break
-					}
-					afi.admin_token = val[1]
+			if strings.HasPrefix(line, "Admin user pass: ") {
+				val := strings.SplitN(strings.TrimSpace(line), "Admin user pass: ", 2)
+				if len(val) < 2 {
+					init_done <- "ERROR: No token after 'Admin user pass: '"
+					break
 				}
-				if strings.Contains(line, "API listening on: ") {
-					val := strings.SplitN(strings.TrimSpace(line), "API listening on: ", 2)
-					if len(val) < 2 {
-						init_done <- "ERROR: No address after 'API listening on: '"
-						break
-					}
-					afi.api_address = val[1]
+				afi.admin_token = val[1]
+			}
+			if strings.Contains(line, "API listening on: ") {
+				val := strings.SplitN(strings.TrimSpace(line), "API listening on: ", 2)
+				if len(val) < 2 {
+					init_done <- "ERROR: No address after 'API listening on: '"
+					break
 				}
-				if afi.admin_token != "" && afi.api_address != "" {
-					// Found the needed values and continue to process to print the fish output for
-					// test debugging purposes
-					init_done <- ""
-				}
+				afi.api_address = val[1]
+			}
+			if strings.HasSuffix(line, "Fish initialized") {
+				// Found the needed values and continue to process to print the fish output for
+				// test debugging purposes
+				init_done <- ""
 			}
 		}
 		t.Log("Reading of AquariumFish output is done")
@@ -99,24 +128,4 @@ func RunAquariumFish(t *testing.T, cfg string) *AFInstance {
 	if failed != "" {
 		t.Fatalf(failed)
 	}
-
-	return afi
-}
-
-// Will return url to access API of AquariumFish
-func (afi *AFInstance) ApiAddress(path string) string {
-	return fmt.Sprintf("https://%s/%s", afi.api_address, path)
-}
-
-// Returns admin token
-func (afi *AFInstance) AdminToken() string {
-	return afi.admin_token
-}
-
-// Cleanup after the test execution
-func (afi *AFInstance) Cleanup() error {
-	log.Println("INFO: Cleaning up:", afi.workspace)
-	afi.fishStop()
-	os.RemoveAll(afi.workspace)
-	return nil
 }

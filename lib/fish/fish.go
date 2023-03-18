@@ -65,13 +65,6 @@ func New(db *gorm.DB, cfg *Config) (*Fish, error) {
 		return nil, err
 	}
 
-	if err := f.DriversSet(); err != nil {
-		return nil, err
-	}
-	if errs := f.DriversPrepare(cfg.Drivers); errs != nil {
-		log.Error("Fish: Unable to prepare some resource drivers:", errs)
-	}
-
 	return f, nil
 }
 
@@ -152,6 +145,13 @@ func (f *Fish) Init() error {
 
 	// Fish is running now
 	f.running = true
+
+	if err := f.DriversSet(); err != nil {
+		return log.Error("Fish: Unable to set drivers:", err)
+	}
+	if errs := f.DriversPrepare(f.cfg.Drivers); errs != nil {
+		log.Error("Fish: Unable to prepare some resource drivers:", errs)
+	}
 
 	// Continue to execute the assigned applications
 	resources, err := f.ResourceListNode(f.node.UID)
@@ -450,12 +450,15 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 	}
 	label_def := label.Definitions[vote.Available]
 
-	// In case there is multiple Applications won the election process on the same node it could
-	// just have not enough resources, so skip it for now to allow the other Nodes to try again.
-	if !f.isNodeAvailableForDefinition(label_def) {
-		log.Warn("Fish: Not enough resources to execute the Application", app.UID)
-		f.node_usage_mutex.Unlock()
-		return nil
+	// The already running applications will not consume the additional resources
+	if app_state.Status == types.ApplicationStatusNEW {
+		// In case there is multiple Applications won the election process on the same node it could
+		// just have not enough resources, so skip it for now to allow the other Nodes to try again.
+		if !f.isNodeAvailableForDefinition(label_def) {
+			log.Warn("Fish: Not enough resources to execute the Application", app.UID)
+			f.node_usage_mutex.Unlock()
+			return nil
+		}
 	}
 
 	// Locate the required driver

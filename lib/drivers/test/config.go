@@ -14,12 +14,16 @@ package test
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 
 	"github.com/adobe/aquarium-fish/lib/log"
 )
 
 type Config struct {
 	IsRemote bool `json:"is_remote"` // Pretend to be remote or not to check the local node limits
+
+	WorkspacePath string `json:"workspace_path"` // Where to place the files of running resources
 
 	CpuLimit uint `json:"cpu_limit"` // Number of available virtual CPUs, 0 - unlimited
 	RamLimit uint `json:"ram_limit"` // Amount of available virtual RAM (GB), 0 - unlimited
@@ -46,5 +50,15 @@ func (c *Config) Apply(config []byte) error {
 }
 
 func (c *Config) Validate() (err error) {
+	if c.WorkspacePath == "" {
+		c.WorkspacePath = "fish_test_workspace"
+	}
+	if c.WorkspacePath, err = filepath.Abs(c.WorkspacePath); err != nil {
+		return err
+	}
+	log.Debug("TEST: Creating working directory:", c.WorkspacePath)
+	if err := os.MkdirAll(c.WorkspacePath, 0o750); err != nil {
+		return err
+	}
 	return randomFail("ConfigValidate", c.FailConfigValidate)
 }
