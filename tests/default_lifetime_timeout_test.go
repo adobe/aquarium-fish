@@ -39,7 +39,7 @@ drivers:
   - name: test`)
 
 	t.Cleanup(func() {
-		afi.Cleanup()
+		afi.Cleanup(t)
 	})
 
 	defer func() {

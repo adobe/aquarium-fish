@@ -18,7 +18,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"sync"
+	"os"
+	"path/filepath"
 
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/drivers"
@@ -31,9 +32,6 @@ type Driver struct {
 	cfg Config
 	// Contains the available tasks of the driver
 	tasks_list []drivers.ResourceDriverTask
-
-	resources      map[string]int
-	resources_lock sync.Mutex
 }
 
 func init() {
@@ -49,11 +47,6 @@ func (d *Driver) IsRemote() bool {
 }
 
 func (d *Driver) Prepare(config []byte) error {
-	d.resources_lock.Lock()
-	defer d.resources_lock.Unlock()
-
-	d.resources = make(map[string]int)
-
 	if err := d.cfg.Apply(config); err != nil {
 		return err
 	}
@@ -147,18 +140,23 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 		return nil, log.Error("TEST: RandomFail:", err)
 	}
 
-	d.resources_lock.Lock()
-	defer d.resources_lock.Unlock()
-
 	// Generate random resource id and if exists - regenerate
 	res := &types.Resource{}
+	res_file := ""
 	for {
 		res.Identifier = "test-" + crypt.RandString(6)
-		if _, ok := d.resources[res.Identifier]; !ok {
+		res_file = filepath.Join(d.cfg.WorkspacePath, res.Identifier)
+		if _, err := os.Stat(res_file); os.IsNotExist(err) {
 			break
 		}
 	}
-	d.resources[res.Identifier] = 0
+
+	// Write identifier file
+	fh, err := os.Create(res_file)
+	if err != nil {
+		return nil, fmt.Errorf("TEST: Unable to open file %q to store identifier: %v", res_file, err)
+	}
+	defer fh.Close()
 
 	return res, nil
 }
@@ -171,10 +169,8 @@ func (d *Driver) Status(res *types.Resource) (string, error) {
 		return "", fmt.Errorf("TEST: RandomFail: %v\n", err)
 	}
 
-	d.resources_lock.Lock()
-	defer d.resources_lock.Unlock()
-
-	if _, ok := d.resources[res.Identifier]; ok {
+	res_file := filepath.Join(d.cfg.WorkspacePath, res.Identifier)
+	if _, err := os.Stat(res_file); !os.IsNotExist(err) {
 		return drivers.StatusAllocated, nil
 	}
 	return drivers.StatusNone, nil
@@ -208,14 +204,13 @@ func (d *Driver) Deallocate(res *types.Resource) error {
 		return log.Error("TEST: RandomFail:", err)
 	}
 
-	d.resources_lock.Lock()
-	defer d.resources_lock.Unlock()
-
-	if _, ok := d.resources[res.Identifier]; !ok {
+	res_file := filepath.Join(d.cfg.WorkspacePath, res.Identifier)
+	if _, err := os.Stat(res_file); os.IsNotExist(err) {
 		return fmt.Errorf("TEST: Unable to deallocate unavailable resource '%s'", res.Identifier)
 	}
-
-	delete(d.resources, res.Identifier)
+	if err := os.Remove(res_file); err != nil {
+		return fmt.Errorf("TEST: Unable to deallocate the resource '%s': %v", res.Identifier, err)
+	}
 
 	return nil
 }

@@ -15,6 +15,8 @@ package test
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/log"
@@ -56,10 +58,8 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 		return out, log.Error("TEST: RandomFail:", err)
 	}
 
-	t.driver.resources_lock.Lock()
-	defer t.driver.resources_lock.Unlock()
-
-	if _, ok := t.driver.resources[t.Resource.Identifier]; !ok {
+	res_file := filepath.Join(t.driver.cfg.WorkspacePath, t.Resource.Identifier)
+	if _, err := os.Stat(res_file); os.IsNotExist(err) {
 		out, _ := json.Marshal(map[string]any{})
 		return out, fmt.Errorf("TEST: Unable to snapshot unavailable resource '%s'", t.Resource.Identifier)
 	}

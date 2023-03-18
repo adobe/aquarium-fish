@@ -45,7 +45,7 @@ drivers:
       ram_limit: 8`)
 
 	t.Cleanup(func() {
-		afi.Cleanup()
+		afi.Cleanup(t)
 	})
 
 	defer func() {
