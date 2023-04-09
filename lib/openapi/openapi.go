@@ -31,6 +31,7 @@ import (
 	//oapimw "github.com/deepmap/oapi-codegen/pkg/middleware"
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
+	"gopkg.in/yaml.v3"
 
 	"github.com/adobe/aquarium-fish/lib/cluster"
 	"github.com/adobe/aquarium-fish/lib/fish"
@@ -39,6 +40,31 @@ import (
 	cluster_server "github.com/adobe/aquarium-fish/lib/openapi/cluster"
 	"github.com/adobe/aquarium-fish/lib/openapi/meta"
 )
+
+type YamlBinder struct{}
+
+func (cb *YamlBinder) Bind(i interface{}, c echo.Context) (err error) {
+	db := &echo.DefaultBinder{}
+	if err = db.Bind(i, c); err != echo.ErrUnsupportedMediaType {
+		return
+	}
+
+	// Process YAML if the content is yaml
+	req := c.Request()
+	if req.ContentLength == 0 {
+		return
+	}
+
+	ctype := req.Header.Get(echo.HeaderContentType)
+
+	if strings.HasPrefix(ctype, "application/yaml") {
+		if err = yaml.NewDecoder(req.Body).Decode(i); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error()).SetInternal(err)
+		}
+	}
+
+	return
+}
 
 func Init(fish *fish.Fish, cl *cluster.Cluster, api_address, ca_path, cert_path, key_path string) (*http.Server, error) {
 	swagger, err := GetSwagger()
@@ -50,6 +76,10 @@ func Init(fish *fish.Fish, cl *cluster.Cluster, api_address, ca_path, cert_path,
 	swagger.Servers = nil
 
 	router := echo.New()
+
+	// Support YAML requests too
+	router.Binder = &YamlBinder{}
+
 	router.Use(echomw.Logger())
 	// TODO: Make sure openapi schema validation is possible
 	//router.Use(oapimw.OapiRequestValidator(swagger))

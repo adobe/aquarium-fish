@@ -61,6 +61,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/UserAPIPassword'
+          application/yaml:
+            schema:
+              $ref: '#/components/schemas/UserAPIPassword'
       responses:
         '200':
           description: Successful operation
@@ -187,6 +190,9 @@ paths:
         required: true
         content:
           application/json:
+            schema:
+              $ref: '#/components/schemas/Label'
+          application/yaml:
             schema:
               $ref: '#/components/schemas/Label'
       responses:
@@ -352,6 +358,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/Application'
+          application/yaml:
+            schema:
+              $ref: '#/components/schemas/Application'
       responses:
         '200':
           description: Successful operation
@@ -509,6 +518,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/ApplicationTask'
+          application/yaml:
+            schema:
+              $ref: '#/components/schemas/ApplicationTask'
       responses:
         '200':
           description: Successful operation
@@ -646,6 +658,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/Location'
+          application/yaml:
+            schema:
+              $ref: '#/components/schemas/Location'
       responses:
         '200':
           description: Successful operation
@@ -698,6 +713,9 @@ paths:
         required: true
         content:
           application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceMapping'
+          application/yaml:
             schema:
               $ref: '#/components/schemas/ServiceMapping'
       responses:
