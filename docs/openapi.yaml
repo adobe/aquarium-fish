@@ -618,6 +618,69 @@ paths:
       security:
         - basic_auth: []
 
+  /api/v1/node/this/:
+    get:
+      summary: Get this Node info
+      description: Returns the requested Node
+      operationId: NodeThisGet
+      tags:
+        - Node
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Node'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+      security:
+        - basic_auth: []
+
+  /api/v1/node/this/maintenance:
+    get:
+      summary: Triggers this Node maintenance mode
+      description:
+        In maintenance mode the node still a part of the cluster, but not taking any new App to
+        execute. If the Node have some workloads executing - it will wait in maintenance mode until
+        they will be completed.
+      operationId: NodeThisMaintenanceGet
+      tags:
+        - Node
+      parameters:
+        - name: enable
+          in: query
+          description: Enable or disable maintenance mode
+          required: false
+          schema:
+            type: boolean
+            default: true
+        - name: shutdown
+          in: query
+          description: |
+            Safely stops the Node. It will wait in maintenance mode until all the Applicaions are
+            done and then exit. If Node deployed as a service - then will be restarted immediately,
+            otherwise will just stop. Could be cancelled by stop=false.
+          required: false
+          schema:
+            type: boolean
+        - name: shutdown_delay
+          in: query
+          description: How much Node should wait in maintenance mode before exit (ex. "1h10m30s")
+          required: false
+          schema:
+            type: string
+            format: duration
+      responses:
+        '200':
+          description: Successful operation
+        '400':
+          description: Bad parameter or conditions
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+      security:
+        - basic_auth: []
+
   /api/v1/location/:
     get:
       summary: Get list of locations

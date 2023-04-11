@@ -16,9 +16,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"os"
+	"os/signal"
 	"path/filepath"
 	"sort"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/google/uuid"
@@ -38,7 +41,14 @@ type Fish struct {
 	cfg  *Config
 	node *types.Node
 
-	running bool
+	// Signal to stop the fish
+	Quit chan os.Signal
+
+	running         bool
+	maintenance     bool
+	shutdown        bool
+	shutdown_cancel chan bool
+	shutdown_delay  time.Duration
 
 	active_votes_mutex sync.Mutex
 	active_votes       []*types.Vote
@@ -69,6 +79,10 @@ func New(db *gorm.DB, cfg *Config) (*Fish, error) {
 }
 
 func (f *Fish) Init() error {
+	f.shutdown_cancel = make(chan bool)
+	f.Quit = make(chan os.Signal, 1)
+	signal.Notify(f.Quit, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
+
 	if err := f.db.AutoMigrate(
 		&types.User{},
 		&types.Node{},
@@ -199,6 +213,10 @@ func (f *Fish) Close() {
 
 func (f *Fish) GetNodeUID() types.ApplicationUID {
 	return f.node.UID
+}
+
+func (f *Fish) GetNode() *types.Node {
+	return f.node
 }
 
 // Creates new UID with 6 starting bytes of Node UID as prefix
@@ -386,6 +404,11 @@ func (f *Fish) voteProcessRound(vote *types.Vote) error {
 }
 
 func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
+	// When node is in maintenance mode - it should not accept any Applications
+	if f.maintenance {
+		return false
+	}
+
 	// Is node supports the required label driver
 	driver := f.DriverGet(def.Driver)
 	if driver == nil {
@@ -741,5 +764,113 @@ func (f *Fish) voteActiveRemove(vote_uid types.VoteUID) {
 		av[i] = av[len(av)-1]
 		f.active_votes = av[:len(av)-1]
 		break
+	}
+}
+
+// Set/unset the maintenance mode which will not allow to accept the additional Applications
+func (f *Fish) MaintenanceSet(value bool) {
+	if f.maintenance != value {
+		if value {
+			log.Info("Fish: Enabled maintenance mode, no new workload accepted")
+		} else {
+			log.Info("Fish: Disabled maintenance mode, accepting new workloads")
+		}
+	}
+
+	f.maintenance = value
+}
+
+// Tells node it need to execute graceful shutdown operation
+func (f *Fish) ShutdownSet(value bool) {
+	if f.shutdown != value {
+		if value {
+			f.activateShutdown()
+		} else {
+			log.Info("Fish: Disabled shutdown mode")
+			f.shutdown_cancel <- true
+		}
+	}
+
+	f.shutdown = value
+}
+
+// Set of how much time to wait before executing the node shutdown operation
+func (f *Fish) ShutdownDelaySet(delay time.Duration) {
+	if f.shutdown_delay != delay {
+		log.Info("Fish: Shutdown delay is set to:", delay)
+	}
+
+	f.shutdown_delay = delay
+}
+
+func (f *Fish) activateShutdown() {
+	log.Infof("Fish: Enabled shutdown mode with maintenance: %v, delay: %v", f.maintenance, f.shutdown_delay)
+
+	wait_apps := make(chan bool, 1)
+
+	// Running the main shutdown routine
+	go func() {
+		fire_shutdown := make(chan bool, 1)
+		delay_ticker_report := &time.Ticker{}
+		delay_timer := &time.Timer{}
+		var delay_end_time time.Time
+
+		for {
+			select {
+			case <-f.shutdown_cancel:
+				return
+			case <-wait_apps:
+				// Maintenance mode: All the apps are completed so it's safe to shutdown
+				log.Debug("Fish: Shutdown: apps execution completed")
+				// If the delay is set, then running timer to execute shutdown with delay
+				if f.shutdown_delay > 0 {
+					delay_end_time = time.Now().Add(f.shutdown_delay)
+					delay_ticker_report := time.NewTicker(30 * time.Second)
+					defer delay_ticker_report.Stop()
+					delay_timer = time.NewTimer(f.shutdown_delay)
+					defer delay_timer.Stop()
+				} else {
+					// No delay is needed, so shutdown now
+					fire_shutdown <- true
+				}
+			case <-delay_ticker_report.C:
+				log.Infof("Fish: Shutdown: countdown: T-%v", delay_end_time.Sub(time.Now()))
+			case <-delay_timer.C:
+				// Delay time has passed, triggering shutdown
+				fire_shutdown <- true
+			case <-fire_shutdown:
+				log.Info("Fish: Shutdown sends quit signal to Fish")
+				f.Quit <- syscall.SIGQUIT
+			}
+		}
+	}()
+
+	if f.maintenance {
+		// Running wait for unfinished apps go routine
+		go func() {
+			ticker_check := time.NewTicker(2 * time.Second)
+			defer ticker_check.Stop()
+			ticker_report := time.NewTicker(30 * time.Second)
+			defer ticker_report.Stop()
+
+			for {
+				select {
+				case <-f.shutdown_cancel:
+					return
+				case <-ticker_check.C:
+					// Need to make sure we're not executing any workload
+					log.Debug("Fish: Shutdown: checking apps execution:", len(f.applications))
+					if len(f.applications) == 0 {
+						wait_apps <- true
+						return
+					}
+				case <-ticker_report.C:
+					log.Info("Fish: Shutdown: waiting for running Applications:", len(f.applications))
+				}
+			}
+		}()
+	} else {
+		// Sending signal since no need to wait for the apps
+		wait_apps <- true
 	}
 }
