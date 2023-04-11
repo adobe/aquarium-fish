@@ -29,6 +29,7 @@ var fish_path = os.Getenv("FISH_PATH") // Full path to the aquarium-fish binary
 type AFInstance struct {
 	workspace string
 	fishStop  context.CancelFunc
+	running   bool
 
 	api_address string
 	admin_token string
@@ -58,6 +59,11 @@ func (afi *AFInstance) AdminToken() string {
 	return afi.admin_token
 }
 
+// Check the fish instance is running
+func (afi *AFInstance) IsRunning() bool {
+	return afi.running
+}
+
 // Restart the application
 func (afi *AFInstance) Restart(t *testing.T) error {
 	t.Log("INFO: Restarting:", afi.workspace)
@@ -78,7 +84,7 @@ func (afi *AFInstance) fishStart(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	afi.fishStop = cancel
 
-	cmd := exec.CommandContext(ctx, fish_path, "-c", filepath.Join(afi.workspace, "config.yml"))
+	cmd := exec.CommandContext(ctx, fish_path, "-v", "debug", "-c", filepath.Join(afi.workspace, "config.yml"))
 	cmd.Dir = afi.workspace
 	r, _ := cmd.StdoutPipe()
 	cmd.Stderr = cmd.Stdout
@@ -116,10 +122,12 @@ func (afi *AFInstance) fishStart(t *testing.T) {
 	}()
 
 	go func() {
+		afi.running = true
 		if err := cmd.Run(); err != nil {
 			t.Log("AquariumFish process was stopped:", err)
 			init_done <- fmt.Sprintf("ERROR: Fish was stopped with exit code: %v", err)
 		}
+		afi.running = false
 		r.Close()
 	}()
 

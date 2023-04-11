@@ -15,13 +15,10 @@ package main
 import (
 	"context"
 	"os"
-	"os/signal"
 	"path/filepath"
-	"syscall"
 	"time"
 
 	"github.com/glebarez/sqlite"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -83,7 +80,7 @@ func main() {
 
 			dir := filepath.Join(cfg.Directory, cfg.NodeAddress)
 			if err := os.MkdirAll(dir, 0o750); err != nil {
-				return errors.Wrapf(err, "can't create %s", dir)
+				return log.Errorf("Fish: Can't create working directory %s: %v", dir, err)
 			}
 
 			log.Info("Fish init TLS...")
@@ -146,10 +143,9 @@ func main() {
 			}
 
 			log.Info("Fish initialized")
-			quit := make(chan os.Signal, 1)
-			signal.Notify(quit, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 
-			<-quit
+			// Wait for signal to quit
+			<-fish.Quit
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()

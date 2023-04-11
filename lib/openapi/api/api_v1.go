@@ -15,6 +15,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -37,7 +38,7 @@ func NewV1Router(e *echo.Echo, fish *fish.Fish) {
 	router.Use(
 		// Regular basic auth
 		echomw.BasicAuth(proc.BasicAuth),
-		// Limiting body size for better security, as usual 64KB ought to be enough for anybody
+		// Limiting body size for better security, as usual "64KB ought to be enough for anybody"
 		echomw.BodyLimit("64KB"),
 	)
 	RegisterHandlers(router, proc)
@@ -440,6 +441,44 @@ func (e *Processor) NodeListGet(c echo.Context, params types.NodeListGetParams) 
 	}
 
 	return c.JSON(http.StatusOK, out)
+}
+
+func (e *Processor) NodeThisGet(c echo.Context) error {
+	node := e.fish.GetNode()
+
+	return c.JSON(http.StatusOK, node)
+}
+
+func (e *Processor) NodeThisMaintenanceGet(c echo.Context, params types.NodeThisMaintenanceGetParams) error {
+	user := c.Get("user")
+	if user.(*types.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' can set node maintenance")})
+		return fmt.Errorf("Only 'admin' user can set node maintenance")
+	}
+
+	// Set shutdown delay first
+	if params.ShutdownDelay != nil {
+		dur, err := time.ParseDuration(*params.ShutdownDelay)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Wrong duration format: %v", err)})
+			return fmt.Errorf("Wrong duration format: %v", err)
+		}
+		e.fish.ShutdownDelaySet(dur)
+	}
+
+	// Then set maintenance mode
+	if params.Enable == nil {
+		e.fish.MaintenanceSet(true)
+	} else {
+		e.fish.MaintenanceSet(*params.Enable)
+	}
+
+	// Shutdown last, technically will work immediately if maintenance enable is false
+	if params.Shutdown != nil {
+		e.fish.ShutdownSet(*params.Shutdown)
+	}
+
+	return c.JSON(http.StatusOK, params)
 }
 
 func (e *Processor) VoteListGet(c echo.Context, params types.VoteListGetParams) error {
