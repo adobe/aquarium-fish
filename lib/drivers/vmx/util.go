@@ -16,7 +16,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -72,13 +72,13 @@ func (d *Driver) loadImages(opts *Options, vm_images_dir string) (string, error)
 			// Getting the image subdir name in the unpacked dir
 			subdir := ""
 			image_unpacked := filepath.Join(d.cfg.ImagesPath, image.Name+"-"+image.Version)
-			items, err := ioutil.ReadDir(image_unpacked)
+			items, err := os.ReadDir(image_unpacked)
 			if err != nil {
 				return log.Error("VMX: Unable to read the unpacked directory:", image_unpacked, err)
 			}
 			for _, f := range items {
 				if strings.HasPrefix(f.Name(), image.Name) {
-					if f.Mode()&os.ModeSymlink != 0 {
+					if f.Type()&fs.ModeSymlink != 0 {
 						// Potentially it can be a symlink (like used in local tests)
 						if _, err := os.Stat(filepath.Join(image_unpacked, f.Name())); err != nil {
 							log.Warn("VMX: The image symlink is broken:", f.Name(), err)
@@ -157,7 +157,7 @@ func (d *Driver) loadImages(opts *Options, vm_images_dir string) (string, error)
 	log.Info("VMX: The images are processed.")
 
 	// Check all the images are in place just by number of them
-	vm_images, _ := ioutil.ReadDir(vm_images_dir)
+	vm_images, _ := os.ReadDir(vm_images_dir)
 	if len(opts.Images) != len(vm_images) {
 		return "", log.Error("VMX: The image processes gone wrong, please check log for the errors")
 	}

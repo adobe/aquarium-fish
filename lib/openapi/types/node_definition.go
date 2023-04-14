@@ -28,7 +28,7 @@ func (nd NodeDefinition) GormDataType() string {
 	return "blob"
 }
 
-func (nd *NodeDefinition) Scan(value interface{}) error {
+func (nd *NodeDefinition) Scan(value any) error {
 	bytes, ok := value.([]byte)
 	if !ok {
 		return fmt.Errorf("Failed to unmarshal JSONB value: %s", value)

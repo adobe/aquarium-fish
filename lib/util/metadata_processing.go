@@ -9,7 +9,7 @@ import (
 )
 
 // Serializes dictionary to usable format
-func SerializeMetadata(format, prefix string, data map[string]interface{}) (out []byte, err error) {
+func SerializeMetadata(format, prefix string, data map[string]any) (out []byte, err error) {
 	switch format {
 	case "json": // Default json
 		return json.Marshal(data)

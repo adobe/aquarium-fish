@@ -16,7 +16,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -162,14 +162,14 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 
 		// Getting the image subdir name in the unpacked dir
 		subdir := ""
-		items, err := ioutil.ReadDir(image_unpacked)
+		items, err := os.ReadDir(image_unpacked)
 		if err != nil {
 			log.Error("Docker: Unable to read the unpacked directory:", image_unpacked, err)
 			return "", fmt.Errorf("Docker: The image was unpacked incorrectly, please check log for the errors")
 		}
 		for _, f := range items {
 			if strings.HasPrefix(f.Name(), image.Name) {
-				if f.Mode()&os.ModeSymlink != 0 {
+				if f.Type()&fs.ModeSymlink != 0 {
 					// Potentially it can be a symlink (like used in local tests)
 					if _, err := os.Stat(filepath.Join(image_unpacked, f.Name())); err != nil {
 						log.Warn("Docker: The image symlink is broken:", f.Name(), err)
@@ -365,7 +365,7 @@ func (d *Driver) disksCreate(c_name string, run_args *[]string, disks map[string
 }
 
 // Creates the env file for the container out of metadata specification
-func (d *Driver) envCreate(c_name string, metadata map[string]interface{}) (string, error) {
+func (d *Driver) envCreate(c_name string, metadata map[string]any) (string, error) {
 	env_file_path := filepath.Join(d.cfg.WorkspacePath, c_name, ".env")
 	if err := os.MkdirAll(filepath.Dir(env_file_path), 0o755); err != nil {
 		return "", log.Error("Docker: Unable to create the container directory:", filepath.Dir(env_file_path), err)

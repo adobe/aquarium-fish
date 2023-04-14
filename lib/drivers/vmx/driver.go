@@ -140,7 +140,7 @@ func (d *Driver) AvailableCapacity(node_usage types.Resources, req types.LabelDe
  * It automatically download the required images, unpack them and runs the VM.
  * Not using metadata because there is no good interfaces to pass it to VM.
  */
-func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]interface{}) (*types.Resource, error) {
+func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*types.Resource, error) {
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
 		return nil, log.Error("VMX: Unable to apply options:", err)

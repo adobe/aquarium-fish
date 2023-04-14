@@ -14,7 +14,6 @@ package util
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -39,7 +38,7 @@ func Test_file_replace_token_simple_proceed(t *testing.T) {
 		"<token>", "test5",
 	)
 
-	body, err := ioutil.ReadFile(tmp_file)
+	body, err := os.ReadFile(tmp_file)
 
 	if err != nil || !bytes.Equal(body, out_data) {
 		t.Fatalf(`FileReplaceToken("<token>", "test5") = %q, %v, want: %q, error`, body, err, out_data)
@@ -65,7 +64,7 @@ func Test_file_replace_token_simple_skip_uppercase_src(t *testing.T) {
 		"<token>", "test5",
 	)
 
-	body, err := ioutil.ReadFile(tmp_file)
+	body, err := os.ReadFile(tmp_file)
 
 	if err != nil || !bytes.Equal(body, out_data) {
 		t.Fatalf(`FileReplaceToken("<token>", "test5") = %q, %v, want: %q, error`, body, err, out_data)
@@ -91,7 +90,7 @@ func Test_file_replace_token_simple_skip_uppercase_token(t *testing.T) {
 		"<TOKEN>", "test5",
 	)
 
-	body, err := ioutil.ReadFile(tmp_file)
+	body, err := os.ReadFile(tmp_file)
 
 	if err != nil || !bytes.Equal(body, out_data) {
 		t.Fatalf(`FileReplaceToken("<TOKEN>", "test5") = %q, %v, want: %q, error`, body, err, out_data)
@@ -117,7 +116,7 @@ func Test_file_replace_token_anycase_token_proceed(t *testing.T) {
 		"<TOKEN>", "test5",
 	)
 
-	body, err := ioutil.ReadFile(tmp_file)
+	body, err := os.ReadFile(tmp_file)
 
 	if err != nil || !bytes.Equal(body, out_data) {
 		t.Fatalf(`FileReplaceToken("<TOKEN>", "test5") = %q, %v, want: %q, error`, body, err, out_data)
@@ -143,7 +142,7 @@ func Test_file_replace_token_anycase_src_proceed(t *testing.T) {
 		"<token>", "test5",
 	)
 
-	body, err := ioutil.ReadFile(tmp_file)
+	body, err := os.ReadFile(tmp_file)
 
 	if err != nil || !bytes.Equal(body, out_data) {
 		t.Fatalf(`FileReplaceToken("<token>", "test5") = %q, %v, want: %q, error`, body, err, out_data)
@@ -169,7 +168,7 @@ func Test_file_replace_token_anycase_multiple(t *testing.T) {
 		"<token>", "test5",
 	)
 
-	body, err := ioutil.ReadFile(tmp_file)
+	body, err := os.ReadFile(tmp_file)
 
 	if err != nil || !bytes.Equal(body, out_data) {
 		t.Fatalf(`FileReplaceToken("<token>", "test5") = %q, %v, want: %q, error`, body, err, out_data)
@@ -194,7 +193,7 @@ func Test_file_replace_token_add(t *testing.T) {
 		"<token>", "test5",
 	)
 
-	body, err := ioutil.ReadFile(tmp_file)
+	body, err := os.ReadFile(tmp_file)
 
 	if err != nil || !bytes.Equal(body, out_data) {
 		t.Fatalf(`FileReplaceToken("<token>", "test5") = %q, %v, want: %q, error`, body, err, out_data)
@@ -220,7 +219,7 @@ func Test_file_replace_token_do_not_add_if_replaced(t *testing.T) {
 		"<token>", "test5",
 	)
 
-	body, err := ioutil.ReadFile(tmp_file)
+	body, err := os.ReadFile(tmp_file)
 
 	if err != nil || !bytes.Equal(body, out_data) {
 		t.Fatalf(`FileReplaceToken("<token>", "test5") = %q, %v, want: %q, error`, body, err, out_data)
@@ -246,7 +245,7 @@ func Test_file_replace_token_full_line(t *testing.T) {
 		"<token>", "test5",
 	)
 
-	body, err := ioutil.ReadFile(tmp_file)
+	body, err := os.ReadFile(tmp_file)
 
 	if err != nil || !bytes.Equal(body, out_data) {
 		t.Fatalf(`FileReplaceToken("<token>", "test5") = %q, %v, want: %q, error`, body, err, out_data)

@@ -17,7 +17,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
+	"os"
 )
 
 const NODE_PING_DELAY = 10
@@ -30,7 +30,7 @@ func (n *Node) Init(node_address, cert_path string) error {
 	n.Address = node_address
 
 	// Read certificate's pubkey to put or compare
-	cert_bytes, err := ioutil.ReadFile(cert_path)
+	cert_bytes, err := os.ReadFile(cert_path)
 	if err != nil {
 		return err
 	}

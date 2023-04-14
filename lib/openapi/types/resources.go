@@ -25,7 +25,7 @@ func (r Resources) GormDataType() string {
 	return "blob"
 }
 
-func (r *Resources) Scan(value interface{}) error {
+func (r *Resources) Scan(value any) error {
 	bytes, ok := value.([]byte)
 	if !ok {
 		return fmt.Errorf("Failed to unmarshal JSONB value: %s", value)
@@ -63,7 +63,7 @@ func (r *Resources) Validate(disk_types []string, check_net bool) error {
 		for _, pattern := range r.NodeFilter {
 			_, err := path.Match(pattern, "whatever")
 			if err != nil {
-				return log.Error("Resources: Bad pattern, please consult `path.Match` docs:", pattern, err)
+				return fmt.Errorf("Resources: Bad pattern %q, please consult `path.Match` docs: %v", pattern, err)
 			}
 		}
 	}

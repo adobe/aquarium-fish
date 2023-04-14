@@ -22,7 +22,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -44,7 +43,7 @@ import (
 
 type YamlBinder struct{}
 
-func (cb *YamlBinder) Bind(i interface{}, c echo.Context) (err error) {
+func (cb *YamlBinder) Bind(i any, c echo.Context) (err error) {
 	db := &echo.DefaultBinder{}
 	if err = db.Bind(i, c); err != echo.ErrUnsupportedMediaType {
 		return
@@ -94,7 +93,7 @@ func Init(fish *fish.Fish, cl *cluster.Cluster, api_address, ca_path, cert_path,
 	// TODO: web UI router
 
 	ca_pool := x509.NewCertPool()
-	if ca_bytes, err := ioutil.ReadFile(ca_path); err == nil {
+	if ca_bytes, err := os.ReadFile(ca_path); err == nil {
 		ca_pool.AppendCertsFromPEM(ca_bytes)
 	}
 	s := router.TLSServer

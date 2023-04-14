@@ -14,7 +14,6 @@ package fish
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"time"
 
@@ -53,7 +52,7 @@ func (c *Config) ReadConfigFile(cfg_path string) error {
 
 	if cfg_path != "" {
 		// Open and parse
-		data, err := ioutil.ReadFile(cfg_path)
+		data, err := os.ReadFile(cfg_path)
 		if err != nil {
 			return err
 		}

@@ -5,8 +5,8 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"net/url"
+	"os"
 
 	"github.com/adobe/aquarium-fish/lib/fish"
 )
@@ -27,7 +27,7 @@ func New(fish *fish.Fish, join []string, ca_path, cert_path, key_path string) (*
 	}
 
 	// Load CA cert to pool
-	ca_bytes, err := ioutil.ReadFile(ca_path)
+	ca_bytes, err := os.ReadFile(ca_path)
 	if err != nil {
 		return nil, fmt.Errorf("Cluster: Unable to load CA certificate: %v", err)
 	}

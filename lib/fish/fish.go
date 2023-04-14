@@ -560,7 +560,7 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 
 		// Merge application and label metadata, in this exact order
 		var merged_metadata []byte
-		var metadata map[string]interface{}
+		var metadata map[string]any
 		if err := json.Unmarshal([]byte(app.Metadata), &metadata); err != nil {
 			log.Error("Fish: Unable to parse the Application metadata:", app.UID, err)
 			app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
