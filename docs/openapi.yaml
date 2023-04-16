@@ -992,6 +992,8 @@ components:
           # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/LabelUID'
           type: string
           format: uuid
+          x-oapi-codegen-extra-tags:
+            yaml: label_UID
         metadata:
           x-go-type: util.UnparsedJson
           description: Additional metadata in JSON format (can't override Label metadata)
@@ -1038,6 +1040,8 @@ components:
           # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/ApplicationUID'
           type: string
           format: uuid
+          x-oapi-codegen-extra-tags:
+            yaml: application_UID
         status:
           $ref: '#/components/schemas/ApplicationStatus'
         description:
@@ -1082,6 +1086,8 @@ components:
           # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/ApplicationUID'
           type: string
           format: uuid
+          x-oapi-codegen-extra-tags:
+            yaml: application_UID
         task:
           type: string
           description: Identifier of the task
@@ -1284,6 +1290,7 @@ components:
         - ram
         - disks
         - network
+        - node_filter
         - multitenancy
         - cpu_overbook
         - ram_overbook
@@ -1306,6 +1313,15 @@ components:
         network:
           type: string
           description: Which network configuration to use for the environment
+        node_filter:
+          type: array
+          items:
+            type: string
+          description: The list of the Node identifiers to run resource on, supports path wildcards
+          example:
+            - OS:darwin
+            - OSVersion:12.*
+            - Arch:x86_64
         multitenancy:
           type: boolean
           description: Tolerate to run along with the other envs on the same node
@@ -1465,14 +1481,20 @@ components:
           # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/ApplicationUID'
           type: string
           format: uuid
+          x-oapi-codegen-extra-tags:
+            yaml: application_UID
         node_UID:
           # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/NodeUID'
           type: string
           format: uuid
+          x-oapi-codegen-extra-tags:
+            yaml: node_UID
         label_UID:
           # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/LabelUID'
           type: string
           format: uuid
+          x-oapi-codegen-extra-tags:
+            yaml: label_UID
         definition_index:
           type: integer
         identifier:
@@ -1531,12 +1553,14 @@ components:
           type: string
           format: uuid
           x-oapi-codegen-extra-tags:
+            yaml: application_UID
             gorm: uniqueIndex:idx_node_app_round_uniq
         node_UID:
           # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/NodeUID'
           type: string
           format: uuid
           x-oapi-codegen-extra-tags:
+            yaml: node_UID
             gorm: uniqueIndex:idx_node_app_round_uniq
         round:
           x-go-type: uint16
@@ -1625,6 +1649,7 @@ components:
           format: uuid
           description: Optional, if need to override the cluster-wide redirects
           x-oapi-codegen-extra-tags:
+            yaml: application_UID
             gorm: uniqueIndex:idx_location_service_app_uniq
 
   securitySchemes:

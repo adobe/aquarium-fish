@@ -16,6 +16,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"path"
 
 	"github.com/adobe/aquarium-fish/lib/util"
 )
@@ -24,7 +25,7 @@ func (r Resources) GormDataType() string {
 	return "blob"
 }
 
-func (r *Resources) Scan(value interface{}) error {
+func (r *Resources) Scan(value any) error {
 	bytes, ok := value.([]byte)
 	if !ok {
 		return fmt.Errorf("Failed to unmarshal JSONB value: %s", value)
@@ -41,24 +42,33 @@ func (r Resources) Value() (driver.Value, error) {
 func (r *Resources) Validate(disk_types []string, check_net bool) error {
 	// Check resources
 	if r.Cpu < 1 {
-		return fmt.Errorf("Driver: Number of CPU cores is less then 1")
+		return fmt.Errorf("Resources: Number of CPU cores is less then 1")
 	}
 	if r.Ram < 1 {
-		return fmt.Errorf("Driver: Amount of RAM is less then 1GB")
+		return fmt.Errorf("Resources: Amount of RAM is less then 1GB")
 	}
 	for name, disk := range r.Disks {
 		if name == "" {
-			return fmt.Errorf("Driver: Disk name can't be empty")
+			return fmt.Errorf("Resources: Disk name can't be empty")
 		}
 		if len(disk_types) > 0 && !util.Contains(disk_types, disk.Type) {
-			return fmt.Errorf(fmt.Sprintf("Driver: Type of disk must be one of: %+q", disk_types))
+			return fmt.Errorf(fmt.Sprintf("Resources: Type of disk must be one of: %+q", disk_types))
 		}
 		if disk.Size < 1 {
-			return fmt.Errorf("Driver: Size of the disk can't be less than 1GB")
+			return fmt.Errorf("Resources: Size of the disk can't be less than 1GB")
+		}
+	}
+	if len(r.NodeFilter) > 0 {
+		// Check filter patterns are correct
+		for _, pattern := range r.NodeFilter {
+			_, err := path.Match(pattern, "whatever")
+			if err != nil {
+				return fmt.Errorf("Resources: Bad pattern %q, please consult `path.Match` docs: %v", pattern, err)
+			}
 		}
 	}
 	if check_net && r.Network != "" && r.Network != "nat" {
-		return fmt.Errorf("Driver: The network configuration must be either '' (empty for hostonly) or 'nat'")
+		return fmt.Errorf("Resources: The network configuration must be either '' (empty for hostonly) or 'nat'")
 	}
 
 	return nil
@@ -84,13 +94,13 @@ func (r *Resources) Add(res Resources) error {
 // Subtracts the Resources data to the existing data
 func (r *Resources) Subtract(res Resources) (err error) {
 	if r.Cpu < res.Cpu {
-		err = fmt.Errorf("Driver: Unable to subtract more CPU than we have: %d < %d", r.Cpu, res.Cpu)
+		err = fmt.Errorf("Resources: Unable to subtract more CPU than we have: %d < %d", r.Cpu, res.Cpu)
 		r.Cpu = 0
 	} else {
 		r.Cpu -= res.Cpu
 	}
 	if r.Ram < res.Ram {
-		mem_err := fmt.Errorf("Driver: Unable to subtract more RAM than we have: %d < %d", r.Ram, res.Ram)
+		mem_err := fmt.Errorf("Resources: Unable to subtract more RAM than we have: %d < %d", r.Ram, res.Ram)
 		if err != nil {
 			err = fmt.Errorf("%v, %v", err, mem_err)
 		}

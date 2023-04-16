@@ -13,7 +13,10 @@
 package fish
 
 import (
+	"fmt"
 	"math/rand"
+
+	"github.com/google/uuid"
 
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
@@ -36,6 +39,12 @@ func (f *Fish) VoteFind(filter *string) (vs []types.Vote, err error) {
 }
 
 func (f *Fish) VoteCreate(v *types.Vote) error {
+	if v.ApplicationUID == uuid.Nil {
+		return fmt.Errorf("Fish: ApplicationUID can't be unset")
+	}
+	if v.NodeUID == uuid.Nil {
+		return fmt.Errorf("Fish: NodeUID can't be unset")
+	}
 	// Update Vote Rand to be actual rand
 	v.Rand = rand.Uint32()
 	v.UID = f.NewUID()

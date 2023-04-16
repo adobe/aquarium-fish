@@ -10,24 +10,20 @@
  * governing permissions and limitations under the License.
  */
 
-package vmx
+package native
 
-// VMWare VMX (Fusion/Workstation) driver to manage VMs & images
+// Native driver to run the workload on the host of the fish node
 
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
-	"time"
 
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
 
-	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
-	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 // Implements drivers.ResourceDriver interface
@@ -40,12 +36,17 @@ type Driver struct {
 	total_ram uint // In RAM GB
 }
 
+// Is used to provide some data to the entry/metadata values which could contain templates
+type EnvData struct {
+	Disks map[string]string // Map with disk_name = mount_path
+}
+
 func init() {
 	drivers.DriversList = append(drivers.DriversList, &Driver{})
 }
 
 func (d *Driver) Name() string {
-	return "vmx"
+	return "native"
 }
 
 func (d *Driver) IsRemote() bool {
@@ -79,23 +80,41 @@ func (d *Driver) Prepare(config []byte) error {
 }
 
 func (d *Driver) ValidateDefinition(def types.LabelDefinition) error {
-	// Check resources
-	if err := def.Resources.Validate([]string{"hfs+", "exfat", "fat32"}, true); err != nil {
-		return log.Error("VMX: Resources validation failed:", err)
-	}
-
 	// Check options
 	var opts Options
-	return opts.Apply(def.Options)
+	if err := opts.Apply(def.Options); err != nil {
+		return err
+	}
+	// Validate image tags are available in the disk names
+	for _, img := range opts.Images {
+		// Empty name means user home which is always exists
+		if img.Tag != "" {
+			found := false
+			for d_name, _ := range def.Resources.Disks {
+				if d_name == img.Tag {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return fmt.Errorf("Unable to find disk with name in the image tag: %q", img.Tag)
+			}
+		}
+	}
+	return nil
 }
 
 // Allow Fish to ask the driver about it's capacity (free slots) of a specific definition
 func (d *Driver) AvailableCapacity(node_usage types.Resources, req types.LabelDefinition) int64 {
 	var out_count int64
 
-	avail_cpu, avail_ram := d.getAvailResources()
+	var opts Options
+	if err := opts.Apply(req.Options); err != nil {
+		return 0
+	}
 
 	// Check if the node has the required resources - otherwise we can't run it anyhow
+	avail_cpu, avail_ram := d.getAvailResources()
 	if req.Resources.Cpu > avail_cpu {
 		return 0
 	}
@@ -135,92 +154,60 @@ func (d *Driver) AvailableCapacity(node_usage types.Resources, req types.LabelDe
 }
 
 /**
- * Allocate VM with provided images
+ * Allocate workload environment with the provided images
  *
- * It automatically download the required images, unpack them and runs the VM.
- * Not using metadata because there is no good interfaces to pass it to VM.
+ * It automatically download the required images, unpack them and runs the workload.
+ * Using metadata to pass the env to the entry point of the image.
  */
 func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*types.Resource, error) {
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
-		return nil, log.Error("VMX: Unable to apply options:", err)
+		return nil, log.Error("Native: Unable to apply options:", err)
 	}
 
-	// Generate unique id from the hw address and required directories
-	buf := crypt.RandBytes(6)
-	buf[0] = (buf[0] | 2) & 0xfe // Set local bit, ensure unicast address
-	vm_id := fmt.Sprintf("%02x%02x%02x%02x%02x%02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5])
-	vm_hwaddr := fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5])
-
-	vm_network := def.Resources.Network
-	if vm_network == "" {
-		vm_network = "hostonly"
-	}
-
-	vm_dir := filepath.Join(d.cfg.WorkspacePath, vm_id)
-	vm_images_dir := filepath.Join(vm_dir, "images")
-
-	// Load the required images
-	img_path, err := d.loadImages(&opts, vm_images_dir)
+	// Create user to execute the workload
+	user, homedir, err := userCreate(&d.cfg, opts.Groups)
 	if err != nil {
-		d.cleanupVm(vm_dir)
-		return nil, log.Error("VMX: Unable to load the required images:", err)
+		userDelete(&d.cfg, user)
+		return nil, log.Error("Native: Unable to create user:", user, err)
+	}
+	log.Info("Native: Created user for Application execution:", user)
+
+	// Create and connect volumes to container
+	disk_paths, err := d.disksCreate(user, def.Resources.Disks)
+	if err != nil {
+		disksDelete(&d.cfg, user)
+		userDelete(&d.cfg, user)
+		return nil, log.Error("Native: Unable to create the required disks:", err)
 	}
 
-	// Clone VM from the image
-	vmx_path := filepath.Join(vm_dir, vm_id+".vmx")
-	args := []string{"-T", "fusion", "clone",
-		img_path, vmx_path,
-		"linked", "-snapshot", "original",
-		"-cloneName", vm_id,
-	}
-	if _, _, err := runAndLog(120*time.Second, d.cfg.VmrunPath, args...); err != nil {
-		d.cleanupVm(vm_dir)
-		return nil, log.Error("VMX: Unable to clone the target image:", img_path, err)
+	// Set default path as homedir
+	disk_paths[""] = homedir
+
+	// Loading images and unpack them to home/disks according
+	if err := d.loadImages(user, opts.Images, disk_paths); err != nil {
+		disksDelete(&d.cfg, user)
+		userDelete(&d.cfg, user)
+		return nil, log.Error("Native: Unable to load and unpack images:", err)
 	}
 
-	// Change cloned vm configuration
-	if err := util.FileReplaceToken(vmx_path,
-		true, true, true,
-		"ethernet0.addressType =", `ethernet0.addressType = "static"`,
-		"ethernet0.address =", fmt.Sprintf("ethernet0.address = %q", vm_hwaddr),
-		"ethernet0.connectiontype =", fmt.Sprintf("ethernet0.connectiontype = %q", vm_network),
-		"numvcpus =", fmt.Sprintf(`numvcpus = "%d"`, def.Resources.Cpu),
-		"cpuid.corespersocket =", fmt.Sprintf(`cpuid.corespersocket = "%d"`, def.Resources.Cpu),
-		"memsize =", fmt.Sprintf(`memsize = "%d"`, def.Resources.Ram*1024),
-	); err != nil {
-		d.cleanupVm(vm_dir)
-		return nil, log.Error("VMX: Unable to change cloned VM configuration:", vmx_path, err)
+	// Running workload
+	if err := userRun(&d.cfg, &EnvData{Disks: disk_paths}, user, opts.Entry, metadata); err != nil {
+		disksDelete(&d.cfg, user)
+		userDelete(&d.cfg, user)
+		return nil, log.Error("Native: Unable to run the entry workload:", err)
 	}
 
-	// Create and connect disks to vmx
-	if err := d.disksCreate(vmx_path, def.Resources.Disks); err != nil {
-		d.cleanupVm(vm_dir)
-		return nil, log.Error("VMX: Unable create disks for VM:", vmx_path, err)
-	}
+	log.Info("Native: Started workload for user:", user, opts.Entry)
 
-	// Run the background monitoring of the vmware log
-	if d.cfg.LogMonitor {
-		go d.logMonitor(vm_id, vmx_path)
-	}
-
-	// Run the VM
-	if _, _, err := runAndLog(120*time.Second, d.cfg.VmrunPath, "start", vmx_path, "nogui"); err != nil {
-		log.Error("VMX: Check logs in ~/Library/Logs/VMware/ or enable debug to see vmware.log")
-		d.cleanupVm(vm_dir)
-		return nil, log.Error("VMX: Unable to run VM:", vmx_path, err)
-	}
-
-	log.Info("VMX: Allocate of VM completed:", vmx_path)
-
-	return &types.Resource{Identifier: vmx_path, HwAddr: vm_hwaddr}, nil
+	return &types.Resource{Identifier: user}, nil
 }
 
 func (d *Driver) Status(res *types.Resource) (string, error) {
 	if res == nil || res.Identifier == "" {
-		return "", fmt.Errorf("VMX: Invalid resource: %v", res)
+		return "", fmt.Errorf("Native: Invalid resource: %v", res)
 	}
-	if d.isAllocated(res.Identifier) {
+	if isEnvAllocated(res.Identifier) {
 		return drivers.StatusAllocated, nil
 	}
 	return drivers.StatusNone, nil
@@ -248,31 +235,29 @@ func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
 
 func (d *Driver) Deallocate(res *types.Resource) error {
 	if res == nil || res.Identifier == "" {
-		return fmt.Errorf("VMX: Invalid resource: %v", res)
+		return fmt.Errorf("Native: Invalid resource: %v", res)
 	}
-	vmx_path := res.Identifier
-	if len(vmx_path) == 0 {
-		return log.Error("VMX: Unable to find VM:", vmx_path)
-	}
-
-	// Sometimes it's stuck, so try to stop a bit more than usual
-	if _, _, err := runAndLogRetry(3, 60*time.Second, d.cfg.VmrunPath, "stop", vmx_path); err != nil {
-		log.Warn("VMX: Unable to soft stop the VM:", vmx_path, err)
-		// Ok, it doesn't want to stop, so stopping it hard
-		if _, _, err := runAndLogRetry(3, 60*time.Second, d.cfg.VmrunPath, "stop", vmx_path, "hard"); err != nil {
-			return log.Error("VMX: Unable to deallocate VM:", vmx_path, err)
-		}
+	if !isEnvAllocated(res.Identifier) {
+		return log.Error("Native: Unable to find the environment user:", res.Identifier)
 	}
 
-	// Delete VM
-	if _, _, err := runAndLogRetry(3, 30*time.Second, d.cfg.VmrunPath, "deleteVM", vmx_path); err != nil {
-		return log.Error("VMX: Unable to delete VM:", vmx_path, err)
+	user := res.Identifier
+
+	// Umounting & delete the user env disks
+	err := disksDelete(&d.cfg, user)
+
+	// Umounting & delete the user env disks
+	err2 := userDelete(&d.cfg, user)
+
+	log.Info("Docker: Deallocate of user env completed:", user)
+
+	// Processing the errors after the cleanup
+	if err != nil {
+		return err
 	}
-
-	// Cleaning the VM images too
-	d.cleanupVm(filepath.Dir(vmx_path))
-
-	log.Info("VMX: Deallocate of VM completed:", vmx_path)
+	if err2 != nil {
+		return err2
+	}
 
 	return nil
 }

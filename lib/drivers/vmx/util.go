@@ -16,7 +16,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -26,6 +26,7 @@ import (
 
 	"github.com/hpcloud/tail"
 
+	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 	"github.com/adobe/aquarium-fish/lib/util"
@@ -56,30 +57,28 @@ func (d *Driver) loadImages(opts *Options, vm_images_dir string) (string, error)
 
 	target_path := ""
 	var wg sync.WaitGroup
-	for name, url := range opts.Images {
-		archive_name := filepath.Base(url)
-		image_unpacked := filepath.Join(d.cfg.ImagesPath, strings.TrimSuffix(archive_name, ".tar.xz"))
-
-		log.Info("VMX: Loading the required image:", name, url)
+	for image_index, image := range opts.Images {
+		log.Info("VMX: Loading the required image:", image.Name, image.Version, image.Url)
 
 		// Running the background routine to download, unpack and process the image
 		// Success will be checked later by existance of the copied image in the vm directory
 		wg.Add(1)
-		go func(name, url, unpack_dir, target_image string) error {
+		go func(image drivers.Image, index int) error {
 			defer wg.Done()
-			if err := util.DownloadUnpackArchive(url, unpack_dir, d.cfg.DownloadUser, d.cfg.DownloadPassword); err != nil {
-				return log.Error("VMX: Unable to download and unpack the image:", name, url, err)
+			if err := image.DownloadUnpack(d.cfg.ImagesPath, d.cfg.DownloadUser, d.cfg.DownloadPassword); err != nil {
+				return log.Error("VMX: Unable to download and unpack the image:", image.Name, image.Url, err)
 			}
 
 			// Getting the image subdir name in the unpacked dir
 			subdir := ""
-			items, err := ioutil.ReadDir(image_unpacked)
+			image_unpacked := filepath.Join(d.cfg.ImagesPath, image.Name+"-"+image.Version)
+			items, err := os.ReadDir(image_unpacked)
 			if err != nil {
 				return log.Error("VMX: Unable to read the unpacked directory:", image_unpacked, err)
 			}
 			for _, f := range items {
-				if strings.HasPrefix(f.Name(), name) {
-					if f.Mode()&os.ModeSymlink != 0 {
+				if strings.HasPrefix(f.Name(), image.Name) {
+					if f.Type()&fs.ModeSymlink != 0 {
 						// Potentially it can be a symlink (like used in local tests)
 						if _, err := os.Stat(filepath.Join(image_unpacked, f.Name())); err != nil {
 							log.Warn("VMX: The image symlink is broken:", f.Name(), err)
@@ -91,16 +90,17 @@ func (d *Driver) loadImages(opts *Options, vm_images_dir string) (string, error)
 				}
 			}
 			if subdir == "" {
-				return log.Errorf("VMX: Unpacked image '%s' has no subfolder '%s', only: %q", image_unpacked, name, items)
+				return log.Errorf("VMX: Unpacked image '%s' has no subfolder '%s', only: %q", image_unpacked, image.Name, items)
 			}
 
-			// Unfortunately the clone operation modifies the image snapshots description
-			// so we walk through the image files, link them to the workspace dir and copy
+			// The VMware clone operation modifies the image snapshots description so
+			// we walk through the image files, link them to the workspace dir and copy
 			// the files (except for vmdk bins) with path to the workspace images dir
 			root_dir := filepath.Join(image_unpacked, subdir)
 			out_dir := filepath.Join(vm_images_dir, subdir)
-			if target_image == name {
-				target_path = filepath.Join(out_dir, name+".vmx")
+			if index+1 == len(opts.Images) {
+				// It's the last image in the list so the target one
+				target_path = filepath.Join(out_dir, image.Name+".vmx")
 			}
 			if err := os.MkdirAll(out_dir, 0o755); err != nil {
 				return log.Error("VMX: Unable to create the vm image dir:", out_dir, err)
@@ -143,12 +143,12 @@ func (d *Driver) loadImages(opts *Options, vm_images_dir string) (string, error)
 						"<REPLACE_PARENT_VM_FULL_PATH>", vm_images_dir,
 					); err != nil {
 						os.RemoveAll(out_dir)
-						return log.Error("VMX: Unable to replace full path token in vmsd:", name, err)
+						return log.Error("VMX: Unable to replace full path token in vmsd:", image.Name, err)
 					}
 				}
 			}
 			return nil
-		}(name, url, image_unpacked, opts.Image)
+		}(image, image_index)
 	}
 
 	log.Debug("VMX: Wait for all the background image processes to be done...")
@@ -157,7 +157,7 @@ func (d *Driver) loadImages(opts *Options, vm_images_dir string) (string, error)
 	log.Info("VMX: The images are processed.")
 
 	// Check all the images are in place just by number of them
-	vm_images, _ := ioutil.ReadDir(vm_images_dir)
+	vm_images, _ := os.ReadDir(vm_images_dir)
 	if len(opts.Images) != len(vm_images) {
 		return "", log.Error("VMX: The image processes gone wrong, please check log for the errors")
 	}
@@ -384,14 +384,14 @@ func runAndLog(timeout time.Duration, path string, arg ...string) (string, strin
 
 	// Check the context error to see if the timeout was executed
 	if ctx.Err() == context.DeadlineExceeded {
-		err = fmt.Errorf("VMware error: Command timed out")
+		err = fmt.Errorf("VMX: Command timed out")
 	} else if _, ok := err.(*exec.ExitError); ok {
 		message := stderrString
 		if message == "" {
 			message = stdoutString
 		}
 
-		err = fmt.Errorf("VMware error: %s", message)
+		err = fmt.Errorf("VMX: Command exited with error: %v: %s", err, message)
 	}
 
 	if len(stdoutString) > 0 {

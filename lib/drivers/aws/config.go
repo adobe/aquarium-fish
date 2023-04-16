@@ -80,9 +80,9 @@ func (c *Config) Validate() (err error) {
 		res, err := conn.GetCallerIdentity(context.TODO(), input)
 		counter++
 		if err != nil {
-			if counter > retries {
+			if counter < retries {
 				log.Warn("AWS: Retry after credentials validation error:", err)
-				// Give command 5 seconds to rest
+				// Give command 10 seconds to rest
 				time.Sleep(10 * time.Second)
 				continue
 			}

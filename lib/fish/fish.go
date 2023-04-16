@@ -18,6 +18,7 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"path"
 	"path/filepath"
 	"sort"
 	"sync"
@@ -156,6 +157,20 @@ func (f *Fish) Init() error {
 			return fmt.Errorf("Fish: Unable to save node: %v", err)
 		}
 	}
+
+	// Fill the node identifiers with defaults
+	if len(f.cfg.NodeIdentifiers) == 0 {
+		// Capturing the current host identifiers
+		f.cfg.NodeIdentifiers = append(f.cfg.NodeIdentifiers, "FishName:"+node.Name,
+			"HostName:"+node.Definition.Host.Hostname,
+			"OS:"+node.Definition.Host.OS,
+			"OSVersion:"+node.Definition.Host.PlatformVersion,
+			"OSPlatform:"+node.Definition.Host.Platform,
+			"OSFamily:"+node.Definition.Host.PlatformFamily,
+			"Arch:"+node.Definition.Host.KernelArch,
+		)
+	}
+	log.Info("Fish: Using the next node identifiers:", f.cfg.NodeIdentifiers)
 
 	// Fish is running now
 	f.running = true
@@ -415,6 +430,25 @@ func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 		return false
 	}
 
+	// Verify node filters because some workload can't be running on all the physical nodes
+	// The node becomes fitting only when all the needed node filter patterns are matched
+	needed_idents := def.Resources.NodeFilter
+	current_idents := f.cfg.NodeIdentifiers
+	for _, needed := range needed_idents {
+		found := false
+		for _, value := range current_idents {
+			// We're validating the pattern on error during label creation, so they should be ok
+			if found, _ = path.Match(needed, value); found {
+				break
+			}
+		}
+		if !found {
+			// One of the required node identifiers did not matched the node ones
+			return false
+		}
+	}
+	// Here all the node filters matched the node identifiers
+
 	// Check with the driver if it's possible to allocate the Application resource
 	node_usage := f.node_usage
 	if capacity := driver.AvailableCapacity(node_usage, def); capacity < 1 {
@@ -526,7 +560,7 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 
 		// Merge application and label metadata, in this exact order
 		var merged_metadata []byte
-		var metadata map[string]interface{}
+		var metadata map[string]any
 		if err := json.Unmarshal([]byte(app.Metadata), &metadata); err != nil {
 			log.Error("Fish: Unable to parse the Application metadata:", app.UID, err)
 			app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
@@ -602,9 +636,9 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 			// Try to get default value from fish config
 			resource_lifetime, err = time.ParseDuration(f.cfg.DefaultResourceLifetime)
 			if err != nil {
-				// Not fatal error - in worst case the resource will just sit there but at least will
+				// Not an error - in worst case the resource will just sit there but at least will
 				// not ruin the workload execution
-				log.Error("Fish: Can't parse the Default Resource Lifetime from fish config")
+				log.Warn("Fish: Default Resource Lifetime is not set in fish config")
 			}
 		}
 		resource_timeout := res.CreatedAt.Add(resource_lifetime)

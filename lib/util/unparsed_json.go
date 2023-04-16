@@ -12,6 +12,12 @@
 
 package util
 
+import (
+	"encoding/json"
+
+	"gopkg.in/yaml.v3"
+)
+
 type UnparsedJson string
 
 func (r *UnparsedJson) MarshalJSON() ([]byte, error) {
@@ -21,5 +27,19 @@ func (r *UnparsedJson) MarshalJSON() ([]byte, error) {
 func (r *UnparsedJson) UnmarshalJSON(b []byte) error {
 	// Store json as string
 	*r = UnparsedJson(b)
+	return nil
+}
+
+// To properly convert incoming yaml requests into json
+func (r *UnparsedJson) UnmarshalYAML(node *yaml.Node) error {
+	var value any
+	if err := node.Decode(&value); err != nil {
+		return err
+	}
+	json_data, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	r.UnmarshalJSON(json_data)
 	return nil
 }

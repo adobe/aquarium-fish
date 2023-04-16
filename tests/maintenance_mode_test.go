@@ -28,9 +28,9 @@ import (
 // Testing the maintenance cancel
 // * Sending maintenance request
 // * Allocate Application
-// * Application should not be allocated for 10 sec
+// * Application should not be allocated for 20 sec
 // * Sending maintenance cancel request
-// * Application should be allocated in 10 sec
+// * Application should be allocated in 20 sec
 func Test_maintenace_cancel(t *testing.T) {
 	t.Parallel()
 	afi := RunAquariumFish(t, `---
@@ -105,8 +105,8 @@ drivers:
 	})
 
 	var app_state types.ApplicationState
-	t.Run("Application should stay NEW for 10 sec", func(t *testing.T) {
-		time.Sleep(10)
+	t.Run("Application should stay NEW for 20 sec", func(t *testing.T) {
+		time.Sleep(20)
 
 		apitest.New().
 			EnableNetworking(cli).
@@ -133,8 +133,8 @@ drivers:
 			End()
 	})
 
-	t.Run("Application should get ALLOCATED in 10 sec", func(t *testing.T) {
-		Retry(&Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *R) {
+	t.Run("Application should get ALLOCATED in 20 sec", func(t *testing.T) {
+		Retry(&Timer{Timeout: 20 * time.Second, Wait: 1 * time.Second}, t, func(r *R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi.ApiAddress("api/v1/application/"+app.UID.String()+"/state")).

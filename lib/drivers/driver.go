@@ -33,7 +33,6 @@ type ResourceDriver interface {
 
 	// Give driver configs and check if it's ok
 	// -> config - driver configuration in json format
-	// -> nodedef - information about the node the driver is running on
 	Prepare(config []byte) error
 
 	// Make sure the allocate definition is appropriate for the driver

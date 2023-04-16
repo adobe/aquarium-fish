@@ -25,8 +25,8 @@ import (
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
-// H is a shortcut for map[string]interface{}
-type H map[string]interface{}
+// H is a shortcut for map[string]any
+type H map[string]any
 
 type Processor struct {
 	fish *fish.Fish

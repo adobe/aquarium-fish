@@ -28,6 +28,11 @@ var (
 	ErrorLogger *log.Logger
 )
 
+func init() {
+	// Init default loggers
+	InitLoggers()
+}
+
 func SetVerbosity(level string) error {
 	switch level {
 	case "debug":

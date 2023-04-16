@@ -96,7 +96,7 @@ func (conn *ClusterClient) listen() {
 }
 
 // Write data to the websocket server
-func (conn *ClusterClient) Write(payload interface{}) error {
+func (conn *ClusterClient) Write(payload any) error {
 	data, err := json.Marshal(payload)
 	if err != nil {
 		return err

@@ -21,6 +21,7 @@ import (
 	// Load all the drivers
 	_ "github.com/adobe/aquarium-fish/lib/drivers/aws"
 	_ "github.com/adobe/aquarium-fish/lib/drivers/docker"
+	_ "github.com/adobe/aquarium-fish/lib/drivers/native"
 	_ "github.com/adobe/aquarium-fish/lib/drivers/vmx"
 
 	_ "github.com/adobe/aquarium-fish/lib/drivers/test"

@@ -25,8 +25,8 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
-// H is a shortcut for map[string]interface{}
-type H map[string]interface{}
+// H is a shortcut for map[string]any
+type H map[string]any
 
 type Processor struct {
 	fish *fish.Fish
@@ -56,7 +56,7 @@ func (e *Processor) AddressAuth(next echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
-func (e *Processor) Return(c echo.Context, code int, obj map[string]interface{}) error {
+func (e *Processor) Return(c echo.Context, code int, obj map[string]any) error {
 	format := c.QueryParam("format")
 	if len(format) == 0 {
 		format = "json"
@@ -79,7 +79,7 @@ func (e *Processor) Return(c echo.Context, code int, obj map[string]interface{})
 }
 
 func (e *Processor) DataGetList(c echo.Context, params types.DataGetListParams) error {
-	var metadata map[string]interface{}
+	var metadata map[string]any
 
 	res_int := c.Get("resource")
 	res, ok := res_int.(*types.Resource)

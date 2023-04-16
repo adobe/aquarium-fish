@@ -15,6 +15,8 @@ package fish
 import (
 	"fmt"
 
+	"github.com/google/uuid"
+
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 	"github.com/adobe/aquarium-fish/lib/util"
@@ -37,6 +39,9 @@ func (f *Fish) ApplicationTaskFindByApplication(uid types.ApplicationUID, filter
 }
 
 func (f *Fish) ApplicationTaskCreate(at *types.ApplicationTask) error {
+	if at.ApplicationUID == uuid.Nil {
+		return fmt.Errorf("Fish: ApplicationUID can't be unset")
+	}
 	if at.Task == "" {
 		return fmt.Errorf("Fish: Task can't be empty")
 	}

@@ -1,5 +1,5 @@
 #!/bin/sh -e
-# Copyright 2021 Adobe. All rights reserved.
+# Copyright 2023 Adobe. All rights reserved.
 # This file is licensed to you under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License. You may obtain a copy
 # of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -19,7 +19,7 @@ token=$1
 hostport=$2
 [ "$hostport" ] || hostport=localhost:8001
 
-label=winserver2019-vs2019_vmx
+label=mac12_native
 
 # It's a bit dirty, but works for now - probably better to create API call to find the latest label
 curr_label=$(curl -s -u "admin:$token" -k "https://$hostport/api/v1/label/?filter=name=\"$label\"" | sed 's/},{/},\n{/g' | tail -1)
@@ -38,22 +38,29 @@ label_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/ya
 name: "'$label'"
 version: '$new_version'
 definitions:
-  - driver: vmx
+  - driver: native
     options:
       images:  # For test purposes images are used as symlink to aquarium-bait/out so does not need checksum
-        - url: https://artifact-storage/aquarium/image/vmx/winserver2019-VERSION/winserver2019-VERSION.tar.xz
-        - url: https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019-VERSION/winserver2019-vs2019-VERSION.tar.xz
-        - url: https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019-ci-VERSION/winserver2019-vs2019-ci-VERSION.tar.xz
+        - url: https://artifact-storage/aquarium/image/native/mac/mac-VERSION.tar.xz
+          tag: ws
+        - url: https://artifact-storage/aquarium/image/native/mac-ci/mac-ci-VERSION.tar.xz
+          tag: ws
+      groups:
+        - staff
+      entry: "{{ .Disks.ws }}/init.sh"
     resources:
-      cpu: 14
-      ram: 12
+      node_filter:
+        - OS:darwin
+        - OSVersion:12.*
+        - Arch:x86_64
+      cpu: 4
+      ram: 8
       disks:
-        vs2019:
-          type: exfat
+        ws:
           size: 10
-          reuse: true
+      network: Name:test-vpc
 metadata:
-  JENKINS_AGENT_WORKSPACE: D:\
+  JENKINS_AGENT_WORKSPACE: "{{ .Disks.ws }}"
 ' "https://$hostport/api/v1/label/" | grep -o '"UID": *"[^"]\+"' | cut -d':' -f 2 | tr -d ' "')
 
 echo "Created Label ID: ${label_id}"

@@ -22,7 +22,7 @@ func (ld LabelDefinitions) GormDataType() string {
 	return "blob"
 }
 
-func (ld *LabelDefinitions) Scan(value interface{}) error {
+func (ld *LabelDefinitions) Scan(value any) error {
 	bytes, ok := value.([]byte)
 	if !ok {
 		return fmt.Errorf("Failed to unmarshal JSONB value: %s", value)

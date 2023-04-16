@@ -25,10 +25,10 @@ import (
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
-// This is a test which makes sure we can send yaml input to create a Label
-// * Create Label with yaml
+// This is a test which makes sure we can send json input to create a Label
+// * Create Label with json
 // * Check Label was created
-func Test_yaml_label_create(t *testing.T) {
+func Test_json_label_create(t *testing.T) {
 	t.Parallel()
 	afi := RunAquariumFish(t, `---
 node_name: node-1
@@ -58,21 +58,12 @@ drivers:
 	}
 
 	var label types.Label
-	t.Run("Create & check YAML Label", func(t *testing.T) {
+	t.Run("Create & check JSON Label", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
 			Post(afi.ApiAddress("api/v1/label/")).
-			Header("Content-Type", "application/yaml").
-			Body(`---
-name: test-label
-version: 1
-definitions:
-  - driver: test
-    options:  # To verify UnparsedJson logic of UnmarshalYAML too
-      fail_options_apply: 0
-    resources:
-      cpu: 1
-      ram: 2`).
+			Header("Content-Type", "application/json").
+			Body(`{"name":"test-label","version":1,"definitions":[{"driver":"test","options":{"fail_options_apply":0},"resources":{"cpu":1,"ram":2}}]}`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).

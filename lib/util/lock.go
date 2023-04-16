@@ -14,7 +14,6 @@ package util
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math"
 	"math/bits"
 	"os"
@@ -49,7 +48,7 @@ func WaitLock(lock_path string, clean func()) error {
 		}
 		if wait_counter%6 == 0 {
 			// Read the lock file to print the pid
-			if lock_info, err := ioutil.ReadFile(lock_path); err == nil {
+			if lock_info, err := os.ReadFile(lock_path); err == nil {
 				// Check the pid is running - because if the app crashes
 				// it can leave the lock file (weak protection but worth it)
 				pid, err := strconv.ParseInt(strings.SplitN(string(lock_info), " ", 2)[0], 10, bits.UintSize)

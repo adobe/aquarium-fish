@@ -13,8 +13,8 @@
 # Script updates the specified fish_*_images directory based on the out dir in aquarium-bait repo
 #
 # Usage:
-#  $ ./test/fill_images.sh <relative/path/to/workdir/fish_vmx_images> </abs/path/to/aquarium-bait/out/vmx>
-#  $ ./test/fill_images.sh <relative/path/to/workdir/fish_docker_images> </abs/path/to/aquarium-bait/out/docker>
+#  $ ./examples/fill_images.sh <relative/path/to/workdir/fish_vmx_images> </abs/path/to/aquarium-bait/out/vmx>
+#  $ ./examples/fill_images.sh <relative/path/to/workdir/fish_docker_images> </abs/path/to/aquarium-bait/out/docker>
 #
 
 IMAGES_DIR=$1
