@@ -636,9 +636,9 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 			// Try to get default value from fish config
 			resource_lifetime, err = time.ParseDuration(f.cfg.DefaultResourceLifetime)
 			if err != nil {
-				// Not fatal error - in worst case the resource will just sit there but at least will
+				// Not an error - in worst case the resource will just sit there but at least will
 				// not ruin the workload execution
-				log.Error("Fish: Can't parse the Default Resource Lifetime from fish config")
+				log.Warn("Fish: Default Resource Lifetime is not set in fish config")
 			}
 		}
 		resource_timeout := res.CreatedAt.Add(resource_lifetime)

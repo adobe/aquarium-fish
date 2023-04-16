@@ -15,6 +15,8 @@ package fish
 import (
 	"fmt"
 
+	"github.com/google/uuid"
+
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
@@ -24,6 +26,9 @@ func (f *Fish) ApplicationStateList() (ass []types.ApplicationState, err error) 
 }
 
 func (f *Fish) ApplicationStateCreate(as *types.ApplicationState) error {
+	if as.ApplicationUID == uuid.Nil {
+		return fmt.Errorf("Fish: ApplicationUID can't be unset")
+	}
 	if as.Status == "" {
 		return fmt.Errorf("Fish: Status can't be empty")
 	}

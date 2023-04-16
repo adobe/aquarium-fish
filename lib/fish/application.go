@@ -15,6 +15,8 @@ package fish
 import (
 	"fmt"
 
+	"github.com/google/uuid"
+
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 	"github.com/adobe/aquarium-fish/lib/util"
@@ -36,6 +38,9 @@ func (f *Fish) ApplicationFind(filter *string) (as []types.Application, err erro
 }
 
 func (f *Fish) ApplicationCreate(a *types.Application) error {
+	if a.LabelUID == uuid.Nil {
+		return fmt.Errorf("Fish: LabelUID can't be unset")
+	}
 	if a.Metadata == "" {
 		a.Metadata = "{}"
 	}
