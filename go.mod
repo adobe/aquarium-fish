@@ -10,7 +10,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/kms v1.20.10
 	github.com/aws/aws-sdk-go-v2/service/servicequotas v1.14.10
 	github.com/aws/aws-sdk-go-v2/service/sts v1.18.9
-	github.com/deepmap/oapi-codegen v1.12.2
+	github.com/deepmap/oapi-codegen v1.12.4
 	github.com/getkin/kin-openapi v0.115.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/glebarez/sqlite v1.7.0
