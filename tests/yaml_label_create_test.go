@@ -69,7 +69,7 @@ version: 1
 definitions:
   - driver: test
     options:  # To verify UnparsedJson logic of UnmarshalYAML too
-	  fail_options_apply: 0
+      fail_options_apply: 0
     resources:
       cpu: 1
       ram: 2`).
