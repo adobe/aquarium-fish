@@ -15,10 +15,8 @@ package native
 // Native driver to run the workload on the host of the fish node
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"text/template"
 
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
@@ -38,8 +36,9 @@ type Driver struct {
 	total_ram uint // In RAM GB
 }
 
-type TemplateData struct {
-	Disks map[string]string // Map with disk_name = volume_path
+// Is used to provide some data to the entry/metadata values which could contain templates
+type EnvData struct {
+	Disks map[string]string // Map with disk_name = mount_path
 }
 
 func init() {
@@ -172,6 +171,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 		userDelete(&d.cfg, user)
 		return nil, log.Error("Native: Unable to create user:", user, err)
 	}
+	log.Info("Native: Created user for Application execution:", user)
 
 	// Create and connect volumes to container
 	disk_paths, err := d.disksCreate(user, def.Resources.Disks)
@@ -191,33 +191,14 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 		return nil, log.Error("Native: Unable to load and unpack images:", err)
 	}
 
-	// Parsing entry because it could contain templates to use the proper disk
-	template_data := TemplateData{
-		Disks: disk_paths,
-	}
-	tmpl, err := template.New("").Parse(opts.Entry)
-	if err != nil {
-		disksDelete(&d.cfg, user)
-		userDelete(&d.cfg, user)
-		return nil, log.Error("Native: Unable to parse entry template:", user, opts.Entry, err)
-	}
-	var buf bytes.Buffer
-	err = tmpl.Execute(&buf, template_data)
-	if err != nil {
-		disksDelete(&d.cfg, user)
-		userDelete(&d.cfg, user)
-		return nil, log.Error("Native: Unable to execute entry template:", user, opts.Entry, err)
-	}
-	entry := buf.String()
-
 	// Running workload
-	if err := userRun(&d.cfg, user, homedir, entry, metadata); err != nil {
+	if err := userRun(&d.cfg, &EnvData{Disks: disk_paths}, user, opts.Entry, metadata); err != nil {
 		disksDelete(&d.cfg, user)
 		userDelete(&d.cfg, user)
 		return nil, log.Error("Native: Unable to run the entry workload:", err)
 	}
 
-	log.Info("Native: Started workload for user:", user, entry)
+	log.Info("Native: Started workload for user:", user, opts.Entry)
 
 	return &types.Resource{Identifier: user}, nil
 }
@@ -256,7 +237,7 @@ func (d *Driver) Deallocate(res *types.Resource) error {
 	if res == nil || res.Identifier == "" {
 		return fmt.Errorf("Native: Invalid resource: %v", res)
 	}
-	if isEnvAllocated(res.Identifier) {
+	if !isEnvAllocated(res.Identifier) {
 		return log.Error("Native: Unable to find the environment user:", res.Identifier)
 	}
 

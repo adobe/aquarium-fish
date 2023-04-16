@@ -26,7 +26,7 @@ import (
 )
 
 type Config struct {
-	Users []string `json:"users"` // List of precreated OS user names in format "user[:password]" to run the workload
+	//TODO: Users []string `json:"users"` // List of precreated OS user names in format "user[:password]" to run the workload
 
 	SudoPath      string `json:"sudo_path"`      // Path to the sudo (privilege escalation) binary
 	ImagesPath    string `json:"images_path"`    // Where to store/look the environment images
@@ -107,94 +107,46 @@ func (c *Config) Validate() (err error) {
 
 	// Verify the configuration works for this machine
 	var opts Options
-	if len(c.Users) == 0 {
-		// If the users are not set - the user will be created dynamically
-		// with "fish-" prefix and it's needed quite a good amount of access:
+	// If the users are not set - the user will be created dynamically
+	// with "fish-" prefix and it's needed quite a good amount of access:
 
-		// Verify user create
-		name, homedir, err := userCreate(c, opts.Groups)
-		if err != nil {
-			userDelete(c, name)
-			return fmt.Errorf("Native: Unable to create new user %q: %v", name, err)
-		}
-
-		// Create test init script
-		init_path, err := testScriptCreate(c, name)
-		if err != nil {
-			userDelete(c, name)
-			return fmt.Errorf("Native: Unable to create test script in %q: %v", init_path, err)
-		}
-
-		// Run the test init script
-		if err = userRun(c, name, homedir, init_path, map[string]any{}); err != nil {
-			userDelete(c, name)
-			return fmt.Errorf("Native: Unable to run test init script %q: %v", init_path, err)
-		}
-
-		// Clean after the run
-		if err = userDelete(c, name); err != nil {
-			return fmt.Errorf("Native: Unable to delete user %q: %v", name, err)
-		}
-
-		// MacOS "/etc/sudoers.d/aquarium-fish-driver-native":
-		//   # Configuration allows aquarium-fish to run native driver
-		//
-		//   # Create new user / unpack images
-		//   <fish-user> ALL=(root) NOPASSWD:NOEXEC: /usr/bin/dscl . create /Users/fish-[a-z][a-z][a-z][a-z][a-z][a-z] *
-		//   <fish-user> ALL=(root) NOPASSWD:NOEXEC: /usr/bin/dscl . append /Groups/* GroupMembership fish-[a-z][a-z][a-z][a-z][a-z][a-z]
-		//   <fish-user> ALL=(root) NOPASSWD:NOEXEC: /usr/sbin/createhomedir -c -u fish-[a-z][a-z][a-z][a-z][a-z][a-z]
-		//   <fish-user> ALL=(root) NOPASSWD:NOEXEC: /usr/sbin/chown -R fish-[a-z][a-z][a-z][a-z][a-z][a-z]\:* /Volumes/fish-[a-z][a-z][a-z][a-z][a-z][a-z]_*/
-		//   <fish-user> ALL=(root) NOPASSWD:NOEXEC: /usr/bin/tar -xf * -C /Users/fish-[a-z][a-z][a-z][a-z][a-z][a-z]
-		//
-		//   # Run env init script
-		//   <fish-user> ALL=(root) NOPASSWD: /usr/bin/su -l fish-[a-z][a-z][a-z][a-z][a-z][a-z] *
-		//
-		//   # Delete user
-		//   <fish-user> ALL=(root) NOPASSWD:NOEXEC: /usr/bin/killall -INT -u fish-[a-z][a-z][a-z][a-z][a-z][a-z]
-		//   <fish-user> ALL=(root) NOPASSWD:NOEXEC: /usr/bin/killall -KILL -u fish-[a-z][a-z][a-z][a-z][a-z][a-z]
-		//   <fish-user> ALL=(root) NOPASSWD:NOEXEC: /usr/bin/dscl . delete /Users/fish-[a-z][a-z][a-z][a-z][a-z][a-z]
-		//   <fish-user> ALL=(root) NOPASSWD:NOEXEC: /bin/rm -rf /Users/fish-[a-z][a-z][a-z][a-z][a-z][a-z]
-
-		// MacOS "createuser.sh":
-		//   #!/bin/sh -xe
-		//   sudo -n /usr/bin/dscl . create /Users/fish-abcdef RealName "BuildUser Account"
-		//   sudo -n /usr/bin/dscl . create /Users/fish-abcdef UniqueID 502
-		//   sudo -n /usr/bin/dscl . create /Users/fish-abcdef PrimaryGroupID 20
-		//   sudo -n /usr/bin/dscl . create /Users/fish-abcdef UserShell /bin/sh
-
-		//   sudo -n /usr/bin/dscl . create /Users/fish-abcdef NFSHomeDirectory /Volumes/fish-abcdef
-		//   hdiutil create fish-abcdef.dmg -fs HFS+ -volname fish-abcdef -size $((10*1024))m
-		//   hdiutil attach -owners on fish-abcdef.dmg
-		//
-		//   # In case it's needed to use user workspace as image unpack directory
-		//   tar xf macos1015-ci.tar -C /Volumes/fish-abcdef
-		//   # In case we need to protect the image data
-		//   tar xf macos1015-ci.tar -C /Users/<fish-user>/aquarium/fish_native_workspace/fish-abcdef
-		//
-		//   sudo -n /usr/sbin/chown -R fish-abcdef:staff /Volumes/fish-abcdef/
-
-		// MacOS "runuser.sh"
-		//   #!/bin/sh -xe
-		//   sudo -n /usr/bin/su -l fish-abcdef --login /Volumes/fish-abcdef/init.sh
-
-		// MacOS "deleteuser.sh"
-		//   #!/bin/sh -xe
-		//   sudo -n /usr/bin/killall -INT -u fish-abcdef
-		//   sleep 5
-		//   sudo -n /usr/bin/killall -KILL -u fish-abcdef
-		//
-		//   hdiutil detach /Volumes/fish-abcdef
-		//   rm -f fish-abcdef.dmg
-		//
-		//   sudo -n /usr/bin/dscl . delete /Users/fish-abcdef
-	} else {
-		// TODO:
-		// If users are specified - check the user exists and we're capable to
-		// control their home directory to unpack images or clean it.
-		//
-		// Sudo most probably still will be used to run the init process as
-		// the user, but will require much less changes in the system.
+	// Verify user create
+	user, _, err := userCreate(c, opts.Groups)
+	if err != nil {
+		userDelete(c, user)
+		return fmt.Errorf("Native: Unable to create new user %q: %v", user, err)
 	}
+
+	// Create test init script
+	init_path, err := testScriptCreate(user)
+	if err != nil {
+		userDelete(c, user)
+		return fmt.Errorf("Native: Unable to create test script in %q: %v", init_path, err)
+	}
+
+	// Run the test init script
+	if err = userRun(c, nil, user, init_path, map[string]any{}); err != nil {
+		userDelete(c, user)
+		return fmt.Errorf("Native: Unable to run test init script %q: %v", init_path, err)
+	}
+
+	// Cleaning up the test script
+	if err := testScriptDelete(init_path); err != nil {
+		userDelete(c, user)
+		return fmt.Errorf("Native: Unable to delete test script in %q: %v", init_path, err)
+	}
+
+	// Clean after the run
+	if err = userDelete(c, user); err != nil {
+		return fmt.Errorf("Native: Unable to delete user %q: %v", user, err)
+	}
+
+	// TODO:
+	// If precreated users are specified - check the user exists and we're
+	// capable to control their home directory to unpack images or clean it.
+	//
+	// Sudo most probably still will be used to run the init process as
+	// the user, but will require much less changes in the system.
 
 	// Validating CpuAlter & RamAlter to not be less then the current cpu/ram count
 	cpu_stat, err := cpu.Counts(true)
@@ -219,10 +171,15 @@ func (c *Config) Validate() (err error) {
 	return nil
 }
 
-// Will create the test script to run
-func testScriptCreate(c *Config, user string) (path string, err error) {
-	path = filepath.Join("/tmp", user+"init.sh")
+// Will create the config test script to run
+func testScriptCreate(user string) (path string, err error) {
+	path = filepath.Join("/tmp", user+"-init.sh")
 
 	script := []byte("#!/bin/sh\nid\n")
 	return path, os.WriteFile(path, script, 0755)
+}
+
+// Will delete the config test script
+func testScriptDelete(path string) error {
+	return os.Remove(path)
 }
