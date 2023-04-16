@@ -39,8 +39,9 @@ import (
  */
 type Options struct {
 	Images []drivers.Image `json:"images"` // Optional list of image dependencies, they will be unpacked in order
-	Entry  string          `json:"entry"`  // Optional path to the executable that will be running as workload (default: init.sh / init.ps1)
-	Groups []string        `json:"groups"` // Optional user groups user should have, first one is primary (default: staff)
+	//TODO: Setup  string          `json:"setup"`  // Optional path to the executable, it will be started before the Entry with escalated priveleges
+	Entry  string   `json:"entry"`  // Optional path to the executable, it will be running as workload (default: init.sh / init.ps1)
+	Groups []string `json:"groups"` // Optional user groups user should have, first one is primary (default: staff)
 }
 
 func (o *Options) Apply(options util.UnparsedJson) error {
@@ -80,8 +81,8 @@ func (o *Options) Validate() error {
 
 	// Check images
 	var img_err error
-	for _, image := range o.Images {
-		if err := image.Validate(); err != nil {
+	for index, _ := range o.Images {
+		if err := o.Images[index].Validate(); err != nil {
 			img_err = log.Error("Native: Error during image validation:", err)
 		}
 	}
