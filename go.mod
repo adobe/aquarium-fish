@@ -1,6 +1,6 @@
 module github.com/adobe/aquarium-fish
 
-go 1.18
+go 1.20
 
 require (
 	github.com/alessio/shellescape v1.4.1
