@@ -19,7 +19,7 @@ clouds, etc.) to one entry point of allocating devices which can be used across 
 
 ## Requirements
 
-In general it can be built for any OS/architecture but for now the primary ones are:
+In general it can be built and used on any OS/architecture but for now the primary ones are:
 * MacOS
 * Linux
 

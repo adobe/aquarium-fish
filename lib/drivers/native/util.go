@@ -116,7 +116,7 @@ func (d *Driver) loadImages(user string, images []drivers.Image, disk_paths map[
 		}
 		defer f.Close()
 		log.Info("Native: Unpacking image:", user, image_archive, unpack_path)
-		_, _, err = runAndLog(5*time.Minute, f, d.cfg.SudoPath, "-n", "/usr/bin/tar", "-xf", "-", "-C", unpack_path+"/")
+		_, _, err = runAndLog(5*time.Minute, f, d.cfg.SudoPath, "-n", "/usr/bin/tar", "-xf", "-", "--uname", user, "-C", unpack_path+"/")
 		if err != nil {
 			return log.Error("Native: Unable to unpack the image:", image_archive, err)
 		}
@@ -433,6 +433,11 @@ func (d *Driver) disksCreate(user string, disks map[string]types.ResourcesDisk) 
 		// Change the owner of the volume to user
 		if _, _, err := runAndLog(5*time.Second, nil, d.cfg.SudoPath, "-n", "/usr/sbin/chown", "-R", user+":staff", mount_point+"/"); err != nil {
 			return disk_paths, fmt.Errorf("Native: Error user disk mount path chown: %v", err)
+		}
+
+		// (Optional) Disable spotlight for the mounted volume
+		if _, _, err := runAndLog(5*time.Second, nil, d.cfg.SudoPath, "/usr/bin/mdutil", "-i", "off", mount_point+"/"); err != nil {
+			log.Warn("Native: Unable to disable spotlight for the volume:", mount_point, err)
 		}
 
 		disk_paths[d_name] = mount_point
