@@ -1,5 +1,5 @@
 #!/bin/sh -e
-# Copyright 2021 Adobe. All rights reserved.
+# Copyright 2023 Adobe. All rights reserved.
 # This file is licensed to you under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License. You may obtain a copy
 # of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -19,7 +19,7 @@ token=$1
 hostport=$2
 [ "$hostport" ] || hostport=localhost:8001
 
-label=ubuntu2004_aws
+label=mac12_native
 
 # It's a bit dirty, but works for now - probably better to create API call to find the latest label
 curr_label=$(curl -s -u "admin:$token" -k "https://$hostport/api/v1/label/?filter=name=\"$label\"" | sed 's/},{"UID":/},\n{"UID":/g' | tail -1)
