@@ -15,6 +15,8 @@ package fish
 import (
 	"fmt"
 
+	"gorm.io/gorm"
+
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
@@ -39,11 +41,8 @@ func (f *Fish) UserFind(filter *string) (us []types.User, err error) {
 
 // UserCreate makes new User
 func (f *Fish) UserCreate(u *types.User) error {
-	if u.Name == "" {
-		return fmt.Errorf("Fish: Name can't be empty")
-	}
-	if u.Hash.IsEmpty() {
-		return fmt.Errorf("Fish: Hash can't be empty")
+	if err := u.Validate(); err != nil {
+		return fmt.Errorf("Fish: Unable to validate User: %v", err)
 	}
 
 	return f.db.Create(u).Error
@@ -103,4 +102,20 @@ func (f *Fish) UserNew(name string, password string) (string, *types.User, error
 // UserDelete removes User
 func (f *Fish) UserDelete(name string) error {
 	return f.db.Where("name = ?", name).Delete(&types.User{}).Error
+}
+
+// Insert / update the user directly from the data, without changing created_at and updated_at
+func (f *Fish) UserImport(u *types.User) error {
+	if err := u.Validate(); err != nil {
+		return fmt.Errorf("Fish: Unable to validate User: %v", err)
+	}
+
+	// The updated_at and created_at should stay the same so skipping the hooks
+	tx := f.db.Session(&gorm.Session{SkipHooks: true})
+	err := tx.Create(u).Error
+	if err != nil {
+		err = tx.Save(u).Error
+	}
+
+	return err
 }

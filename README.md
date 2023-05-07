@@ -76,7 +76,7 @@ $ ./aquarium-fish --cfg local2.yml
 
 #### Security
 
-By default Fish generates a simple CA and key/cert pair for Server & Client auth - it just shows
+By default Fish generates a sample CA and key/cert pair for Server & Client auth - it just shows
 the example of cluster communication transport protection via TLS and uses certificate public key
 as identifier of the cluster node. If a CA certificate is not exists - it will be generated. If
 node certificate and key are exists, they will be used, but if not - Fish will try to generate them
@@ -112,30 +112,44 @@ https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-argon2-04#section-4
 
 ### To run as a cluster
 
-**TODO [#30](https://github.com/adobe/aquarium-fish/issues/30):** This functionality is in active
-development, the available logic can't handle the cluster.
+Second node also can try to join a cluster - so the data will be synced between two nodes. Just add
+the `cluster_join` list to the config of the second node and specify the first node api address:
 
-Just make sure there is a path from one node to at least one another - there is no requirement of
-seeing the entire cluster for each node, but it need to be able to connect to at least one. More
-visibility is better up to 8 total - because it's the default limit of cluster connections for the
-node.
+* local2.yml
+   ```yaml
+   ---
+   node_name: test-2
+   api_address: 0.0.0.0:8002
+   cluster_join:
+     - 127.0.0.1:8001
+   ```
 
-#### Cluster usage
+```
+$ ./aquarium-fish --cfg local2.yml
+```
 
-To initialize cluster you need to create users with admin account and create Labels you want to
-use. In order to use the resources manager manually - check the `API` section and follow the next
-general directions:
+When you run the secondary node with this config - it will sync the cluster data before servicing
+it's API. Read more in **Cluster details**.
 
-1. Get your user and it's token
-2. Check the available Labels on the cluster (and create some if you need them)
-3. Create Application with description of what kind of resource you need
-4. Check the Status of your Application and wait for "ALLOCATED" status
-5. Now resource is allocated, it's all yours and, probably, already pinged you
-6. When you're done - request Application to deallocate the resource
-7. Make sure the Application status is "DEALLOCATED"
+### Cluster details
+
+Aquarium Fish p2p cluster DB is relatively simple and was designed to be brainsplit-resistant. In
+case you don't know - it's the situation when the working cluster was split in 2 clusters, due to
+connection interrupt or any other reason, which works separately for some time and then tries to
+restore the single cluster back when connection restored.
+
+It's started with the first node and then extends by simple `cluster_join` config option during
+start of the consequent nodes. After that node tries to establish the other cluster nodes
+connections up to 8 established connections (by default). It's not a big deal if the particular
+node will not see the entire cluster - the sync logic will work even if the node will have just one
+connection.
+
+Cluster connection uses websocket - it's started from one node and received by another (needs just
+one for bidirectional communication) and relatively easy to proxy in case it is needed. Node will
+try to have as much connections as possible to the similar location and ~10% with different ones.
 
 To use with Jenkins - you can install [Aquarium Net Jenkins](https://github.com/adobe/aquarium-net-jenkins)
-cloud plugin to dynamically allocate the required resources. Don't forget to add the served Labels
+cloud plugin to dynamically allocate the required resources. Don't forget to add the served labels
 to the cluster and you will be ready to go.
 
 ### Users policy
@@ -173,7 +187,7 @@ cluster data. The current schema could be found in OpenAPI format here:
 ### How the cluster choose node for resource allocation
 
 The cluster can't force any node to follow the majority decision, so the rules are providing full
-consensus.
+consensus. That means rules are executed by each node and each node decides separately.
 
 For now the rule is simple - when all the nodes are voted, each node can find the first node in the
 vote table that answered "yes". There are a couple of protection mechanisms like "CreateAt" to find

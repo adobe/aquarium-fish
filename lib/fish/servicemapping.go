@@ -15,6 +15,8 @@ package fish
 import (
 	"fmt"
 
+	"gorm.io/gorm"
+
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 	"github.com/adobe/aquarium-fish/lib/util"
@@ -38,11 +40,8 @@ func (f *Fish) ServiceMappingFind(filter *string) (sms []types.ServiceMapping, e
 
 // ServiceMappingCreate makes new ServiceMapping
 func (f *Fish) ServiceMappingCreate(sm *types.ServiceMapping) error {
-	if sm.Service == "" {
-		return fmt.Errorf("Fish: Service can't be empty")
-	}
-	if sm.Redirect == "" {
-		return fmt.Errorf("Fish: Redirect can't be empty")
+	if err := sm.Validate(); err != nil {
+		return fmt.Errorf("Fish: Unable to validate ServiceMapping: %v", err)
 	}
 
 	sm.UID = f.NewUID()
@@ -64,4 +63,20 @@ func (f *Fish) ServiceMappingGet(uid types.ServiceMappingUID) (sm *types.Service
 // ServiceMappingDelete removes ServiceMapping
 func (f *Fish) ServiceMappingDelete(uid types.ServiceMappingUID) error {
 	return f.db.Delete(&types.ServiceMapping{}, uid).Error
+}
+
+// Insert / update the service mapping directly from the data, without changing created_at and updated_at
+func (f *Fish) ServiceMappingImport(sm *types.ServiceMapping) error {
+	if err := sm.Validate(); err != nil {
+		return fmt.Errorf("Fish: Unable to validate ServiceMapping: %v", err)
+	}
+
+	// The updated_at and created_at should stay the same so skipping the hooks
+	tx := f.db.Session(&gorm.Session{SkipHooks: true})
+	err := tx.Create(sm).Error
+	if err != nil {
+		err = tx.Save(sm).Error
+	}
+
+	return err
 }

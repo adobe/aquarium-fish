@@ -28,6 +28,7 @@ import (
 	"gorm.io/gorm/logger"
 
 	"github.com/adobe/aquarium-fish/lib/build"
+	"github.com/adobe/aquarium-fish/lib/cluster"
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
@@ -44,10 +45,12 @@ func main() {
 	var proxySocksAddress string
 	var proxySSHAddress string
 	var nodeAddress string
+	var clusterJoin *[]string
 	var cfgPath string
 	var dir string
 	var cpuLimit string
 	var memTarget string
+	var maintenance bool
 	var logVerbosity string
 	var logTimestamp bool
 
@@ -82,6 +85,9 @@ func main() {
 			if nodeAddress != "" {
 				cfg.NodeAddress = nodeAddress
 			}
+			if len(*clusterJoin) > 0 {
+				cfg.ClusterJoin = *clusterJoin
+			}
 			if dir != "" {
 				cfg.Directory = dir
 			}
@@ -108,8 +114,8 @@ func main() {
 				debug.SetMemoryLimit(int64(cfg.MemTarget.Bytes()))
 			}
 
-			dir := filepath.Join(cfg.Directory, cfg.NodeAddress)
-			if err = os.MkdirAll(dir, 0o750); err != nil {
+			dir := filepath.Join(cfg.Directory, cfg.NodeName)
+			if err := os.MkdirAll(dir, 0o750); err != nil {
 				return log.Errorf("Fish: Can't create working directory %s: %v", dir, err)
 			}
 
@@ -126,7 +132,12 @@ func main() {
 			if !filepath.IsAbs(certPath) {
 				certPath = filepath.Join(cfg.Directory, certPath)
 			}
-			if err = crypt.InitTLSPairCa([]string{cfg.NodeName, cfg.NodeAddress}, caPath, keyPath, certPath); err != nil {
+			addr := cfg.NodeAddress
+			if addr == "" {
+				// Use API address in case the node address is unknow yet
+				addr = cfg.APIAddress
+			}
+			if err := crypt.InitTLSPairCa([]string{cfg.NodeName, addr}, caPath, keyPath, certPath); err != nil {
 				return err
 			}
 
@@ -134,7 +145,7 @@ func main() {
 			db, err := gorm.Open(sqlite.Open(filepath.Join(dir, "sqlite.db")), &gorm.Config{
 				Logger: logger.New(log.GetErrorLogger(), logger.Config{
 					SlowThreshold:             500 * time.Millisecond,
-					LogLevel:                  logger.Error,
+					LogLevel:                  logger.Silent,
 					IgnoreRecordNotFoundError: true,
 					Colorful:                  false,
 				}),
@@ -154,6 +165,12 @@ func main() {
 				return err
 			}
 
+			// Set startup maintenance mode, very useful on the init to handle cluster conn issues
+			// before the node starts to execute the real workload
+			if maintenance {
+				fish.MaintenanceSet(true)
+			}
+
 			log.Info("Fish starting socks5 proxy...")
 			err = proxysocks.Init(fish, cfg.ProxySocksAddress)
 			if err != nil {
@@ -170,8 +187,27 @@ func main() {
 				return err
 			}
 
+			log.Info("Fish running cluster...")
+			cl, err := cluster.New(fish, cfg.ClusterJoin, dir, caPath, certPath, keyPath)
+			if err != nil {
+				return err
+			}
+
+			// Register callbacks for create/update/delete to enable further synchronization of
+			// the cluster data with the connected to cluster nodes. It's registered after the
+			// cluster creation on purpose to allow a quick synchronization and not to duplicate
+			// the broadcast requests.
+			db.Callback().Create().After("gorm:create").Register("cluster_sync", cl.HookCreateUpdate)
+			db.Callback().Update().After("gorm:update").Register("cluster_sync", cl.HookCreateUpdate)
+			// TODO: make sure delete will work as well
+			//db.Callback().Update().After("gorm:delete").Register("cluster_sync_delete", func(db *gorm.DB) {
+			//	if db.Error == nil && db.Statement.Schema != nil && !db.Statement.SkipHooks {
+			//		log.Debug("DEBUG: GORM DELETE")
+			//	}
+			//})
+
 			log.Info("Fish starting API...")
-			srv, err := openapi.Init(fish, cfg.APIAddress, caPath, certPath, keyPath)
+			srv, err := openapi.Init(fish, cl, cfg.APIAddress, caPath, certPath, keyPath)
 			if err != nil {
 				return err
 			}
@@ -202,10 +238,12 @@ func main() {
 	flags.StringVar(&proxySocksAddress, "socks_proxy", "", "address used to expose the SOCKS5 proxy")
 	flags.StringVar(&proxySSHAddress, "ssh_proxy", "", "address used to expose the SSH proxy")
 	flags.StringVarP(&nodeAddress, "node", "n", "", "node external endpoint to connect to tell the other nodes")
+	clusterJoin = flags.StringSliceP("join", "j", nil, "addresses of existing cluster nodes to join, comma separated")
 	flags.StringVarP(&cfgPath, "cfg", "c", "", "yaml configuration file")
 	flags.StringVarP(&dir, "dir", "D", "", "database and other fish files directory")
 	flags.StringVar(&cpuLimit, "cpu", "", "max amount of threads fish node will be able to utilize, default - no limit")
 	flags.StringVar(&memTarget, "mem", "", "target memory utilization for fish node to run GC more aggressively when too close")
+	flags.BoolVar(&maintenance, "maintenance", false, "run in maintenance mode, connects to cluster but not executing Applications")
 	flags.StringVarP(&logVerbosity, "verbosity", "v", "info", "log level (debug, info, warn, error)")
 	flags.BoolVar(&logTimestamp, "timestamp", true, "prepend timestamps for each log line")
 	flags.Lookup("timestamp").NoOptDefVal = "false"

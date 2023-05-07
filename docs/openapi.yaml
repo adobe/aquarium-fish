@@ -676,6 +676,39 @@ paths:
       security:
         - basic_auth: []
 
+  /api/v1/node/{name}/pubkey:
+    put:
+      summary: Sets pubkey of the node
+      description: In order to change public key of the node
+      operationId: NodePubkeyPut
+      tags:
+        - Node
+      parameters:
+        - name: name
+          in: path
+          description: Name of the node
+          required: true
+          schema:
+            type: string
+        - name: value
+          in: query
+          description: Value of the pubkey, if omitted then will be nulled
+          required: false
+          schema:
+            type: string
+            format: byte
+      responses:
+        '200':
+          description: Successful operation
+        '400':
+          description: Bad parameter or conditions
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Node not found
+      security:
+        - basic_auth: []
+
   /api/v1/node/this/:
     get:
       summary: Get this Node info
@@ -782,6 +815,27 @@ paths:
           description: Successful operation
         '400':
           description: Bad parameter or conditions
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+      security:
+        - basic_auth: []
+
+  /api/v1/node/this/connections:
+    get:
+      summary: List current node connections & status
+      description: Returns list of node cluster connections
+      operationId: NodeThisConnectionsGet
+      tags:
+        - Node
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Connection'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
       security:
@@ -1046,13 +1100,22 @@ paths:
         '404':
           description: Key path not found
 
+  # Actually just a dummy - implemented in lib/openapi/cluster
   /cluster/v1/connect:
-    post:
+    get:
       summary: Connect to the cluster
       description: WebSocket json-based messaging between the cluster nodes
       operationId: ClusterConnect
       tags:
         - Cluster
+      parameters:
+        - name: uid
+          in: query
+          description: Precaution measure to allow node to not connect to wrong cluster
+          required: false
+          schema:
+            type: string
+            format: uuid
       responses:
         '200':
           description: The connection is established
@@ -1492,7 +1555,6 @@ components:
         - created_at
         - updated_at
         - name
-        - definition
         - location_name
         - address
       properties:
@@ -1510,8 +1572,6 @@ components:
           x-oapi-codegen-extra-tags:
             gorm: unique
           description: Unique name of the Node
-        definition:
-          $ref: '#/components/schemas/NodeDefinition'
         location_name:
           # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/LocationName'
           type: string
@@ -1526,31 +1586,6 @@ components:
             gorm: unique
           description: The node public key to verify on secondary connections and signatures
 
-    NodeDefinition:
-      type: object
-      description: Contains technical information about the node
-      required:
-        - cpu
-        - disks
-        - nets
-      properties:
-        host:
-          x-go-type: host.InfoStat
-          x-omitempty: false
-        memory:
-          x-go-type: mem.VirtualMemoryStat
-          x-omitempty: false
-        cpu:
-          type: array
-          items:
-            x-go-type: cpu.InfoStat
-        disks:
-          x-go-type: 'map[string]*disk.UsageStat'
-        nets:
-          type: array
-          items:
-            x-go-type: net.InterfaceStat
-
     ResourceUID:
       type: string
       format: uuid
@@ -1559,7 +1594,7 @@ components:
     Resource:
       type: object
       description: >
-        Active resource definition to be able to properly restore the state during the cluster node
+        Resource definition to be able to properly restore the state during the cluster node
         restart. Also contains additional info about the resource, for example user requested
         metadata, which is available for the resource through the `Meta API`.
 
@@ -1571,6 +1606,7 @@ components:
         - application_UID
         - node_UID
         - label_UID
+        - deactivated
         - definition_index
         - identifier
         - ip_addr
@@ -1603,8 +1639,14 @@ components:
           format: uuid
           x-oapi-codegen-extra-tags:
             yaml: label_UID
+        deactivated:
+          type: boolean
+          description: |
+            Flag to mark the resource as not active in case it was deallocated
         definition_index:
           type: integer
+          description: |
+            Which particular definition from the Label was used to allocate this resource
         identifier:
           type: string
           description: |
@@ -1819,6 +1861,39 @@ components:
           x-oapi-codegen-extra-tags:
             yaml: application_UID
             gorm: uniqueIndex:idx_location_service_app_uniq
+
+    # Runtime
+    ConnectionStatus:
+      type: string
+      enum:
+        - CONNECTED     # Connected and feel good
+        - DISCONNECTED  # Not connected
+        - ERROR         # Not connected and error happened
+    Connection:
+      type: object
+      description: >
+        Simple runtime object to describe node connection and it's status
+      required:
+        - name
+        - url
+        - host
+        - status
+        - error
+      properties:
+        name:
+          type: string
+          description: Contains node name as known from the certificate
+        url:
+          type: string
+          description: URL to the node to connect to, empty if receiver
+        host:
+          type: string
+          description: IP address of the remote node that initiated or will receive connection
+        status:
+          $ref: '#/components/schemas/ConnectionStatus'
+        error:
+          type: string
+          description: If error happened it will contain the error message string
 
   securitySchemes:
     basic_auth:

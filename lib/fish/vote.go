@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/google/uuid"
+	"gorm.io/gorm"
 
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
@@ -41,12 +41,10 @@ func (f *Fish) VoteFind(filter *string) (vs []types.Vote, err error) {
 
 // VoteCreate makes new Vote
 func (f *Fish) VoteCreate(v *types.Vote) error {
-	if v.ApplicationUID == uuid.Nil {
-		return fmt.Errorf("Fish: ApplicationUID can't be unset")
+	if err := v.Validate(); err != nil {
+		return fmt.Errorf("Fish: Unable to validate Vote: %v", err)
 	}
-	if v.NodeUID == uuid.Nil {
-		return fmt.Errorf("Fish: NodeUID can't be unset")
-	}
+
 	// Update Vote Rand to be actual rand
 	v.Rand = rand.Uint32() // #nosec G404
 	v.UID = f.NewUID()
@@ -92,4 +90,20 @@ func (f *Fish) VoteGetNodeApplication(nodeUID types.NodeUID, appUID types.Applic
 	v = &types.Vote{}
 	err = f.db.Where("application_uid = ?", appUID).Where("node_uid = ?", nodeUID).Order("round DESC").First(&v).Error
 	return v, err
+}
+
+// Insert / update the vote directly from the data, without changing created_at and updated_at
+func (f *Fish) VoteImport(v *types.Vote) error {
+	if err := v.Validate(); err != nil {
+		return fmt.Errorf("Fish: Unable to validate Vote: %v", err)
+	}
+
+	// The updated_at and created_at should stay the same so skipping the hooks
+	tx := f.db.Session(&gorm.Session{SkipHooks: true})
+	err := tx.Create(v).Error
+	if err != nil {
+		err = tx.Save(v).Error
+	}
+
+	return err
 }

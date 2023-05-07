@@ -14,7 +14,8 @@ package fish
 
 import (
 	"fmt"
-	"time"
+
+	"gorm.io/gorm"
 
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
@@ -39,29 +40,8 @@ func (f *Fish) LabelFind(filter *string) (labels []types.Label, err error) {
 
 // LabelCreate makes new Label
 func (f *Fish) LabelCreate(l *types.Label) error {
-	if l.Name == "" {
-		return fmt.Errorf("Fish: Name can't be empty")
-	}
-	for i, def := range l.Definitions {
-		if def.Driver == "" {
-			return fmt.Errorf("Fish: Driver can't be empty in Label Definition %d", i)
-		}
-		if def.Resources.Cpu < 1 {
-			return fmt.Errorf("Fish: Resources CPU can't be less than 1 in Label Definition %d", i)
-		}
-		if def.Resources.Ram < 1 {
-			return fmt.Errorf("Fish: Resources RAM can't be less than 1 in Label Definition %d", i)
-		}
-		_, err := time.ParseDuration(def.Resources.Lifetime)
-		if def.Resources.Lifetime != "" && err != nil {
-			return fmt.Errorf("Fish: Resources Lifetime parse error in Label Definition %d: %v", i, err)
-		}
-		if def.Options == "" {
-			l.Definitions[i].Options = "{}"
-		}
-	}
-	if l.Metadata == "" {
-		l.Metadata = "{}"
+	if err := l.Validate(); err != nil {
+		return fmt.Errorf("Fish: Unable to validate Label: %v", err)
 	}
 
 	l.UID = f.NewUID()
@@ -84,4 +64,20 @@ func (f *Fish) LabelGet(uid types.LabelUID) (label *types.Label, err error) {
 // LabelDelete deletes the Label by UID
 func (f *Fish) LabelDelete(uid types.LabelUID) error {
 	return f.db.Delete(&types.Label{}, uid).Error
+}
+
+// Insert / update the label directly from the data, without changing created_at and updated_at
+func (f *Fish) LabelImport(l *types.Label) error {
+	if err := l.Validate(); err != nil {
+		return fmt.Errorf("Fish: Unable to validate Label: %v", err)
+	}
+
+	// The updated_at and created_at should stay the same so skipping the hooks
+	tx := f.db.Session(&gorm.Session{SkipHooks: true})
+	err := tx.Create(l).Error
+	if err != nil {
+		err = tx.Save(l).Error
+	}
+
+	return err
 }
