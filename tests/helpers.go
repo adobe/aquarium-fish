@@ -16,6 +16,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -36,6 +37,7 @@ type AFInstance struct {
 }
 
 func RunAquariumFish(t *testing.T, cfg string) *AFInstance {
+	t.Log("INFO: Creating new node")
 	afi := &AFInstance{}
 
 	afi.workspace = t.TempDir()
@@ -65,19 +67,43 @@ func (afi *AFInstance) IsRunning() bool {
 }
 
 // Restart the application
-func (afi *AFInstance) Restart(t *testing.T) error {
+func (afi *AFInstance) Restart(t *testing.T) {
 	t.Log("INFO: Restarting:", afi.workspace)
 	afi.fishStop()
 	afi.fishStart(t)
-	return nil
+}
+
+// Start another node of cluster
+// It will automatically add cluster_join parameter to the config
+func (afi1 *AFInstance) RunClusterNode(t *testing.T, cfg string) *AFInstance {
+	t.Log("INFO: Creating new cluster node with seed:", afi1.api_address)
+	afi2 := &AFInstance{}
+
+	afi2.workspace = t.TempDir()
+	t.Log("INFO: Created workspace:", afi2.workspace)
+
+	cfg += fmt.Sprintf("\ncluster_join: [%q]", afi1.api_address)
+	os.WriteFile(filepath.Join(afi2.workspace, "config.yml"), []byte(cfg), 0644)
+	t.Log("INFO: Stored config:", cfg)
+
+	// Copy seed node CA to generate valid cluster node cert
+	if err := copyFile(filepath.Join(afi1.workspace, "fish_data", "ca.key"), filepath.Join(afi2.workspace, "fish_data", "ca.key")); err != nil {
+		t.Fatalf("Unable to copy CA key: %v", err)
+	}
+	if err := copyFile(filepath.Join(afi1.workspace, "fish_data", "ca.crt"), filepath.Join(afi2.workspace, "fish_data", "ca.crt")); err != nil {
+		t.Fatalf("Unable to copy CA crt: %v", err)
+	}
+
+	afi2.fishStart(t)
+
+	return afi2
 }
 
 // Cleanup after the test execution
-func (afi *AFInstance) Cleanup(t *testing.T) error {
+func (afi *AFInstance) Cleanup(t *testing.T) {
 	t.Log("INFO: Cleaning up:", afi.workspace)
 	afi.fishStop()
 	os.RemoveAll(afi.workspace)
-	return nil
 }
 
 func (afi *AFInstance) fishStart(t *testing.T) {
@@ -95,7 +121,7 @@ func (afi *AFInstance) fishStart(t *testing.T) {
 		// Listening for log and scan for token and address
 		for scanner.Scan() {
 			line := scanner.Text()
-			t.Log(line)
+			t.Log(afi.api_address, line)
 			if strings.HasPrefix(line, "Admin user pass: ") {
 				val := strings.SplitN(strings.TrimSpace(line), "Admin user pass: ", 2)
 				if len(val) < 2 {
@@ -136,4 +162,26 @@ func (afi *AFInstance) fishStart(t *testing.T) {
 	if failed != "" {
 		t.Fatalf(failed)
 	}
+}
+
+// Func to copy files around
+func copyFile(src, dst string) error {
+	fin, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer fin.Close()
+
+	os.MkdirAll(filepath.Dir(dst), 0755)
+	fout, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer fout.Close()
+
+	if _, err = io.Copy(fout, fin); err != nil {
+		return err
+	}
+
+	return nil
 }
