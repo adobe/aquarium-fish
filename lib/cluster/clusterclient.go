@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gorilla/websocket"
+	"github.com/fasthttp/websocket"
 
 	"github.com/adobe/aquarium-fish/lib/log"
 )
@@ -114,6 +114,7 @@ func (conn *ClusterClient) Write(payload any) error {
 	}
 }
 
+// Function to write the requested data into the socket
 func (conn *ClusterClient) listenWrite() {
 	for data := range conn.send_buf {
 		ws := conn.Connect()
@@ -148,6 +149,7 @@ func (conn *ClusterClient) closeWs() {
 	conn.mu.Unlock()
 }
 
+// Ensures the socket is active and not silently dropped
 func (conn *ClusterClient) ping() {
 	log.Infof("ClusterClient %s: Ping started", conn.url.Host)
 	ticker := time.NewTicker(ping_period)

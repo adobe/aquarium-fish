@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/gorilla/websocket"
+	"github.com/fasthttp/websocket"
 	"github.com/labstack/echo/v4"
 
 	"github.com/adobe/aquarium-fish/lib/cluster"
@@ -62,7 +62,7 @@ func (e *Processor) ClientCertAuth(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		// The connecting client should have the valid to cluster CA certificate, with the CN of
 		// the node name, pubkey need be the same as stored (or first time registration) in cluster
-		// nodes table and the time of last ping need to be more than ping delay time x2
+		// nodes table
 
 		if len(c.Request().TLS.PeerCertificates) == 0 {
 			return echo.NewHTTPError(http.StatusUnauthorized, "Client certificate is not provided")

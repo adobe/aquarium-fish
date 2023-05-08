@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gorilla/websocket"
+	"github.com/fasthttp/websocket"
 	//	"github.com/adobe/aquarium-fish/lib/cluster/msg"
 )
 

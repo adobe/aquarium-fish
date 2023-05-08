@@ -11,11 +11,11 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/servicequotas v1.14.10
 	github.com/aws/aws-sdk-go-v2/service/sts v1.18.9
 	github.com/deepmap/oapi-codegen v1.12.4
+	github.com/fasthttp/websocket v1.5.3
 	github.com/getkin/kin-openapi v0.115.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/glebarez/sqlite v1.7.0
 	github.com/google/uuid v1.3.0
-	github.com/gorilla/websocket v1.4.0
 	github.com/hpcloud/tail v1.0.0
 	github.com/labstack/echo/v4 v4.10.2
 	github.com/mostlygeek/arp v0.0.0-20170424181311-541a2129847a
@@ -31,6 +31,7 @@ require (
 )
 
 require (
+	github.com/andybalholm/brotli v1.0.5 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.32 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.26 // indirect
@@ -50,6 +51,7 @@ require (
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
+	github.com/klauspost/compress v1.16.5 // indirect
 	github.com/labstack/gommon v0.4.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
@@ -59,10 +61,12 @@ require (
 	github.com/perimeterx/marshmallow v1.1.4 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230126093431-47fa9a501578 // indirect
+	github.com/savsgio/gotils v0.0.0-20230208104028-c358bd845dee // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/tklauser/go-sysconf v0.3.11 // indirect
 	github.com/tklauser/numcpus v0.6.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
+	github.com/valyala/fasthttp v1.47.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	golang.org/x/sys v0.7.0 // indirect
