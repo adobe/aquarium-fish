@@ -625,6 +625,7 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 				}
 			}
 			f.ApplicationStateCreate(app_state)
+			log.Info("Fish: Allocated the Resource for Application:", app.UID, res.Identifier)
 		}
 
 		// Getting the resource lifetime to know how much time it will live

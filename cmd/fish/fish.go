@@ -33,6 +33,8 @@ import (
 )
 
 func main() {
+	log.Infof("Aquarium Fish %s (%s)", build.Version, build.Time)
+
 	var api_address string
 	var proxy_address string
 	var node_address string
@@ -56,7 +58,6 @@ func main() {
 			return log.InitLoggers()
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			log.Infof("Aquarium Fish %s (%s)", build.Version, build.Time)
 
 			cfg := &fish.Config{}
 			if err := cfg.ReadConfigFile(cfg_path); err != nil {
@@ -101,10 +102,11 @@ func main() {
 			}
 
 			log.Info("Fish starting ORM...")
+			// TODO: If the cluster UID is different - recreate the database from scratch
 			db, err := gorm.Open(sqlite.Open(filepath.Join(dir, "sqlite.db")), &gorm.Config{
 				Logger: logger.New(log.ErrorLogger, logger.Config{
 					SlowThreshold:             500 * time.Millisecond,
-					LogLevel:                  logger.Error,
+					LogLevel:                  logger.Silent,
 					IgnoreRecordNotFoundError: true,
 					Colorful:                  false,
 				}),

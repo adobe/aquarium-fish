@@ -17,7 +17,6 @@ import (
 	"net"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mostlygeek/arp"
 	"gorm.io/gorm"
 
@@ -47,21 +46,8 @@ func (f *Fish) ResourceListNode(node_uid types.NodeUID) (rs []types.Resource, er
 }
 
 func (f *Fish) ResourceCreate(r *types.Resource) error {
-	if r.ApplicationUID == uuid.Nil {
-		return fmt.Errorf("Fish: ApplicationUID can't be unset")
-	}
-	if r.LabelUID == uuid.Nil {
-		return fmt.Errorf("Fish: LabelUID can't be unset")
-	}
-	if r.NodeUID == uuid.Nil {
-		return fmt.Errorf("Fish: NodeUID can't be unset")
-	}
-	if len(r.Identifier) == 0 {
-		return fmt.Errorf("Fish: Identifier can't be empty")
-	}
-	// TODO: check JSON
-	if len(r.Metadata) < 2 {
-		return fmt.Errorf("Fish: Metadata can't be empty")
+	if err := r.Validate(); err != nil {
+		return fmt.Errorf("Fish: Unable to validate Resource: %v", err)
 	}
 
 	r.UID = f.NewUID()

@@ -1,5 +1,5 @@
 /**
- * Copyright 2021 Adobe. All rights reserved.
+ * Copyright 2023 Adobe. All rights reserved.
  * This file is licensed to you under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may obtain a copy
  * of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -13,16 +13,15 @@
 package cluster
 
 import (
-	"fmt"
+	"github.com/adobe/aquarium-fish/lib/log"
 )
 
-// Hub maintains the set of active clients and broadcasts messages to the
-// clients.
+// Hub maintains the set of active clients and broadcasts messages to them.
 type Hub struct {
 	// Registered clients.
 	clients map[*Client]bool
 
-	// Inbound messages from the clients.
+	// Message to be sent to all the clients.
 	broadcast chan []byte
 
 	// Register requests from the clients.
@@ -41,12 +40,12 @@ func (h *Hub) Run() {
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
 				close(client.send)
-				fmt.Println("Cluster: Hub: connection closed")
+				log.Info("Cluster: Hub: connection closed")
 			}
-		case <-h.broadcast:
+		case msg := <-h.broadcast:
 			for client := range h.clients {
 				select {
-				case client.send <- []byte("acknowledge"):
+				case client.send <- msg:
 				default:
 					close(client.send)
 					delete(h.clients, client)

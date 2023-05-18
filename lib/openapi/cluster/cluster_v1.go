@@ -1,5 +1,5 @@
 /**
- * Copyright 2021 Adobe. All rights reserved.
+ * Copyright 2023 Adobe. All rights reserved.
  * This file is licensed to you under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may obtain a copy
  * of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -77,8 +77,7 @@ func (e *Processor) ClientCertAuth(next echo.HandlerFunc) echo.HandlerFunc {
 			}
 			_, err := crt.Verify(opts)
 			if err != nil {
-				log.Warn(fmt.Sprintf("Cluster: Client %s (%s) certificate CA verify failed:",
-					crt.Subject.CommonName, c.RealIP()), err)
+				log.Warnf("Cluster: Client %s (%s) certificate CA verify failed: %v", crt.Subject.CommonName, c.RealIP(), err)
 				continue
 			}
 
@@ -112,15 +111,14 @@ func (e *Processor) ClusterConnect(c echo.Context) error {
 	ws, err := e.upgrader.Upgrade(c.Response(), c.Request(), nil)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to connect with the cluster: %v", err)})
-		return fmt.Errorf("Unable to connect with the cluster: %w", err)
+		return log.Errorf("Unable to connect with the cluster: %v", err)
 	}
-	client := &Client{hub: e.hub, conn: ws, send: make(chan []byte, 256)}
+	client := &Client{fish: e.fish, hub: e.hub, conn: ws, send: make(chan []byte, 256)}
 	e.hub.register <- client
 
 	// Starting the new connected client processes
 	go client.writePump()
 	go client.readPump()
-	go client.init()
 
 	return nil
 }
