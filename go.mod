@@ -13,7 +13,6 @@ require (
 	github.com/deepmap/oapi-codegen v1.12.4
 	github.com/fasthttp/websocket v1.5.3
 	github.com/getkin/kin-openapi v0.115.0
-	github.com/ghodss/yaml v1.0.0
 	github.com/glebarez/sqlite v1.7.0
 	github.com/google/uuid v1.3.0
 	github.com/hpcloud/tail v1.0.0
