@@ -13,29 +13,49 @@
 package cluster
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/google/uuid"
+	"gopkg.in/yaml.v3"
 
 	"github.com/adobe/aquarium-fish/lib/fish"
+	"github.com/adobe/aquarium-fish/lib/log"
 )
+
+type ClusterInfo struct {
+	UID       uuid.UUID
+	UpdatedAt time.Time
+}
 
 type Cluster struct {
 	fish *fish.Fish
 
-	clients []*ClusterClient
+	// Contains info about the cluster to be permanently stored
+	info ClusterInfo
+
+	// Where the info will be stored
+	cluster_file string
+
+	clients []*Client
 
 	ca_pool *x509.CertPool
 	certkey tls.Certificate
+
+	// Fired when cluster is ready and completed the sync process
+	Ready chan bool
 }
 
-func New(fish *fish.Fish, join []string, ca_path, cert_path, key_path string) (*Cluster, error) {
+func New(fish *fish.Fish, join []string, data_dir, ca_path, cert_path, key_path string) (*Cluster, error) {
 	c := &Cluster{
 		fish:    fish,
 		ca_pool: x509.NewCertPool(),
+		Ready:   make(chan bool, 1),
 	}
 
 	// Load CA cert to pool
@@ -53,26 +73,49 @@ func New(fish *fish.Fish, join []string, ca_path, cert_path, key_path string) (*
 		return nil, fmt.Errorf("Cluster: Unable to load cert/key: %v", err)
 	}
 
+	// Read the cluster info if it's existing
+	c.cluster_file = filepath.Join(data_dir, "cluster.yml")
+	data, err := os.ReadFile(c.cluster_file)
+	if err == nil {
+		if err := yaml.Unmarshal(data, c); err != nil {
+			return nil, fmt.Errorf("Cluster: Unable to read cluster config file: %v", err)
+		}
+	}
+
 	// Connect the join nodes
-	for _, endpoint := range join {
-		c.NewClient(endpoint, "cluster/v1/connect")
+	if len(join) > 0 {
+		log.Info("Cluster: Connecting to cluster:", join)
+		for _, endpoint := range join {
+			c.NewConnect(endpoint, "cluster/v1/connect")
+		}
+
+		// Wait until all the clients will be synced
+		go c.waitForClientsSync()
+	} else {
+		// In case it's the first node in the cluster - then create it
+		c.info.UID = uuid.New()
+		c.info.UpdatedAt = time.Now()
+
+		log.Info("Cluster: Creating new cluster UID:", c.info.UID)
+
+		// Write the first cluster info file
+		cl_data, err := yaml.Marshal(&c.info)
+		if err != nil {
+			return nil, fmt.Errorf("Cluster: Unable to prepare cluster state yaml: %v", err)
+		}
+		if err := os.WriteFile(c.cluster_file, cl_data, 0500); err != nil {
+			return nil, fmt.Errorf("Cluster: Unable to write cluster state file: %v", err)
+		}
+
+		// New cluster is ready
+		c.Ready <- true
 	}
 
 	return c, nil
 }
 
-func (c *Cluster) NewClient(host, channel string) *ClusterClient {
-	conn := &ClusterClient{
-		fish:     c.fish,
-		url:      url.URL{Scheme: "wss", Host: host, Path: channel},
-		send_buf: make(chan []byte, 1),
-		cluster:  c,
-	}
-	conn.ctx, conn.ctxCancel = context.WithCancel(context.Background())
-
-	go conn.listen()
-	go conn.listenWrite()
-	go conn.ping()
+func (c *Cluster) NewConnect(host, channel string) *Client {
+	conn := NewClientInitiator(c.fish, c, url.URL{Scheme: "wss", Host: host, Path: channel})
 
 	c.clients = append(c.clients, conn)
 
@@ -83,4 +126,30 @@ func (c *Cluster) Stop() {
 	for _, conn := range c.clients {
 		conn.Stop()
 	}
+}
+
+// Function waits until the active clients will be synchronized (sync operation completed)
+func (c *Cluster) waitForClientsSync() {
+	var all_synced bool
+
+	for !all_synced {
+		log.Debug("Cluster: Waiting for all conections get in sync...")
+		time.Sleep(time.Second)
+
+		all_synced = true
+		for _, conn := range c.clients {
+			// In case connection is failed - no need to wait for it
+			if conn.ConnFail == nil && !conn.InSync {
+				all_synced = false
+				break
+			}
+		}
+	}
+
+	// Ok, seems all the clients now in sync
+	c.Ready <- true
+}
+
+func (c *Cluster) GetInfo() ClusterInfo {
+	return c.info
 }

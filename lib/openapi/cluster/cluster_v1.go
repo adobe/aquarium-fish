@@ -32,24 +32,23 @@ type Processor struct {
 	fish     *fish.Fish
 	upgrader websocket.Upgrader
 
-	hub *Hub
+	cluster *cluster.Cluster
+	hub     *cluster.Hub
 }
 
 func NewV1Router(e *echo.Echo, fish *fish.Fish, cl *cluster.Cluster) {
-	hub := &Hub{
-		broadcast:  make(chan []byte),
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
-		clients:    make(map[*Client]bool),
-	}
+	hub := cluster.NewHub()
 	go hub.Run()
+
 	proc := &Processor{
 		fish: fish,
 		upgrader: websocket.Upgrader{
 			EnableCompression: true,
 		},
-		hub: hub,
+		cluster: cl,
+		hub:     hub,
 	}
+
 	router := e.Group("")
 	router.Use(
 		// The connected client should have valid cluster signed certificate
@@ -81,7 +80,6 @@ func (e *Processor) ClientCertAuth(next echo.HandlerFunc) echo.HandlerFunc {
 				continue
 			}
 
-			// TODO: Check the node in db by CA as NodeName and if exists compare the pubkey
 			log.Debug("Cluster: Client certificate CN:", crt.Subject.CommonName)
 			der, err := x509.MarshalPKIXPublicKey(crt.PublicKey)
 			if err != nil {
@@ -96,12 +94,9 @@ func (e *Processor) ClientCertAuth(next echo.HandlerFunc) echo.HandlerFunc {
 			return echo.NewHTTPError(http.StatusUnauthorized, "Client certificate is invalid")
 		}
 
-		c.Set("client_cert", valid_client_cert)
+		// TODO: Check the node in db by CA as NodeName and if exists compare the pubkey
 
-		//res, err := e.fish.ResourceGetByIP(c.RealIP())
-		//if err != nil {
-		//	return echo.NewHTTPError(http.StatusUnauthorized, "Client IP was not found in the node Resources")
-		//}
+		c.Set("client_cert", valid_client_cert)
 
 		return next(c)
 	}
@@ -113,12 +108,8 @@ func (e *Processor) ClusterConnect(c echo.Context) error {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to connect with the cluster: %v", err)})
 		return log.Errorf("Unable to connect with the cluster: %v", err)
 	}
-	client := &Client{fish: e.fish, hub: e.hub, conn: ws, send: make(chan []byte, 256)}
-	e.hub.register <- client
 
-	// Starting the new connected client processes
-	go client.writePump()
-	go client.readPump()
+	cluster.NewClientReceiver(e.fish, e.cluster, e.hub, ws)
 
 	return nil
 }

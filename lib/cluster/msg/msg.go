@@ -20,7 +20,9 @@ import (
 
 // Basic container with the message to transfer type of the request
 type Message struct {
-	Type string
+	Type string // Type of the request
+	Resp string // Responce on a specific request type, will be identical to the Req field
+
 	Data util.UnparsedJson
 }
 

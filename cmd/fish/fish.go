@@ -132,11 +132,14 @@ func main() {
 				return err
 			}
 
-			log.Info("Fish joining cluster...")
-			cl, err := cluster.New(fish, cfg.ClusterJoin, ca_path, cert_path, key_path)
+			log.Info("Fish running cluster...")
+			cl, err := cluster.New(fish, cfg.ClusterJoin, dir, ca_path, cert_path, key_path)
 			if err != nil {
 				return err
 			}
+
+			// Wait for cluster
+			<-cl.Ready
 
 			log.Info("Fish starting API...")
 			srv, err := openapi.Init(fish, cl, cfg.APIAddress, ca_path, cert_path, key_path)

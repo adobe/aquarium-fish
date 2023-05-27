@@ -117,6 +117,7 @@ func (afi *AFInstance) fishStart(t *testing.T) {
 
 	init_done := make(chan string)
 	scanner := bufio.NewScanner(r)
+	// TODO: Add timeout for waiting of API available
 	go func() {
 		// Listening for log and scan for token and address
 		for scanner.Scan() {
