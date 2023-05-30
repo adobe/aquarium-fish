@@ -18,6 +18,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"sync"
@@ -25,6 +26,7 @@ import (
 
 	"github.com/fasthttp/websocket"
 
+	"github.com/adobe/aquarium-fish/lib/cluster/msg"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
 )
@@ -48,12 +50,14 @@ var (
 	space   = []byte{' '}
 )
 
-// Client is a middleman between the websocket connection and the hub.
+// Client is used to communicate and receive connections to/from the Node
 type Client struct {
 	cluster *Cluster
 	fish    *fish.Fish
-	hub     *Hub
 	ident   string // Contains identifier of the connection both for receiver and initiator
+
+	// Used to store long-running operations wait groups
+	long_ops map[string]*WaitGroupCount
 
 	// Used when connecting to remote
 	url url.URL
@@ -75,41 +79,46 @@ type Client struct {
 }
 
 // Receiving the incoming connection from remote node
-func NewClientReceiver(fish *fish.Fish, cluster *Cluster, hub *Hub, ws *websocket.Conn) *Client {
+func NewClientReceiver(fish *fish.Fish, cluster *Cluster, ws *websocket.Conn) *Client {
 	client := &Client{
 		cluster:  cluster,
 		fish:     fish,
-		hub:      hub,
 		ident:    ws.RemoteAddr().String(),
 		ws:       ws,
+		long_ops: make(map[string]*WaitGroupCount),
 		send_buf: make(chan []byte, 256),
 	}
-
-	hub.register <- client
 
 	// Starting the new connected client processes
 	go client.receiverWritePump()
 	go client.receiverReadPump()
+
+	// Registering the new client in hub
+	cluster.hub.register <- client
 
 	return client
 }
 
 // Initiates the connection to remote node
 func NewClientInitiator(fish *fish.Fish, cluster *Cluster, addr url.URL) *Client {
-	cl := &Client{
+	client := &Client{
 		cluster:  cluster,
 		fish:     fish,
 		ident:    addr.Host,
 		url:      addr,
+		long_ops: make(map[string]*WaitGroupCount),
 		send_buf: make(chan []byte, 1),
 	}
-	cl.ctx, cl.ctxCancel = context.WithCancel(context.Background())
+	client.ctx, client.ctxCancel = context.WithCancel(context.Background())
 
-	go cl.initiatorListen()
-	go cl.initiatorListenWrite()
-	go cl.initiatorPing()
+	go client.initiatorListen()
+	go client.initiatorListenWrite()
+	go client.initiatorPing()
 
-	return cl
+	// Registering the new client in hub
+	cluster.hub.register <- client
+
+	return client
 }
 
 func (c *Client) IsConnected() bool {
@@ -119,23 +128,39 @@ func (c *Client) IsConnected() bool {
 // receiverReadPump pumps messages from the websocket connection to the processor
 func (c *Client) receiverReadPump() {
 	defer func() {
-		c.hub.unregister <- c
+		c.cluster.GetHub().unregister <- c
 		c.ws.Close()
 	}()
 	//c.ws.SetReadLimit(maxMessageSize)
 	c.ws.SetReadDeadline(time.Now().Add(pong_wait))
 	c.ws.SetPongHandler(func(string) error { c.ws.SetReadDeadline(time.Now().Add(pong_wait)); return nil })
 	for {
-		_, message, err := c.ws.ReadMessage()
+		_, data, err := c.ws.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Warnf("Cluster: Client %s: receiverReadPump: reading error", c.ident)
 			}
 			break
 		}
-		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
-		//log.Debugf("Cluster: Client %s: receiverReadPump: got: %s", c.ident, message)
-		go c.processMessage(message)
+		data = bytes.TrimSpace(bytes.Replace(data, newline, space, -1))
+		//log.Debugf("Cluster: Client %s: receiverReadPump: got: %s", c.ident, data)
+
+		// Decode the message
+		var message msg.Message
+
+		// Seems json.Unmarshal doesn't really like to be executed in parallel so using decoder
+		dec := json.NewDecoder(bytes.NewReader(data))
+
+		// Reading multiple messages that could potentially be joined
+		for {
+			if err := dec.Decode(&message); err == io.EOF {
+				break
+			} else if err != nil {
+				log.Warnf("Cluster: Client %s: Unable to unmarshal the message container: %v", c.ident, err)
+				return
+			}
+			go c.processMessage(message)
+		}
 	}
 }
 
@@ -235,10 +260,6 @@ func (c *Client) Connect() *websocket.Conn {
 			c.ConnFail = nil
 			c.ws = ws
 
-			// The node is connected to the cluster - so starting the sync process to ensure the
-			// node is up to date (TODO: before interacting with the cluster)
-			go c.syncRequest()
-
 			return c.ws
 		}
 	}
@@ -258,14 +279,30 @@ func (c *Client) initiatorListen() {
 				if ws == nil {
 					return
 				}
-				_, message, err := ws.ReadMessage()
+				_, data, err := ws.ReadMessage()
 				if err != nil {
 					log.Errorf("Cluster: Client %s: Initiator: Cannot read websocket message: %v", c.ident, err)
 					c.closeWs()
 					break
 				}
-				//log.Debugf("Cluster: Client %s: Initiator: Received msg: %s", c.ident, message)
-				go c.processMessage(message)
+				//log.Debugf("Cluster: Client %s: Initiator: Received msg: %s", c.ident, data)
+
+				// Decode the message
+				var message msg.Message
+
+				// Seems json.Unmarshal doesn't really like to be executed in parallel so using decoder
+				dec := json.NewDecoder(bytes.NewReader(data))
+
+				// Reading multiple messages that could potentially be joined
+				for {
+					if err := dec.Decode(&message); err == io.EOF {
+						break
+					} else if err != nil {
+						log.Warnf("Cluster: Client %s: Unable to unmarshal the message container: %v", c.ident, err)
+						return
+					}
+					go c.processMessage(message)
+				}
 			}
 		}
 	}

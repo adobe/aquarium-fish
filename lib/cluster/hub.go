@@ -13,6 +13,11 @@
 package cluster
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"time"
+
 	"github.com/adobe/aquarium-fish/lib/log"
 )
 
@@ -31,16 +36,20 @@ type Hub struct {
 	unregister chan *Client
 }
 
-func NewHub() *Hub {
-	return &Hub{
+func newHub() *Hub {
+	hub := &Hub{
 		broadcast:  make(chan []byte),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		clients:    make(map[*Client]bool),
 	}
+
+	go hub.run()
+
+	return hub
 }
 
-func (h *Hub) Run() {
+func (h *Hub) run() {
 	for {
 		select {
 		case client := <-h.register:
@@ -60,6 +69,25 @@ func (h *Hub) Run() {
 					delete(h.clients, client)
 				}
 			}
+		}
+	}
+}
+
+// Write data to broadcast
+func (h *Hub) Broadcast(payload any) error {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
+	defer cancel()
+
+	for {
+		select {
+		case h.broadcast <- data:
+			return nil
+		case <-ctx.Done():
+			return fmt.Errorf("context canceled")
 		}
 	}
 }

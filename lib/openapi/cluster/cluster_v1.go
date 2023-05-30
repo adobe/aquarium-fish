@@ -33,20 +33,15 @@ type Processor struct {
 	upgrader websocket.Upgrader
 
 	cluster *cluster.Cluster
-	hub     *cluster.Hub
 }
 
 func NewV1Router(e *echo.Echo, fish *fish.Fish, cl *cluster.Cluster) {
-	hub := cluster.NewHub()
-	go hub.Run()
-
 	proc := &Processor{
 		fish: fish,
 		upgrader: websocket.Upgrader{
 			EnableCompression: true,
 		},
 		cluster: cl,
-		hub:     hub,
 	}
 
 	router := e.Group("")
@@ -109,7 +104,7 @@ func (e *Processor) ClusterConnect(c echo.Context) error {
 		return log.Errorf("Unable to connect with the cluster: %v", err)
 	}
 
-	cluster.NewClientReceiver(e.fish, e.cluster, e.hub, ws)
+	cluster.NewClientReceiver(e.fish, e.cluster, ws)
 
 	return nil
 }

@@ -24,6 +24,7 @@ import (
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
 
+	"github.com/adobe/aquarium-fish/lib/cluster/msg"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
 )
@@ -35,9 +36,13 @@ type ClusterInfo struct {
 
 type Cluster struct {
 	fish *fish.Fish
+	hub  *Hub
 
 	// Contains info about the cluster to be permanently stored
 	info ClusterInfo
+
+	// The map contains types allowed for sync, because not all the types needed to be synced
+	allowed_sync_types map[string]func(*msg.Message)
 
 	// Where the info will be stored
 	cluster_file string
@@ -54,8 +59,22 @@ type Cluster struct {
 func New(fish *fish.Fish, join []string, data_dir, ca_path, cert_path, key_path string) (*Cluster, error) {
 	c := &Cluster{
 		fish:    fish,
+		hub:     newHub(),
 		ca_pool: x509.NewCertPool(),
 		Ready:   make(chan bool, 1),
+	}
+
+	// Fill the allowed to sync types
+	c.allowed_sync_types = map[string]func(*msg.Message){
+		"User":             c.importUser,
+		"Label":            c.importLabel,
+		"Application":      c.importApplication,
+		"ApplicationState": c.importApplicationState,
+		"ApplicationTask":  c.importApplicationTask,
+		"ServiceMapping":   c.importServiceMapping,
+		"Vote":             c.importVote,
+		"Location":         c.importLocation,
+		"Node":             c.importNode,
 	}
 
 	// Load CA cert to pool
@@ -114,12 +133,26 @@ func New(fish *fish.Fish, join []string, data_dir, ca_path, cert_path, key_path 
 	return c, nil
 }
 
+// Checks the filled map of the type-importing and used for sending too
+func (c *Cluster) ImportTypeAllowed(type_name string) (func(*msg.Message), bool) {
+	f, ok := c.allowed_sync_types[type_name]
+	return f, ok
+}
+
 func (c *Cluster) NewConnect(host, channel string) *Client {
 	conn := NewClientInitiator(c.fish, c, url.URL{Scheme: "wss", Host: host, Path: channel})
 
 	c.clients = append(c.clients, conn)
 
 	return conn
+}
+
+func (c *Cluster) GetHub() *Hub {
+	return c.hub
+}
+
+func (c *Cluster) Send(type_name string, item any) error {
+	return c.hub.Broadcast(map[string]any{"type": type_name, "data": []any{item}})
 }
 
 func (c *Cluster) Stop() {
@@ -133,11 +166,19 @@ func (c *Cluster) waitForClientsSync() {
 	var all_synced bool
 
 	for !all_synced {
-		log.Debug("Cluster: Waiting for all conections get in sync...")
+		log.Info("Cluster: Waiting for all conections get in sync...")
 		time.Sleep(time.Second)
 
 		all_synced = true
 		for _, conn := range c.clients {
+			// Triggering the client sync if it's connected but not in sync with the cluster.
+			// It's running sequentially over each connected client to put not much pressure on
+			// the cluster and simplifies the sync parallelization.
+			if conn.IsConnected() && !conn.InSync {
+				conn.SyncRequest()
+				all_synced = false
+				break
+			}
 			// In case connection is failed - no need to wait for it
 			if conn.ConnFail == nil && !conn.InSync {
 				all_synced = false

@@ -115,7 +115,7 @@ func main() {
 				return err
 			}
 
-			// Set one connection and WAL mode to handle "database is locked" errors
+			// SQLite: Set one connection and WAL mode to handle "database is locked" errors
 			sql_db, _ := db.DB()
 			sql_db.SetMaxOpenConns(1)
 			sql_db.Exec("PRAGMA journal_mode=WAL;")
@@ -137,6 +137,17 @@ func main() {
 			if err != nil {
 				return err
 			}
+
+			// Register callbacks for create/update/delete to enable further synchronization of
+			// the cluster data with the connected to cluster nodes
+			db.Callback().Create().After("gorm:create").Register("cluster_sync", cl.HookCreateUpdate)
+			db.Callback().Update().After("gorm:update").Register("cluster_sync", cl.HookCreateUpdate)
+			// TODO: make sure delete will work
+			//db.Callback().Update().After("gorm:delete").Register("cluster_sync_delete", func(db *gorm.DB) {
+			//	if db.Error == nil && db.Statement.Schema != nil && !db.Statement.SkipHooks {
+			//		log.Debug("DEBUG: GORM DELETE")
+			//	}
+			//})
 
 			// Wait for cluster
 			<-cl.Ready
