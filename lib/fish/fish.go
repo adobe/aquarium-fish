@@ -27,6 +27,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mostlygeek/arp"
+	"github.com/shirou/gopsutil/v3/host"
 	"gorm.io/gorm"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
@@ -161,14 +162,19 @@ func (f *Fish) Init() error {
 	// Fill the node identifiers with defaults
 	if len(f.cfg.NodeIdentifiers) == 0 {
 		// Capturing the current host identifiers
-		f.cfg.NodeIdentifiers = append(f.cfg.NodeIdentifiers, "FishName:"+node.Name,
-			"HostName:"+node.Definition.Host.Hostname,
-			"OS:"+node.Definition.Host.OS,
-			"OSVersion:"+node.Definition.Host.PlatformVersion,
-			"OSPlatform:"+node.Definition.Host.Platform,
-			"OSFamily:"+node.Definition.Host.PlatformFamily,
-			"Arch:"+node.Definition.Host.KernelArch,
-		)
+		host_info, err := host.Info()
+		if err != nil {
+			log.Error("Fish: Unable to identify host info, please fill the NodeIndentifiers yourself")
+		} else {
+			f.cfg.NodeIdentifiers = append(f.cfg.NodeIdentifiers, "FishName:"+node.Name,
+				"HostName:"+host_info.Hostname,
+				"OS:"+host_info.OS,
+				"OSVersion:"+host_info.PlatformVersion,
+				"OSPlatform:"+host_info.Platform,
+				"OSFamily:"+host_info.PlatformFamily,
+				"Arch:"+host_info.KernelArch,
+			)
+		}
 	}
 	log.Info("Fish: Using the next node identifiers:", f.cfg.NodeIdentifiers)
 

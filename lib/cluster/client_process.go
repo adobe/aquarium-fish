@@ -38,6 +38,7 @@ func (c *Client) SyncRequest() {
 
 // Procesing incoming message
 func (c *Client) processMessage(message msg.Message) {
+	// TODO: Broadcast the message if it contains unique Sum
 	// Pre-processing the long-running responses
 	if message.Resp != "" && message.Type != "completed" {
 		c.long_ops[message.Resp].Add(1)

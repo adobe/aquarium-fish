@@ -56,8 +56,5 @@ func (n *Node) Init(node_address, cert_path string) error {
 		}
 	}
 
-	// Collect the node definition data
-	n.Definition.Update()
-
 	return nil
 }

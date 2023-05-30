@@ -74,6 +74,7 @@ func (f *Fish) NodeGet(name string) (node *types.Node, err error) {
 }
 
 func (f *Fish) pingProcess() error {
+	// TODO: Clean up this ping process and switch to cluster websocket one
 	// In order to optimize network & database - update just UpdatedAt field
 	ping_ticker := time.NewTicker(types.NODE_PING_DELAY * time.Second)
 	for {

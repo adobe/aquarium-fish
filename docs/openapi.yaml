@@ -1384,7 +1384,6 @@ components:
         - created_at
         - updated_at
         - name
-        - definition
         - location_name
         - address
       properties:
@@ -1402,8 +1401,6 @@ components:
           x-oapi-codegen-extra-tags:
             gorm: unique
           description: Unique name of the Node
-        definition:
-          $ref: '#/components/schemas/NodeDefinition'
         location_name:
           # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/LocationName'
           type: string
@@ -1417,31 +1414,6 @@ components:
           x-oapi-codegen-extra-tags:
             gorm: unique
           description: The node public key to verify on secondary connections and signatures
-
-    NodeDefinition:
-      type: object
-      description: Contains technical information about the node
-      required:
-        - cpu
-        - disks
-        - nets
-      properties:
-        host:
-          x-go-type: host.InfoStat
-          x-omitempty: false
-        memory:
-          x-go-type: mem.VirtualMemoryStat
-          x-omitempty: false
-        cpu:
-          type: array
-          items:
-            x-go-type: cpu.InfoStat
-        disks:
-          x-go-type: 'map[string]*disk.UsageStat'
-        nets:
-          type: array
-          items:
-            x-go-type: net.InterfaceStat
 
     ResourceUID:
       type: string
