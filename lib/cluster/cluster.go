@@ -128,6 +128,9 @@ func New(fish *fish.Fish, join []string, data_dir, ca_path, cert_path, key_path 
 
 		// New cluster is ready
 		c.Ready <- true
+
+		// Cluster is ready, run the background watcher
+		go c.watchConnections()
 	}
 
 	return c, nil
@@ -189,8 +192,17 @@ func (c *Cluster) waitForClientsSync() {
 
 	// Ok, seems all the clients now in sync
 	c.Ready <- true
+
+	// Cluster is ready, run the background watcher
+	go c.watchConnections()
 }
 
 func (c *Cluster) GetInfo() ClusterInfo {
 	return c.info
+}
+
+// Background watcher to estblish enough connections to the other cluster nodes
+func (c *Cluster) watchConnections() {
+	// TODO: Run watch on the nodes and ensure there is ~8 connections available (configurable),
+	// ensure most of the connections (~90%) are to the same location and rest to the other ones
 }

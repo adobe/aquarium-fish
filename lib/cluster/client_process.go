@@ -33,7 +33,7 @@ func (c *Client) SyncRequest() {
 
 	// Request all the cluster data since the last update
 	// TODO: Add getting only the last changes by from data field
-	c.Write(map[string]any{"type": "sync", "data": msg.Sync{}})
+	c.Write(msg.NewMessage("sync", "", msg.Sync{}))
 }
 
 // Procesing incoming message
@@ -139,7 +139,7 @@ func (c *Client) processSync(message *msg.Message) {
 	{
 		//log.Debugf("Cluster: Client %s: Sending cluster", c.ident)
 		counter += 1
-		if err := c.Write(map[string]any{"resp": message.Type, "type": "cluster", "data": c.cluster.GetInfo()}); err != nil {
+		if err := c.Write(msg.NewMessage("cluster", message.Type, c.cluster.GetInfo())); err != nil {
 			log.Errorf("Cluster: Client %s: Unable to send users: %v", c.ident, err)
 			return
 		}
@@ -155,7 +155,7 @@ func (c *Client) processSync(message *msg.Message) {
 		}
 		if len(users) > 0 {
 			counter += 1
-			if err := c.Write(map[string]any{"resp": message.Type, "type": "User", "data": users}); err != nil {
+			if err := c.Write(msg.NewMessage("User", message.Type, users)); err != nil {
 				log.Errorf("Cluster: Client %s: Unable to send users: %v", c.ident, err)
 				return
 			}
@@ -172,7 +172,7 @@ func (c *Client) processSync(message *msg.Message) {
 		}
 		if len(labels) > 0 {
 			counter += 1
-			if err := c.Write(map[string]any{"resp": message.Type, "type": "Label", "data": labels}); err != nil {
+			if err := c.Write(msg.NewMessage("Label", message.Type, labels)); err != nil {
 				log.Errorf("Cluster: Client %s: Unable to send users: %v", c.ident, err)
 				return
 			}
@@ -189,7 +189,7 @@ func (c *Client) processSync(message *msg.Message) {
 		}
 		if len(applications) > 0 {
 			counter += 1
-			if err := c.Write(map[string]any{"resp": message.Type, "type": "Application", "data": applications}); err != nil {
+			if err := c.Write(msg.NewMessage("Application", message.Type, applications)); err != nil {
 				log.Errorf("Cluster: Client %s: Unable to send Applications: %v", c.ident, err)
 				return
 			}
@@ -206,7 +206,7 @@ func (c *Client) processSync(message *msg.Message) {
 		}
 		if len(application_states) > 0 {
 			counter += 1
-			if err := c.Write(map[string]any{"resp": message.Type, "type": "ApplicationState", "data": application_states}); err != nil {
+			if err := c.Write(msg.NewMessage("ApplicationState", message.Type, application_states)); err != nil {
 				log.Errorf("Cluster: Client %s: Unable to send ApplicationStates: %v", c.ident, err)
 				return
 			}
@@ -223,7 +223,7 @@ func (c *Client) processSync(message *msg.Message) {
 		}
 		if len(application_tasks) > 0 {
 			counter += 1
-			if err := c.Write(map[string]any{"resp": message.Type, "type": "ApplicationTask", "data": application_tasks}); err != nil {
+			if err := c.Write(msg.NewMessage("ApplicationTask", message.Type, application_tasks)); err != nil {
 				log.Errorf("Cluster: Client %s: Unable to send ApplicationTasks: %v", c.ident, err)
 				return
 			}
@@ -240,7 +240,7 @@ func (c *Client) processSync(message *msg.Message) {
 		}
 		if len(service_mappings) > 0 {
 			counter += 1
-			if err := c.Write(map[string]any{"resp": message.Type, "type": "ServiceMapping", "data": service_mappings}); err != nil {
+			if err := c.Write(msg.NewMessage("ServiceMapping", message.Type, service_mappings)); err != nil {
 				log.Errorf("Cluster: Client %s: Unable to send ServiceMappings: %v", c.ident, err)
 				return
 			}
@@ -258,7 +258,7 @@ func (c *Client) processSync(message *msg.Message) {
 		}
 		if len(votes) > 0 {
 			counter += 1
-			if err := c.Write(map[string]any{"resp": message.Type, "type": "Vote", "data": votes}); err != nil {
+			if err := c.Write(msg.NewMessage("Vote", message.Type, votes)); err != nil {
 				log.Errorf("Cluster: Client %s: Unable to send Votes: %v", c.ident, err)
 				return
 			}
@@ -275,7 +275,7 @@ func (c *Client) processSync(message *msg.Message) {
 		}
 		if len(locations) > 0 {
 			counter += 1
-			if err := c.Write(map[string]any{"resp": message.Type, "type": "Location", "data": locations}); err != nil {
+			if err := c.Write(msg.NewMessage("Location", message.Type, locations)); err != nil {
 				log.Errorf("Cluster: Client %s: Unable to send Locations: %v", c.ident, err)
 				return
 			}
@@ -292,7 +292,7 @@ func (c *Client) processSync(message *msg.Message) {
 		}
 		if len(nodes) > 0 {
 			counter += 1
-			if err := c.Write(map[string]any{"resp": message.Type, "type": "Node", "data": nodes}); err != nil {
+			if err := c.Write(msg.NewMessage("Node", message.Type, nodes)); err != nil {
 				log.Errorf("Cluster: Client %s: Unable to send Nodes: %v", c.ident, err)
 				return
 			}
@@ -301,7 +301,7 @@ func (c *Client) processSync(message *msg.Message) {
 
 	// Sending back the sync completed message
 	//log.Debugf("Cluster: Client %s: Sending sync completed", c.ident)
-	if err := c.Write(map[string]any{"resp": message.Type, "type": "completed", "data": counter}); err != nil {
+	if err := c.Write(msg.NewMessage("completed", message.Type, counter)); err != nil {
 		log.Errorf("Cluster: Client %s: Unable to send sync completed message: %v", c.ident, err)
 		return
 	}
