@@ -33,8 +33,7 @@ import (
 // * Fish should shutdown in 10 sec
 func Test_shutdown_after_maintenace(t *testing.T) {
 	t.Parallel()
-	afi := RunAquariumFish(t, `---
-node_name: node-1
+	afi := RunAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0
@@ -155,8 +154,7 @@ drivers:
 // * Fish should shutdown in 10 sec
 func Test_immediate_shutdown(t *testing.T) {
 	t.Parallel()
-	afi := RunAquariumFish(t, `---
-node_name: node-1
+	afi := RunAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0
@@ -262,8 +260,7 @@ drivers:
 // * Fish should shutdown in 10 sec
 func Test_shutdown_after_delay(t *testing.T) {
 	t.Parallel()
-	afi := RunAquariumFish(t, `---
-node_name: node-1
+	afi := RunAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0
@@ -378,8 +375,7 @@ drivers:
 // * Fish should not shutdown in 10 sec
 func Test_shutdown_cancel_during_maintenance(t *testing.T) {
 	t.Parallel()
-	afi := RunAquariumFish(t, `---
-node_name: node-1
+	afi := RunAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0
@@ -530,8 +526,7 @@ drivers:
 // * Fish should not shutdown in 10 sec
 func Test_shutdown_cancel_during_delay(t *testing.T) {
 	t.Parallel()
-	afi := RunAquariumFish(t, `---
-node_name: node-1
+	afi := RunAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0

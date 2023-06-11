@@ -17,6 +17,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/adobe/aquarium-fish/lib/cluster/msg"
 	"github.com/adobe/aquarium-fish/lib/log"
 )
 
@@ -35,7 +36,7 @@ func (cl *Cluster) HookCreateUpdate(db *gorm.DB) {
 			if value := reflect.Indirect(db.Statement.ReflectValue.Index(i)); value.CanAddr() {
 				if _, ok := cl.ImportTypeAllowed(value.Type().Name()); ok {
 					log.Debug("GORM create/update:", value.Type().Name())
-					cl.Send(value.Type().Name(), value.Addr().Interface())
+					cl.Send(msg.NewMessage(value.Type().Name(), "", []any{value.Addr().Interface()}))
 				}
 			}
 			db.Statement.CurDestIndex++
@@ -44,7 +45,7 @@ func (cl *Cluster) HookCreateUpdate(db *gorm.DB) {
 		if db.Statement.ReflectValue.CanAddr() {
 			if _, ok := cl.ImportTypeAllowed(db.Statement.ReflectValue.Type().Name()); ok {
 				log.Debug("GORM create/update:", db.Statement.ReflectValue.Type().Name())
-				cl.Send(db.Statement.ReflectValue.Type().Name(), db.Statement.ReflectValue.Addr().Interface())
+				cl.Send(msg.NewMessage(db.Statement.ReflectValue.Type().Name(), "", []any{db.Statement.ReflectValue.Addr().Interface()}))
 			}
 		}
 	}

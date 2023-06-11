@@ -54,6 +54,10 @@ type Cluster struct {
 
 	// Fired when cluster is ready and completed the sync process
 	Ready chan bool
+
+	// Optimization to skip the processed messages and not broadcast again during cluster operation
+	// They are not stay here for long - just for ~2 minutes while cluster quickly syncs the data
+	processed_sums *sumCache
 }
 
 func New(fish *fish.Fish, join []string, data_dir, ca_path, cert_path, key_path string) (*Cluster, error) {
@@ -62,9 +66,11 @@ func New(fish *fish.Fish, join []string, data_dir, ca_path, cert_path, key_path 
 		hub:     newHub(),
 		ca_pool: x509.NewCertPool(),
 		Ready:   make(chan bool, 1),
+
+		processed_sums: newSumCache(time.Minute*2, time.Second*30),
 	}
 
-	// Fill the allowed to sync types
+	// Fill the list of allowed to sync types
 	c.allowed_sync_types = map[string]func(*msg.Message){
 		"User":             c.importUser,
 		"Label":            c.importLabel,
@@ -96,7 +102,7 @@ func New(fish *fish.Fish, join []string, data_dir, ca_path, cert_path, key_path 
 	c.cluster_file = filepath.Join(data_dir, "cluster.yml")
 	data, err := os.ReadFile(c.cluster_file)
 	if err == nil {
-		if err := yaml.Unmarshal(data, c); err != nil {
+		if err := yaml.Unmarshal(data, &c.info); err != nil {
 			return nil, fmt.Errorf("Cluster: Unable to read cluster config file: %v", err)
 		}
 	}
@@ -110,7 +116,7 @@ func New(fish *fish.Fish, join []string, data_dir, ca_path, cert_path, key_path 
 
 		// Wait until all the clients will be synced
 		go c.waitForClientsSync()
-	} else {
+	} else if c.info.UID == uuid.Nil {
 		// In case it's the first node in the cluster - then create it
 		c.info.UID = uuid.New()
 		c.info.UpdatedAt = time.Now()
@@ -122,7 +128,7 @@ func New(fish *fish.Fish, join []string, data_dir, ca_path, cert_path, key_path 
 		if err != nil {
 			return nil, fmt.Errorf("Cluster: Unable to prepare cluster state yaml: %v", err)
 		}
-		if err := os.WriteFile(c.cluster_file, cl_data, 0500); err != nil {
+		if err := os.WriteFile(c.cluster_file, cl_data, 0600); err != nil {
 			return nil, fmt.Errorf("Cluster: Unable to write cluster state file: %v", err)
 		}
 
@@ -130,6 +136,11 @@ func New(fish *fish.Fish, join []string, data_dir, ca_path, cert_path, key_path 
 		c.Ready <- true
 
 		// Cluster is ready, run the background watcher
+		go c.watchConnections()
+	} else {
+		// TODO: Cluster is existing, but we need to run clients and sync them from previous good state
+		c.Ready <- true // Just for now
+		//go c.waitForClientsSync()
 		go c.watchConnections()
 	}
 
@@ -154,8 +165,17 @@ func (c *Cluster) GetHub() *Hub {
 	return c.hub
 }
 
-func (c *Cluster) Send(type_name string, item any) error {
-	return c.hub.Broadcast(map[string]any{"type": type_name, "data": []any{item}})
+func (c *Cluster) Send(message *msg.Message) error {
+	if ok := c.processed_sums.Put(message.Sum); !ok {
+		// The message was already processed by the cluster so skipping
+		return nil
+	}
+	log.Debug("Cluster: Broadcasting message:", message.Type)
+	if err := c.hub.Broadcast(message); err != nil {
+		c.processed_sums.Delete(message.Sum)
+		return log.Error("Cluster: Unable to broadcast message:", err)
+	}
+	return nil
 }
 
 func (c *Cluster) Stop() {

@@ -31,8 +31,7 @@ import (
 // * Destroy the third app
 func Test_three_apps_with_limit(t *testing.T) {
 	t.Parallel()
-	afi := RunAquariumFish(t, `---
-node_name: node-1
+	afi := RunAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0

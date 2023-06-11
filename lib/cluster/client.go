@@ -76,6 +76,10 @@ type Client struct {
 	ConnFail error // Contains last error if connection to the remote node failed
 	Valid    bool  // Remote cluster is good to use
 	InSync   bool  // True when the client successfully synchronized
+
+	// Optimization to skip sending duplicate messages
+	// They are not stay here for long - just for ~2 minutes while cluster quickly syncs the data
+	processed_sums *sumCache
 }
 
 // Receiving the incoming connection from remote node
@@ -87,6 +91,8 @@ func NewClientReceiver(fish *fish.Fish, cluster *Cluster, ws *websocket.Conn) *C
 		ws:       ws,
 		long_ops: make(map[string]*WaitGroupCount),
 		send_buf: make(chan []byte, 256),
+
+		processed_sums: newSumCache(time.Minute*2, time.Second*30),
 	}
 
 	// Starting the new connected client processes
@@ -108,6 +114,8 @@ func NewClientInitiator(fish *fish.Fish, cluster *Cluster, addr url.URL) *Client
 		url:      addr,
 		long_ops: make(map[string]*WaitGroupCount),
 		send_buf: make(chan []byte, 1),
+
+		processed_sums: newSumCache(time.Minute*2, time.Second*30),
 	}
 	client.ctx, client.ctxCancel = context.WithCancel(context.Background())
 

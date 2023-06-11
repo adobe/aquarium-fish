@@ -28,8 +28,7 @@ import (
 // Checks the Application is getting deallocated by label rather than default timeout in node config
 func Test_label_overrides_default_lifetime_timeout(t *testing.T) {
 	t.Parallel()
-	afi := RunAquariumFish(t, `---
-node_name: node-1
+	afi := RunAquariumFish(t, "node-1", `---
 node_location: test_loc
 default_resource_lifetime: 5s
 

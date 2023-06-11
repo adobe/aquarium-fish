@@ -38,7 +38,6 @@ func (c *Client) SyncRequest() {
 
 // Procesing incoming message
 func (c *Client) processMessage(message msg.Message) {
-	// TODO: Broadcast the message if it contains unique Sum
 	// Pre-processing the long-running responses
 	if message.Resp != "" && message.Type != "completed" {
 		c.long_ops[message.Resp].Add(1)
@@ -56,7 +55,23 @@ func (c *Client) processMessage(message msg.Message) {
 		// Received sync request to send back the cluster DB
 		c.processSync(&message)
 	default:
+		// Here we processing the DB objects transfer and broadcast them to the other conected nodes
+
+		// Processing the DB object if allowed
 		if importFunc, ok := c.cluster.ImportTypeAllowed(message.Type); ok {
+			// Broadcast only when the client in sync
+			if c.InSync {
+				// Check the message duplication in client
+				if ok := c.processed_sums.Put(message.Sum); !ok {
+					// The message is already known by the client
+					break
+				}
+				// Try to broadcast the message and check if it's already processed by the cluster
+				if err := c.cluster.Send(&message); err != nil {
+					// The message is already processed by the cluster
+					break
+				}
+			}
 			importFunc(&message)
 		} else {
 			log.Warnf("Cluster: Client %s: Unable to process the unknown message type: %s", c.ident, message.Type)
@@ -306,4 +321,7 @@ func (c *Client) processSync(message *msg.Message) {
 		log.Errorf("Cluster: Client %s: Unable to send sync completed message: %v", c.ident, err)
 		return
 	}
+
+	// Mark client as in sync
+	c.InSync = true
 }

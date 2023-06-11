@@ -389,7 +389,7 @@ func (f *Fish) voteProcessRound(vote *types.Vote) error {
 						f.won_votes[app.CreatedAt.UnixMicro()] = *vote
 						f.won_votes_mutex.Unlock()
 					} else {
-						log.Infof("Fish: I lose the election for Application %s to Node %s", vote.ApplicationUID, vote.NodeUID)
+						log.Infof("Fish: I lost the election for Application %s to Node %s", vote.ApplicationUID, vote.NodeUID)
 					}
 				}
 

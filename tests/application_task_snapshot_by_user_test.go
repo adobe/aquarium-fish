@@ -28,8 +28,7 @@ import (
 // Ensure application task interface snapshot for user is working
 func Test_application_task_snapshot_by_user(t *testing.T) {
 	t.Parallel()
-	afi := RunAquariumFish(t, `---
-node_name: node-1
+	afi := RunAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0

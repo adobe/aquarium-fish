@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 var fish_path = os.Getenv("FISH_PATH") // Full path to the aquarium-fish binary
@@ -29,20 +30,25 @@ var fish_path = os.Getenv("FISH_PATH") // Full path to the aquarium-fish binary
 // Saves state of the running Aquarium Fish for particular test
 type AFInstance struct {
 	workspace string
-	fishStop  context.CancelFunc
+	fishKill  context.CancelFunc
 	running   bool
+	cmd       *exec.Cmd
 
+	node_name   string
 	api_address string
 	admin_token string
 }
 
-func RunAquariumFish(t *testing.T, cfg string) *AFInstance {
+func RunAquariumFish(t *testing.T, name, cfg string) *AFInstance {
 	t.Log("INFO: Creating new node")
-	afi := &AFInstance{}
+	afi := &AFInstance{
+		node_name: name,
+	}
 
 	afi.workspace = t.TempDir()
-	t.Log("INFO: Created workspace:", afi.workspace)
+	t.Log("INFO: Created workspace:", afi.node_name, afi.workspace)
 
+	cfg += fmt.Sprintf("\nnode_name: %q", afi.node_name)
 	os.WriteFile(filepath.Join(afi.workspace, "config.yml"), []byte(cfg), 0644)
 	t.Log("INFO: Stored config:", cfg)
 
@@ -68,20 +74,23 @@ func (afi *AFInstance) IsRunning() bool {
 
 // Restart the application
 func (afi *AFInstance) Restart(t *testing.T) {
-	t.Log("INFO: Restarting:", afi.workspace)
-	afi.fishStop()
+	t.Log("INFO: Restarting:", afi.node_name, afi.workspace)
+	afi.fishStop(t)
 	afi.fishStart(t)
 }
 
 // Start another node of cluster
 // It will automatically add cluster_join parameter to the config
-func (afi1 *AFInstance) RunClusterNode(t *testing.T, cfg string) *AFInstance {
+func (afi1 *AFInstance) RunClusterNode(t *testing.T, name, cfg string) *AFInstance {
 	t.Log("INFO: Creating new cluster node with seed:", afi1.api_address)
-	afi2 := &AFInstance{}
+	afi2 := &AFInstance{
+		node_name: name,
+	}
 
 	afi2.workspace = t.TempDir()
-	t.Log("INFO: Created workspace:", afi2.workspace)
+	t.Log("INFO: Created workspace:", afi2.node_name, afi2.workspace)
 
+	cfg += fmt.Sprintf("\nnode_name: %q", afi2.node_name)
 	cfg += fmt.Sprintf("\ncluster_join: [%q]", afi1.api_address)
 	os.WriteFile(filepath.Join(afi2.workspace, "config.yml"), []byte(cfg), 0644)
 	t.Log("INFO: Stored config:", cfg)
@@ -101,19 +110,39 @@ func (afi1 *AFInstance) RunClusterNode(t *testing.T, cfg string) *AFInstance {
 
 // Cleanup after the test execution
 func (afi *AFInstance) Cleanup(t *testing.T) {
-	t.Log("INFO: Cleaning up:", afi.workspace)
-	afi.fishStop()
+	t.Log("INFO: Cleaning up:", afi.node_name, afi.workspace)
+	afi.fishStop(t)
 	os.RemoveAll(afi.workspace)
+}
+
+func (afi *AFInstance) fishStop(t *testing.T) {
+	if afi.cmd == nil || !afi.running {
+		return
+	}
+	// Send interrupt signal
+	afi.cmd.Process.Signal(os.Interrupt)
+
+	// Wait 10 seconds for process to stop
+	t.Log("INFO: Wait 10s for fish node to stop:", afi.node_name, afi.workspace)
+	for i := 1; i < 20; i++ {
+		if !afi.running {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Hard killing the process
+	afi.fishKill()
 }
 
 func (afi *AFInstance) fishStart(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	afi.fishStop = cancel
+	afi.fishKill = cancel
 
-	cmd := exec.CommandContext(ctx, fish_path, "-v", "debug", "-c", filepath.Join(afi.workspace, "config.yml"))
-	cmd.Dir = afi.workspace
-	r, _ := cmd.StdoutPipe()
-	cmd.Stderr = cmd.Stdout
+	afi.cmd = exec.CommandContext(ctx, fish_path, "-v", "debug", "-c", filepath.Join(afi.workspace, "config.yml"))
+	afi.cmd.Dir = afi.workspace
+	r, _ := afi.cmd.StdoutPipe()
+	afi.cmd.Stderr = afi.cmd.Stdout
 
 	init_done := make(chan string)
 	scanner := bufio.NewScanner(r)
@@ -122,7 +151,7 @@ func (afi *AFInstance) fishStart(t *testing.T) {
 		// Listening for log and scan for token and address
 		for scanner.Scan() {
 			line := scanner.Text()
-			t.Log(afi.api_address, line)
+			t.Log(afi.node_name, line)
 			if strings.HasPrefix(line, "Admin user pass: ") {
 				val := strings.SplitN(strings.TrimSpace(line), "Admin user pass: ", 2)
 				if len(val) < 2 {
@@ -148,14 +177,18 @@ func (afi *AFInstance) fishStart(t *testing.T) {
 		t.Log("Reading of AquariumFish output is done")
 	}()
 
+	afi.cmd.Start()
+
 	go func() {
 		afi.running = true
-		if err := cmd.Run(); err != nil {
+		defer func() {
+			afi.running = false
+			r.Close()
+		}()
+		if err := afi.cmd.Wait(); err != nil {
 			t.Log("AquariumFish process was stopped:", err)
 			init_done <- fmt.Sprintf("ERROR: Fish was stopped with exit code: %v", err)
 		}
-		afi.running = false
-		r.Close()
 	}()
 
 	failed := <-init_done

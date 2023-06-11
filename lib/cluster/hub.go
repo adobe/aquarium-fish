@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/adobe/aquarium-fish/lib/cluster/msg"
 	"github.com/adobe/aquarium-fish/lib/log"
 )
 
@@ -27,7 +28,7 @@ type Hub struct {
 	clients map[*Client]bool
 
 	// Message to be sent to all the clients.
-	broadcast chan []byte
+	broadcast chan *msg.Message
 
 	// Register requests from the clients.
 	register chan *Client
@@ -38,7 +39,7 @@ type Hub struct {
 
 func newHub() *Hub {
 	hub := &Hub{
-		broadcast:  make(chan []byte),
+		broadcast:  make(chan *msg.Message),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		clients:    make(map[*Client]bool),
@@ -60,10 +61,19 @@ func (h *Hub) run() {
 				close(client.send_buf)
 				log.Info("Cluster: Hub: connection closed")
 			}
-		case msg := <-h.broadcast:
+		case message := <-h.broadcast:
+			data, err := json.Marshal(message)
+			if err != nil {
+				log.Error("Unable to marshal the message to broadcast:", err)
+				continue
+			}
 			for client := range h.clients {
+				if ok := client.processed_sums.Put(message.Sum); !ok {
+					// The message was already processed or received by the client
+					continue
+				}
 				select {
-				case client.send_buf <- msg:
+				case client.send_buf <- data:
 				default:
 					close(client.send_buf)
 					delete(h.clients, client)
@@ -74,17 +84,13 @@ func (h *Hub) run() {
 }
 
 // Write data to broadcast
-func (h *Hub) Broadcast(payload any) error {
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
+func (h *Hub) Broadcast(message *msg.Message) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
 	defer cancel()
 
 	for {
 		select {
-		case h.broadcast <- data:
+		case h.broadcast <- message:
 			return nil
 		case <-ctx.Done():
 			return fmt.Errorf("context canceled")

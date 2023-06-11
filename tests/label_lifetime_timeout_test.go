@@ -28,8 +28,7 @@ import (
 // Checks the Application is getting deallocated by timeout
 func Test_label_lifetime_timeout(t *testing.T) {
 	t.Parallel()
-	afi := RunAquariumFish(t, `---
-node_name: node-1
+	afi := RunAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0
