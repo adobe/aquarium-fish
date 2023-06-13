@@ -80,6 +80,10 @@ func New(db *gorm.DB, cfg *Config) (*Fish, error) {
 	return f, nil
 }
 
+func (f *Fish) IsRunning() bool {
+	return f.running
+}
+
 func (f *Fish) Init() error {
 	f.shutdown_cancel = make(chan bool)
 	f.Quit = make(chan os.Signal, 1)

@@ -75,7 +75,6 @@ type Client struct {
 	// Status of the client connection
 	ConnFail error // Contains last error if connection to the remote node failed
 	Valid    bool  // Remote cluster is good to use
-	InSync   bool  // True when the client successfully synchronized
 
 	// Optimization to skip sending duplicate messages
 	// They are not stay here for long - just for ~2 minutes while cluster quickly syncs the data
@@ -131,6 +130,12 @@ func NewClientInitiator(fish *fish.Fish, cluster *Cluster, addr url.URL) *Client
 
 func (c *Client) IsConnected() bool {
 	return c.ws != nil
+}
+
+// Way to check when long-process is still executing
+func (c *Client) IsLongOperationExecuting(name string) bool {
+	_, ok := c.long_ops[name]
+	return ok
 }
 
 // receiverReadPump pumps messages from the websocket connection to the processor

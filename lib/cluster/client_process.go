@@ -26,7 +26,7 @@ import (
 // Starts the synchronization process with the remote cluster node
 func (c *Client) SyncRequest() {
 	// Check the sync process is not running and client is not in sync already
-	if _, ok := c.long_ops["sync"]; ok || c.InSync {
+	if _, ok := c.long_ops["sync"]; ok || c.cluster.InSync {
 		return
 	}
 	c.long_ops["sync"] = &WaitGroupCount{}
@@ -60,7 +60,7 @@ func (c *Client) processMessage(message msg.Message) {
 		// Processing the DB object if allowed
 		if importFunc, ok := c.cluster.ImportTypeAllowed(message.Type); ok {
 			// Broadcast only when the client in sync
-			if c.InSync {
+			if c.cluster.InSync {
 				// Check the message duplication in client
 				if ok := c.processed_sums.Put(message.Sum); !ok {
 					// The message is already known by the client
@@ -126,13 +126,11 @@ func (c *Client) processCompleted(message *msg.Message) {
 	switch message.Resp {
 	case "sync":
 		log.Infof("Cluster: Client %s: Sync completed", c.ident)
-		c.InSync = true
+		delete(c.long_ops, "sync")
 	default:
 		log.Warnf("Cluster: Client %s: Unknown `completed` request for: %v", c.ident, message.Resp)
 		return
 	}
-
-	delete(c.long_ops, "sync")
 }
 
 func (c *Client) processSync(message *msg.Message) {
@@ -321,7 +319,4 @@ func (c *Client) processSync(message *msg.Message) {
 		log.Errorf("Cluster: Client %s: Unable to send sync completed message: %v", c.ident, err)
 		return
 	}
-
-	// Mark client as in sync
-	c.InSync = true
 }

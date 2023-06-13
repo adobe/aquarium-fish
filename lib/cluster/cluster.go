@@ -30,7 +30,10 @@ import (
 )
 
 type ClusterInfo struct {
-	UID       uuid.UUID
+	// Which cluster data is used in the internal database
+	UID uuid.UUID
+
+	// This field used as "last sync point" for the incoming cluster data
 	UpdatedAt time.Time
 }
 
@@ -53,7 +56,8 @@ type Cluster struct {
 	certkey tls.Certificate
 
 	// Fired when cluster is ready and completed the sync process
-	Ready chan bool
+	InSync bool
+	Ready  chan bool
 
 	// Optimization to skip the processed messages and not broadcast again during cluster operation
 	// They are not stay here for long - just for ~2 minutes while cluster quickly syncs the data
@@ -100,51 +104,102 @@ func New(fish *fish.Fish, join []string, data_dir, ca_path, cert_path, key_path 
 
 	// Read the cluster info if it's existing
 	c.cluster_file = filepath.Join(data_dir, "cluster.yml")
-	data, err := os.ReadFile(c.cluster_file)
-	if err == nil {
-		if err := yaml.Unmarshal(data, &c.info); err != nil {
-			return nil, fmt.Errorf("Cluster: Unable to read cluster config file: %v", err)
-		}
+	if err := c.readClusterInfo(); err != nil {
+		return nil, fmt.Errorf("Cluster: Unable to read cluster config file: %v", err)
 	}
 
-	// Connect the join nodes
+	// Connecting to the cluster or creating it
 	if len(join) > 0 {
-		log.Info("Cluster: Connecting to cluster:", join)
+		// When we have join list - try those addresses to sync first
+		// Useful on initial cluster join and if the cluster nodes were changed since last sync
+		log.Info("Cluster: Connecting to existing cluster:", join)
 		for _, endpoint := range join {
 			c.NewConnect(endpoint, "cluster/v1/connect")
 		}
 
 		// Wait until all the clients will be synced
-		go c.waitForClientsSync()
-	} else if c.info.UID == uuid.Nil {
+		go c.waitForSync()
+	} else if c.info.UID != uuid.Nil {
+		// When cluster UID is here - use the available nodes info to connect and sync with them
+		log.Info("Cluster: Connecting to known cluster:", join)
+		// TODO: Cluster is existing, but we need to run clients and sync them from previous good state
+		c.Ready <- true // Just for now
+		//go c.waitForSync()
+		go c.watchConnectionsProcess()
+	} else {
 		// In case it's the first node in the cluster - then create it
 		c.info.UID = uuid.New()
 		c.info.UpdatedAt = time.Now()
 
-		log.Info("Cluster: Creating new cluster UID:", c.info.UID)
-
 		// Write the first cluster info file
-		cl_data, err := yaml.Marshal(&c.info)
-		if err != nil {
-			return nil, fmt.Errorf("Cluster: Unable to prepare cluster state yaml: %v", err)
+		if err := c.writeClusterInfo(); err != nil {
+			return nil, fmt.Errorf("Cluster: Unable to create cluster info file: %v", err)
 		}
-		if err := os.WriteFile(c.cluster_file, cl_data, 0600); err != nil {
-			return nil, fmt.Errorf("Cluster: Unable to write cluster state file: %v", err)
-		}
+
+		log.Info("Cluster: Created new cluster UID:", c.info.UID)
 
 		// New cluster is ready
 		c.Ready <- true
 
 		// Cluster is ready, run the background watcher
-		go c.watchConnections()
-	} else {
-		// TODO: Cluster is existing, but we need to run clients and sync them from previous good state
-		c.Ready <- true // Just for now
-		//go c.waitForClientsSync()
-		go c.watchConnections()
+		go c.watchConnectionsProcess()
 	}
 
 	return c, nil
+}
+
+// Writes the cluster info file which is used to sync after node restart
+// Usually running by timer during the regular cluster stamp update process
+func (c *Cluster) writeClusterInfo() error {
+	cl_data, err := yaml.Marshal(&c.info)
+	if err != nil {
+		return fmt.Errorf("Cluster: Unable to prepare cluster state yaml: %v", err)
+	}
+
+	if _, err := os.Stat(c.cluster_file); !os.IsNotExist(err) {
+		// Make sure we have backup of the cluster data - in case of fail it will stay and allow
+		// for easy restore of the node in exchange for a bit longer sync process
+		os.Remove(c.cluster_file + ".bak")
+		if err := os.Rename(c.cluster_file, c.cluster_file+".bak"); err != nil {
+			return fmt.Errorf("Cluster: Unable to rename the cluster info file %q: %v", c.cluster_file, err)
+		}
+	}
+
+	// Writing the new file right in place of the actual cluster file since it was moved before
+	if err := os.WriteFile(c.cluster_file, cl_data, 0600); err != nil {
+		return fmt.Errorf("Cluster: Unable to write cluster state file: %v", err)
+	}
+	return nil
+}
+
+// Reads the current cluster info from the yaml file, in case there is an error in reading the file
+// the backup will be used instead
+func (c *Cluster) readClusterInfo() (out error) {
+	if _, err := os.Stat(c.cluster_file); !os.IsNotExist(err) {
+		if data, err := os.ReadFile(c.cluster_file); err == nil {
+			if err = yaml.Unmarshal(data, &c.info); err == nil {
+				return nil
+			}
+			out = log.Error("Cluster: Unable to parse cluster config file:", c.cluster_file, err)
+		} else {
+			out = log.Error("Cluster: Unable to read cluster config file:", c.cluster_file, err)
+		}
+	}
+
+	// Try to read the backup file since previous try failed
+	bak_config := c.cluster_file + ".bak"
+	if _, err := os.Stat(bak_config); !os.IsNotExist(err) {
+		if data, err := os.ReadFile(bak_config); err == nil {
+			if err = yaml.Unmarshal(data, &c.info); err == nil {
+				return nil
+			}
+			out = log.Error("Cluster: Unable to parse cluster config file backup:", bak_config, err)
+		} else {
+			out = log.Error("Cluster: Unable to read cluster config file backup:", bak_config, err)
+		}
+	}
+
+	return out
 }
 
 // Checks the filled map of the type-importing and used for sending too
@@ -185,36 +240,49 @@ func (c *Cluster) Stop() {
 }
 
 // Function waits until the active clients will be synchronized (sync operation completed)
-func (c *Cluster) waitForClientsSync() {
-	var all_synced bool
-
-	for !all_synced {
-		log.Info("Cluster: Waiting for all conections get in sync...")
-		time.Sleep(time.Second)
-
-		all_synced = true
+func (c *Cluster) waitForSync() {
+	var in_sync bool
+	for {
+		// When we've got the clients - need to trigger sync and wait for it
 		for _, conn := range c.clients {
 			// Triggering the client sync if it's connected but not in sync with the cluster.
 			// It's running sequentially over each connected client to put not much pressure on
 			// the cluster and simplifies the sync parallelization.
-			if conn.IsConnected() && !conn.InSync {
+			if conn.IsConnected() {
 				conn.SyncRequest()
-				all_synced = false
-				break
-			}
-			// In case connection is failed - no need to wait for it
-			if conn.ConnFail == nil && !conn.InSync {
-				all_synced = false
-				break
+				// Waiting for sync to complete
+				for {
+					log.Info("Cluster: Waiting for cluster sync from client:", conn.ident)
+					// In case connection is failed - no need to wait for it
+					if conn.ConnFail != nil || !conn.IsConnected() {
+						log.Warn("Cluster: Failed to wait for sync from client:", conn.ident)
+						break
+					}
+					if !conn.IsLongOperationExecuting("sync") {
+						// Marking cluster as  in sync
+						in_sync = true
+						break
+					}
+					time.Sleep(time.Second)
+				}
 			}
 		}
+
+		if in_sync {
+			break
+		}
+
+		log.Info("Cluster: Waiting for any conection to sync the cluster...")
+		time.Sleep(time.Second)
 	}
 
 	// Ok, seems all the clients now in sync
+	log.Info("Cluster: Sync is done, cluster is ready:", c.info.UpdatedAt)
+	c.InSync = true
 	c.Ready <- true
 
 	// Cluster is ready, run the background watcher
-	go c.watchConnections()
+	go c.watchConnectionsProcess()
 }
 
 func (c *Cluster) GetInfo() ClusterInfo {
@@ -222,7 +290,34 @@ func (c *Cluster) GetInfo() ClusterInfo {
 }
 
 // Background watcher to estblish enough connections to the other cluster nodes
-func (c *Cluster) watchConnections() {
+func (c *Cluster) watchConnectionsProcess() {
+	// Running the background process to write cluster info file periodically
+	go c.infoUpdateProcess()
+
 	// TODO: Run watch on the nodes and ensure there is ~8 connections available (configurable),
 	// ensure most of the connections (~90%) are to the same location and rest to the other ones
+}
+
+// This function needed to periodically write the cluster info file, otherwise it will be written
+// way too often and will make disk worn-out quicker then we would love to
+func (c *Cluster) infoUpdateProcess() {
+	prev_time := c.info.UpdatedAt
+	update_ticker := time.NewTicker(time.Minute)
+	for {
+		if !c.fish.IsRunning() {
+			break
+		}
+		select {
+		case <-update_ticker.C:
+			// Write only when the cluster was updated since previous time
+			if prev_time.Before(c.info.UpdatedAt) {
+				log.Debug("Cluster: update info")
+				if err := c.writeClusterInfo(); err != nil {
+					log.Error("Cluster: Unable to write cluster info:", err)
+				} else {
+					prev_time = c.info.UpdatedAt
+				}
+			}
+		}
+	}
 }
