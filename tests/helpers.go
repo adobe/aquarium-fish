@@ -39,7 +39,7 @@ type AFInstance struct {
 	admin_token string
 }
 
-func RunAquariumFish(t *testing.T, name, cfg string) *AFInstance {
+func RunAquariumFish(t *testing.T, name, cfg string, args ...string) *AFInstance {
 	t.Log("INFO: Creating new node")
 	afi := &AFInstance{
 		node_name: name,
@@ -52,7 +52,7 @@ func RunAquariumFish(t *testing.T, name, cfg string) *AFInstance {
 	os.WriteFile(filepath.Join(afi.workspace, "config.yml"), []byte(cfg), 0644)
 	t.Log("INFO: Stored config:", cfg)
 
-	afi.fishStart(t)
+	afi.fishStart(t, args...)
 
 	return afi
 }
@@ -73,15 +73,15 @@ func (afi *AFInstance) IsRunning() bool {
 }
 
 // Restart the application
-func (afi *AFInstance) Restart(t *testing.T) {
+func (afi *AFInstance) Restart(t *testing.T, args ...string) {
 	t.Log("INFO: Restarting:", afi.node_name, afi.workspace)
 	afi.fishStop(t)
-	afi.fishStart(t)
+	afi.fishStart(t, args...)
 }
 
 // Start another node of cluster
 // It will automatically add cluster_join parameter to the config
-func (afi1 *AFInstance) RunClusterNode(t *testing.T, name, cfg string) *AFInstance {
+func (afi1 *AFInstance) RunClusterNode(t *testing.T, name, cfg string, args ...string) *AFInstance {
 	t.Log("INFO: Creating new cluster node with seed:", afi1.api_address)
 	afi2 := &AFInstance{
 		node_name: name,
@@ -103,7 +103,7 @@ func (afi1 *AFInstance) RunClusterNode(t *testing.T, name, cfg string) *AFInstan
 		t.Fatalf("Unable to copy CA crt: %v", err)
 	}
 
-	afi2.fishStart(t)
+	afi2.fishStart(t, args...)
 
 	return afi2
 }
@@ -135,11 +135,13 @@ func (afi *AFInstance) fishStop(t *testing.T) {
 	afi.fishKill()
 }
 
-func (afi *AFInstance) fishStart(t *testing.T) {
+func (afi *AFInstance) fishStart(t *testing.T, args ...string) {
 	ctx, cancel := context.WithCancel(context.Background())
 	afi.fishKill = cancel
 
-	afi.cmd = exec.CommandContext(ctx, fish_path, "-v", "debug", "-c", filepath.Join(afi.workspace, "config.yml"))
+	cmd_args := []string{"-v", "debug", "-c", filepath.Join(afi.workspace, "config.yml")}
+	cmd_args = append(cmd_args, args...)
+	afi.cmd = exec.CommandContext(ctx, fish_path, cmd_args...)
 	afi.cmd.Dir = afi.workspace
 	r, _ := afi.cmd.StdoutPipe()
 	afi.cmd.Stderr = afi.cmd.Stdout

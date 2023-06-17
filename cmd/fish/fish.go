@@ -41,6 +41,7 @@ func main() {
 	var cluster_join *[]string
 	var cfg_path string
 	var dir string
+	var maintenance bool
 	var log_verbosity string
 	var log_timestamp bool
 
@@ -126,6 +127,12 @@ func main() {
 				return err
 			}
 
+			// Set startup maintenance mode, very useful on the init to handle cluster conn issues
+			// before the node starts to execute the real workload
+			if maintenance {
+				fish.MaintenanceSet(true)
+			}
+
 			log.Info("Fish starting socks5 proxy...")
 			err = proxy.Init(fish, cfg.ProxyAddress)
 			if err != nil {
@@ -187,6 +194,7 @@ func main() {
 	cluster_join = flags.StringSliceP("join", "j", nil, "addresses of existing cluster nodes to join, comma separated")
 	flags.StringVarP(&cfg_path, "cfg", "c", "", "yaml configuration file")
 	flags.StringVarP(&dir, "dir", "D", "", "database and other fish files directory")
+	flags.BoolVar(&maintenance, "maintenance", false, "run in maintenance mode, connects to cluster but not executing Applications")
 	flags.StringVarP(&log_verbosity, "verbosity", "v", "info", "log level (debug, info, warn, error")
 	flags.BoolVar(&log_timestamp, "timestamp", true, "prepend timestamps for each log line")
 	flags.Lookup("timestamp").NoOptDefVal = "false"
