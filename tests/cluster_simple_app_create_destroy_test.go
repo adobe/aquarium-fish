@@ -1,5 +1,5 @@
 /**
- * Copyright 2021 Adobe. All rights reserved.
+ * Copyright 2023 Adobe. All rights reserved.
  * This file is licensed to you under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may obtain a copy
  * of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -31,7 +31,7 @@ import (
 // * Destroy Application
 func Test_cluster_simple_app_create_destroy(t *testing.T) {
 	// Small cluster node
-	afi1 := RunAquariumFish(t, "node-1", `---
+	afi1 := NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0
@@ -43,7 +43,7 @@ drivers:
       ram_limit: 4`)
 
 	// Big cluster node
-	afi2 := afi1.RunClusterNode(t, "node-2", `---
+	afi2 := afi1.NewClusterNode(t, "node-2", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0
@@ -175,7 +175,7 @@ drivers:
 // * Destroy Application
 func Test_cluster_simple_app_create_destroy_reverse(t *testing.T) {
 	// Big cluster node
-	afi1 := RunAquariumFish(t, "node-1", `---
+	afi1 := NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0
@@ -187,7 +187,7 @@ drivers:
       ram_limit: 8`)
 
 	// Small cluster node
-	afi2 := afi1.RunClusterNode(t, "node-2", `---
+	afi2 := afi1.NewClusterNode(t, "node-2", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0

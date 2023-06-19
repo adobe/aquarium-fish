@@ -30,7 +30,7 @@ import (
 // * Check Label was created
 func Test_yaml_label_create(t *testing.T) {
 	t.Parallel()
-	afi := RunAquariumFish(t, "node-1", `---
+	afi := NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0

@@ -31,7 +31,7 @@ import (
 // * Make sure it's allocated
 func Test_node_filter_one_match_good(t *testing.T) {
 	t.Parallel()
-	afi := RunAquariumFish(t, "node-1", `---
+	afi := NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 node_identifiers:
   - "example:test"
@@ -119,7 +119,7 @@ drivers:
 // * Make sure it's allocated
 func Test_node_filter_two_match_good(t *testing.T) {
 	t.Parallel()
-	afi := RunAquariumFish(t, "node-1", `---
+	afi := NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 node_identifiers:
   - "example:test"
@@ -208,7 +208,7 @@ drivers:
 // * Make sure it's not allocated in 10 sec
 func Test_node_filter_label_wrong_filter(t *testing.T) {
 	t.Parallel()
-	afi := RunAquariumFish(t, "node-1", `---
+	afi := NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 node_identifiers:
   - "example:test"
@@ -296,7 +296,7 @@ drivers:
 // * Make sure it's not allocated in 10 sec
 func Test_node_filter_node_has_less_than_needed(t *testing.T) {
 	t.Parallel()
-	afi := RunAquariumFish(t, "node-1", `---
+	afi := NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 node_identifiers:
   - "example:test"

@@ -28,7 +28,7 @@ import (
 // Ensure application task could be created with weird name but will fail during execution
 func Test_application_task_notexisting_fail(t *testing.T) {
 	t.Parallel()
-	afi := RunAquariumFish(t, "node-1", `---
+	afi := NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0

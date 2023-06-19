@@ -32,9 +32,8 @@ import (
 // * Check second node knows about the requested allocation
 // * Make sure that allocation is not happening on the second node
 func Test_cluster_reconnect_in_maintenance_mode(t *testing.T) {
-	//TODO
 	// Small cluster node
-	afi1 := RunAquariumFish(t, "node-1", `---
+	afi1 := NewAquariumFish(t, "node-1", `---
 node_location: test_loc-1
 
 api_address: 127.0.0.1:0
@@ -96,7 +95,7 @@ drivers:
 	})
 
 	// Big cluster node
-	afi2 := afi1.RunClusterNode(t, "node-2", `---
+	afi2 := afi1.NewClusterNode(t, "node-2", `---
 node_location: test_loc-1
 
 api_address: 127.0.0.1:0

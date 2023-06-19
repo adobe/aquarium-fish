@@ -33,7 +33,7 @@ import (
 // * Application should be allocated in 20 sec
 func Test_maintenace_cancel(t *testing.T) {
 	t.Parallel()
-	afi := RunAquariumFish(t, "node-1", `---
+	afi := NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0
