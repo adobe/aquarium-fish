@@ -23,6 +23,7 @@ import (
 	"github.com/steinfletcher/apitest"
 
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
 // Testing the way to connect to cluster in maintenance mode, which allows to connect to cluster but not to accept any workload
@@ -33,7 +34,7 @@ import (
 // * Make sure that allocation is not happening on the second node
 func Test_cluster_reconnect_in_maintenance_mode(t *testing.T) {
 	// Small cluster node
-	afi1 := NewAquariumFish(t, "node-1", `---
+	afi1 := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc-1
 
 api_address: 127.0.0.1:0
@@ -110,7 +111,7 @@ drivers:
 
 	var app_state types.ApplicationState
 	t.Run("Application should not get ALLOCATED in 15 sec", func(t *testing.T) {
-		Retry(&Timer{Timeout: 15 * time.Second, Wait: 1 * time.Second}, t, func(r *R) {
+		h.Retry(&h.Timer{Timeout: 15 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi1.ApiAddress("api/v1/application/"+app1.UID.String()+"/state")).
@@ -130,7 +131,7 @@ drivers:
 
 	app_state.Status = ""
 	t.Run("Application should get ALLOCATED in 15 sec", func(t *testing.T) {
-		Retry(&Timer{Timeout: 15 * time.Second, Wait: 1 * time.Second}, t, func(r *R) {
+		h.Retry(&h.Timer{Timeout: 15 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi1.ApiAddress("api/v1/application/"+app1.UID.String()+"/state")).
@@ -173,7 +174,7 @@ drivers:
 	})
 
 	t.Run("Application should get DEALLOCATED in 10 sec", func(t *testing.T) {
-		Retry(&Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *R) {
+		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi2.ApiAddress("api/v1/application/"+app1.UID.String()+"/state")).

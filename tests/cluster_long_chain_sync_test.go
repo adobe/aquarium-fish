@@ -23,6 +23,7 @@ import (
 	"github.com/steinfletcher/apitest"
 
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
 // Testing cluster of 5 machines connected in chain how they are sync with each other
@@ -32,7 +33,7 @@ import (
 // * Destroy Application from node-4
 func Test_cluster_long_chain_sync_destroy(t *testing.T) {
 	// Small cluster node
-	afi1 := NewAquariumFish(t, "node-1", `---
+	afi1 := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc-1
 
 api_address: 127.0.0.1:0
@@ -149,7 +150,7 @@ drivers:
 
 	var app5 types.Application
 	t.Run("Application should sync in cluster chain in 2 sec", func(t *testing.T) {
-		Retry(&Timer{Timeout: 2 * time.Second, Wait: 1 * time.Second}, t, func(r *R) {
+		h.Retry(&h.Timer{Timeout: 2 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi5.ApiAddress("api/v1/application/"+app1.UID.String())).
@@ -167,7 +168,7 @@ drivers:
 
 	var app_state5 types.ApplicationState
 	t.Run("Application should get ALLOCATED in 15 sec", func(t *testing.T) {
-		Retry(&Timer{Timeout: 15 * time.Second, Wait: 1 * time.Second}, t, func(r *R) {
+		h.Retry(&h.Timer{Timeout: 15 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi5.ApiAddress("api/v1/application/"+app1.UID.String()+"/state")).
@@ -185,7 +186,7 @@ drivers:
 
 	var app_state1 types.ApplicationState
 	t.Run("Application should sync ALLOCATED status in cluster chain in 2 sec", func(t *testing.T) {
-		Retry(&Timer{Timeout: 2 * time.Second, Wait: 1 * time.Second}, t, func(r *R) {
+		h.Retry(&h.Timer{Timeout: 2 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi5.ApiAddress("api/v1/application/"+app1.UID.String()+"/state")).
@@ -228,7 +229,7 @@ drivers:
 	})
 
 	t.Run("Application should get DEALLOCATED in 10 sec", func(t *testing.T) {
-		Retry(&Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *R) {
+		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi5.ApiAddress("api/v1/application/"+app1.UID.String()+"/state")).
@@ -245,7 +246,7 @@ drivers:
 	})
 
 	t.Run("Application should sync DEALLOCATED status in cluster chain in 2 sec", func(t *testing.T) {
-		Retry(&Timer{Timeout: 2 * time.Second, Wait: 1 * time.Second}, t, func(r *R) {
+		h.Retry(&h.Timer{Timeout: 2 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi1.ApiAddress("api/v1/application/"+app1.UID.String()+"/state")).

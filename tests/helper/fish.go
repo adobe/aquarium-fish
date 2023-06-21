@@ -1,5 +1,5 @@
 /**
- * Copyright 2021 Adobe. All rights reserved.
+ * Copyright 2023 Adobe. All rights reserved.
  * This file is licensed to you under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may obtain a copy
  * of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -10,7 +10,7 @@
  * governing permissions and limitations under the License.
  */
 
-package tests
+package helper
 
 import (
 	"bufio"
@@ -40,8 +40,16 @@ type afInstance struct {
 }
 
 // Simple creates and run the fish node
-func NewAquariumFish(t *testing.T, name, cfg string, args ...string) *afInstance {
-	t.Log("INFO: Creating new node")
+func NewAquariumFish(t testing.TB, name, cfg string, args ...string) *afInstance {
+	afi := NewAfInstance(t, name, cfg)
+	afi.Start(t, args...)
+
+	return afi
+}
+
+// If you need to create instance without starting it up right away
+func NewAfInstance(t testing.TB, name, cfg string) *afInstance {
+	t.Log("INFO: Creating new node:", name)
 	afi := &afInstance{
 		node_name: name,
 	}
@@ -53,14 +61,37 @@ func NewAquariumFish(t *testing.T, name, cfg string, args ...string) *afInstance
 	os.WriteFile(filepath.Join(afi.workspace, "config.yml"), []byte(cfg), 0644)
 	t.Log("INFO: Stored config:", cfg)
 
-	afi.Start(t, args...)
-
 	return afi
+}
+
+// Start another node of cluster
+// It will automatically add cluster_join parameter to the config
+func (afi1 *afInstance) NewClusterNode(t testing.TB, name, cfg string, args ...string) *afInstance {
+	t.Log("INFO: Creating new cluster node with seed node:", afi1.node_name)
+	cfg += fmt.Sprintf("\ncluster_join: [%q]", afi1.api_address)
+	afi2 := NewAfInstance(t, name, cfg)
+
+	// Copy seed node CA to generate valid cluster node cert
+	if err := CopyFile(filepath.Join(afi1.workspace, "fish_data", "ca.key"), filepath.Join(afi2.workspace, "fish_data", "ca.key")); err != nil {
+		t.Fatalf("ERROR: Unable to copy CA key: %v", err)
+	}
+	if err := CopyFile(filepath.Join(afi1.workspace, "fish_data", "ca.crt"), filepath.Join(afi2.workspace, "fish_data", "ca.crt")); err != nil {
+		t.Fatalf("ERROR: Unable to copy CA crt: %v", err)
+	}
+
+	afi2.Start(t, args...)
+
+	return afi2
 }
 
 // Will return url to access API of AquariumFish
 func (afi *afInstance) ApiAddress(path string) string {
 	return fmt.Sprintf("https://%s/%s", afi.api_address, path)
+}
+
+// Will return workspace of the AquariumFish
+func (afi *afInstance) Workspace() string {
+	return afi.workspace
 }
 
 // Returns admin token
@@ -74,50 +105,21 @@ func (afi *afInstance) IsRunning() bool {
 }
 
 // Restart the application
-func (afi *afInstance) Restart(t *testing.T, args ...string) {
+func (afi *afInstance) Restart(t testing.TB, args ...string) {
 	t.Log("INFO: Restarting:", afi.node_name, afi.workspace)
 	afi.Stop(t)
 	afi.Start(t, args...)
 }
 
-// Start another node of cluster
-// It will automatically add cluster_join parameter to the config
-func (afi1 *afInstance) NewClusterNode(t *testing.T, name, cfg string, args ...string) *afInstance {
-	t.Log("INFO: Creating new cluster node with seed:", afi1.api_address)
-	afi2 := &afInstance{
-		node_name: name,
-	}
-
-	afi2.workspace = t.TempDir()
-	t.Log("INFO: Created workspace:", afi2.node_name, afi2.workspace)
-
-	cfg += fmt.Sprintf("\nnode_name: %q", afi2.node_name)
-	cfg += fmt.Sprintf("\ncluster_join: [%q]", afi1.api_address)
-	os.WriteFile(filepath.Join(afi2.workspace, "config.yml"), []byte(cfg), 0644)
-	t.Log("INFO: Stored config:", cfg)
-
-	// Copy seed node CA to generate valid cluster node cert
-	if err := copyFile(filepath.Join(afi1.workspace, "fish_data", "ca.key"), filepath.Join(afi2.workspace, "fish_data", "ca.key")); err != nil {
-		t.Fatalf("Unable to copy CA key: %v", err)
-	}
-	if err := copyFile(filepath.Join(afi1.workspace, "fish_data", "ca.crt"), filepath.Join(afi2.workspace, "fish_data", "ca.crt")); err != nil {
-		t.Fatalf("Unable to copy CA crt: %v", err)
-	}
-
-	afi2.Start(t, args...)
-
-	return afi2
-}
-
 // Cleanup after the test execution
-func (afi *afInstance) Cleanup(t *testing.T) {
+func (afi *afInstance) Cleanup(t testing.TB) {
 	t.Log("INFO: Cleaning up:", afi.node_name, afi.workspace)
 	afi.Stop(t)
 	os.RemoveAll(afi.workspace)
 }
 
 // Stops the fish node executable
-func (afi *afInstance) Stop(t *testing.T) {
+func (afi *afInstance) Stop(t testing.TB) {
 	if afi.cmd == nil || !afi.running {
 		return
 	}
@@ -138,7 +140,7 @@ func (afi *afInstance) Stop(t *testing.T) {
 }
 
 // Starts the fish node executable
-func (afi *afInstance) Start(t *testing.T, args ...string) {
+func (afi *afInstance) Start(t testing.TB, args ...string) {
 	if afi.running {
 		t.Fatalf("ERROR: Fish node can't be started since already started: %s", afi.node_name)
 		return
@@ -183,7 +185,7 @@ func (afi *afInstance) Start(t *testing.T, args ...string) {
 				init_done <- ""
 			}
 		}
-		t.Log("Reading of AquariumFish output is done")
+		t.Log("INFO: Reading of AquariumFish output is done")
 	}()
 
 	afi.cmd.Start()
@@ -195,7 +197,7 @@ func (afi *afInstance) Start(t *testing.T, args ...string) {
 			r.Close()
 		}()
 		if err := afi.cmd.Wait(); err != nil {
-			t.Log("AquariumFish process was stopped:", err)
+			t.Log("WARN: AquariumFish process was stopped:", err)
 			init_done <- fmt.Sprintf("ERROR: Fish was stopped with exit code: %v", err)
 		}
 	}()
@@ -203,12 +205,12 @@ func (afi *afInstance) Start(t *testing.T, args ...string) {
 	failed := <-init_done
 
 	if failed != "" {
-		t.Fatalf(failed)
+		t.Fatalf("ERROR: Failed to init node %q: %s", afi.node_name, failed)
 	}
 }
 
 // Func to copy files around
-func copyFile(src, dst string) error {
+func CopyFile(src, dst string) error {
 	fin, err := os.Open(src)
 	if err != nil {
 		return err
