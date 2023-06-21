@@ -31,9 +31,15 @@ func (c *Client) SyncRequest() {
 	}
 	c.long_ops["sync"] = &WaitGroupCount{}
 
+	// Sending the Node object belongs to this node
+	nodes := []any{c.fish.GetNode()}
+	if err := c.Write(msg.NewMessage("Node", "", nodes)); err != nil {
+		log.Errorf("Cluster: Client %s: Unable to send self Node: %v", c.ident, err)
+	}
+
 	// Request all the cluster data since the last update
-	// TODO: Add getting only the last changes by from data field
-	c.Write(msg.NewMessage("sync", "", msg.Sync{}))
+	// TODO: Make the received messages to update the cluster UpdatedAt field
+	c.Write(msg.NewMessage("sync", "", msg.Sync{From: c.cluster.info.UpdatedAt}))
 }
 
 // Procesing incoming message

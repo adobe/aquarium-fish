@@ -146,7 +146,9 @@ func main() {
 			}
 
 			// Register callbacks for create/update/delete to enable further synchronization of
-			// the cluster data with the connected to cluster nodes
+			// the cluster data with the connected to cluster nodes. It's registered after the
+			// cluster creation on purpose to allow a quick synchronization and not to duplicate
+			// the broadcast requests.
 			db.Callback().Create().After("gorm:create").Register("cluster_sync", cl.HookCreateUpdate)
 			db.Callback().Update().After("gorm:update").Register("cluster_sync", cl.HookCreateUpdate)
 			// TODO: make sure delete will work
@@ -155,9 +157,6 @@ func main() {
 			//		log.Debug("DEBUG: GORM DELETE")
 			//	}
 			//})
-
-			// Wait for cluster
-			<-cl.Ready
 
 			log.Info("Fish starting API...")
 			srv, err := openapi.Init(fish, cl, cfg.APIAddress, ca_path, cert_path, key_path)

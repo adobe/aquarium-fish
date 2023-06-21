@@ -618,6 +618,39 @@ paths:
       security:
         - basic_auth: []
 
+  /api/v1/node/{name}/pubkey:
+    put:
+      summary: Sets pubkey of the node
+      description: In order to change public key of the node
+      operationId: NodePubkeyPut
+      tags:
+        - Node
+      parameters:
+        - name: name
+          in: path
+          description: Name of the node
+          required: true
+          schema:
+            type: string
+        - name: value
+          in: query
+          description: Value of the pubkey, if omitted then will be nulled
+          required: false
+          schema:
+            type: string
+            format: byte
+      responses:
+        '200':
+          description: Successful operation
+        '400':
+          description: Bad parameter or conditions
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Node not found
+      security:
+        - basic_auth: []
+
   /api/v1/node/this/:
     get:
       summary: Get this Node info
@@ -676,6 +709,27 @@ paths:
           description: Successful operation
         '400':
           description: Bad parameter or conditions
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+      security:
+        - basic_auth: []
+
+  /api/v1/node/this/connections:
+    get:
+      summary: List current node connections & status
+      description: Returns list of node cluster connections
+      operationId: NodeThisConnectionsGet
+      tags:
+        - Node
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Connection'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
       security:
@@ -1623,6 +1677,35 @@ components:
           x-oapi-codegen-extra-tags:
             yaml: application_UID
             gorm: uniqueIndex:idx_location_service_app_uniq
+
+    # Runtime
+    ConnectionStatus:
+      type: string
+      enum:
+        - CONNECTED     # Connected and feel good
+        - DISCONNECTED  # Not connected
+        - ERROR         # Not connected and error happened
+    Connection:
+      type: object
+      description: >
+        Simple runtime object to describe node connection and it's status
+      required:
+        - ident
+        - url
+        - status
+        - error
+      properties:
+        ident:
+          type: string
+          description: Identifier of the connection, usually name of the node
+        url:
+          type: string
+          description: URL to the node to connect to, empty if receiver
+        status:
+          $ref: '#/components/schemas/ConnectionStatus'
+        error:
+          type: string
+          description: If error happened it will contain the error message string
 
   securitySchemes:
     basic_auth:

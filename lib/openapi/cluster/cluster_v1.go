@@ -13,6 +13,7 @@
 package cluster
 
 import (
+	"bytes"
 	"crypto/x509"
 	"fmt"
 	"net/http"
@@ -62,6 +63,7 @@ func (e *Processor) ClientCertAuth(next echo.HandlerFunc) echo.HandlerFunc {
 			return echo.NewHTTPError(http.StatusUnauthorized, "Client certificate is not provided")
 		}
 
+		// Finding the first valid client certificate
 		var valid_client_cert *x509.Certificate
 		for _, crt := range c.Request().TLS.PeerCertificates {
 			// Validation over cluster CA cert
@@ -71,25 +73,50 @@ func (e *Processor) ClientCertAuth(next echo.HandlerFunc) echo.HandlerFunc {
 			}
 			_, err := crt.Verify(opts)
 			if err != nil {
-				log.Warnf("Cluster: Client %s (%s) certificate CA verify failed: %v", crt.Subject.CommonName, c.RealIP(), err)
+				log.Warnf("Cluster: Client %q (%s): certificate CA verify failed: %v", crt.Subject.CommonName, c.RealIP(), err)
 				continue
 			}
 
-			log.Debug("Cluster: Client certificate CN:", crt.Subject.CommonName)
-			der, err := x509.MarshalPKIXPublicKey(crt.PublicKey)
+			client_der, err := x509.MarshalPKIXPublicKey(crt.PublicKey)
 			if err != nil {
+				log.Warnf("Cluster: Client %q (%s): Unable to marshal public key: %x", crt.Subject.CommonName, c.RealIP(), err)
 				continue
 			}
-			log.Debug("Cluster: Client certificate pubkey der:", der)
+			log.Debugf("Cluster: Client %q (%s): certificate pubkey der: %x", crt.Subject.CommonName, c.RealIP(), client_der)
+
+			// Checking existing Node with cert CA name with non-nil pubkey data
+			if node, err := e.fish.NodeGet(crt.Subject.CommonName); err == nil {
+				// The Node with this name is available in the DB, so checking it's pubkey
+				if node.Pubkey != nil && bytes.Equal(*node.Pubkey, client_der) == false {
+					log.Warnf("Cluster: Client %q (%s): certificate pubkey did not matched the known one: %x != %x", crt.Subject.CommonName, c.RealIP(), client_der, *node.Pubkey)
+					continue
+				}
+			}
+
+			// Checking there is no nodes with the same pubkey (to eliminate the copy of crt to be used)
+			if nodes, err := e.fish.NodeGetPubkey(client_der); err == nil && len(nodes) > 0 {
+				// Seems we have some known nodes with the same pubkey
+				found_dup := false
+				for _, node := range nodes {
+					log.Debug("!!! REMOVE: Checking node:", node.Name, crt.Subject.CommonName)
+					if node.Name != crt.Subject.CommonName {
+						log.Warnf("Cluster: Client %q (%s): certificate pubkey reused by another node: %q", crt.Subject.CommonName, c.RealIP(), node.Name)
+						found_dup = true
+					}
+				}
+				if found_dup {
+					continue
+				}
+			}
 
 			valid_client_cert = crt
+			break
 		}
 
 		if valid_client_cert == nil {
-			return echo.NewHTTPError(http.StatusUnauthorized, "Client certificate is invalid")
+			log.Warnf("Cluster: Client (%s): Failed to validate all the provided certificates", c.RealIP())
+			return echo.NewHTTPError(http.StatusUnauthorized, "Client certificates are invalid")
 		}
-
-		// TODO: Check the node in db by CA as NodeName and if exists compare the pubkey
 
 		c.Set("client_cert", valid_client_cert)
 

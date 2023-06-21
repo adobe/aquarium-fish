@@ -89,7 +89,7 @@ func Init(fish *fish.Fish, cl *cluster.Cluster, api_address, ca_path, cert_path,
 	// routers to independance ports if needed
 	meta.NewV1Router(router, fish)
 	cluster_server.NewV1Router(router, fish, cl)
-	api.NewV1Router(router, fish)
+	api.NewV1Router(router, fish, cl)
 	// TODO: web UI router
 
 	ca_pool := x509.NewCertPool()

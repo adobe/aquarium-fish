@@ -16,7 +16,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -67,6 +66,14 @@ func NewAfInstance(t testing.TB, name, cfg string) *afInstance {
 // Start another node of cluster
 // It will automatically add cluster_join parameter to the config
 func (afi1 *afInstance) NewClusterNode(t testing.TB, name, cfg string, args ...string) *afInstance {
+	afi2 := afi1.NewAfInstanceCluster(t, name, cfg)
+	afi2.Start(t, args...)
+
+	return afi2
+}
+
+// Just create the node based on the existing cluster node
+func (afi1 *afInstance) NewAfInstanceCluster(t testing.TB, name, cfg string) *afInstance {
 	t.Log("INFO: Creating new cluster node with seed node:", afi1.node_name)
 	cfg += fmt.Sprintf("\ncluster_join: [%q]", afi1.api_address)
 	afi2 := NewAfInstance(t, name, cfg)
@@ -78,8 +85,6 @@ func (afi1 *afInstance) NewClusterNode(t testing.TB, name, cfg string, args ...s
 	if err := CopyFile(filepath.Join(afi1.workspace, "fish_data", "ca.crt"), filepath.Join(afi2.workspace, "fish_data", "ca.crt")); err != nil {
 		t.Fatalf("ERROR: Unable to copy CA crt: %v", err)
 	}
-
-	afi2.Start(t, args...)
 
 	return afi2
 }
@@ -142,7 +147,7 @@ func (afi *afInstance) Stop(t testing.TB) {
 // Starts the fish node executable
 func (afi *afInstance) Start(t testing.TB, args ...string) {
 	if afi.running {
-		t.Fatalf("ERROR: Fish node can't be started since already started: %s", afi.node_name)
+		t.Fatalf("ERROR: Fish node %q can't be started since already started", afi.node_name)
 		return
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -207,26 +212,4 @@ func (afi *afInstance) Start(t testing.TB, args ...string) {
 	if failed != "" {
 		t.Fatalf("ERROR: Failed to init node %q: %s", afi.node_name, failed)
 	}
-}
-
-// Func to copy files around
-func CopyFile(src, dst string) error {
-	fin, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer fin.Close()
-
-	os.MkdirAll(filepath.Dir(dst), 0755)
-	fout, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer fout.Close()
-
-	if _, err = io.Copy(fout, fin); err != nil {
-		return err
-	}
-
-	return nil
 }

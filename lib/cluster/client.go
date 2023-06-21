@@ -132,6 +132,14 @@ func (c *Client) IsConnected() bool {
 	return c.ws != nil
 }
 
+func (c *Client) Ident() string {
+	return c.ident
+}
+
+func (c *Client) Url() url.URL {
+	return c.url
+}
+
 // Way to check when long-process is still executing
 func (c *Client) IsLongOperationExecuting(name string) bool {
 	_, ok := c.long_ops[name]

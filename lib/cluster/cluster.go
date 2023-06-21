@@ -110,7 +110,7 @@ func New(fish *fish.Fish, join []string, data_dir, ca_path, cert_path, key_path 
 
 	// Connecting to the cluster or creating it
 	if len(join) > 0 {
-		// When we have join list - try those addresses to sync first
+		// When we have join list - try those addresses to sync the cluster
 		// Useful on initial cluster join and if the cluster nodes were changed since last sync
 		log.Info("Cluster: Connecting to existing cluster:", join)
 		for _, endpoint := range join {
@@ -118,12 +118,13 @@ func New(fish *fish.Fish, join []string, data_dir, ca_path, cert_path, key_path 
 		}
 
 		// Wait until all the clients will be synced
-		go c.waitForSync()
+		if err := c.waitForSync(); err != nil {
+			return nil, fmt.Errorf("Cluster: Unable to sync with the join nodes: %v", err)
+		}
 	} else if c.info.UID != uuid.Nil {
 		// When cluster UID is here - use the available nodes info to connect and sync with them
 		log.Info("Cluster: Connecting to known cluster:", join)
 		// TODO: Cluster is existing, but we need to run clients and sync them from previous good state
-		c.Ready <- true // Just for now
 		//go c.waitForSync()
 		go c.watchConnectionsProcess()
 	} else {
@@ -137,9 +138,6 @@ func New(fish *fish.Fish, join []string, data_dir, ca_path, cert_path, key_path 
 		}
 
 		log.Info("Cluster: Created new cluster UID:", c.info.UID)
-
-		// New cluster is ready
-		c.Ready <- true
 
 		// Cluster is ready, run the background watcher
 		go c.watchConnectionsProcess()
@@ -240,9 +238,11 @@ func (c *Cluster) Stop() {
 }
 
 // Function waits until the active clients will be synchronized (sync operation completed)
-func (c *Cluster) waitForSync() {
+func (c *Cluster) waitForSync() error {
 	var in_sync bool
+	var conn_fails int
 	for {
+		conn_fails = 0
 		// When we've got the clients - need to trigger sync and wait for it
 		for _, conn := range c.clients {
 			// Triggering the client sync if it's connected but not in sync with the cluster.
@@ -266,10 +266,20 @@ func (c *Cluster) waitForSync() {
 					time.Sleep(time.Second)
 				}
 			}
+
+			// Increasing the counter of failed connections
+			if conn.ConnFail != nil {
+				conn_fails += 1
+			}
 		}
 
 		if in_sync {
 			break
+		}
+
+		// Check if all the connections fail
+		if conn_fails == len(c.clients) {
+			return fmt.Errorf("Cluster: All the cluster clients failed to connect and unable to sync")
 		}
 
 		log.Info("Cluster: Waiting for any conection to sync the cluster...")
@@ -279,10 +289,11 @@ func (c *Cluster) waitForSync() {
 	// Ok, seems all the clients now in sync
 	log.Info("Cluster: Sync is done, cluster is ready:", c.info.UpdatedAt)
 	c.InSync = true
-	c.Ready <- true
 
 	// Cluster is ready, run the background watcher
 	go c.watchConnectionsProcess()
+
+	return nil
 }
 
 func (c *Cluster) GetInfo() ClusterInfo {
@@ -296,6 +307,9 @@ func (c *Cluster) watchConnectionsProcess() {
 
 	// TODO: Run watch on the nodes and ensure there is ~8 connections available (configurable),
 	// ensure most of the connections (~90%) are to the same location and rest to the other ones
+	// 1. Check if there is not enough connected clients in the hub and find more similar location
+	// nodes
+	// 2. Ensure node connected to one connection to the other location
 }
 
 // This function needed to periodically write the cluster info file, otherwise it will be written

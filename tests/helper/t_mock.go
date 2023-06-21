@@ -40,6 +40,16 @@ func (m *MockT) Logf(format string, args ...any) {
 	m.t.Logf(format, args...)
 }
 
+func (m *MockT) Fatal(args ...any) {
+	m.t.Log(args...)
+	m.FailNow()
+}
+
+func (m *MockT) Fatalf(format string, args ...any) {
+	m.t.Logf(format, args...)
+	m.FailNow()
+}
+
 func ExpectFailure(t *testing.T, f func(tt testing.TB)) {
 	var wg sync.WaitGroup
 	mock_t := &MockT{t: t}

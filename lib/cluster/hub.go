@@ -50,6 +50,13 @@ func newHub() *Hub {
 	return hub
 }
 
+func (h *Hub) Clients() (out []*Client) {
+	for client, _ := range h.clients {
+		out = append(out, client)
+	}
+	return out
+}
+
 func (h *Hub) run() {
 	for {
 		select {

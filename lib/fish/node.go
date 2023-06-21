@@ -73,6 +73,12 @@ func (f *Fish) NodeGet(name string) (node *types.Node, err error) {
 	return node, err
 }
 
+func (f *Fish) NodeGetPubkey(pubkey []byte) (nodes []types.Node, err error) {
+	err = f.db.Where("pubkey = ?", pubkey).Find(&nodes).Error
+	log.Debug("!!! REMOVE: Found the next nodes by pubkey:", nodes)
+	return nodes, err
+}
+
 func (f *Fish) pingProcess() error {
 	// TODO: Clean up this ping process and switch to cluster websocket one
 	// In order to optimize network & database - update just UpdatedAt field
