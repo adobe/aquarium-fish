@@ -98,7 +98,6 @@ func (e *Processor) ClientCertAuth(next echo.HandlerFunc) echo.HandlerFunc {
 				// Seems we have some known nodes with the same pubkey
 				found_dup := false
 				for _, node := range nodes {
-					log.Debug("!!! REMOVE: Checking node:", node.Name, crt.Subject.CommonName)
 					if node.Name != crt.Subject.CommonName {
 						log.Warnf("Cluster: Client %q (%s): certificate pubkey reused by another node: %q", crt.Subject.CommonName, c.RealIP(), node.Name)
 						found_dup = true

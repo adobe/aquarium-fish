@@ -193,7 +193,7 @@ func (f *Fish) Init() error {
 	}
 
 	// Continue to execute the assigned applications
-	resources, err := f.ResourceListNode(f.node.UID)
+	resources, err := f.ResourceListNodeActive(f.node.UID)
 	if err != nil {
 		return log.Error("Fish: Unable to get the node resources:", err)
 	}
@@ -209,9 +209,10 @@ func (f *Fish) Init() error {
 				log.Errorf("Fish: Can't execute Application %s: %v", vote.ApplicationUID, err)
 			}
 		} else {
-			log.Warn("Fish: Found not allocated Resource of Application, cleaning up:", res.ApplicationUID)
-			if err := f.ResourceDelete(res.UID); err != nil {
-				log.Error("Fish: Unable to delete Resource of Application:", res.ApplicationUID, err)
+			log.Warn("Fish: Found not allocated Resource of Application, deactivating it:", res.ApplicationUID)
+			res.Deactivated = true
+			if err := f.ResourceSave(&res); err != nil {
+				log.Error("Fish: Unable to update Resource of Application:", res.ApplicationUID, err)
 			}
 			app_state := &types.ApplicationState{ApplicationUID: res.ApplicationUID, Status: types.ApplicationStatusERROR,
 				Description: "Found not cleaned up resource",
@@ -710,9 +711,11 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 						Description: fmt.Sprint("Driver deallocated the resource"),
 					}
 				}
-				// Destroying the resource anyway to not bloat the table - otherwise it will stuck there and
-				// will block the access to IP of the other VM's that will reuse this IP
-				if err := f.ResourceDelete(res.UID); err != nil {
+
+				// Deactivating the resource anyway to not bloat the table - otherwise it will stuck
+				// there and will block the access to IP of the other VM's that will reuse this IP
+				res.Deactivated = true
+				if err := f.ResourceSave(res); err != nil {
 					log.Error("Fish: Unable to delete Resource for Application:", app.UID, err)
 				}
 				f.ApplicationStateCreate(app_state)

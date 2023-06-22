@@ -164,3 +164,19 @@ func (cl *Cluster) importNode(message *msg.Message) {
 		}
 	}
 }
+
+func (cl *Cluster) importResource(message *msg.Message) {
+	var items []types.Resource
+	dec := json.NewDecoder(bytes.NewReader([]byte(message.Data)))
+	if err := dec.Decode(&items); err != nil {
+		log.Warn("Cluster: Unable to unmarshal the Resources data:", err)
+		return
+	}
+
+	for _, i := range items {
+		log.Debug("Cluster: Importing Resource:", i.UID)
+		if err := cl.fish.ResourceImport(&i); err != nil {
+			log.Warnf("Cluster: Unable to import resource '%s': %v", i.UID, err)
+		}
+	}
+}

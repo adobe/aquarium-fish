@@ -85,6 +85,7 @@ func New(fish *fish.Fish, join []string, data_dir, ca_path, cert_path, key_path 
 		"Vote":             c.importVote,
 		"Location":         c.importLocation,
 		"Node":             c.importNode,
+		"Resource":         c.importResource,
 	}
 
 	// Load CA cert to pool

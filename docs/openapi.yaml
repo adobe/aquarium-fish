@@ -1477,7 +1477,7 @@ components:
     Resource:
       type: object
       description: >
-        Active resource definition to be able to properly restore the state during the cluster node
+        Resource definition to be able to properly restore the state during the cluster node
         restart. Also contains additional info about the resource, for example user requested
         metadata, which is available for the resource through the `Meta API`.
 
@@ -1489,6 +1489,7 @@ components:
         - application_UID
         - node_UID
         - label_UID
+        - deactivated
         - definition_index
         - identifier
         - ip_addr
@@ -1521,8 +1522,14 @@ components:
           format: uuid
           x-oapi-codegen-extra-tags:
             yaml: label_UID
+        deactivated:
+          type: boolean
+          description: |
+            Flag to mark the resource as not active in case it was deallocated
         definition_index:
           type: integer
+          description: |
+            Which particular definition from the Label was used to allocate this resource
         identifier:
           type: string
           description: |

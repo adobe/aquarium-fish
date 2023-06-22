@@ -75,7 +75,6 @@ func (f *Fish) NodeGet(name string) (node *types.Node, err error) {
 
 func (f *Fish) NodeGetPubkey(pubkey []byte) (nodes []types.Node, err error) {
 	err = f.db.Where("pubkey = ?", pubkey).Find(&nodes).Error
-	log.Debug("!!! REMOVE: Found the next nodes by pubkey:", nodes)
 	return nodes, err
 }
 

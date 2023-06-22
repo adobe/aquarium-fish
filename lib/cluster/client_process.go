@@ -319,6 +319,23 @@ func (c *Client) processSync(message *msg.Message) {
 		}
 	}
 
+	// Sending back the resources
+	{
+		//log.Debugf("Cluster: Client %s: Sending resources", c.ident)
+		resources, err := c.fish.ResourceFind(filter)
+		if err != nil {
+			log.Errorf("Cluster: Client %s: Unable to get Resources to send: %v", c.ident, err)
+			return
+		}
+		if len(resources) > 0 {
+			counter += 1
+			if err := c.Write(msg.NewMessage("Resource", message.Type, resources)); err != nil {
+				log.Errorf("Cluster: Client %s: Unable to send Resources: %v", c.ident, err)
+				return
+			}
+		}
+	}
+
 	// Sending back the sync completed message
 	//log.Debugf("Cluster: Client %s: Sending sync completed", c.ident)
 	if err := c.Write(msg.NewMessage("completed", message.Type, counter)); err != nil {

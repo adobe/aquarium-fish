@@ -189,7 +189,7 @@ drivers:
 		h.Retry(&h.Timer{Timeout: 2 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
-				Get(afi5.ApiAddress("api/v1/application/"+app1.UID.String()+"/state")).
+				Get(afi1.ApiAddress("api/v1/application/"+app1.UID.String()+"/state")).
 				BasicAuth("admin", afi1.AdminToken()).
 				Expect(r).
 				Status(http.StatusOK).
@@ -203,10 +203,10 @@ drivers:
 	})
 
 	var res types.Resource
-	t.Run("Resource should be created", func(t *testing.T) {
+	t.Run("Resource should be created and synced in cluster already", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Get(afi5.ApiAddress("api/v1/application/"+app1.UID.String()+"/resource")).
+			Get(afi1.ApiAddress("api/v1/application/"+app1.UID.String()+"/resource")).
 			BasicAuth("admin", afi1.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
