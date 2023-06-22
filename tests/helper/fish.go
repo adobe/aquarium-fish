@@ -34,7 +34,7 @@ type afInstance struct {
 	cmd       *exec.Cmd
 
 	node_name   string
-	api_address string
+	endpoint    string
 	admin_token string
 }
 
@@ -75,7 +75,7 @@ func (afi1 *afInstance) NewClusterNode(t testing.TB, name, cfg string, args ...s
 // Just create the node based on the existing cluster node
 func (afi1 *afInstance) NewAfInstanceCluster(t testing.TB, name, cfg string) *afInstance {
 	t.Log("INFO: Creating new cluster node with seed node:", afi1.node_name)
-	cfg += fmt.Sprintf("\ncluster_join: [%q]", afi1.api_address)
+	cfg += fmt.Sprintf("\ncluster_join: [%q]", afi1.endpoint)
 	afi2 := NewAfInstance(t, name, cfg)
 
 	// Copy seed node CA to generate valid cluster node cert
@@ -89,9 +89,14 @@ func (afi1 *afInstance) NewAfInstanceCluster(t testing.TB, name, cfg string) *af
 	return afi2
 }
 
+// Will return just IP:PORT
+func (afi *afInstance) Endpoint() string {
+	return afi.endpoint
+}
+
 // Will return url to access API of AquariumFish
 func (afi *afInstance) ApiAddress(path string) string {
-	return fmt.Sprintf("https://%s/%s", afi.api_address, path)
+	return fmt.Sprintf("https://%s/%s", afi.endpoint, path)
 }
 
 // Will return workspace of the AquariumFish
@@ -182,7 +187,7 @@ func (afi *afInstance) Start(t testing.TB, args ...string) {
 					init_done <- "ERROR: No address after 'API listening on: '"
 					break
 				}
-				afi.api_address = val[1]
+				afi.endpoint = val[1]
 			}
 			if strings.HasSuffix(line, "Fish initialized") {
 				// Found the needed values and continue to process to print the fish output for

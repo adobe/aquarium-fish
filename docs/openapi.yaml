@@ -994,13 +994,22 @@ paths:
         '404':
           description: Key path not found
 
+  # Actually just a dummy - implemented in lib/openapi/cluster
   /cluster/v1/connect:
-    post:
+    get:
       summary: Connect to the cluster
       description: WebSocket json-based messaging between the cluster nodes
       operationId: ClusterConnect
       tags:
         - Cluster
+      parameters:
+        - name: uid
+          in: query
+          description: Precaution measure to allow node to not connect to wrong cluster
+          required: false
+          schema:
+            type: string
+            format: uuid
       responses:
         '200':
           description: The connection is established

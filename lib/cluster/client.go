@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/fasthttp/websocket"
+	"github.com/google/uuid"
 
 	"github.com/adobe/aquarium-fish/lib/cluster/msg"
 	"github.com/adobe/aquarium-fish/lib/fish"
@@ -93,6 +94,7 @@ func NewClientReceiver(fish *fish.Fish, cluster *Cluster, ws *websocket.Conn) *C
 
 		processed_sums: newSumCache(time.Minute*2, time.Second*30),
 	}
+	log.Debugf("Cluster: Client %q: Created new receiver client", client.ident)
 
 	// Starting the new connected client processes
 	go client.receiverWritePump()
@@ -106,6 +108,12 @@ func NewClientReceiver(fish *fish.Fish, cluster *Cluster, ws *websocket.Conn) *C
 
 // Initiates the connection to remote node
 func NewClientInitiator(fish *fish.Fish, cluster *Cluster, addr url.URL) *Client {
+	if cluster.GetInfo().UID != uuid.Nil {
+		// Adding uid to the address as query param
+		vals := addr.Query()
+		vals.Set("uid", cluster.GetInfo().UID.String())
+		addr.RawQuery = vals.Encode()
+	}
 	client := &Client{
 		cluster:  cluster,
 		fish:     fish,
@@ -116,6 +124,8 @@ func NewClientInitiator(fish *fish.Fish, cluster *Cluster, addr url.URL) *Client
 
 		processed_sums: newSumCache(time.Minute*2, time.Second*30),
 	}
+	log.Debugf("Cluster: Client %q: Created new initiator client: %q", client.ident, client.url.String())
+
 	client.ctx, client.ctxCancel = context.WithCancel(context.Background())
 
 	go client.initiatorListen()

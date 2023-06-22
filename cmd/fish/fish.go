@@ -103,7 +103,6 @@ func main() {
 			}
 
 			log.Info("Fish starting ORM...")
-			// TODO: If the cluster UID is different - recreate the database from scratch
 			db, err := gorm.Open(sqlite.Open(filepath.Join(dir, "sqlite.db")), &gorm.Config{
 				Logger: logger.New(log.ErrorLogger, logger.Config{
 					SlowThreshold:             500 * time.Millisecond,

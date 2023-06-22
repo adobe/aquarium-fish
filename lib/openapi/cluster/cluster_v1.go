@@ -19,6 +19,7 @@ import (
 	"net/http"
 
 	"github.com/fasthttp/websocket"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
 	"github.com/adobe/aquarium-fish/lib/cluster"
@@ -124,6 +125,13 @@ func (e *Processor) ClientCertAuth(next echo.HandlerFunc) echo.HandlerFunc {
 }
 
 func (e *Processor) ClusterConnect(c echo.Context) error {
+	// Check cluster UID
+	cluster_uid, err := uuid.Parse(c.QueryParam("uid"))
+	if err == nil && e.cluster.GetInfo().UID != cluster_uid {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Incorrect connect cluster UID: %q", cluster_uid)})
+		return log.Errorf("Incorrect connect cluster UID: %q != %q", e.cluster.GetInfo().UID, cluster_uid)
+	}
+
 	ws, err := e.upgrader.Upgrade(c.Response(), c.Request(), nil)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to connect with the cluster: %v", err)})
