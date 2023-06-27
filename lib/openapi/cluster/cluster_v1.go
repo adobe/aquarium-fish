@@ -119,6 +119,7 @@ func (e *Processor) ClientCertAuth(next echo.HandlerFunc) echo.HandlerFunc {
 		}
 
 		c.Set("client_cert", valid_client_cert)
+		c.Set("client_name", valid_client_cert.Subject.CommonName)
 
 		return next(c)
 	}
@@ -138,7 +139,13 @@ func (e *Processor) ClusterConnect(c echo.Context) error {
 		return log.Errorf("Unable to connect with the cluster: %v", err)
 	}
 
-	cluster.NewClientReceiver(e.fish, e.cluster, ws)
+	name := c.Get("client_name")
+	if name.(string) == "" {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Node name from certificate can't be empty to connect to the cluster")})
+		return fmt.Errorf("Node name from certificate can't be empty to connect to the cluster")
+	}
+
+	cluster.NewClientReceiver(e.fish, e.cluster, ws, name.(string))
 
 	return nil
 }

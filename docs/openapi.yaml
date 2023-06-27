@@ -1707,13 +1707,17 @@ components:
         Simple runtime object to describe node connection and it's status
       required:
         - ident
+        - name
         - url
         - status
         - error
       properties:
         ident:
           type: string
-          description: Identifier of the connection, usually name of the node
+          description: Identifier of the connection, it's ip and potentially port
+        name:
+          type: string
+          description: Contains node name as known from the certificate
         url:
           type: string
           description: URL to the node to connect to, empty if receiver

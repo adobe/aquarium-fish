@@ -56,6 +56,7 @@ type Client struct {
 	cluster *Cluster
 	fish    *fish.Fish
 	ident   string // Contains identifier of the connection both for receiver and initiator
+	name    string // Eventually contains the node name we're connecting to or receiving connection from
 
 	// Used to store long-running operations wait groups
 	long_ops map[string]*WaitGroupCount
@@ -83,11 +84,12 @@ type Client struct {
 }
 
 // Receiving the incoming connection from remote node
-func NewClientReceiver(fish *fish.Fish, cluster *Cluster, ws *websocket.Conn) *Client {
+func NewClientReceiver(fish *fish.Fish, cluster *Cluster, ws *websocket.Conn, name string) *Client {
 	client := &Client{
 		cluster:  cluster,
 		fish:     fish,
 		ident:    ws.RemoteAddr().String(),
+		name:     name,
 		ws:       ws,
 		long_ops: make(map[string]*WaitGroupCount),
 		send_buf: make(chan []byte, 256),
@@ -144,6 +146,10 @@ func (c *Client) IsConnected() bool {
 
 func (c *Client) Ident() string {
 	return c.ident
+}
+
+func (c *Client) Name() string {
+	return c.name
 }
 
 func (c *Client) Url() url.URL {
@@ -287,7 +293,20 @@ func (c *Client) Connect() *websocket.Conn {
 				continue
 			}
 
-			log.Infof("Cluster: Client %s: Connected to node", c.ident)
+			// Receiving the server node name from certificate
+			tls_conn, ok := ws.UnderlyingConn().(*tls.Conn)
+			if !ok {
+				c.ConnFail = log.Errorf("Cluster: Client %s: Non-TLS connection prohibited: %s", c.ident, c.url.String())
+				continue
+			}
+			srv_certs := tls_conn.ConnectionState().PeerCertificates
+			if len(srv_certs) < 1 {
+				c.ConnFail = log.Errorf("Cluster: Client %s: Unable to find the server node certificates: %s", c.ident, c.url.String())
+				continue
+			}
+			c.name = srv_certs[0].Subject.CommonName
+
+			log.Infof("Cluster: Client %s: Connected to node: %s", c.ident, c.name)
 			c.ConnFail = nil
 			c.ws = ws
 

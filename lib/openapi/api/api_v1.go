@@ -468,6 +468,7 @@ func (e *Processor) NodeThisConnectionsGet(c echo.Context) error {
 		curl := client.Url()
 		conn := types.Connection{
 			Ident:  client.Ident(),
+			Name:   client.Name(),
 			Url:    (&curl).String(),
 			Status: types.ConnectionStatusDISCONNECTED,
 		}
