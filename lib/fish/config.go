@@ -25,10 +25,12 @@ import (
 type Config struct {
 	Directory string `yaml:"directory"` // Where to store database and other useful data (if relative - to CWD)
 
-	APIAddress   string   `yaml:"api_address"`   // Where to serve Web UI, API & Meta API
-	ProxyAddress string   `yaml:"proxy_address"` // Where to serve SOCKS5 proxy for the allocated resources
-	NodeAddress  string   `yaml:"node_address"`  // What is the external address of the node
-	ClusterJoin  []string `yaml:"cluster_join"`  // The node addresses to join the cluster
+	APIAddress   string `yaml:"api_address"`   // Where to serve Web UI, API & Meta API
+	ProxyAddress string `yaml:"proxy_address"` // Where to serve SOCKS5 proxy for the allocated resources
+	NodeAddress  string `yaml:"node_address"`  // What is the external address of the node
+
+	ClusterJoin []string `yaml:"cluster_join"` // The node addresses to join the cluster
+	ClusterAuto bool     `yaml:"cluster_auto"` // Automatic cluster management (if you need to have only the configured connections)
 
 	TLSKey   string `yaml:"tls_key"`    // TLS PEM private key (if relative - to directory)
 	TLSCrt   string `yaml:"tls_crt"`    // TLS PEM public certificate (if relative - to directory)
@@ -79,12 +81,13 @@ func (c *Config) ReadConfigFile(cfg_path string) error {
 }
 
 func (c *Config) initDefaults() {
+	c.ClusterAuto = true
 	c.Directory = "fish_data"
 	c.APIAddress = "0.0.0.0:8001"
 	c.ProxyAddress = "0.0.0.0:1080"
-	c.NodeAddress = "127.0.0.1:8001"
-	c.TLSKey = "" // Will be set after read config file from NodeName
-	c.TLSCrt = "" // ...
+	c.NodeAddress = "" // Will be replaced by the API bind to the proper address with port
+	c.TLSKey = ""      // Will be set after read config file from NodeName
+	c.TLSCrt = ""      // ...
 	c.TLSCaCrt = "ca.crt"
 	c.NodeName, _ = os.Hostname()
 }

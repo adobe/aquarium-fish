@@ -80,7 +80,7 @@ func main() {
 				cfg.Directory = dir
 			}
 
-			dir := filepath.Join(cfg.Directory, cfg.NodeAddress)
+			dir := filepath.Join(cfg.Directory, cfg.NodeName)
 			if err := os.MkdirAll(dir, 0o750); err != nil {
 				return log.Errorf("Fish: Can't create working directory %s: %v", dir, err)
 			}
@@ -98,7 +98,12 @@ func main() {
 			if !filepath.IsAbs(cert_path) {
 				cert_path = filepath.Join(cfg.Directory, cert_path)
 			}
-			if err := crypt.InitTlsPairCa([]string{cfg.NodeName, cfg.NodeAddress}, ca_path, key_path, cert_path); err != nil {
+			addr := cfg.NodeAddress
+			if addr == "" {
+				// Use API address in case the node address is unknow yet
+				addr = cfg.APIAddress
+			}
+			if err := crypt.InitTlsPairCa([]string{cfg.NodeName, addr}, ca_path, key_path, cert_path); err != nil {
 				return err
 			}
 
@@ -150,7 +155,7 @@ func main() {
 			// the broadcast requests.
 			db.Callback().Create().After("gorm:create").Register("cluster_sync", cl.HookCreateUpdate)
 			db.Callback().Update().After("gorm:update").Register("cluster_sync", cl.HookCreateUpdate)
-			// TODO: make sure delete will work
+			// TODO: make sure delete will work as well
 			//db.Callback().Update().After("gorm:delete").Register("cluster_sync_delete", func(db *gorm.DB) {
 			//	if db.Error == nil && db.Statement.Schema != nil && !db.Statement.SkipHooks {
 			//		log.Debug("DEBUG: GORM DELETE")

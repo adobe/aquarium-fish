@@ -245,6 +245,10 @@ func (f *Fish) GetNode() *types.Node {
 	return f.node
 }
 
+func (f *Fish) GetCfg() *Config {
+	return f.cfg
+}
+
 // Creates new UID with 6 starting bytes of Node UID as prefix
 func (f *Fish) NewUID() uuid.UUID {
 	uid := uuid.New()

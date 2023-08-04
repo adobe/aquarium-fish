@@ -55,8 +55,8 @@ var (
 type Client struct {
 	cluster *Cluster
 	fish    *fish.Fish
-	ident   string // Contains identifier of the connection both for receiver and initiator
 	name    string // Eventually contains the node name we're connecting to or receiving connection from
+	host    string // Contains host:port of the connection both for receiver and initiator
 
 	// Used to store long-running operations wait groups
 	long_ops map[string]*WaitGroupCount
@@ -64,19 +64,19 @@ type Client struct {
 	// Used when connecting to remote
 	url url.URL
 
-	ctx       context.Context
-	ctxCancel context.CancelFunc
-
 	// The websocket connection.
 	mu sync.RWMutex
 	ws *websocket.Conn
+
+	ctx       context.Context
+	ctxCancel context.CancelFunc
 
 	// Buffered channel of outbound messages.
 	send_buf chan []byte
 
 	// Status of the client connection
 	ConnFail error // Contains last error if connection to the remote node failed
-	Valid    bool  // Remote cluster is good to use
+	Stopped  bool  // In case the client was stopped and sitting there doing nothing
 
 	// Optimization to skip sending duplicate messages
 	// They are not stay here for long - just for ~2 minutes while cluster quickly syncs the data
@@ -88,15 +88,17 @@ func NewClientReceiver(fish *fish.Fish, cluster *Cluster, ws *websocket.Conn, na
 	client := &Client{
 		cluster:  cluster,
 		fish:     fish,
-		ident:    ws.RemoteAddr().String(),
 		name:     name,
+		host:     ws.RemoteAddr().String(),
 		ws:       ws,
 		long_ops: make(map[string]*WaitGroupCount),
 		send_buf: make(chan []byte, 256),
 
 		processed_sums: newSumCache(time.Minute*2, time.Second*30),
 	}
-	log.Debugf("Cluster: Client %q: Created new receiver client", client.ident)
+	log.Debugf("Cluster: Client %q: Created new receiver client with host: %q", client.Ident(), client.Host())
+
+	client.ctx, client.ctxCancel = context.WithCancel(context.Background())
 
 	// Starting the new connected client processes
 	go client.receiverWritePump()
@@ -119,14 +121,14 @@ func NewClientInitiator(fish *fish.Fish, cluster *Cluster, addr url.URL) *Client
 	client := &Client{
 		cluster:  cluster,
 		fish:     fish,
-		ident:    addr.Host,
+		host:     addr.Host,
 		url:      addr,
 		long_ops: make(map[string]*WaitGroupCount),
 		send_buf: make(chan []byte, 1),
 
 		processed_sums: newSumCache(time.Minute*2, time.Second*30),
 	}
-	log.Debugf("Cluster: Client %q: Created new initiator client: %q", client.ident, client.url.String())
+	log.Debugf("Cluster: Client: Created new initiator client: %q", client.url.String())
 
 	client.ctx, client.ctxCancel = context.WithCancel(context.Background())
 
@@ -144,12 +146,23 @@ func (c *Client) IsConnected() bool {
 	return c.ws != nil
 }
 
+// Returns string that will somehow identify the client,
+// if the name is not known it will return host and port
 func (c *Client) Ident() string {
-	return c.ident
+	if c.name == "" {
+		return c.host
+	}
+	return c.name
 }
 
+// Returns name of the client
+// It could be empty if handshake was not yet done
 func (c *Client) Name() string {
 	return c.name
+}
+
+func (c *Client) Host() string {
+	return c.host
 }
 
 func (c *Client) Url() url.URL {
@@ -166,7 +179,7 @@ func (c *Client) IsLongOperationExecuting(name string) bool {
 func (c *Client) receiverReadPump() {
 	defer func() {
 		c.cluster.GetHub().unregister <- c
-		c.ws.Close()
+		c.closeWs()
 	}()
 	//c.ws.SetReadLimit(maxMessageSize)
 	c.ws.SetReadDeadline(time.Now().Add(pong_wait))
@@ -175,12 +188,12 @@ func (c *Client) receiverReadPump() {
 		_, data, err := c.ws.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Warnf("Cluster: Client %s: receiverReadPump: reading error", c.ident)
+				log.Warnf("Cluster: Client %s: receiverReadPump: reading error", c.Ident())
 			}
 			break
 		}
 		data = bytes.TrimSpace(bytes.Replace(data, newline, space, -1))
-		//log.Debugf("Cluster: Client %s: receiverReadPump: got: %s", c.ident, data)
+		//log.Debugf("Cluster: Client %s: receiverReadPump: got: %s", c.Ident(), data)
 
 		// Decode the message
 		var message msg.Message
@@ -193,7 +206,7 @@ func (c *Client) receiverReadPump() {
 			if err := dec.Decode(&message); err == io.EOF {
 				break
 			} else if err != nil {
-				log.Warnf("Cluster: Client %s: Unable to unmarshal the message container: %v", c.ident, err)
+				log.Warnf("Cluster: Client %s: Unable to unmarshal the message container: %v", c.Ident(), err)
 				return
 			}
 			go c.processMessage(message)
@@ -225,10 +238,12 @@ func (c *Client) receiverWritePump() {
 	ticker := time.NewTicker(ping_period)
 	defer func() {
 		ticker.Stop()
-		c.ws.Close()
+		c.closeWs()
 	}()
 	for {
 		select {
+		case <-c.ctx.Done():
+			return
 		case message, ok := <-c.send_buf:
 			c.ws.SetWriteDeadline(time.Now().Add(write_wait))
 			if !ok {
@@ -288,7 +303,7 @@ func (c *Client) Connect() *websocket.Conn {
 			}
 			ws, _, err := dialer.Dial(c.url.String(), nil)
 			if err != nil {
-				log.Errorf("Cluster: Client %s: Cannot connect to websocket: %s: %v", c.ident, c.url.String(), err)
+				log.Errorf("Cluster: Client %s: Cannot connect to websocket: %s: %v", c.Ident(), c.url.String(), err)
 				c.ConnFail = err
 				continue
 			}
@@ -296,17 +311,17 @@ func (c *Client) Connect() *websocket.Conn {
 			// Receiving the server node name from certificate
 			tls_conn, ok := ws.UnderlyingConn().(*tls.Conn)
 			if !ok {
-				c.ConnFail = log.Errorf("Cluster: Client %s: Non-TLS connection prohibited: %s", c.ident, c.url.String())
+				c.ConnFail = log.Errorf("Cluster: Client %s: Non-TLS connection prohibited: %s", c.Ident(), c.url.String())
 				continue
 			}
 			srv_certs := tls_conn.ConnectionState().PeerCertificates
 			if len(srv_certs) < 1 {
-				c.ConnFail = log.Errorf("Cluster: Client %s: Unable to find the server node certificates: %s", c.ident, c.url.String())
+				c.ConnFail = log.Errorf("Cluster: Client %s: Unable to find the server node certificates: %s", c.Ident(), c.url.String())
 				continue
 			}
 			c.name = srv_certs[0].Subject.CommonName
 
-			log.Infof("Cluster: Client %s: Connected to node: %s", c.ident, c.name)
+			log.Infof("Cluster: Client %s: Connected to node: %s", c.Ident(), c.Host())
 			c.ConnFail = nil
 			c.ws = ws
 
@@ -316,9 +331,12 @@ func (c *Client) Connect() *websocket.Conn {
 }
 
 func (c *Client) initiatorListen() {
-	log.Infof("Cluster: Client %s: Initiator: Listen for the messages", c.ident)
+	log.Infof("Cluster: Client %s: Initiator: Listen for the messages", c.Ident())
 	ticker := time.NewTicker(50 * time.Millisecond)
-	defer ticker.Stop()
+	defer func() {
+		c.cluster.GetHub().unregister <- c
+		ticker.Stop()
+	}()
 	for {
 		select {
 		case <-c.ctx.Done():
@@ -331,11 +349,11 @@ func (c *Client) initiatorListen() {
 				}
 				_, data, err := ws.ReadMessage()
 				if err != nil {
-					log.Errorf("Cluster: Client %s: Initiator: Cannot read websocket message: %v", c.ident, err)
+					log.Errorf("Cluster: Client %s: Initiator: Cannot read websocket message: %v", c.Ident(), err)
 					c.closeWs()
 					break
 				}
-				//log.Debugf("Cluster: Client %s: Initiator: Received msg: %s", c.ident, data)
+				//log.Debugf("Cluster: Client %s: Initiator: Received msg: %s", c.Ident(), data)
 
 				// Decode the message
 				var message msg.Message
@@ -348,7 +366,7 @@ func (c *Client) initiatorListen() {
 					if err := dec.Decode(&message); err == io.EOF {
 						break
 					} else if err != nil {
-						log.Warnf("Cluster: Client %s: Unable to unmarshal the message container: %v", c.ident, err)
+						log.Warnf("Cluster: Client %s: Unable to unmarshal the message container: %v", c.Ident(), err)
 						return
 					}
 					go c.processMessage(message)
@@ -363,7 +381,7 @@ func (c *Client) initiatorListenWrite() {
 	for data := range c.send_buf {
 		ws := c.Connect()
 		if ws == nil {
-			log.Errorf("Cluster: Client %s: Initiator: No websocket connection: ws is nil", c.ident)
+			log.Errorf("Cluster: Client %s: Initiator: No websocket connection: ws is nil", c.Ident())
 			continue
 		}
 
@@ -371,7 +389,7 @@ func (c *Client) initiatorListenWrite() {
 			websocket.TextMessage,
 			data,
 		); err != nil {
-			log.Errorf("Cluster: Client %s: Write error: %v", c.ident, err)
+			log.Errorf("Cluster: Client %s: Write error: %v", c.Ident(), err)
 		}
 	}
 }
@@ -380,6 +398,7 @@ func (c *Client) initiatorListenWrite() {
 func (c *Client) Stop() {
 	c.ctxCancel()
 	c.closeWs()
+	c.Stopped = true
 }
 
 // Close will send close message and shutdown websocket connection
@@ -395,7 +414,7 @@ func (c *Client) closeWs() {
 
 // Ensures the socket is active and not silently dropped
 func (c *Client) initiatorPing() {
-	log.Infof("Cluster: Client %s: Ping started", c.ident)
+	log.Infof("Cluster: Client %s: Ping started", c.Ident())
 	ticker := time.NewTicker(ping_period)
 	defer ticker.Stop()
 	for {

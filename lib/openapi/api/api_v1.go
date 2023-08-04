@@ -467,8 +467,8 @@ func (e *Processor) NodeThisConnectionsGet(c echo.Context) error {
 	for _, client := range connections {
 		curl := client.Url()
 		conn := types.Connection{
-			Ident:  client.Ident(),
 			Name:   client.Name(),
+			Host:   client.Host(),
 			Url:    (&curl).String(),
 			Status: types.ConnectionStatusDISCONNECTED,
 		}
