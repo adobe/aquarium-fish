@@ -16,7 +16,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"math/rand"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -28,7 +27,6 @@ import (
 	"github.com/adobe/aquarium-fish/lib/cluster/msg"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
 const (
@@ -327,7 +325,7 @@ func (cl *Cluster) watchConnectionsProcess() {
 
 	// Cache for checked nodes - we don't want to bother the other nodes of
 	// the cluster too much, so keeping the items for 30 mins
-	checked_nodes := make(map[string]time.Time)
+	//checked_nodes := make(map[string]time.Time)
 
 	// Check the available connections every 10 seconds
 	conns_ticker := time.NewTicker(10 * time.Second)
