@@ -23,6 +23,7 @@ import (
 	"github.com/steinfletcher/apitest"
 
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
 // Filters are using the user-defined SQL in find, so need to make sure there is no SQL injection
@@ -31,8 +32,7 @@ import (
 // * A number of valid filter requests
 func Test_label_find_filter_sql_injection(t *testing.T) {
 	t.Parallel()
-	afi := RunAquariumFish(t, `---
-node_name: node-1
+	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0

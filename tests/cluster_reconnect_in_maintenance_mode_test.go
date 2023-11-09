@@ -1,5 +1,5 @@
 /**
- * Copyright 2021 Adobe. All rights reserved.
+ * Copyright 2023 Adobe. All rights reserved.
  * This file is licensed to you under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may obtain a copy
  * of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -26,23 +26,26 @@ import (
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
-// This is a simple test with one application and without any limits:
-// * Allocate Application
-// * Get Application information
-// * Destroy Application
-func Test_simple_app_create_destroy(t *testing.T) {
-	t.Parallel()
-	afi := h.NewAquariumFish(t, "node-1", `---
-node_location: test_loc
+// Testing the way to connect to cluster in maintenance mode, which allows to connect to cluster but not to accept any workload
+// * Create one node with not enough resources
+// * Send allocation request
+// * Connect second node with enough resources in maintenance mode
+// * Check second node knows about the requested allocation
+// * Make sure that allocation is not happening on the second node
+func Test_cluster_reconnect_in_maintenance_mode(t *testing.T) {
+	// Small cluster node
+	afi1 := h.NewAquariumFish(t, "node-1", `---
+node_location: test_loc-1
 
 api_address: 127.0.0.1:0
 
 drivers:
-  - name: test`)
+  - name: test
+    cfg:
+      cpu_limit: 2
+      ram_limit: 4`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
+	t.Cleanup(func() { afi1.Cleanup(t) })
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -62,9 +65,9 @@ drivers:
 	t.Run("Create Label", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Post(afi.ApiAddress("api/v1/label/")).
-			JSON(`{"name":"test-label", "version":1, "definitions": [{"driver":"test", "resources":{"cpu":1,"ram":2}}]}`).
-			BasicAuth("admin", afi.AdminToken()).
+			Post(afi1.ApiAddress("api/v1/label/")).
+			JSON(`{"name":"test-label", "version":1, "definitions": [{"driver":"test", "resources":{"cpu":4,"ram":8}}]}`).
+			BasicAuth("admin", afi1.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
 			End().
@@ -75,30 +78,64 @@ drivers:
 		}
 	})
 
-	var app types.Application
+	var app1 types.Application
 	t.Run("Create Application", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Post(afi.ApiAddress("api/v1/application/")).
+			Post(afi1.ApiAddress("api/v1/application/")).
 			JSON(`{"label_UID":"`+label.UID.String()+`"}`).
-			BasicAuth("admin", afi.AdminToken()).
+			BasicAuth("admin", afi1.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
 			End().
-			JSON(&app)
+			JSON(&app1)
 
-		if app.UID == uuid.Nil {
-			t.Fatalf("Application UID is incorrect: %v", app.UID)
+		if app1.UID == uuid.Nil {
+			t.Fatalf("Application UID is incorrect: %v", app1.UID)
 		}
 	})
 
+	// Big cluster node
+	afi2 := afi1.NewClusterNode(t, "node-2", `---
+node_location: test_loc-1
+
+api_address: 127.0.0.1:0
+
+drivers:
+  - name: test
+    cfg:
+      cpu_limit: 4
+      ram_limit: 8`, "--maintenance")
+
+	t.Cleanup(func() { afi2.Cleanup(t) })
+
 	var app_state types.ApplicationState
-	t.Run("Application should get ALLOCATED in 10 sec", func(t *testing.T) {
-		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
+	t.Run("Application should not get ALLOCATED in 15 sec", func(t *testing.T) {
+		h.Retry(&h.Timer{Timeout: 15 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
-				Get(afi.ApiAddress("api/v1/application/"+app.UID.String()+"/state")).
-				BasicAuth("admin", afi.AdminToken()).
+				Get(afi1.ApiAddress("api/v1/application/"+app1.UID.String()+"/state")).
+				BasicAuth("admin", afi1.AdminToken()).
+				Expect(r).
+				Status(http.StatusOK).
+				End().
+				JSON(&app_state)
+
+			if app_state.Status == types.ApplicationStatusALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", app_state.Status)
+			}
+		})
+	})
+
+	afi2.Restart(t)
+
+	app_state.Status = ""
+	t.Run("Application should get ALLOCATED in 15 sec", func(t *testing.T) {
+		h.Retry(&h.Timer{Timeout: 15 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
+			apitest.New().
+				EnableNetworking(cli).
+				Get(afi1.ApiAddress("api/v1/application/"+app1.UID.String()+"/state")).
+				BasicAuth("admin", afi1.AdminToken()).
 				Expect(r).
 				Status(http.StatusOK).
 				End().
@@ -114,8 +151,8 @@ drivers:
 	t.Run("Resource should be created", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Get(afi.ApiAddress("api/v1/application/"+app.UID.String()+"/resource")).
-			BasicAuth("admin", afi.AdminToken()).
+			Get(afi2.ApiAddress("api/v1/application/"+app1.UID.String()+"/resource")).
+			BasicAuth("admin", afi1.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
 			End().
@@ -129,8 +166,8 @@ drivers:
 	t.Run("Deallocate the Application", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Get(afi.ApiAddress("api/v1/application/"+app.UID.String()+"/deallocate")).
-			BasicAuth("admin", afi.AdminToken()).
+			Get(afi1.ApiAddress("api/v1/application/"+app1.UID.String()+"/deallocate")).
+			BasicAuth("admin", afi1.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
 			End()
@@ -140,8 +177,8 @@ drivers:
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
-				Get(afi.ApiAddress("api/v1/application/"+app.UID.String()+"/state")).
-				BasicAuth("admin", afi.AdminToken()).
+				Get(afi2.ApiAddress("api/v1/application/"+app1.UID.String()+"/state")).
+				BasicAuth("admin", afi1.AdminToken()).
 				Expect(r).
 				Status(http.StatusOK).
 				End().

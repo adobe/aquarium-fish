@@ -27,6 +27,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mostlygeek/arp"
+	"github.com/shirou/gopsutil/v3/host"
 	"gorm.io/gorm"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
@@ -79,6 +80,10 @@ func New(db *gorm.DB, cfg *Config) (*Fish, error) {
 	return f, nil
 }
 
+func (f *Fish) IsRunning() bool {
+	return f.running
+}
+
 func (f *Fish) Init() error {
 	f.shutdown_cancel = make(chan bool)
 	f.Quit = make(chan os.Signal, 1)
@@ -92,7 +97,6 @@ func (f *Fish) Init() error {
 		&types.ApplicationState{},
 		&types.ApplicationTask{},
 		&types.Resource{},
-		&types.Vote{},
 		&types.Location{},
 		&types.ServiceMapping{},
 	); err != nil {
@@ -102,7 +106,7 @@ func (f *Fish) Init() error {
 	// Init variables
 	f.won_votes = make(map[int64]types.Vote, 5)
 
-	// Create admin user and ignore errors if it's existing
+	// Create admin user and ignore errors if it's exist
 	_, err := f.UserGet("admin")
 	if err == gorm.ErrRecordNotFound {
 		if pass, _, _ := f.UserNew("admin", ""); pass != "" {
@@ -161,14 +165,19 @@ func (f *Fish) Init() error {
 	// Fill the node identifiers with defaults
 	if len(f.cfg.NodeIdentifiers) == 0 {
 		// Capturing the current host identifiers
-		f.cfg.NodeIdentifiers = append(f.cfg.NodeIdentifiers, "FishName:"+node.Name,
-			"HostName:"+node.Definition.Host.Hostname,
-			"OS:"+node.Definition.Host.OS,
-			"OSVersion:"+node.Definition.Host.PlatformVersion,
-			"OSPlatform:"+node.Definition.Host.Platform,
-			"OSFamily:"+node.Definition.Host.PlatformFamily,
-			"Arch:"+node.Definition.Host.KernelArch,
-		)
+		host_info, err := host.Info()
+		if err != nil {
+			log.Error("Fish: Unable to identify host info, please fill the NodeIndentifiers yourself")
+		} else {
+			f.cfg.NodeIdentifiers = append(f.cfg.NodeIdentifiers, "FishName:"+node.Name,
+				"HostName:"+host_info.Hostname,
+				"OS:"+host_info.OS,
+				"OSVersion:"+host_info.PlatformVersion,
+				"OSPlatform:"+host_info.Platform,
+				"OSFamily:"+host_info.PlatformFamily,
+				"Arch:"+host_info.KernelArch,
+			)
+		}
 	}
 	log.Info("Fish: Using the next node identifiers:", f.cfg.NodeIdentifiers)
 
@@ -183,25 +192,21 @@ func (f *Fish) Init() error {
 	}
 
 	// Continue to execute the assigned applications
-	resources, err := f.ResourceListNode(f.node.UID)
+	resources, err := f.ResourceListNodeActive(f.node.UID)
 	if err != nil {
 		return log.Error("Fish: Unable to get the node resources:", err)
 	}
 	for _, res := range resources {
 		if f.ApplicationIsAllocated(res.ApplicationUID) == nil {
 			log.Info("Fish: Found allocated resource to serve:", res.UID)
-			vote, err := f.VoteGetNodeApplication(f.node.UID, res.ApplicationUID)
-			if err != nil {
-				log.Errorf("Fish: Can't find Application vote %s: %v", res.ApplicationUID, err)
-				continue
-			}
-			if err := f.executeApplication(*vote); err != nil {
-				log.Errorf("Fish: Can't execute Application %s: %v", vote.ApplicationUID, err)
+			if err := f.executeApplication(res.ApplicationUID, res.DefinitionIndex); err != nil {
+				log.Errorf("Fish: Can't execute Application %s: %v", res.ApplicationUID, err)
 			}
 		} else {
-			log.Warn("Fish: Found not allocated Resource of Application, cleaning up:", res.ApplicationUID)
-			if err := f.ResourceDelete(res.UID); err != nil {
-				log.Error("Fish: Unable to delete Resource of Application:", res.ApplicationUID, err)
+			log.Warn("Fish: Found not allocated Resource of Application, deactivating it:", res.ApplicationUID)
+			res.Deactivated = true
+			if err := f.ResourceSave(&res); err != nil {
+				log.Error("Fish: Unable to update Resource of Application:", res.ApplicationUID, err)
 			}
 			app_state := &types.ApplicationState{ApplicationUID: res.ApplicationUID, Status: types.ApplicationStatusERROR,
 				Description: "Found not cleaned up resource",
@@ -232,6 +237,10 @@ func (f *Fish) GetNodeUID() types.ApplicationUID {
 
 func (f *Fish) GetNode() *types.Node {
 	return f.node
+}
+
+func (f *Fish) GetCfg() *Config {
+	return f.cfg
 }
 
 // Creates new UID with 6 starting bytes of Node UID as prefix
@@ -295,7 +304,7 @@ func (f *Fish) checkNewApplicationProcess() error {
 				sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
 
 				for _, k := range keys {
-					if err := f.executeApplication(f.won_votes[k]); err != nil {
+					if err := f.executeApplication(f.won_votes[k].ApplicationUID, f.won_votes[k].Available); err != nil {
 						log.Errorf("Fish: Can't execute Application %s: %v", f.won_votes[k].ApplicationUID, err)
 					}
 					delete(f.won_votes, k)
@@ -383,7 +392,7 @@ func (f *Fish) voteProcessRound(vote *types.Vote) error {
 						f.won_votes[app.CreatedAt.UnixMicro()] = *vote
 						f.won_votes_mutex.Unlock()
 					} else {
-						log.Infof("Fish: I lose the election for Application %s to Node %s", vote.ApplicationUID, vote.NodeUID)
+						log.Infof("Fish: I lost the election for Application %s to Node %s", vote.ApplicationUID, vote.NodeUID)
 					}
 				}
 
@@ -458,12 +467,12 @@ func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 	return true
 }
 
-func (f *Fish) executeApplication(vote types.Vote) error {
+func (f *Fish) executeApplication(app_uid types.ApplicationUID, def_index int) error {
 	// Check the application is executed already
 	f.applications_mutex.Lock()
 	{
 		for _, uid := range f.applications {
-			if uid == vote.ApplicationUID {
+			if uid == app_uid {
 				// Seems the application is already executing
 				f.applications_mutex.Unlock()
 				return nil
@@ -472,15 +481,15 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 	}
 	f.applications_mutex.Unlock()
 
-	// Check vote have available field >= 0 means it chose the label definition
-	if vote.Available < 0 {
-		return fmt.Errorf("Fish: The vote for Application %s is negative: %v", vote.ApplicationUID, vote.Available)
+	// Make sure definition is >= 0 which means it was chosen by the node
+	if def_index < 0 {
+		return fmt.Errorf("Fish: The definition index for Application %s is not chosen: %v", app_uid, def_index)
 	}
 
 	// Locking the node resources until the app will be allocated
 	f.node_usage_mutex.Lock()
 
-	app, err := f.ApplicationGet(vote.ApplicationUID)
+	app, err := f.ApplicationGet(app_uid)
 	if err != nil {
 		f.node_usage_mutex.Unlock()
 		return fmt.Errorf("Fish: Unable to get the Application: %v", err)
@@ -500,12 +509,12 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 		return fmt.Errorf("Fish: Unable to find Label %s: %v", app.LabelUID, err)
 	}
 
-	// Extract the vote won Label Definition
-	if len(label.Definitions) <= vote.Available {
+	// Extract the Label Definition by the provided index
+	if len(label.Definitions) <= def_index {
 		f.node_usage_mutex.Unlock()
-		return fmt.Errorf("Fish: ERROR: The voted Definition not exists in the Label %s: %v (App: %s)", app.LabelUID, vote.Available, app.UID)
+		return fmt.Errorf("Fish: ERROR: The chosen Definition not exists in the Label %s: %v (App: %s)", app.LabelUID, def_index, app.UID)
 	}
-	label_def := label.Definitions[vote.Available]
+	label_def := label.Definitions[def_index]
 
 	// The already running applications will not consume the additional resources
 	if app_state.Status == types.ApplicationStatusNEW {
@@ -539,7 +548,8 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 	f.applications_mutex.Unlock()
 
 	// The main application processing is executed on background because allocation could take a
-	// while, after that the bg process will wait for application state change
+	// while, after that the bg process will wait for application state change. We do not separate
+	// it into method because effectively it could not be running without the logic above.
 	go func() {
 		log.Info("Fish: Start executing Application", app.UID, app_state.Status)
 
@@ -615,7 +625,7 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 				res.HwAddr = drv_res.HwAddr
 				res.IpAddr = drv_res.IpAddr
 				res.LabelUID = label.UID
-				res.DefinitionIndex = vote.Available
+				res.DefinitionIndex = def_index
 				err := f.ResourceCreate(res)
 				if err != nil {
 					log.Error("Fish: Unable to store Resource for Application:", app.UID, err)
@@ -625,6 +635,7 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 				}
 			}
 			f.ApplicationStateCreate(app_state)
+			log.Info("Fish: Allocated the Resource for Application:", app.UID, res.Identifier)
 		}
 
 		// Getting the resource lifetime to know how much time it will live
@@ -699,9 +710,11 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 						Description: fmt.Sprint("Driver deallocated the resource"),
 					}
 				}
-				// Destroying the resource anyway to not bloat the table - otherwise it will stuck there and
-				// will block the access to IP of the other VM's that will reuse this IP
-				if err := f.ResourceDelete(res.UID); err != nil {
+
+				// Deactivating the resource anyway to not bloat the table - otherwise it will stuck
+				// there and will block the access to IP of the other VM's that will reuse this IP
+				res.Deactivated = true
+				if err := f.ResourceSave(res); err != nil {
 					log.Error("Fish: Unable to delete Resource for Application:", app.UID, err)
 				}
 				f.ApplicationStateCreate(app_state)

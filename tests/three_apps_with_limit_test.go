@@ -23,6 +23,7 @@ import (
 	"github.com/steinfletcher/apitest"
 
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
 // Will check how the Apps are allocated with limited amount of resources it should looks like:
@@ -31,8 +32,7 @@ import (
 // * Destroy the third app
 func Test_three_apps_with_limit(t *testing.T) {
 	t.Parallel()
-	afi := RunAquariumFish(t, `---
-node_name: node-1
+	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0
@@ -131,7 +131,7 @@ drivers:
 
 	var app_state types.ApplicationState
 	t.Run("Application 1 should get ALLOCATED in 10 sec", func(t *testing.T) {
-		Retry(&Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *R) {
+		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi.ApiAddress("api/v1/application/"+app1.UID.String()+"/state")).
@@ -148,7 +148,7 @@ drivers:
 	})
 
 	t.Run("Application 2 should get ALLOCATED in 10 sec", func(t *testing.T) {
-		Retry(&Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *R) {
+		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi.ApiAddress("api/v1/application/"+app2.UID.String()+"/state")).
@@ -200,7 +200,7 @@ drivers:
 	})
 
 	t.Run("Application 1 should get DEALLOCATED in 10 sec", func(t *testing.T) {
-		Retry(&Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *R) {
+		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi.ApiAddress("api/v1/application/"+app1.UID.String()+"/state")).
@@ -217,7 +217,7 @@ drivers:
 	})
 
 	t.Run("Application 2 should get DEALLOCATED in 10 sec", func(t *testing.T) {
-		Retry(&Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *R) {
+		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi.ApiAddress("api/v1/application/"+app2.UID.String()+"/state")).
@@ -234,7 +234,7 @@ drivers:
 	})
 
 	t.Run("Application 3 should get ALLOCATED in 40 sec", func(t *testing.T) {
-		Retry(&Timer{Timeout: 40 * time.Second, Wait: 5 * time.Second}, t, func(r *R) {
+		h.Retry(&h.Timer{Timeout: 40 * time.Second, Wait: 5 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi.ApiAddress("api/v1/application/"+app3.UID.String()+"/state")).
@@ -261,7 +261,7 @@ drivers:
 	})
 
 	t.Run("Application 3 should get DEALLOCATED in 10 sec", func(t *testing.T) {
-		Retry(&Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *R) {
+		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi.ApiAddress("api/v1/application/"+app3.UID.String()+"/state")).

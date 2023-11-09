@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
@@ -47,11 +48,8 @@ func (f *Fish) NodeActiveList() (ns []types.Node, err error) {
 }
 
 func (f *Fish) NodeCreate(n *types.Node) error {
-	if n.Name == "" {
-		return fmt.Errorf("Fish: Name can't be empty")
-	}
-	if n.Pubkey == nil {
-		return fmt.Errorf("Fish: Node should be initialized before create")
+	if err := n.Validate(); err != nil {
+		return fmt.Errorf("Fish: Unable to validate Node: %v", err)
 	}
 
 	// Create node UUID based on the public key
@@ -75,7 +73,13 @@ func (f *Fish) NodeGet(name string) (node *types.Node, err error) {
 	return node, err
 }
 
+func (f *Fish) NodeGetPubkey(pubkey []byte) (nodes []types.Node, err error) {
+	err = f.db.Where("pubkey = ?", pubkey).Find(&nodes).Error
+	return nodes, err
+}
+
 func (f *Fish) pingProcess() error {
+	// TODO: Clean up this ping process and switch to cluster websocket one
 	// In order to optimize network & database - update just UpdatedAt field
 	ping_ticker := time.NewTicker(types.NODE_PING_DELAY * time.Second)
 	for {
@@ -89,4 +93,20 @@ func (f *Fish) pingProcess() error {
 		}
 	}
 	return nil
+}
+
+// Insert / update the node directly from the data, without changing created_at and updated_at
+func (f *Fish) NodeImport(n *types.Node) error {
+	if err := n.Validate(); err != nil {
+		return fmt.Errorf("Fish: Unable to validate Node: %v", err)
+	}
+
+	// The updated_at and created_at should stay the same so skipping the hooks
+	tx := f.db.Session(&gorm.Session{SkipHooks: true})
+	err := tx.Create(n).Error
+	if err != nil {
+		err = tx.Save(n).Error
+	}
+
+	return err
 }

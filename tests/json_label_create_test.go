@@ -23,6 +23,7 @@ import (
 	"github.com/steinfletcher/apitest"
 
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
 // This is a test which makes sure we can send json input to create a Label
@@ -30,8 +31,7 @@ import (
 // * Check Label was created
 func Test_json_label_create(t *testing.T) {
 	t.Parallel()
-	afi := RunAquariumFish(t, `---
-node_name: node-1
+	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0

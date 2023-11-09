@@ -33,7 +33,8 @@ PATH="$gopath/bin:$PATH" go generate -v ./lib/...
 # Making LabelDefinitions an actual type to attach GORM-needed Scanner/Valuer functions to it to
 # make the array a json document and store in the DB row as one item
 # TODO: https://github.com/deepmap/oapi-codegen/issues/859
-sed -i 's/^type LabelDefinitions = /type LabelDefinitions /' lib/openapi/types/types.gen.go
+sed -i.orig 's/^type LabelDefinitions = /type LabelDefinitions /' lib/openapi/types/types.gen.go
+rm -f lib/openapi/types/types.gen.go.orig
 
 # Prepare version number as overrides during link
 mod_name=$(grep '^module' "${root_dir}/go.mod" | cut -d' ' -f 2)
@@ -116,29 +117,32 @@ done
 
 [ $errorcount -eq 0 ] || exit $errorcount
 
-echo
-echo "--- ARCHIVE ${BINARY_NAME} ($MAXJOBS in parallel) ---"
+if [ "x${RELEASE}" != "x" ]; then
+    echo
+    echo "--- ARCHIVE ${BINARY_NAME} ($MAXJOBS in parallel) ---"
 
-# Pack the artifact archives
-for GOOS in $os_list; do
-    for GOARCH in $arch_list; do
-        name="$BINARY_NAME.${GOOS}_${GOARCH}"
-        [ -f "$name" ] || continue
+    # Pack the artifact archives
+    for GOOS in $os_list; do
+        for GOARCH in $arch_list; do
+            name="$BINARY_NAME.${GOOS}_${GOARCH}"
+            [ -f "$name" ] || continue
 
-        echo "Archiving: $name ..."
-        mkdir "$name.dir"
-        bin_name='aquarium-fish'
-        [ "$GOOS" != "windows" ] || bin_name="$bin_name.exe"
+            echo "Archiving: $name ..."
+            mkdir "$name.dir"
+            bin_name='aquarium-fish'
+            [ "$GOOS" != "windows" ] || bin_name="$bin_name.exe"
 
-        cp -a "$name" "$name.dir/$bin_name"
-        $(
-            cd "$name.dir"
-            tar -cJf "../$name.tar.xz" "$bin_name" >/dev/null 2>&1
-            zip "../$name.zip" "$bin_name" >/dev/null 2>&1
-            cd .. && rm -rf "$name.dir"
-        ) &
-        pwait $MAXJOBS
+            cp -a "$name" "$name.dir/$bin_name"
+            $(
+                cd "$name.dir"
+                tar -cJf "../$name.tar.xz" "$bin_name" >/dev/null 2>&1
+                zip "../$name.zip" "$bin_name" >/dev/null 2>&1
+                cd .. && rm -rf "$name.dir"
+            ) &
+            pwait $MAXJOBS
+        done
     done
-done
 
-wait
+    wait
+fi
+

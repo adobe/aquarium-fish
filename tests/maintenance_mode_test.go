@@ -23,6 +23,7 @@ import (
 	"github.com/steinfletcher/apitest"
 
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
 // Testing the maintenance cancel
@@ -33,8 +34,7 @@ import (
 // * Application should be allocated in 20 sec
 func Test_maintenace_cancel(t *testing.T) {
 	t.Parallel()
-	afi := RunAquariumFish(t, `---
-node_name: node-1
+	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0
@@ -134,7 +134,7 @@ drivers:
 	})
 
 	t.Run("Application should get ALLOCATED in 20 sec", func(t *testing.T) {
-		Retry(&Timer{Timeout: 20 * time.Second, Wait: 1 * time.Second}, t, func(r *R) {
+		h.Retry(&h.Timer{Timeout: 20 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi.ApiAddress("api/v1/application/"+app.UID.String()+"/state")).

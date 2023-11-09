@@ -18,10 +18,13 @@ import (
 	"encoding/pem"
 	"fmt"
 	"os"
+
+	"github.com/adobe/aquarium-fish/lib/log"
 )
 
 const NODE_PING_DELAY = 10
 
+// TODO: Need to restore this functionality to not allow node duplicates join the cluster
 var NodePingDuplicationErr = fmt.Errorf("Fish Node: Unable to join the Aquarium cluster due to " +
 	"the node with the same name pinged the cluster less then 2xNODE_PING_DELAY time ago")
 
@@ -44,20 +47,12 @@ func (n *Node) Init(node_address, cert_path string) error {
 		return err
 	}
 
-	// Update the pubkey once - it can not be changed for the node name for now,
-	// maybe later the process of key switch will be implemented
-	if n.Pubkey == nil {
-		// Set the pubkey once
-		n.Pubkey = &pubkey_der
-	} else {
-		// Validate the existing pubkey
-		if bytes.Compare(*n.Pubkey, pubkey_der) != 0 {
-			return fmt.Errorf("Fish Node: The pubkey was changed for Node, that's not supported")
-		}
+	// Validate the existing node pubkey
+	if n.Pubkey != nil && !bytes.Equal(*n.Pubkey, pubkey_der) {
+		log.Warn("Fish Node: The pubkey was changed for the Node, replacing it with the new one")
 	}
 
-	// Collect the node definition data
-	n.Definition.Update()
+	n.Pubkey = &pubkey_der
 
 	return nil
 }

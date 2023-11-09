@@ -23,6 +23,7 @@ import (
 	"github.com/steinfletcher/apitest"
 
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
 // Make sure one node filter will match to allocate
@@ -31,8 +32,7 @@ import (
 // * Make sure it's allocated
 func Test_node_filter_one_match_good(t *testing.T) {
 	t.Parallel()
-	afi := RunAquariumFish(t, `---
-node_name: node-1
+	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 node_identifiers:
   - "example:test"
@@ -97,7 +97,7 @@ drivers:
 
 	var app_state types.ApplicationState
 	t.Run("Application should get ALLOCATED in 10 sec", func(t *testing.T) {
-		Retry(&Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *R) {
+		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi.ApiAddress("api/v1/application/"+app.UID.String()+"/state")).
@@ -120,8 +120,7 @@ drivers:
 // * Make sure it's allocated
 func Test_node_filter_two_match_good(t *testing.T) {
 	t.Parallel()
-	afi := RunAquariumFish(t, `---
-node_name: node-1
+	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 node_identifiers:
   - "example:test"
@@ -187,7 +186,7 @@ drivers:
 
 	var app_state types.ApplicationState
 	t.Run("Application should get ALLOCATED in 10 sec", func(t *testing.T) {
-		Retry(&Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *R) {
+		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi.ApiAddress("api/v1/application/"+app.UID.String()+"/state")).
@@ -210,8 +209,7 @@ drivers:
 // * Make sure it's not allocated in 10 sec
 func Test_node_filter_label_wrong_filter(t *testing.T) {
 	t.Parallel()
-	afi := RunAquariumFish(t, `---
-node_name: node-1
+	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 node_identifiers:
   - "example:test"
@@ -299,8 +297,7 @@ drivers:
 // * Make sure it's not allocated in 10 sec
 func Test_node_filter_node_has_less_than_needed(t *testing.T) {
 	t.Parallel()
-	afi := RunAquariumFish(t, `---
-node_name: node-1
+	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 node_identifiers:
   - "example:test"

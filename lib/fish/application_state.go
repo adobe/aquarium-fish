@@ -15,10 +15,27 @@ package fish
 import (
 	"fmt"
 
-	"github.com/google/uuid"
+	"gorm.io/gorm"
 
+	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	"github.com/adobe/aquarium-fish/lib/util"
 )
+
+func (f *Fish) ApplicationStateFind(filter *string) (as []types.ApplicationState, err error) {
+	db := f.db
+	if filter != nil {
+		secured_filter, err := util.ExpressionSqlFilter(*filter)
+		if err != nil {
+			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
+			// We do not fail here because we should not give attacker more information
+			return as, nil
+		}
+		db = db.Where(secured_filter)
+	}
+	err = db.Find(&as).Error
+	return as, err
+}
 
 func (f *Fish) ApplicationStateList() (ass []types.ApplicationState, err error) {
 	err = f.db.Find(&ass).Error
@@ -26,11 +43,8 @@ func (f *Fish) ApplicationStateList() (ass []types.ApplicationState, err error) 
 }
 
 func (f *Fish) ApplicationStateCreate(as *types.ApplicationState) error {
-	if as.ApplicationUID == uuid.Nil {
-		return fmt.Errorf("Fish: ApplicationUID can't be unset")
-	}
-	if as.Status == "" {
-		return fmt.Errorf("Fish: Status can't be empty")
+	if err := as.Validate(); err != nil {
+		return fmt.Errorf("Fish: Unable to validate ApplicationState: %v", err)
 	}
 
 	as.UID = f.NewUID()
@@ -69,4 +83,20 @@ func (f *Fish) ApplicationStateIsActive(status types.ApplicationStatus) bool {
 		return false
 	}
 	return true
+}
+
+// Insert / update the application state directly from the data, without changing created_at and updated_at
+func (f *Fish) ApplicationStateImport(as *types.ApplicationState) error {
+	if err := as.Validate(); err != nil {
+		return fmt.Errorf("Fish: Unable to validate ApplicationState: %v", err)
+	}
+
+	// The updated_at and created_at should stay the same so skipping the hooks
+	tx := f.db.Session(&gorm.Session{SkipHooks: true})
+	err := tx.Create(as).Error
+	if err != nil {
+		err = tx.Save(as).Error
+	}
+
+	return err
 }

@@ -89,7 +89,7 @@ func Init(fish *fish.Fish, cl *cluster.Cluster, api_address, ca_path, cert_path,
 	// routers to independance ports if needed
 	meta.NewV1Router(router, fish)
 	cluster_server.NewV1Router(router, fish, cl)
-	api.NewV1Router(router, fish)
+	api.NewV1Router(router, fish, cl)
 	// TODO: web UI router
 
 	ca_pool := x509.NewCertPool()
@@ -138,6 +138,11 @@ func Init(fish *fish.Fish, cl *cluster.Cluster, api_address, ca_path, cert_path,
 			addr := router.TLSListenerAddr()
 			if addr != nil && strings.Contains(addr.String(), ":") {
 				log.Info("API listening on:", addr)
+				if fish.GetNode().Address == "" {
+					// Set the proper address of the node
+					fish.GetNode().Address = addr.String()
+					fish.NodeSave(fish.GetNode())
+				}
 				return router.TLSServer, nil // Was started
 			}
 		case err := <-errChan:

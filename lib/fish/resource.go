@@ -17,7 +17,6 @@ import (
 	"net"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mostlygeek/arp"
 	"gorm.io/gorm"
 
@@ -41,27 +40,14 @@ func (f *Fish) ResourceFind(filter *string) (rs []types.Resource, err error) {
 	return rs, err
 }
 
-func (f *Fish) ResourceListNode(node_uid types.NodeUID) (rs []types.Resource, err error) {
-	err = f.db.Where("node_uid = ?", node_uid).Find(&rs).Error
+func (f *Fish) ResourceListNodeActive(node_uid types.NodeUID) (rs []types.Resource, err error) {
+	err = f.db.Where("node_uid = ?", node_uid).Where("deactivated = ?", false).Find(&rs).Error
 	return rs, err
 }
 
 func (f *Fish) ResourceCreate(r *types.Resource) error {
-	if r.ApplicationUID == uuid.Nil {
-		return fmt.Errorf("Fish: ApplicationUID can't be unset")
-	}
-	if r.LabelUID == uuid.Nil {
-		return fmt.Errorf("Fish: LabelUID can't be unset")
-	}
-	if r.NodeUID == uuid.Nil {
-		return fmt.Errorf("Fish: NodeUID can't be unset")
-	}
-	if len(r.Identifier) == 0 {
-		return fmt.Errorf("Fish: Identifier can't be empty")
-	}
-	// TODO: check JSON
-	if len(r.Metadata) < 2 {
-		return fmt.Errorf("Fish: Metadata can't be empty")
+	if err := r.Validate(); err != nil {
+		return fmt.Errorf("Fish: Unable to validate Resource: %v", err)
 	}
 
 	r.UID = f.NewUID()
@@ -140,11 +126,11 @@ func isControlledNetwork(ip string) bool {
 	return false
 }
 
-func (f *Fish) ResourceGetByIP(ip string) (res *types.Resource, err error) {
+func (f *Fish) ResourceGetActiveByIP(ip string) (res *types.Resource, err error) {
 	res = &types.Resource{}
 
 	// Check by IP first
-	err = f.db.Where("node_uid = ?", f.GetNodeUID()).Where("ip_addr = ?", ip).First(res).Error
+	err = f.db.Where("node_uid = ?", f.GetNodeUID()).Where("deactivated = ?", false).Where("ip_addr = ?", ip).First(res).Error
 	if err == nil {
 		// Check if the state is allocated to prevent old resources access
 		if f.ApplicationIsAllocated(res.ApplicationUID) != nil {
@@ -166,7 +152,7 @@ func (f *Fish) ResourceGetByIP(ip string) (res *types.Resource, err error) {
 	if hw_addr == "" {
 		return nil, gorm.ErrRecordNotFound
 	}
-	err = f.db.Where("node_uid = ?", f.GetNodeUID()).Where("hw_addr = ?", hw_addr).First(res).Error
+	err = f.db.Where("node_uid = ?", f.GetNodeUID()).Where("deactivated = ?", false).Where("hw_addr = ?", hw_addr).First(res).Error
 	if err != nil {
 		return nil, fmt.Errorf("Fish: %s for HW address %s", err, hw_addr)
 	}
@@ -192,7 +178,6 @@ func (f *Fish) ResourceGetByApplication(app_uid types.ApplicationUID) (res *type
 func (f *Fish) ResourceServiceMapping(res *types.Resource, dest string) string {
 	sm := &types.ServiceMapping{}
 
-	// TODO: rewrite to uid system
 	// Trying to find the record with Application and Location if possible
 	// The application in priority, location - secondary priority, if no such
 	// records found - default will be used
@@ -205,4 +190,20 @@ func (f *Fish) ResourceServiceMapping(res *types.Resource, dest string) string {
 	}
 
 	return sm.Redirect
+}
+
+// Insert / update the resource directly from the data, without changing created_at and updated_at
+func (f *Fish) ResourceImport(res *types.Resource) error {
+	if err := res.Validate(); err != nil {
+		return fmt.Errorf("Fish: Unable to validate Resource: %v", err)
+	}
+
+	// The updated_at and created_at should stay the same so skipping the hooks
+	tx := f.db.Session(&gorm.Session{SkipHooks: true})
+	err := tx.Create(res).Error
+	if err != nil {
+		err = tx.Save(res).Error
+	}
+
+	return err
 }

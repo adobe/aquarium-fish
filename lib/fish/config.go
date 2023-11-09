@@ -17,34 +17,37 @@ import (
 	"os"
 	"time"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/adobe/aquarium-fish/lib/util"
-	"github.com/ghodss/yaml"
 )
 
 type Config struct {
-	Directory string `json:"directory"` // Where to store database and other useful data (if relative - to CWD)
+	Directory string `yaml:"directory"` // Where to store database and other useful data (if relative - to CWD)
 
-	APIAddress   string   `json:"api_address"`   // Where to serve Web UI, API & Meta API
-	ProxyAddress string   `json:"proxy_address"` // Where to serve SOCKS5 proxy for the allocated resources
-	NodeAddress  string   `json:"node_address"`  // What is the external address of the node
-	ClusterJoin  []string `json:"cluster_join"`  // The node addresses to join the cluster
+	APIAddress   string `yaml:"api_address"`   // Where to serve Web UI, API & Meta API
+	ProxyAddress string `yaml:"proxy_address"` // Where to serve SOCKS5 proxy for the allocated resources
+	NodeAddress  string `yaml:"node_address"`  // What is the external address of the node
 
-	TLSKey   string `json:"tls_key"`    // TLS PEM private key (if relative - to directory)
-	TLSCrt   string `json:"tls_crt"`    // TLS PEM public certificate (if relative - to directory)
-	TLSCaCrt string `json:"tls_ca_crt"` // TLS PEM certificate authority certificate (if relative - to directory)
+	ClusterJoin []string `yaml:"cluster_join"` // The node addresses to join the cluster
+	ClusterAuto bool     `yaml:"cluster_auto"` // Automatic cluster management (if you need to have only the configured connections)
 
-	NodeName        string   `json:"node_name"`        // Last resort in case you need to override the default host node name
-	NodeLocation    string   `json:"node_location"`    // Specify cluster node location for multi-dc configurations
-	NodeIdentifiers []string `json:"node_identifiers"` // The list of node identifiers which could be used to find the right Node for Resource
+	TLSKey   string `yaml:"tls_key"`    // TLS PEM private key (if relative - to directory)
+	TLSCrt   string `yaml:"tls_crt"`    // TLS PEM public certificate (if relative - to directory)
+	TLSCaCrt string `yaml:"tls_ca_crt"` // TLS PEM certificate authority certificate (if relative - to directory)
 
-	DefaultResourceLifetime string `json:"default_resource_lifetime"` // Sets the lifetime of the resource which will be used if label definition one is not set
+	NodeName        string   `yaml:"node_name"`        // Last resort in case you need to override the default host node name
+	NodeLocation    string   `yaml:"node_location"`    // Specify cluster node location for multi-dc configurations
+	NodeIdentifiers []string `yaml:"node_identifiers"` // The list of node identifiers which could be used to find the right Node for Resource
 
-	Drivers []ConfigDriver `json:"drivers"` // If specified - only the listed plugins will be loaded
+	DefaultResourceLifetime string `yaml:"default_resource_lifetime"` // Sets the lifetime of the resource which will be used if label definition one is not set
+
+	Drivers []ConfigDriver `yaml:"drivers"` // If specified - only the listed plugins will be loaded
 }
 
 type ConfigDriver struct {
-	Name string            `json:"name"`
-	Cfg  util.UnparsedJson `json:"cfg"`
+	Name string            `yaml:"name"`
+	Cfg  util.UnparsedJson `yaml:"cfg"`
 }
 
 func (c *Config) ReadConfigFile(cfg_path string) error {
@@ -78,12 +81,13 @@ func (c *Config) ReadConfigFile(cfg_path string) error {
 }
 
 func (c *Config) initDefaults() {
+	c.ClusterAuto = true
 	c.Directory = "fish_data"
 	c.APIAddress = "0.0.0.0:8001"
 	c.ProxyAddress = "0.0.0.0:1080"
-	c.NodeAddress = "127.0.0.1:8001"
-	c.TLSKey = "" // Will be set after read config file from NodeName
-	c.TLSCrt = "" // ...
+	c.NodeAddress = "" // Will be replaced by the API bind to the proper address with port
+	c.TLSKey = ""      // Will be set after read config file from NodeName
+	c.TLSCrt = ""      // ...
 	c.TLSCaCrt = "ca.crt"
 	c.NodeName, _ = os.Hostname()
 }
