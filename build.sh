@@ -33,7 +33,8 @@ PATH="$gopath/bin:$PATH" go generate -v ./lib/...
 # Making LabelDefinitions an actual type to attach GORM-needed Scanner/Valuer functions to it to
 # make the array a json document and store in the DB row as one item
 # TODO: https://github.com/deepmap/oapi-codegen/issues/859
-sed -i 's/^type LabelDefinitions = /type LabelDefinitions /' lib/openapi/types/types.gen.go
+sed -i.bak 's/^type LabelDefinitions = /type LabelDefinitions /' lib/openapi/types/types.gen.go
+rm -f lib/openapi/types/types.gen.go.bak
 
 # Prepare version number as overrides during link
 mod_name=$(grep '^module' "${root_dir}/go.mod" | cut -d' ' -f 2)

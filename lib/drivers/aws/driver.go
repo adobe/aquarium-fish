@@ -118,7 +118,7 @@ func (d *Driver) AvailableCapacity(node_usage types.Resources, def types.LabelDe
 
 	// Dedicated hosts
 	// For now operated only on pre-created dedicated machines pool
-	if opts.InstanceType == "mac1" || opts.InstanceType == "mac2" {
+	if awsInstTypeAny(opts.InstanceType, "mac") {
 		// Ensure we have the available (not busy) dedicated hosts to use as base for resource.
 		// For now we're not creating new dedicated hosts dynamically because they can be
 		// terminated only after 24h which costs a pretty penny.
@@ -127,7 +127,7 @@ func (d *Driver) AvailableCapacity(node_usage types.Resources, def types.LabelDe
 			Filter: []ec2_types.Filter{
 				ec2_types.Filter{
 					Name:   aws.String("instance-type"),
-					Values: []string{fmt.Sprintf("%s.metal", opts.InstanceType)},
+					Values: []string{opts.InstanceType},
 				},
 				ec2_types.Filter{
 					Name:   aws.String("state"),
@@ -272,6 +272,13 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 
 		MinCount: aws.Int32(1),
 		MaxCount: aws.Int32(1),
+	}
+
+	// For mac machines only dedicated hosts are working, so set the tenancy
+	if awsInstTypeAny(opts.InstanceType, "mac") {
+		input.Placement = &ec2_types.Placement{
+			Tenancy: ec2_types.TenancyHost,
+		}
 	}
 
 	if opts.UserDataFormat != "" {
