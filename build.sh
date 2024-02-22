@@ -120,29 +120,31 @@ done
 
 [ $errorcount -eq 0 ] || exit $errorcount
 
-echo
-echo "--- ARCHIVE ${BINARY_NAME} ($MAXJOBS in parallel) ---"
+if [ "x${RELEASE}" != "x" ]; then
+    echo
+    echo "--- ARCHIVE ${BINARY_NAME} ($MAXJOBS in parallel) ---"
 
-# Pack the artifact archives
-for GOOS in $os_list; do
-    for GOARCH in $arch_list; do
-        name="$BINARY_NAME.${GOOS}_${GOARCH}"
-        [ -f "$name" ] || continue
+    # Pack the artifact archives
+    for GOOS in $os_list; do
+        for GOARCH in $arch_list; do
+            name="$BINARY_NAME.${GOOS}_${GOARCH}"
+            [ -f "$name" ] || continue
 
-        echo "Archiving: $(du -h "$name") ..."
-        mkdir "$name.dir"
-        bin_name='aquarium-fish'
-        [ "$GOOS" != "windows" ] || bin_name="$bin_name.exe"
+            echo "Archiving: $(du -h "$name") ..."
+            mkdir "$name.dir"
+            bin_name='aquarium-fish'
+            [ "$GOOS" != "windows" ] || bin_name="$bin_name.exe"
 
-        cp -a "$name" "$name.dir/$bin_name"
-        $(
-            cd "$name.dir"
-            tar -cJf "../$name.tar.xz" "$bin_name" >/dev/null 2>&1
-            zip "../$name.zip" "$bin_name" >/dev/null 2>&1
-            cd .. && rm -rf "$name.dir"
-        ) &
-        pwait $MAXJOBS
+            cp -a "$name" "$name.dir/$bin_name"
+            $(
+                cd "$name.dir"
+                tar -cJf "../$name.tar.xz" "$bin_name" >/dev/null 2>&1
+                zip "../$name.zip" "$bin_name" >/dev/null 2>&1
+                cd .. && rm -rf "$name.dir"
+            ) &
+            pwait $MAXJOBS
+        done
     done
-done
 
-wait
+    wait
+fi

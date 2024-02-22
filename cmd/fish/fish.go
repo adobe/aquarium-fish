@@ -33,6 +33,8 @@ import (
 )
 
 func main() {
+	log.Infof("Aquarium Fish %s (%s)", build.Version, build.Time)
+
 	var api_address string
 	var proxy_address string
 	var node_address string
@@ -56,8 +58,6 @@ func main() {
 			return log.InitLoggers()
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			log.Infof("Aquarium Fish %s (%s)", build.Version, build.Time)
-
 			cfg := &fish.Config{}
 			if err := cfg.ReadConfigFile(cfg_path); err != nil {
 				return log.Error("Fish: Unable to apply config file:", cfg_path, err)
