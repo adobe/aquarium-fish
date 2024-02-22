@@ -23,6 +23,17 @@ func SerializeMetadata(format, prefix string, data map[string]any) (out []byte, 
 			value := []byte("=" + shellescape.Quote(val) + "\n")
 			out = append(out, append(line, value...)...)
 		}
+	case "export": // Format env with exports for easy usage with source
+		m := DotSerialize(prefix, data)
+		for key, val := range m {
+			line := cleanShellKey(strings.Replace(shellescape.StripUnsafe(key), ".", "_", -1))
+			if len(line) == 0 {
+				continue
+			}
+			line = append([]byte("export "), line...)
+			value := []byte("=" + shellescape.Quote(val) + "\n")
+			out = append(out, append(line, value...)...)
+		}
 	case "ps1": // Plain format suitable to use in powershell
 		m := DotSerialize(prefix, data)
 		for key, val := range m {

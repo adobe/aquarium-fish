@@ -198,7 +198,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 		return nil, log.Error("Native: Unable to run the entry workload:", err)
 	}
 
-	log.Info("Native: Started workload for user:", user, opts.Entry)
+	log.Infof("Native: Started environment for user %q", user)
 
 	return &types.Resource{Identifier: user}, nil
 }

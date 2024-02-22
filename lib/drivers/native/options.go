@@ -15,6 +15,7 @@ package native
 import (
 	"encoding/json"
 	"fmt"
+	os_user "os/user"
 	"runtime"
 	"text/template"
 
@@ -57,10 +58,10 @@ func (o *Options) Validate() error {
 	// Set default entry
 	if o.Entry == "" {
 		if runtime.GOOS == "windows" {
-			o.Entry = "init.ps1"
+			o.Entry = ".\\init.ps1"
 		} else {
 			// On other systems sh should work just fine
-			o.Entry = "init.sh"
+			o.Entry = "./init.sh"
 		}
 	}
 	// Verify that entry template is ok
@@ -69,14 +70,17 @@ func (o *Options) Validate() error {
 	}
 
 	// Set default user groups
+	// The user is not complete without the primary group, so using current runtime user group
 	if len(o.Groups) == 0 {
-		switch os := runtime.GOOS; os {
-		case "darwin":
-			o.Groups = append(o.Groups, "staff")
-		case "windows":
-			o.Groups = append(o.Groups, "Users")
-			// On the other systems user group will be created with the same name as user
+		u, e := os_user.Current()
+		if e != nil {
+			return log.Error("Native: Unable to get the current system user:", e)
 		}
+		group, e := os_user.LookupGroupId(u.Gid)
+		if e != nil {
+			return log.Error("Native: Unable to get the current system user group name:", u.Gid, e)
+		}
+		o.Groups = append(o.Groups, group.Name)
 	}
 
 	// Check images
