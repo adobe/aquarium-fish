@@ -16,6 +16,9 @@ root_dir=$(cd "$(dirname "$0")"; echo "$PWD")
 echo "ROOT DIR: ${root_dir}"
 cd "${root_dir}"
 
+# Disabling cgo in order to not link with libc and utilize static linkage binaries
+# which will help to not relay on glibc on linux and be truely independend from OS
+export CGO_ENABLED=0
 
 echo "--- GENERATE CODE FOR AQUARIUM-FISH ---"
 # Install oapi-codegen if it's not available or version is not the same with go.mod
@@ -126,7 +129,7 @@ for GOOS in $os_list; do
         name="$BINARY_NAME.${GOOS}_${GOARCH}"
         [ -f "$name" ] || continue
 
-        echo "Archiving: $name ..."
+        echo "Archiving: $(du -h "$name") ..."
         mkdir "$name.dir"
         bin_name='aquarium-fish'
         [ "$GOOS" != "windows" ] || bin_name="$bin_name.exe"
