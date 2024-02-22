@@ -23,13 +23,13 @@ import (
 	"github.com/steinfletcher/apitest"
 
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
 // Ensure application task interface snapshot for user is working
 func Test_application_task_snapshot_by_user(t *testing.T) {
 	t.Parallel()
-	afi := RunAquariumFish(t, `---
-node_name: node-1
+	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0
@@ -107,7 +107,7 @@ drivers:
 
 	var app_state types.ApplicationState
 	t.Run("Application should get ALLOCATED in 10 sec", func(t *testing.T) {
-		Retry(&Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *R) {
+		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi.ApiAddress("api/v1/application/"+app.UID.String()+"/state")).
@@ -175,7 +175,7 @@ drivers:
 
 	var app_tasks []types.ApplicationTask
 	t.Run("ApplicationTask 1 should be executed in 10 sec and 2 should not be executed", func(t *testing.T) {
-		Retry(&Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *R) {
+		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi.ApiAddress("api/v1/application/"+app.UID.String()+"/task/")).
@@ -214,7 +214,7 @@ drivers:
 	})
 
 	t.Run("ApplicationTask 2 should be executed in 10 sec", func(t *testing.T) {
-		Retry(&Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *R) {
+		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi.ApiAddress("api/v1/application/"+app.UID.String()+"/task/")).
@@ -237,7 +237,7 @@ drivers:
 	})
 
 	t.Run("Application should get DEALLOCATED in 10 sec", func(t *testing.T) {
-		Retry(&Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *R) {
+		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi.ApiAddress("api/v1/application/"+app.UID.String()+"/state")).
