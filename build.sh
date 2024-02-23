@@ -69,7 +69,8 @@ fi
 # Run parallel builds but no more than limit (gox doesn't support all the os/archs we need)
 pwait() {
     # Note: Dash really don't like jobs to be executed in a pipe or in other shell, soooo...
-    while jobs > /tmp/jobs_list.tmp; do
+    # Using "-p" to show only PIDs (because it could be multiline) and "-r" to show only running jobs
+    while jobs -pr > /tmp/jobs_list.tmp; do
         [ $(cat /tmp/jobs_list.tmp | wc -l) -ge $1 ] || break
         sleep 1
     done
