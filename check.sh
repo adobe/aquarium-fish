@@ -32,7 +32,7 @@ done
 echo
 echo '---------------------- GoFmt verify ----------------------'
 echo
-reformat=$(gofmt -l .)
+reformat=$(gofmt -l . 2>&1)
 if [ "${reformat}" ]; then
     echo "Please run 'gofmt -w .': \n${reformat}"
     errors=$((${errors}+$(echo "${reformat}" | wc -l)))
@@ -57,7 +57,7 @@ echo
 vet=$(go vet ./... 2>&1)
 if [ "${vet}" ]; then
     echo "Please fix the issues: \n${vet}"
-    errors=$(((${errors}+$(echo "${vet}" | wc -l))/2))
+    errors=$(( ${errors}+$(echo "${vet}" | wc -l) ))
 fi
 
 

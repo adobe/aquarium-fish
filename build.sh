@@ -16,6 +16,9 @@ root_dir=$(cd "$(dirname "$0")"; echo "$PWD")
 echo "ROOT DIR: ${root_dir}"
 cd "${root_dir}"
 
+# Disabling cgo in order to not link with libc and utilize static linkage binaries
+# which will help to not relay on glibc on linux and be truely independend from OS
+export CGO_ENABLED=0
 
 echo "--- GENERATE CODE FOR AQUARIUM-FISH ---"
 # Install oapi-codegen if it's not available or version is not the same with go.mod
@@ -66,7 +69,8 @@ fi
 # Run parallel builds but no more than limit (gox doesn't support all the os/archs we need)
 pwait() {
     # Note: Dash really don't like jobs to be executed in a pipe or in other shell, soooo...
-    while jobs > /tmp/jobs_list.tmp; do
+    # Using "-p" to show only PIDs (because it could be multiline) and "-r" to show only running jobs
+    while jobs -pr > /tmp/jobs_list.tmp; do
         [ $(cat /tmp/jobs_list.tmp | wc -l) -ge $1 ] || break
         sleep 1
     done
@@ -117,29 +121,31 @@ done
 
 [ $errorcount -eq 0 ] || exit $errorcount
 
-echo
-echo "--- ARCHIVE ${BINARY_NAME} ($MAXJOBS in parallel) ---"
+if [ "x${RELEASE}" != "x" ]; then
+    echo
+    echo "--- ARCHIVE ${BINARY_NAME} ($MAXJOBS in parallel) ---"
 
-# Pack the artifact archives
-for GOOS in $os_list; do
-    for GOARCH in $arch_list; do
-        name="$BINARY_NAME.${GOOS}_${GOARCH}"
-        [ -f "$name" ] || continue
+    # Pack the artifact archives
+    for GOOS in $os_list; do
+        for GOARCH in $arch_list; do
+            name="$BINARY_NAME.${GOOS}_${GOARCH}"
+            [ -f "$name" ] || continue
 
-        echo "Archiving: $name ..."
-        mkdir "$name.dir"
-        bin_name='aquarium-fish'
-        [ "$GOOS" != "windows" ] || bin_name="$bin_name.exe"
+            echo "Archiving: $(du -h "$name") ..."
+            mkdir "$name.dir"
+            bin_name='aquarium-fish'
+            [ "$GOOS" != "windows" ] || bin_name="$bin_name.exe"
 
-        cp -a "$name" "$name.dir/$bin_name"
-        $(
-            cd "$name.dir"
-            tar -cJf "../$name.tar.xz" "$bin_name" >/dev/null 2>&1
-            zip "../$name.zip" "$bin_name" >/dev/null 2>&1
-            cd .. && rm -rf "$name.dir"
-        ) &
-        pwait $MAXJOBS
+            cp -a "$name" "$name.dir/$bin_name"
+            $(
+                cd "$name.dir"
+                tar -cJf "../$name.tar.xz" "$bin_name" >/dev/null 2>&1
+                zip "../$name.zip" "$bin_name" >/dev/null 2>&1
+                cd .. && rm -rf "$name.dir"
+            ) &
+            pwait $MAXJOBS
+        done
     done
-done
 
-wait
+    wait
+fi
