@@ -35,6 +35,21 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
+// Implements drivers.ResourceDriverFabric interface
+type Fabric struct{}
+
+func (f *Fabric) Name() string {
+	return "aws"
+}
+
+func (f *Fabric) NewResourceDriver() drivers.ResourceDriver {
+	return &Driver{}
+}
+
+func init() {
+	drivers.FabricsList = append(drivers.FabricsList, &Fabric{})
+}
+
 // Implements drivers.ResourceDriver interface
 type Driver struct {
 	cfg Config
@@ -45,10 +60,6 @@ type Driver struct {
 	quotas             map[string]int64
 	quotas_mutex       sync.Mutex
 	quotas_next_update time.Time
-}
-
-func init() {
-	drivers.DriversList = append(drivers.DriversList, &Driver{})
 }
 
 func (d *Driver) Name() string {
