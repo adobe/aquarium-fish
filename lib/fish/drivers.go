@@ -45,12 +45,12 @@ func (f *Fish) DriversSet() error {
 
 	if len(f.cfg.Drivers) == 0 {
 		// If no drivers instances are specified in the config - load all the drivers
-		for _, fbr := range drivers.FabricsList {
+		for _, fbr := range drivers.FactoryList {
 			instances[fbr.Name()] = fbr.NewResourceDriver()
 			log.Info("Fish: Resource driver enabled:", fbr.Name())
 		}
 	} else {
-		for _, fbr := range drivers.FabricsList {
+		for _, fbr := range drivers.FactoryList {
 			// One driver could be used multiple times by config suffixes
 			for _, cfg := range f.cfg.Drivers {
 				log.Debug("Fish: Processing driver config:", cfg.Name, "vs", fbr.Name())
