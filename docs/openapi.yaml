@@ -681,6 +681,52 @@ paths:
       security:
         - basic_auth: []
 
+  # In theory not needed if `required: false` work in the next API call, but it doesn't
+  /api/v1/node/this/profiling/:
+    get:
+      summary: Shows pprof index page
+      description:
+        Shows debug information about heap, goroutines, symbols etc. Very helpful in figuring out
+        the memory issues and to understand the internals of the Fish Node execution.
+      operationId: NodeThisProfilingIndexGet
+      tags:
+        - Node
+      responses:
+        '200':
+          description: Successful operation
+        '400':
+          description: Bad parameter or conditions
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+      security:
+        - basic_auth: []
+
+  /api/v1/node/this/profiling/{handler}:
+    get:
+      summary: Gives profiling data from pprof
+      description:
+        Shows debug information about heap, goroutines, symbols etc. Very helpful in figuring out
+        the memory issues and to understand the internals of the Fish Node execution.
+      operationId: NodeThisProfilingGet
+      tags:
+        - Node
+      parameters:
+        - name: handler
+          in: path
+          description: Which pprof handler to use. If empty - will show index
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+        '400':
+          description: Bad parameter or conditions
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+      security:
+        - basic_auth: []
+
   /api/v1/location/:
     get:
       summary: Get list of locations
