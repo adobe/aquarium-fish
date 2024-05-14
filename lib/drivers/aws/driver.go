@@ -78,8 +78,10 @@ func (d *Driver) Prepare(config []byte) error {
 		return err
 	}
 
-	// Fill up the available tasks
-	d.tasks_list = append(d.tasks_list, &TaskSnapshot{driver: d})
+	// Fill up the available tasks to execute
+	d.tasks_list = append(d.tasks_list,
+		&TaskSnapshot{driver: d},
+	)
 
 	d.quotas_mutex.Lock()
 	{
@@ -97,6 +99,11 @@ func (d *Driver) Prepare(config []byte) error {
 		d.quotas["Running On-Demand X instances"] = 0
 	}
 	d.quotas_mutex.Unlock()
+
+	// Run the background dedicated hosts pool management
+	for name, params := range d.cfg.DedicatedPool {
+		go d.dedicatedPoolProcess(name, params)
+	}
 
 	return nil
 }

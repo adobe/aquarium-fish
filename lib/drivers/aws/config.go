@@ -32,6 +32,28 @@ type Config struct {
 	// Optional
 	AccountIDs   []string          `json:"account_ids"`   // AWS Trusted account IDs to filter vpc, subnet, sg, images, snapshots...
 	InstanceTags map[string]string `json:"instance_tags"` // AWS Instance tags to use when this node provision them
+
+	// Manage the AWS dedicated hosts to keep them busy and deallocate when not needed
+	// Key of the map is name of the pool - will be used for identification of the pool
+	DedicatedPool map[string]DedicatedPoolRecord `json:"dedicated_pool"`
+}
+
+// Stores the configuration of AWS dedicated pool of particular type to manage
+// aws ec2 allocate-hosts --availability-zone "us-west-2c" --auto-placement "on" --host-recovery "off" --host-maintenance "off" --quantity 1 --instance-type "mac2.metal"
+type DedicatedPoolRecord struct {
+	Type string `json:"type"` // Type of the dedicated hosts pool (example: "mac2.metal")
+	Zone string `json:"zone"` // Where to allocate the dedicated host (example: "us-west-2c")
+	Min  uint   `json:"min"`  // Minimum available hosts to keep up, otherwise the hosts will be released as soon as possible
+	Max  uint   `json:"max"`  // Maximum dedicated hosts to allocate
+
+	// Optimization for the Mac dedicated hosts to send them in [scrubbing process] to save money
+	// (scrubbing is free but takes ~1-2h) when we can't release the host ([24h min limit]). When
+	// this option is set to 0 - no scrubbing is enabled. When it's set - then it's amount of
+	// milliseconds to stay idle and then run and terminate empty instance to trigger scrubbing.
+	//
+	// [scrubbing process]: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/mac-instance-stop.html
+	// [24h min limit]: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-mac-instances.html#mac-instance-considerations
+	ScrubbingDelayMs uint `json:"scrubbing_delay_ms"`
 }
 
 func (c *Config) Apply(config []byte) error {
