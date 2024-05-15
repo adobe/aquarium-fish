@@ -682,8 +682,8 @@ paths:
         - basic_auth: []
 
   # This /profiling/ endpoint is separate from the /profiling/{handler} because `required: false`
-  # behaved as expected. Since it is not, /profiling/ will route to a separate method that just
-  # calls the /profiling/{handler} endpoint with the empty string
+  # did not behaved as expected. Since it is not, /profiling/ will route to a separate method that
+  # just calls the /profiling/{handler} endpoint with the empty string
   /api/v1/node/this/profiling/:
     get:
       summary: Shows pprof index page
