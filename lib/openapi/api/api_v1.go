@@ -489,8 +489,9 @@ func (e *Processor) NodeThisProfilingIndexGet(c echo.Context) error {
 func (e *Processor) NodeThisProfilingGet(c echo.Context, handler string) error {
 	user := c.Get("user")
 	if user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' can see profiling info")})
-		return fmt.Errorf("Only 'admin' user can see profiling info")
+		message := "Only 'admin' can see profiling info"
+		c.JSON(http.StatusBadRequest, H{"message": message})
+		return fmt.Errorf(message)
 	}
 
 	switch handler {
@@ -509,7 +510,9 @@ func (e *Processor) NodeThisProfilingGet(c echo.Context, handler string) error {
 	case "trace":
 		pprof.Trace(c.Response(), c.Request())
 	default:
-		return fmt.Errorf("Unable to find requested profiling handler")
+		message := "Unable to find requested profiling handler"
+		c.JSON(http.StatusNotFound, H{"message": message})
+		return fmt.Errorf(message)
 	}
 
 	return nil
