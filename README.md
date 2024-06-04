@@ -189,12 +189,29 @@ The election process:
 
 Simplify the cluster management, for example adding labels or check the status [#8](https://github.com/adobe/aquarium-fish/issues/8).
 
-## Integration tests
+## Development
+
+Is relatively easy - you change logic, you run `./build.sh` to create a binary, testing it and send
+the PR when you think it's perfect enough. That will be great if you can ask in the discussions or
+create an issue on GitHub to align with the current direction and the plans.
+
+### Integration tests
 
 To verify that everything works as expected you can run integration tests like that:
 ```sh
 $ FISH_PATH=$PWD/aquarium-fish.darwin_amd64 go test -v -failfast -parallel 4 ./tests/...
 ```
+
+### Profiling
+
+Is available through pprof like that:
+```
+$ go tool pprof 'https+insecure://<USER>:<TOKEN>@localhost:8001/api/v1/node/this/profiling/heap'
+$ curl -ku "<USER>:<TOKEN>" 'https://localhost:8001/api/v1/node/this/prof:w
+iling/?debug=1'
+```
+
+Or you can open https://localhost:8001/api/v1/node/this/profiling/ in browser to see the index.
 
 ## API
 
