@@ -34,6 +34,7 @@ type Options struct {
 	SecurityGroup string            `json:"security_group"` // ID/Name of the security group to use for the instance
 	Tags          map[string]string `json:"tags"`           // Tags to add during instance creation
 	EncryptKey    string            `json:"encrypt_key"`    // Use specific encryption key for the new disks
+	Pool          string            `json:"pool"`           // Use machine from dedicated pool, otherwise will try to use one with auto-placement
 
 	UserDataFormat string `json:"userdata_format"` // If not empty - will store the resource metadata to userdata in defined format
 	UserDataPrefix string `json:"userdata_prefix"` // Optional if need to add custom prefix to the metadata key during formatting

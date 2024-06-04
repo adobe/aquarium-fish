@@ -43,17 +43,18 @@ type Config struct {
 type DedicatedPoolRecord struct {
 	Type string `json:"type"` // Type of the dedicated hosts pool (example: "mac2.metal")
 	Zone string `json:"zone"` // Where to allocate the dedicated host (example: "us-west-2c")
-	Min  uint   `json:"min"`  // Minimum available hosts to keep up, otherwise the hosts will be released as soon as possible
 	Max  uint   `json:"max"`  // Maximum dedicated hosts to allocate
 
 	// Optimization for the Mac dedicated hosts to send them in [scrubbing process] to save money
 	// (scrubbing is free but takes ~1-2h) when we can't release the host ([24h min limit]). When
 	// this option is set to 0 - no scrubbing is enabled. When it's set - then it's amount of
-	// milliseconds to stay idle and then run and terminate empty instance to trigger scrubbing.
+	// minutes to stay idle and then run and terminate empty instance to trigger scrubbing. Without
+	// this delay the host will have no time to be utilized by the new workload, which is not good
+	// from utilization perspective.
 	//
 	// [scrubbing process]: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/mac-instance-stop.html
 	// [24h min limit]: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-mac-instances.html#mac-instance-considerations
-	ScrubbingDelayMs uint `json:"scrubbing_delay_ms"`
+	ScrubbingDelayMin uint `json:"scrubbing_delay_min"`
 }
 
 func (c *Config) Apply(config []byte) error {
