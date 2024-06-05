@@ -15,6 +15,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"net/http/pprof"
 	"time"
 
 	"github.com/google/uuid"
@@ -479,6 +480,42 @@ func (e *Processor) NodeThisMaintenanceGet(c echo.Context, params types.NodeThis
 	}
 
 	return c.JSON(http.StatusOK, params)
+}
+
+func (e *Processor) NodeThisProfilingIndexGet(c echo.Context) error {
+	return e.NodeThisProfilingGet(c, "")
+}
+
+func (e *Processor) NodeThisProfilingGet(c echo.Context, handler string) error {
+	user := c.Get("user")
+	if user.(*types.User).Name != "admin" {
+		message := "Only 'admin' can see profiling info"
+		c.JSON(http.StatusBadRequest, H{"message": message})
+		return fmt.Errorf(message)
+	}
+
+	switch handler {
+	case "":
+		// Show index if no handler name provided
+		pprof.Index(c.Response().Writer, c.Request())
+	case "allocs", "block", "goroutine", "heap", "mutex", "threadcreate":
+		// PProf usual handlers
+		pprof.Handler(handler).ServeHTTP(c.Response(), c.Request())
+	case "cmdline":
+		pprof.Cmdline(c.Response(), c.Request())
+	case "profile":
+		pprof.Profile(c.Response(), c.Request())
+	case "symbol":
+		pprof.Symbol(c.Response(), c.Request())
+	case "trace":
+		pprof.Trace(c.Response(), c.Request())
+	default:
+		message := "Unable to find requested profiling handler"
+		c.JSON(http.StatusNotFound, H{"message": message})
+		return fmt.Errorf(message)
+	}
+
+	return nil
 }
 
 func (e *Processor) VoteListGet(c echo.Context, params types.VoteListGetParams) error {
