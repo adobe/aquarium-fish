@@ -207,8 +207,7 @@ $ FISH_PATH=$PWD/aquarium-fish.darwin_amd64 go test -v -failfast -parallel 4 ./t
 Is available through pprof like that:
 ```
 $ go tool pprof 'https+insecure://<USER>:<TOKEN>@localhost:8001/api/v1/node/this/profiling/heap'
-$ curl -ku "<USER>:<TOKEN>" 'https://localhost:8001/api/v1/node/this/prof:w
-iling/?debug=1'
+$ curl -ku "<USER>:<TOKEN>" 'https://localhost:8001/api/v1/node/this/profiling/?debug=1'
 ```
 
 Or you can open https://localhost:8001/api/v1/node/this/profiling/ in browser to see the index.
