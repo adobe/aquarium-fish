@@ -322,7 +322,7 @@ func (w *dedicatedPoolWorker) updateDedicatedHostsProcess() ([]ec2_types.Host, e
 // Will list all the allocated dedicated hosts on AWS with desired zone and tag
 func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 	// Do not update too often
-	if w.active_hosts_updated.Before(time.Now().Add(-10 * time.Second)) {
+	if w.active_hosts_updated.After(time.Now().Add(-10 * time.Second)) {
 		return nil
 	}
 
