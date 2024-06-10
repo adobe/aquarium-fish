@@ -22,6 +22,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 
 	"github.com/adobe/aquarium-fish/lib/log"
+	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 type Config struct {
@@ -57,7 +58,7 @@ type DedicatedPoolRecord struct {
 	//
 	// [scrubbing process]: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/mac-instance-stop.html
 	// [24h min limit]: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-mac-instances.html#mac-instance-considerations
-	ScrubbingDelay time.Duration `json:"scrubbing_delay"`
+	ScrubbingDelay util.Duration `json:"scrubbing_delay"`
 }
 
 func (c *Config) Apply(config []byte) error {
@@ -136,7 +137,7 @@ func (c *Config) Validate() (err error) {
 	}
 	// Make sure the ScrubbingDelay either unset or >= 1min or we will face often update API reqs
 	for name, pool := range c.DedicatedPool {
-		if pool.ScrubbingDelay > 0 && pool.ScrubbingDelay < 1*time.Minute {
+		if pool.ScrubbingDelay > 0 && time.Duration(pool.ScrubbingDelay) < 1*time.Minute {
 			return fmt.Errorf("AWS: Scrubbing delay of pool %q is less then 1 minute: %v", name, pool.ScrubbingDelay)
 		}
 	}

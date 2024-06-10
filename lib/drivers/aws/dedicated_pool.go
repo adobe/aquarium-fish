@@ -301,8 +301,9 @@ func (w *dedicatedPoolWorker) updateDedicatedHostsProcess() ([]ec2_types.Host, e
 	// Balancing the regular update delay based on the scrubbing optimization because it needs to
 	// record the time of host state change and only then the timer to scrubbing will start ticking
 	update_delay := 5 * time.Minute // 5 min by default
-	if w.record.ScrubbingDelay != 0 && w.record.ScrubbingDelay < 10*time.Minute {
-		update_delay = w.record.ScrubbingDelay / 2
+	scrubbing_delay := time.Duration(w.record.ScrubbingDelay)
+	if scrubbing_delay != 0 && scrubbing_delay < 10*time.Minute {
+		update_delay = scrubbing_delay / 2
 	}
 
 	for {
