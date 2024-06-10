@@ -270,7 +270,7 @@ func (w *dedicatedPoolWorker) releaseHosts(release_hosts []string) {
 	}
 
 	// Scrubbing the rest of mac hosts
-	if len(mac_hosts) > 0 && w.record.ScrubbingDelayMin != 0 {
+	if len(mac_hosts) > 0 && w.record.ScrubbingDelay != 0 {
 		for _, host_id := range mac_hosts {
 			host, ok := w.active_hosts[host_id]
 			if !ok {
@@ -301,8 +301,8 @@ func (w *dedicatedPoolWorker) updateDedicatedHostsProcess() ([]ec2_types.Host, e
 	// Balancing the regular update delay based on the scrubbing optimization because it needs to
 	// record the time of host state change and only then the timer to scrubbing will start ticking
 	update_delay := 5 * time.Minute // 5 min by default
-	if w.record.ScrubbingDelayMin > 0 && w.record.ScrubbingDelayMin < 10 {
-		update_delay = time.Duration(w.record.ScrubbingDelayMin) * time.Minute / 2
+	if w.record.ScrubbingDelay != 0 && w.record.ScrubbingDelay < 10*time.Minute {
+		update_delay = w.record.ScrubbingDelay / 2
 	}
 
 	for {

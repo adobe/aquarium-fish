@@ -47,14 +47,17 @@ type DedicatedPoolRecord struct {
 
 	// Optimization for the Mac dedicated hosts to send them in [scrubbing process] to save money
 	// (scrubbing is free but takes ~1-2h) when we can't release the host ([24h min limit]). When
-	// this option is set to 0 - no scrubbing is enabled. When it's set - then it's amount of
-	// minutes to stay idle and then run and terminate empty instance to trigger scrubbing. Without
-	// this delay the host will have no time to be utilized by the new workload, which is not good
-	// from utilization perspective.
+	// this option is set to 0 - no scrubbing is enabled. When it's set - then it's duration to
+	// stay idle and then run and terminate empty instance to trigger scrubbing. Without this delay
+	// the host will have no time to be utilized by the new workload, which is not good from
+	// utilization perspective.
+	//
+	// Current implementation is attached to state update, which could be API consuming, so this
+	// duration should be >= 1 min, otherwise API requests will be too often.
 	//
 	// [scrubbing process]: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/mac-instance-stop.html
 	// [24h min limit]: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-mac-instances.html#mac-instance-considerations
-	ScrubbingDelayMin uint `json:"scrubbing_delay_min"`
+	ScrubbingDelay time.Duration `json:"scrubbing_delay"`
 }
 
 func (c *Config) Apply(config []byte) error {
@@ -121,6 +124,21 @@ func (c *Config) Validate() (err error) {
 	} else {
 		c.AccountIDs = []string{account}
 		log.Debug("AWS: Using Account IDs:", c.AccountIDs)
+	}
+
+	// Init empty instance tags in case its not set
+	if c.DedicatedPool == nil {
+		c.InstanceTags = make(map[string]string)
+	}
+	// Init empty dedicated pool in case its not set
+	if c.DedicatedPool == nil {
+		c.DedicatedPool = make(map[string]DedicatedPoolRecord)
+	}
+	// Make sure the ScrubbingDelay either unset or >= 1min or we will face often update API reqs
+	for name, pool := range c.DedicatedPool {
+		if pool.ScrubbingDelay > 0 && pool.ScrubbingDelay < 1*time.Minute {
+			return fmt.Errorf("AWS: Scrubbing delay of pool %q is less then 1 minute: %v", name, pool.ScrubbingDelay)
+		}
 	}
 
 	return nil
