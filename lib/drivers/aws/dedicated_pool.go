@@ -451,6 +451,9 @@ func (w *dedicatedPoolWorker) allocateDedicatedHosts(amount int32) ([]string, er
 
 // Will request a release for a bunch of hosts and return unsuccessful id's or error
 func (w *dedicatedPoolWorker) releaseDedicatedHosts(ids []string) ([]string, error) {
+	if len(ids) < 1 {
+		return ids, nil
+	}
 	log.Infof("AWS: dedicated %q: Releasing %d dedicated hosts: %v", w.name, len(ids), ids)
 
 	conn := w.driver.newEC2Conn()

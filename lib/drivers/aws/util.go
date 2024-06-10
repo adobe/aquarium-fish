@@ -229,12 +229,7 @@ func (d *Driver) getImageIdByType(conn *ec2.Client, instance_type string) (strin
 
 	// Look for instance type architecture
 	req := ec2.DescribeInstanceTypesInput{
-		Filters: []types.Filter{
-			types.Filter{
-				Name:   aws.String("instance-type"),
-				Values: []string{instance_type},
-			},
-		},
+		InstanceTypes: []types.InstanceType{types.InstanceType(instance_type)},
 	}
 	resp, err := conn.DescribeInstanceTypes(context.TODO(), &req)
 	if err != nil || len(resp.InstanceTypes) == 0 {
