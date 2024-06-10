@@ -214,11 +214,17 @@ func (w *dedicatedPoolWorker) manageHosts() []string {
 		}
 		if host.State == ec2_types.AllocationStateAvailable {
 			// Skipping the hosts that already in managed list
+			found := false
 			for hid, _ := range w.to_manage_at {
 				if host_id == hid {
-					continue
+					found = true
+					break
 				}
 			}
+			if found {
+				continue
+			}
+
 			// Check if mac - giving it some time before action release or scrubbing
 			// If not mac: giving a chance to be reused - will be processed next cycle
 			if awsInstTypeAny(aws.ToString(host.HostProperties.InstanceType), "mac") {
