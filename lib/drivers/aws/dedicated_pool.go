@@ -214,6 +214,21 @@ func (w *dedicatedPoolWorker) manageHosts() []string {
 			// Immediately release - we don't need failed hosts in our pool
 			to_release = append(to_release, host_id)
 		}
+		if host.State == ec2_types.AllocationStateAvailable {
+			// Skipping the hosts that already in managed list
+			for hid, _ := range w.to_manage_at {
+				if host_id == hid {
+					continue
+				}
+			}
+			// Check if mac - giving it some time before action release or scrubbing
+			// If not mac: giving a chance to be reused - will be processed next cycle
+			if awsInstTypeAny(aws.ToString(host.HostProperties.InstanceType), "mac") {
+				w.to_manage_at[host_id] = time.Now().Add(time.Duration(w.record.ScrubbingDelay))
+			} else {
+				w.to_manage_at[host_id] = time.Now()
+			}
+		}
 	}
 
 	return to_release
@@ -380,6 +395,14 @@ func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 
 	w.active_hosts_updated = time.Now()
 	w.active_hosts = curr_active_hosts
+
+	// Printing list for debug purposes
+	if log.Verbosity == 1 {
+		log.Debugf("AWS: dedicated %q: Amount of active hosts in pool: %d", w.name, len(w.active_hosts))
+		for host_id, host := range w.active_hosts {
+			log.Debugf("AWS: dedicated %q: active_hosts item: host_id:%q, allocated:%q, state:%q", w.name, host_id, host.AllocationTime, host.State)
+		}
+	}
 
 	return nil
 }
