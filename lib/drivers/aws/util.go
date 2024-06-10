@@ -269,7 +269,7 @@ func (d *Driver) getImageIdByType(conn *ec2.Client, instance_type string) (strin
 					Values: []string{"available"},
 				},
 			},
-			MaxResults: aws.Int32(1), // Just one image is enough
+			MaxResults: aws.Int32(5), // Just one image is enough, but AWS API says "minimum 5"
 		}
 		resp, err := conn.DescribeImages(context.TODO(), &req)
 		if err != nil {
