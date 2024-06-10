@@ -179,8 +179,6 @@ func (w *dedicatedPoolWorker) backgroundProcess() {
 // Runs periodically to keep the hosts pool busy and cheap
 // Will return the list of hosts to release or exetute a scrubbing process for macs
 func (w *dedicatedPoolWorker) manageHosts() []string {
-	log.Debugf("AWS: dedicated %q: Running manageHosts()", w.name)
-
 	w.active_hosts_mu.RLock()
 	defer w.active_hosts_mu.RUnlock()
 
@@ -228,6 +226,7 @@ func (w *dedicatedPoolWorker) manageHosts() []string {
 			} else {
 				w.to_manage_at[host_id] = time.Now()
 			}
+			log.Debugf("AWS: dedicated %q: Added new host to be managed: %q at %q", w.name, host_id, w.to_manage_at[host_id])
 		}
 	}
 
