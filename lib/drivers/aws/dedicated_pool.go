@@ -112,7 +112,7 @@ func (w *dedicatedPoolWorker) ReserveHost(instance_type string) string {
 	}
 
 	if len(available_hosts) < 1 {
-		log.Infof("AWS: dedicated %q: No available hosts found in the current active list")
+		log.Infof("AWS: dedicated %q: No available hosts found in the current active list", w.name)
 		return ""
 	}
 
@@ -131,8 +131,9 @@ func (w *dedicatedPoolWorker) AllocateHost(instance_type string) string {
 		return ""
 	}
 
-	if w.record.Max >= uint(len(w.active_hosts)) {
-		log.Warnf("AWS: dedicated %q: Unable to request new host due to reached the maximum limit: %d >= %d", w.name, w.record.Max, len(w.active_hosts))
+	curr_active_hosts := len(w.active_hosts)
+	if w.record.Max <= uint(curr_active_hosts) {
+		log.Warnf("AWS: dedicated %q: Unable to request new host due to reached the maximum limit: %d <= %d", w.name, w.record.Max, curr_active_hosts)
 		return ""
 	}
 
