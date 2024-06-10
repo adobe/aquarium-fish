@@ -98,7 +98,7 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 		Description:        aws.String("Created by AquariumFish"),
 		CopyTagsFromSource: ec2_types.CopyTagsFromSourceVolume,
 		TagSpecifications: []ec2_types.TagSpecification{{
-			ResourceType: "snapshot",
+			ResourceType: ec2_types.ResourceTypeSnapshot,
 			Tags: []ec2_types.Tag{{
 				Key:   aws.String("InstanceId"),
 				Value: aws.String(t.Resource.Identifier),

@@ -396,7 +396,7 @@ func (w *dedicatedPoolWorker) allocateDedicatedHosts(amount int32) ([]string, er
 		Quantity:         aws.Int32(amount),
 
 		TagSpecifications: []ec2_types.TagSpecification{{
-			ResourceType: "snapshot",
+			ResourceType: ec2_types.ResourceTypeDedicatedHost,
 			Tags: []ec2_types.Tag{
 				{
 					Key:   aws.String("AquariumDedicatedPoolName"),
