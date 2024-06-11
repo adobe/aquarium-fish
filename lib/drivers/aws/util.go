@@ -241,11 +241,13 @@ func (d *Driver) getImageIdByType(conn *ec2.Client, instance_type string) (strin
 	}
 
 	type_arch := resp.InstanceTypes[0].ProcessorInfo.SupportedArchitectures[0]
+	log.Debug("AWS: Looking an image for type: found arch:", type_arch)
 
 	// Look for base image from aws with the defined architecture
 	// We checking last year and if it's empty - trying past years until will find the image
 	images_till := time.Now()
 	for images_till.Year() > time.Now().Year()-10 { // Probably past 10 years will work for everyone, right?
+		log.Debugf("AWS: Looking an image: Checking past year from %d", images_till.Year())
 		req := ec2.DescribeImagesInput{
 			Filters: []types.Filter{
 				types.Filter{
@@ -269,17 +271,17 @@ func (d *Driver) getImageIdByType(conn *ec2.Client, instance_type string) (strin
 					Values: []string{"available"},
 				},
 			},
-			MaxResults: aws.Int32(5), // Just one image is enough, but AWS API says "minimum 5"
 		}
 		resp, err := conn.DescribeImages(context.TODO(), &req)
 		if err != nil {
 			log.Errorf("AWS: Error during request to find image with arch %q for year %d: %v", type_arch, images_till.Year(), err)
-			images_till.AddDate(-1, 0, 0)
+			images_till = images_till.AddDate(-1, 0, 0)
 			continue
 		}
 		if len(resp.Images) == 0 {
 			// No images this year, let's reiterate with previous year
-			images_till.AddDate(-1, 0, 0)
+			log.Infof("AWS: Unable to find any images of arch %q till year %d: %v %v", type_arch, images_till.Year(), req, resp)
+			images_till = images_till.AddDate(-1, 0, 0)
 			continue
 		}
 
@@ -531,13 +533,7 @@ func awsInstTypeAny(val string, options ...string) bool {
 func (d *Driver) triggerHostScrubbing(host_id, instance_type string) (err error) {
 	conn := d.newEC2Conn()
 
-	// Use the default network
-	vm_network := ""
-	if vm_network, _, err = d.getSubnetId(conn, ""); err != nil {
-		return fmt.Errorf("AWS: scrubbing %s: Unable to get subnet: %v", host_id, err)
-	}
-	log.Infof("AWS: scrubbing %s: Selected subnet: %q", host_id, vm_network)
-
+	// Just need an image, which we could find by looking at the host instance type
 	vm_image := ""
 	if vm_image, err = d.getImageIdByType(conn, instance_type); err != nil {
 		return fmt.Errorf("AWS: scrubbing %s: Unable to find image: %v", host_id, err)
@@ -548,15 +544,6 @@ func (d *Driver) triggerHostScrubbing(host_id, instance_type string) (err error)
 	input := ec2.RunInstancesInput{
 		ImageId:      aws.String(vm_image),
 		InstanceType: types.InstanceType(instance_type),
-
-		NetworkInterfaces: []types.InstanceNetworkInterfaceSpecification{
-			{
-				AssociatePublicIpAddress: aws.Bool(false),
-				DeleteOnTermination:      aws.Bool(true),
-				DeviceIndex:              aws.Int32(0),
-				SubnetId:                 aws.String(vm_network),
-			},
-		},
 
 		// Set placement to the target host
 		Placement: &types.Placement{
@@ -576,7 +563,7 @@ func (d *Driver) triggerHostScrubbing(host_id, instance_type string) (err error)
 
 	inst_id := aws.ToString(result.Instances[0].InstanceId)
 
-	// Don't need to wait much - let's terminate the instance right away
+	// Don't need to wait - let's terminate the instance right away
 	// We need to terminate no matter wat - so repeating until it will be terminated, otherwise
 	// we will easily get into a huge budget impact
 
