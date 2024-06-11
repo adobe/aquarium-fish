@@ -223,24 +223,50 @@ func (d *Driver) getImageId(conn *ec2.Client, id_name string) (string, error) {
 	return id_name, nil
 }
 
+// Types are used to calculate some not that obvious values
+func (d *Driver) getTypes(conn *ec2.Client, instance_types []string) (map[string]types.InstanceTypeInfo, error) {
+	out := make(map[string]types.InstanceTypeInfo)
+
+	req := ec2.DescribeInstanceTypesInput{}
+	for _, typ := range instance_types {
+		req.InstanceTypes = append(req.InstanceTypes, types.InstanceType(typ))
+	}
+	resp, err := conn.DescribeInstanceTypes(context.TODO(), &req)
+	if err != nil || len(resp.InstanceTypes) == 0 {
+		return out, fmt.Errorf("AWS: Unable to locate instance types with specified name %q: %v", instance_types, err)
+	}
+
+	for i, typ := range resp.InstanceTypes {
+		out[string(typ.InstanceType)] = resp.InstanceTypes[i]
+	}
+
+	if len(resp.InstanceTypes) != len(instance_types) {
+		not_found := []string{}
+		for _, typ := range instance_types {
+			if _, ok := out[typ]; !ok {
+				not_found = append(not_found, typ)
+			}
+		}
+		return out, fmt.Errorf("AWS: Unable to locate all the requested types %q: %q", instance_types, not_found)
+	}
+
+	return out, nil
+}
+
 // Will return latest available image for the instance type
 func (d *Driver) getImageIdByType(conn *ec2.Client, instance_type string) (string, error) {
 	log.Debug("AWS: Looking an image for type:", instance_type)
 
-	// Look for instance type architecture
-	req := ec2.DescribeInstanceTypesInput{
-		InstanceTypes: []types.InstanceType{types.InstanceType(instance_type)},
-	}
-	resp, err := conn.DescribeInstanceTypes(context.TODO(), &req)
-	if err != nil || len(resp.InstanceTypes) == 0 {
-		return "", fmt.Errorf("AWS: Unable to locate instance type with specified name %q: %v", instance_type, err)
+	inst_types, err := d.getTypes(conn, []string{instance_type})
+	if err != nil {
+		return "", fmt.Errorf("AWS: Unable to find instance type %q: %v", instance_type, err)
 	}
 
-	if resp.InstanceTypes[0].ProcessorInfo == nil || len(resp.InstanceTypes[0].ProcessorInfo.SupportedArchitectures) < 1 {
+	if inst_types[instance_type].ProcessorInfo == nil || len(inst_types[instance_type].ProcessorInfo.SupportedArchitectures) < 1 {
 		return "", fmt.Errorf("AWS: The instance type doesn't have needed processor arch params %q: %v", instance_type, err)
 	}
 
-	type_arch := resp.InstanceTypes[0].ProcessorInfo.SupportedArchitectures[0]
+	type_arch := inst_types[instance_type].ProcessorInfo.SupportedArchitectures[0]
 	log.Debug("AWS: Looking an image for type: found arch:", type_arch)
 
 	// Look for base image from aws with the defined architecture
