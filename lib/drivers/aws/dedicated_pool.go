@@ -259,6 +259,11 @@ func (w *dedicatedPoolWorker) manageHosts() []string {
 			continue
 		}
 
+		// If it's mac not too old and in scrubbing process (pending) - we don't need to bother
+		if host.State == ec2_types.AllocationStatePending && isHostMac(&host) && !isMacTooOld(&host) {
+			continue
+		}
+
 		// Skipping the hosts that already in managed list
 		found := false
 		for hid, _ := range w.to_manage_at {
