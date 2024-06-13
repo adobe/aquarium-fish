@@ -85,10 +85,8 @@ func (w *dedicatedPoolWorker) AvailableCapacity(instance_type string) int64 {
 	w.active_hosts_mu.RLock()
 	defer w.active_hosts_mu.RUnlock()
 	for _, host := range w.active_hosts {
-		if host.State == ec2_types.AllocationStateAvailable && host.AvailableCapacity != nil {
-			// For now support only single-type dedicated hosts, because primary goal is mac machines
-			inst_count += int64(aws.ToInt32(host.AvailableCapacity.AvailableInstanceCapacity[0].AvailableCapacity))
-		}
+		// For now support only single-type dedicated hosts, because primary goal is mac machines
+		inst_count += int64(getHostCapacity(&host))
 	}
 
 	// Let's add the amount of instances we can allocate
@@ -114,11 +112,8 @@ func (w *dedicatedPoolWorker) ReserveHost(instance_type string) string {
 
 	// Look for the hosts with capacity
 	for host_id, host := range w.active_hosts {
-		if host.State == ec2_types.AllocationStateAvailable && host.AvailableCapacity != nil {
-			// For now support only single-type dedicated hosts, because primary goal is mac machines
-			if aws.ToInt32(host.AvailableCapacity.AvailableInstanceCapacity[0].AvailableCapacity) > 0 {
-				available_hosts = append(available_hosts, host_id)
-			}
+		if getHostCapacity(&host) > 0 {
+			available_hosts = append(available_hosts, host_id)
 		}
 	}
 
@@ -234,25 +229,15 @@ func (w *dedicatedPoolWorker) manageHosts() []string {
 
 	// Going through the process list
 	for host_id, timeout := range w.to_manage_at {
-		if host, ok := w.active_hosts[host_id]; ok {
-			if host.State != ec2_types.AllocationStateAvailable || len(host.Instances) > 1 {
-				// Optimization for macs that is older then 24h - we can continue to release even if
-				// it's in pending state, so why not to reduce our allocated pool faster...
-				if !(host.State == ec2_types.AllocationStatePending && aws.ToTime(host.AllocationTime).Before(time.Now().Add(-24*time.Hour))) {
-					// The host state is changed, we don't need to manage it
-					to_clean = append(to_clean, host_id)
-					continue
-				}
-			}
-		} else {
-			// The host disappeared from the list, so we don't need to manage it out anymore
+		if host, ok := w.active_hosts[host_id]; !ok || isHostUsed(&host) {
+			// The host is disappeared or used, we don't need to manage it out anymore
 			to_clean = append(to_clean, host_id)
 			continue
 		}
 
-		// Host seems still in available state - check for timeout
+		// Host seems still exists and not used - check for timeout
 		if timeout.Before(time.Now()) {
-			// Ok, timeout for the host reached - let's put it in the release bucket
+			// Timeout for the host reached - let's put it in the release bucket
 			to_release = append(to_release, host_id)
 		}
 	}
@@ -268,28 +253,32 @@ func (w *dedicatedPoolWorker) manageHosts() []string {
 			// Immediately release - we don't need failed hosts in our pool
 			to_release = append(to_release, host_id)
 		}
-		if host.State == ec2_types.AllocationStateAvailable || host.State == ec2_types.AllocationStatePending {
-			// Skipping the hosts that already in managed list
-			found := false
-			for hid, _ := range w.to_manage_at {
-				if host_id == hid {
-					found = true
-					break
-				}
-			}
-			if found {
-				continue
-			}
 
-			// Check if mac - giving it some time before action release or scrubbing
-			// If not mac: giving a chance to be reused - will be processed next cycle
-			if awsInstTypeAny(aws.ToString(host.HostProperties.InstanceType), "mac") {
-				w.to_manage_at[host_id] = time.Now().Add(time.Duration(w.record.ScrubbingDelay))
-			} else {
-				w.to_manage_at[host_id] = time.Now()
-			}
-			log.Debugf("AWS: dedicated %q: Added new host to be managed out: %q at %q", w.name, host_id, w.to_manage_at[host_id])
+		// We don't need to manage out the hosts in use
+		if isHostUsed(&host) {
+			continue
 		}
+
+		// Skipping the hosts that already in managed list
+		found := false
+		for hid, _ := range w.to_manage_at {
+			if host_id == hid {
+				found = true
+				break
+			}
+		}
+		if found {
+			continue
+		}
+
+		// Check if mac - giving it some time before action release or scrubbing
+		// If not mac or mac is old: giving a chance to be reused - will be processed next cycle
+		if isHostMac(&host) && !isMacTooOld(&host) {
+			w.to_manage_at[host_id] = time.Now().Add(time.Duration(w.record.ScrubbingDelay))
+		} else {
+			w.to_manage_at[host_id] = time.Now()
+		}
+		log.Debugf("AWS: dedicated %q: Added new host to be managed out: %q at %q", w.name, host_id, w.to_manage_at[host_id])
 	}
 
 	return to_release
@@ -314,10 +303,10 @@ func (w *dedicatedPoolWorker) releaseHosts(release_hosts []string) {
 		// Special treatment for mac hosts - it makes not much sense to try to release them until
 		// they've live for 24h due to Apple-AWS license.
 		if host, ok := w.active_hosts[host_id]; ok && host.HostProperties != nil {
-			if awsInstTypeAny(aws.ToString(host.HostProperties.InstanceType), "mac") {
+			if isHostMac(&host) {
 				mac_hosts = append(mac_hosts, host_id)
 				// If mac host reached 24h since allocation - adding it to the release list
-				if aws.ToTime(host.AllocationTime).Before(time.Now().Add(-24 * time.Hour)) {
+				if isHostReadyForRelease(&host) {
 					to_release = append(to_release, host_id)
 				}
 				continue
@@ -369,6 +358,46 @@ func (w *dedicatedPoolWorker) releaseHosts(release_hosts []string) {
 			delete(w.active_hosts, host_id)
 		}
 	}
+}
+
+func isHostMac(host *ec2_types.Host) bool {
+	return host.HostProperties != nil && awsInstTypeAny(aws.ToString(host.HostProperties.InstanceType), "mac")
+}
+
+func isMacTooOld(host *ec2_types.Host) bool {
+	return aws.ToTime(host.AllocationTime).Before(time.Now().Add(-24 * time.Hour))
+}
+
+// Check if the host is ready to be released - if it's mac then it should be older then 24h
+func isHostReadyForRelease(host *ec2_types.Host) bool {
+	if !isHostUsed(host) {
+		return false
+	}
+	// Special case for mac which can't be released until will be older then 24h
+	if isHostMac(host) {
+		if !isMacTooOld(host) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// Check if the host is used
+func isHostUsed(host *ec2_types.Host) bool {
+	if host.Instances != nil && len(host.Instances) > 0 {
+		return true
+	}
+	return false
+}
+
+// Check how much capacity we have on a host
+func getHostCapacity(host *ec2_types.Host) uint {
+	if host.State != ec2_types.AllocationStateAvailable || host.AvailableCapacity == nil {
+		return 0
+	}
+	// TODO: For now supports only single-type dedicated hosts
+	return uint(aws.ToInt32(host.AvailableCapacity.AvailableInstanceCapacity[0].AvailableCapacity))
 }
 
 // Updates the hosts list every 5 minutes
@@ -461,7 +490,7 @@ func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 	if log.Verbosity == 1 {
 		log.Debugf("AWS: dedicated %q: Amount of active hosts in pool: %d", w.name, len(w.active_hosts))
 		for host_id, host := range w.active_hosts {
-			log.Debugf("AWS: dedicated %q: active_hosts item: host_id:%q, allocated:%q, state:%q", w.name, host_id, host.AllocationTime, host.State)
+			log.Debugf("AWS: dedicated %q: active_hosts item: host_id:%q, allocated:%q, state:%q, capacity:%d (%d)", w.name, host_id, host.AllocationTime, host.State, getHostCapacity(&host), w.instances_per_host)
 		}
 	}
 
