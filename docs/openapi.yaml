@@ -10,7 +10,7 @@ servers:
 info:
   description: API of the Fish node/cluster
   version: 1.0.0
-  title: Aquarium Fish
+  title: Aqurium Fish
   contact:
     name: Sergei Parshev
     url: 'https://github.com/adobe/aquarium-fish'

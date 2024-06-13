@@ -14,7 +14,6 @@ package fish
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/log"
@@ -28,56 +27,57 @@ import (
 	_ "github.com/adobe/aquarium-fish/lib/drivers/test"
 )
 
-var drivers_instances map[string]drivers.ResourceDriver
+var drivers_enabled_list []drivers.ResourceDriver
 
 func (f *Fish) DriverGet(name string) drivers.ResourceDriver {
-	if drivers_instances == nil {
-		log.Error("Fish: Resource drivers are not initialized to request the driver instance:", name)
-		return nil
+	for _, drv := range drivers_enabled_list {
+		if drv.Name() == name {
+			return drv
+		}
 	}
-	drv, _ := drivers_instances[name]
-	return drv
+	return nil
 }
 
-// Making the drivers instances map with specified names
 func (f *Fish) DriversSet() error {
-	instances := make(map[string]drivers.ResourceDriver)
+	var list []drivers.ResourceDriver
 
-	if len(f.cfg.Drivers) == 0 {
-		// If no drivers instances are specified in the config - load all the drivers
-		for _, fbr := range drivers.FabricsList {
-			instances[fbr.Name()] = fbr.NewResourceDriver()
-			log.Info("Fish: Resource driver enabled:", fbr.Name())
-		}
-	} else {
-		for _, fbr := range drivers.FabricsList {
-			// One driver could be used multiple times by config suffixes
-			for _, cfg := range f.cfg.Drivers {
-				log.Debug("Fish: Processing driver config:", cfg.Name, "vs", fbr.Name())
-				if cfg.Name == fbr.Name() || strings.HasPrefix(cfg.Name, fbr.Name()+"/") {
-					instances[cfg.Name] = fbr.NewResourceDriver()
-					log.Info("Fish: Resource driver enabled:", fbr.Name(), "as", cfg.Name)
+	for _, drv := range drivers.DriversList {
+		en := false
+		if len(f.cfg.Drivers) == 0 {
+			// If no drivers is specified in the config - load all
+			en = true
+		} else {
+			for _, res := range f.cfg.Drivers {
+				if res.Name == drv.Name() {
+					en = true
+					break
 				}
 			}
 		}
-
-		if len(f.cfg.Drivers) > len(instances) {
-			return fmt.Errorf("Unable to enable all the required drivers %s", f.cfg.Drivers)
+		if en {
+			log.Info("Fish: Resource driver enabled:", drv.Name())
+			list = append(list, drv)
+		} else {
+			log.Info("Fish: Resource driver disabled:", drv.Name())
 		}
 	}
 
-	drivers_instances = instances
+	if len(f.cfg.Drivers) > len(list) {
+		return fmt.Errorf("Unable to enable all the required drivers %s", f.cfg.Drivers)
+	}
+
+	drivers_enabled_list = list
 
 	return nil
 }
 
 func (f *Fish) DriversPrepare(configs []ConfigDriver) (errs []error) {
-	activated_drivers_instances := make(map[string]drivers.ResourceDriver)
-	for name, drv := range drivers_instances {
+	not_skipped_drivers := drivers_enabled_list[:0]
+	for _, drv := range drivers_enabled_list {
 		// Looking for the driver config
 		var json_cfg []byte
 		for _, cfg := range configs {
-			if name == cfg.Name {
+			if drv.Name() == cfg.Name {
 				json_cfg = []byte(cfg.Cfg)
 				break
 			}
@@ -87,12 +87,12 @@ func (f *Fish) DriversPrepare(configs []ConfigDriver) (errs []error) {
 			errs = append(errs, err)
 			log.Warn("Fish: Resource driver prepare failed:", drv.Name(), err)
 		} else {
-			activated_drivers_instances[name] = drv
+			not_skipped_drivers = append(not_skipped_drivers, drv)
 			log.Info("Fish: Resource driver activated:", drv.Name())
 		}
 	}
 
-	drivers_instances = activated_drivers_instances
+	drivers_enabled_list = not_skipped_drivers
 
 	return errs
 }
