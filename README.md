@@ -141,11 +141,6 @@ installed on my machine - I can run Fish and it's VMX driver will automatically 
 run VMX images. In case I have docker installed too - I can use both for different workloads or
 select the ones I actually want to use by `--drivers` option or via the API.
 
-In case you need to utilize multiple different configuration for the driver - you can use suffix
-for it's name: like `aws` and `aws/dev` - will effectively serve AWS workloads, but both will have
-different keys, so labels will be able to specify `driver: aws/dev` in order to use `aws/dev` config
-or `driver: aws` in order to use `aws` one - so will run in different AWS projects.
-
 ### Internal DB structure
 
 The cluster supports the internal SQL database, which provides a common storage for the node &

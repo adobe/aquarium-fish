@@ -21,10 +21,10 @@ const (
 	StatusAllocated = "ALLOCATED"
 )
 
-var FactoryList []ResourceDriverFactory
+var FabricsList []ResourceDriverFabric
 
-// Factory allows to generate new instances of the drivers
-type ResourceDriverFactory interface {
+// Fabric allows to generate new instances of the drivers
+type ResourceDriverFabric interface {
 	// Name of the driver
 	Name() string
 

@@ -30,19 +30,19 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
-// Implements drivers.ResourceDriverFactory interface
-type Factory struct{}
+// Implements drivers.ResourceDriverFabric interface
+type Fabric struct{}
 
-func (f *Factory) Name() string {
+func (f *Fabric) Name() string {
 	return "vmx"
 }
 
-func (f *Factory) NewResourceDriver() drivers.ResourceDriver {
+func (f *Fabric) NewResourceDriver() drivers.ResourceDriver {
 	return &Driver{}
 }
 
 func init() {
-	drivers.FactoryList = append(drivers.FactoryList, &Factory{})
+	drivers.FabricsList = append(drivers.FabricsList, &Fabric{})
 }
 
 // Implements drivers.ResourceDriver interface
