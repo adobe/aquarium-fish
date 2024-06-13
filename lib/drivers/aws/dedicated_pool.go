@@ -27,6 +27,9 @@ import (
 	"github.com/adobe/aquarium-fish/lib/log"
 )
 
+// Custom status to set in the host for simplifying parallel ops in between the updates
+const HOST_RESERVED = "reserved"
+
 // TODO: Right now logic pinned to just one node, need to be distributed
 
 // This structure keeps the available list of hosts & state to operate on hosts management
@@ -125,7 +128,7 @@ func (w *dedicatedPoolWorker) ReserveHost(instance_type string) string {
 	// Pick random one from the list of available hosts to reduce the possibility of conflict
 	host := w.active_hosts[available_hosts[rand.Intn(len(available_hosts))]]
 	// Mark it as reserved temporarly to ease multi-allocation at the same time
-	host.State = "reserved"
+	host.State = HOST_RESERVED
 	w.active_hosts[aws.ToString(host.HostId)] = host
 	return aws.ToString(host.HostId)
 }
@@ -350,7 +353,7 @@ func (w *dedicatedPoolWorker) releaseHosts(release_hosts []string) {
 			}
 
 			// Reserve the host internally for scrubbing process to prevent allocation issues
-			host.State = "reserved"
+			host.State = HOST_RESERVED
 			w.active_hosts[aws.ToString(host.HostId)] = host
 
 			// Triggering the scrubbing process
@@ -390,7 +393,7 @@ func isHostReadyForRelease(host *ec2_types.Host) bool {
 
 // Check if the host is used
 func isHostUsed(host *ec2_types.Host) bool {
-	if host.Instances != nil && len(host.Instances) > 0 {
+	if host.State == HOST_RESERVED || host.Instances != nil && len(host.Instances) > 0 {
 		return true
 	}
 	return false

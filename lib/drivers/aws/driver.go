@@ -299,6 +299,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 				Tenancy: ec2_types.TenancyHost,
 				HostId:  aws.String(host_id),
 			}
+			log.Infof("AWS: %s: Utilizing pool %q host: %s", i_name, opts.Pool, host_id)
 		} else {
 			return nil, fmt.Errorf("AWS: %s: Unable to locate the dedicated pool: %s", i_name, opts.Pool)
 		}
