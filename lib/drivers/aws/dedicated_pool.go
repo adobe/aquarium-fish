@@ -43,8 +43,8 @@ type dedicatedPoolWorker struct {
 
 	// It's better to update active_hosts by calling updateDedicatedHosts()
 	active_hosts         map[string]ec2_types.Host
-	active_hosts_mu      sync.RWMutex
 	active_hosts_updated time.Time
+	active_hosts_mu      sync.RWMutex
 
 	// Hosts to release or scrub at specified time, used by manageHosts process
 	to_manage_at map[string]time.Time
@@ -81,7 +81,9 @@ func (w *dedicatedPoolWorker) AvailableCapacity(instance_type string) int64 {
 	var inst_count int64
 
 	if err := w.updateDedicatedHosts(); err != nil {
+		w.active_hosts_mu.RLock()
 		log.Warnf("AWS: dedicated %q: Unable to update dedicated hosts list, continue with %q: %v", w.active_hosts_updated, err)
+		w.active_hosts_mu.RUnlock()
 	}
 
 	// Looking for the available hosts in the list and their capacity
@@ -423,9 +425,12 @@ func (w *dedicatedPoolWorker) updateDedicatedHostsProcess() ([]ec2_types.Host, e
 		time.Sleep(30 * time.Second)
 		// We need to keep the request rate budget, so using a delay between regular updates.
 		// If the dedicated hosts are used often, it could wait for a while due to often updates
-		if w.active_hosts_updated.Before(time.Now().Add(-update_delay)) {
+		w.active_hosts_mu.Rlock()
+		last_update := active_hosts_updated
+		w.active_hosts_mu.RUnlock()
+		if last_update.Before(time.Now().Add(-update_delay)) {
 			if err := w.updateDedicatedHosts(); err != nil {
-				log.Warnf("AWS: dedicated %q: Error happened during the regular hosts update, continue with updated on %q: %v", w.active_hosts_updated, err)
+				log.Warnf("AWS: dedicated %q: Error happened during the regular hosts update, continue with updated on %q: %v", last_update, err)
 			}
 		}
 	}
@@ -434,7 +439,10 @@ func (w *dedicatedPoolWorker) updateDedicatedHostsProcess() ([]ec2_types.Host, e
 // Will list all the allocated dedicated hosts on AWS with desired zone and tag
 func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 	// Do not update too often
-	if w.active_hosts_updated.After(time.Now().Add(-10 * time.Second)) {
+	w.active_hosts_mu.Rlock()
+	ready_for_update := w.active_hosts_updated.Before(time.Now().Add(-10 * time.Second))
+	w.active_hosts_mu.RUnlock()
+	if !ready_for_update {
 		return nil
 	}
 

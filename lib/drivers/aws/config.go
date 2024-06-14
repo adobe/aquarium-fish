@@ -128,7 +128,7 @@ func (c *Config) Validate() (err error) {
 	}
 
 	// Init empty instance tags in case its not set
-	if c.DedicatedPool == nil {
+	if c.InstanceTags == nil {
 		c.InstanceTags = make(map[string]string)
 	}
 	// Init empty dedicated pool in case its not set
