@@ -382,7 +382,7 @@ func isHostReadyForRelease(host *ec2_types.Host) bool {
 	// Host not used - for sure ready for release
 	if !isHostUsed(host) {
 		// If mac is not old enough - it's not ready for release
-		if isHostMac(host) && !isMacTooOld(host)) {
+		if isHostMac(host) && !isMacTooOld(host) {
 			return false
 		}
 		return true
@@ -429,8 +429,8 @@ func (w *dedicatedPoolWorker) updateDedicatedHostsProcess() ([]ec2_types.Host, e
 		time.Sleep(30 * time.Second)
 		// We need to keep the request rate budget, so using a delay between regular updates.
 		// If the dedicated hosts are used often, it could wait for a while due to often updates
-		w.active_hosts_mu.Rlock()
-		last_update := active_hosts_updated
+		w.active_hosts_mu.RLock()
+		last_update := w.active_hosts_updated
 		w.active_hosts_mu.RUnlock()
 		if last_update.Before(time.Now().Add(-update_delay)) {
 			if err := w.updateDedicatedHosts(); err != nil {
@@ -443,7 +443,7 @@ func (w *dedicatedPoolWorker) updateDedicatedHostsProcess() ([]ec2_types.Host, e
 // Will list all the allocated dedicated hosts on AWS with desired zone and tag
 func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 	// Do not update too often
-	w.active_hosts_mu.Rlock()
+	w.active_hosts_mu.RLock()
 	ready_for_update := w.active_hosts_updated.Before(time.Now().Add(-10 * time.Second))
 	w.active_hosts_mu.RUnlock()
 	if !ready_for_update {
