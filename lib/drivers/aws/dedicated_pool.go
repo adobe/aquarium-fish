@@ -313,11 +313,10 @@ func (w *dedicatedPoolWorker) releaseHosts(release_hosts []string) {
 		if host, ok := w.active_hosts[host_id]; ok && host.HostProperties != nil {
 			if isHostMac(&host) {
 				mac_hosts = append(mac_hosts, host_id)
-				// If mac host reached 24h since allocation - adding it to the release list
-				if isHostReadyForRelease(&host) {
-					to_release = append(to_release, host_id)
+				// If mac host not reached 24h since allocation - skipping addtion to the release list
+				if !isHostReadyForRelease(&host) {
+					continue
 				}
-				continue
 			}
 		}
 		// Adding any host to to_release list
@@ -378,17 +377,17 @@ func isMacTooOld(host *ec2_types.Host) bool {
 
 // Check if the host is ready to be released - if it's mac then it should be older then 24h
 func isHostReadyForRelease(host *ec2_types.Host) bool {
+	// Host not used - for sure ready for release (or scrubbing in case of young mac)
 	if !isHostUsed(host) {
-		return false
-	}
-	// Special case for mac which can't be released until will be older then 24h
-	if isHostMac(host) {
-		if !isMacTooOld(host) {
-			return false
-		}
+		return true
 	}
 
-	return true
+	// Mac in scrubbing process (pending) can be released but should be older then 24h
+	if host.State == ec2_types.AllocationStatePending && isHostMac(host) && isMacTooOld(host) {
+		return true
+	}
+
+	return false
 }
 
 // Check if the host is used
