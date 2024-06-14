@@ -23,7 +23,7 @@ In general it can be built and used on any OS/architecture but for now the prima
 * MacOS
 * Linux
 
-To run the node you need nothing, but the drivers usually require some apps to be installed into
+To run the Node you need nothing, but the drivers usually require some apps to be installed into
 the environment.
 
 ## Goals
@@ -39,7 +39,7 @@ the environment.
 ## Usage
 
 To use the Aquarium Fish you just need to execute the next steps:
-* Ensure the driver requirements for needed driver are installed
+* Ensure the dependencies for needed driver are installed
 * Run Fish node
 * Obtain the generated admin user token
 * With HTTP API:
@@ -68,23 +68,11 @@ node name, because the first will use hostname as node name:
    ---
    node_name: test-2
    api_address: 0.0.0.0:8002
-   cluster_join:
-     - 127.0.0.1:9001
    ```
 
 ```
 $ ./aquarium-fish --cfg local2.yml
 ```
-
-### To run as a cluster
-
-**TODO [#30](https://github.com/adobe/aquarium-fish/issues/30):** This functionality is in active
-development, the available logic can't handle the cluster.
-
-Just make sure there is a path from one node to at least one another - there is no requirement of
-seeing the entire cluster for each node, but it need to be able to connect to at least one. More
-visibility is better up to 8 total - because it's the default limit of cluster connections for the
-node.
 
 #### Security
 
@@ -103,14 +91,24 @@ check that the server (or client) is the one is approved in the cluster.
 Maybe in the future Fish will allow to manage the cluster CA and issue certificate for a new node,
 but for now just check openssl and https://github.com/jcmoraisjr/simple-ca for reference.
 
-### Cluster usage
+### To run as a cluster
 
-To initialize cluster you need to create users with admin account and create labels you want to
+**TODO [#30](https://github.com/adobe/aquarium-fish/issues/30):** This functionality is in active
+development, the available logic can't handle the cluster.
+
+Just make sure there is a path from one node to at least one another - there is no requirement of
+seeing the entire cluster for each node, but it need to be able to connect to at least one. More
+visibility is better up to 8 total - because it's the default limit of cluster connections for the
+node.
+
+#### Cluster usage
+
+To initialize cluster you need to create users with admin account and create Labels you want to
 use. In order to use the resources manager manually - check the `API` section and follow the next
 general directions:
 
 1. Get your user and it's token
-2. Check the available labels on the cluster (and create some if you need them)
+2. Check the available Labels on the cluster (and create some if you need them)
 3. Create Application with description of what kind of resource you need
 4. Check the Status of your Application and wait for "ALLOCATED" status
 5. Now resource is allocated, it's all yours and, probably, already pinged you
@@ -118,8 +116,8 @@ general directions:
 7. Make sure the Application status is "DEALLOCATED"
 
 To use with Jenkins - you can install [Aquarium Net Jenkins](https://github.com/adobe/aquarium-net-jenkins)
-cloud plugin to dynamically allocate the required resources. Don't forget to add the served labels
-to the cloud and you will be ready to go.
+cloud plugin to dynamically allocate the required resources. Don't forget to add the served Labels
+to the cluster and you will be ready to go.
 
 ### Users policy
 
@@ -141,12 +139,17 @@ installed on my machine - I can run Fish and it's VMX driver will automatically 
 run VMX images. In case I have docker installed too - I can use both for different workloads or
 select the ones I actually want to use by `--drivers` option or via the API.
 
+In the event you need to use more than one configuration for a given driver, you can add a suffix
+`/<name>`. For example, `aws` and `aws/dev` will both utilize the AWS driver, but use a different
+configuration. In this example, Labels created will need to specify either `driver: aws` or
+`driver: aws/dev` to select which configuration to run.
+
 ### Internal DB structure
 
 The cluster supports the internal SQL database, which provides a common storage for the node &
 cluster data. The current schema could be found in OpenAPI format here:
  * When the Fish app is running locally: https://0.0.0.0:8001/api/
- * YAML specification: https://github.com/adobe/aquarium-fish/blob/main/docs/openapi.yaml
+ * YAML OpenAPI specification: https://github.com/adobe/aquarium-fish/blob/main/docs/openapi.yaml
 
 ### How the cluster choose node for resource allocation
 
@@ -187,7 +190,7 @@ The election process:
 
 **TODO**
 
-Simplify the cluster management, for example adding labels or check the status [#8](https://github.com/adobe/aquarium-fish/issues/8).
+Simplify the cluster management, for example adding Labels or check the status [#8](https://github.com/adobe/aquarium-fish/issues/8).
 
 ## Development
 

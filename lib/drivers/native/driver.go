@@ -26,6 +26,21 @@ import (
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
+// Implements drivers.ResourceDriverFactory interface
+type Factory struct{}
+
+func (f *Factory) Name() string {
+	return "native"
+}
+
+func (f *Factory) NewResourceDriver() drivers.ResourceDriver {
+	return &Driver{}
+}
+
+func init() {
+	drivers.FactoryList = append(drivers.FactoryList, &Factory{})
+}
+
 // Implements drivers.ResourceDriver interface
 type Driver struct {
 	cfg Config
@@ -39,10 +54,6 @@ type Driver struct {
 // Is used to provide some data to the entry/metadata values which could contain templates
 type EnvData struct {
 	Disks map[string]string // Map with disk_name = mount_path
-}
-
-func init() {
-	drivers.DriversList = append(drivers.DriversList, &Driver{})
 }
 
 func (d *Driver) Name() string {

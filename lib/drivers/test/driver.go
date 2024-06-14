@@ -27,15 +27,26 @@ import (
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
+// Implements drivers.ResourceDriverFactory interface
+type Factory struct{}
+
+func (f *Factory) Name() string {
+	return "test"
+}
+
+func (f *Factory) NewResourceDriver() drivers.ResourceDriver {
+	return &Driver{}
+}
+
+func init() {
+	drivers.FactoryList = append(drivers.FactoryList, &Factory{})
+}
+
 // Implements drivers.ResourceDriver interface
 type Driver struct {
 	cfg Config
 	// Contains the available tasks of the driver
 	tasks_list []drivers.ResourceDriverTask
-}
-
-func init() {
-	drivers.DriversList = append(drivers.DriversList, &Driver{})
 }
 
 func (d *Driver) Name() string {

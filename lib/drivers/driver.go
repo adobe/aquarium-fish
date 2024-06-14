@@ -21,7 +21,16 @@ const (
 	StatusAllocated = "ALLOCATED"
 )
 
-var DriversList []ResourceDriver
+var FactoryList []ResourceDriverFactory
+
+// Factory allows to generate new instances of the drivers
+type ResourceDriverFactory interface {
+	// Name of the driver
+	Name() string
+
+	// Generates new resource driver
+	NewResourceDriver() ResourceDriver
+}
 
 type ResourceDriver interface {
 	// Name of the driver

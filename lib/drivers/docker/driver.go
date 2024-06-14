@@ -30,6 +30,21 @@ import (
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
+// Implements drivers.ResourceDriverFactory interface
+type Factory struct{}
+
+func (f *Factory) Name() string {
+	return "docker"
+}
+
+func (f *Factory) NewResourceDriver() drivers.ResourceDriver {
+	return &Driver{}
+}
+
+func init() {
+	drivers.FactoryList = append(drivers.FactoryList, &Factory{})
+}
+
 // Implements drivers.ResourceDriver interface
 type Driver struct {
 	cfg Config
@@ -41,10 +56,6 @@ type Driver struct {
 
 	docker_usage_mutex sync.Mutex
 	docker_usage       types.Resources // Used when the docker is remote
-}
-
-func init() {
-	drivers.DriversList = append(drivers.DriversList, &Driver{})
 }
 
 func (d *Driver) Name() string {

@@ -30,6 +30,21 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
+// Implements drivers.ResourceDriverFactory interface
+type Factory struct{}
+
+func (f *Factory) Name() string {
+	return "vmx"
+}
+
+func (f *Factory) NewResourceDriver() drivers.ResourceDriver {
+	return &Driver{}
+}
+
+func init() {
+	drivers.FactoryList = append(drivers.FactoryList, &Factory{})
+}
+
 // Implements drivers.ResourceDriver interface
 type Driver struct {
 	cfg Config
@@ -38,10 +53,6 @@ type Driver struct {
 
 	total_cpu uint // In logical threads
 	total_ram uint // In RAM GB
-}
-
-func init() {
-	drivers.DriversList = append(drivers.DriversList, &Driver{})
 }
 
 func (d *Driver) Name() string {
