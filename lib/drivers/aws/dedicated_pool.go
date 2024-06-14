@@ -379,8 +379,12 @@ func isMacTooOld(host *ec2_types.Host) bool {
 
 // Check if the host is ready to be released - if it's mac then it should be older then 24h
 func isHostReadyForRelease(host *ec2_types.Host) bool {
-	// Host not used - for sure ready for release (or scrubbing in case of young mac)
+	// Host not used - for sure ready for release
 	if !isHostUsed(host) {
+		// If mac is not old enough - it's not ready for release
+		if isHostMac(host) && !isMacTooOld(host)) {
+			return false
+		}
 		return true
 	}
 
@@ -569,7 +573,7 @@ func (w *dedicatedPoolWorker) releaseDedicatedHosts(ids []string) ([]string, err
 	if len(resp.Unsuccessful) > 0 {
 		failed_info := ""
 		for _, item := range resp.Unsuccessful {
-			failed_info += fmt.Sprintf("- InstanceId: %s\n  Error: %v\n", aws.ToString(item.ResourceId), item.Error)
+			failed_info += fmt.Sprintf("- InstanceId: %s\n  Error: %s %q\n", aws.ToString(item.ResourceId), aws.ToString(item.Error.Code), aws.ToString(item.Error.Message))
 			unsuccessful = append(unsuccessful, aws.ToString(item.ResourceId))
 		}
 
