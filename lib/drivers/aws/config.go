@@ -46,18 +46,33 @@ type DedicatedPoolRecord struct {
 	Zone string `json:"zone"` // Where to allocate the dedicated host (example: "us-west-2c")
 	Max  uint   `json:"max"`  // Maximum dedicated hosts to allocate (they sometimes can handle more than 1 capacity slot)
 
-	// Optimization for the Mac dedicated hosts to send them in [scrubbing process] to save money
-	// (scrubbing is free but takes ~1-2h) when we can't release the host ([24h min limit]). When
-	// this option is set to 0 - no scrubbing is enabled. When it's set - then it's duration to
-	// stay idle and then run and terminate empty instance to trigger scrubbing. Without this delay
-	// the host will have no time to be utilized by the new workload, which is not good from
-	// utilization perspective.
+	// Is a special optimization for the Mac dedicated hosts to send them in [scrubbing process] to
+	// save money when we can't release the host due to Apple's license of [24 hours] min limit.
+	//
+	// Details:
+	//
+	// Apple forces AWS and any of their customers to keep the Mac dedicated hosts allocated for at
+	// least [24 hours]. So after allocation you have no way to release the dedicated host even if
+	// you don't need it. This makes the mac hosts very pricey for any kind of dynamic allocation.
+	// In order to workaround this issue - Aquarium implements optimization to keep the Mac hosts
+	// busy with [scrubbing process], which is triggered after the instance stop or termination and
+	// puts Mac host in pending state for 1-2hr. That's the downside of optimization, because you
+	// not be able to use the machine until it will become available again.
+	//
+	// That's why this ScrubbingDelay config exists - we need to give Mac host some time to give
+	// the workload a chance to utilize the host. If it will not be utilized in this duration - the
+	// manager will start the scrubbing process. When the host become old enough - the manager will
+	// release it to clean up space for new fresh mac in the roster.
+	//
+	// * When this option is unset or 0 - no optimization is enabled.
+	// * When it's set - then it's a duration to stay idle and then allocate and terminate empty
+	// instance to trigger scrubbing.
 	//
 	// Current implementation is attached to state update, which could be API consuming, so this
 	// duration should be >= 1 min, otherwise API requests will be too often.
 	//
+	// [24 hours]: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-mac-instances.html#mac-instance-considerations
 	// [scrubbing process]: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/mac-instance-stop.html
-	// [24h min limit]: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-mac-instances.html#mac-instance-considerations
 	ScrubbingDelay util.Duration `json:"scrubbing_delay"`
 }
 
