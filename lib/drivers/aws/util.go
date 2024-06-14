@@ -37,6 +37,11 @@ func (d *Driver) newEC2Conn() *ec2.Client {
 				Source:          "fish-cfg",
 			}, nil
 		}),
+
+		// Using retries in order to handle the transient errors:
+		// https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/retry-backoff.html
+		RetryMaxAttempts: 5,
+		RetryMode:        aws.RetryModeStandard,
 	})
 }
 
@@ -50,6 +55,11 @@ func (d *Driver) newKMSConn() *kms.Client {
 				Source:          "fish-cfg",
 			}, nil
 		}),
+
+		// Using retries in order to handle the transient errors:
+		// https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/retry-backoff.html
+		RetryMaxAttempts: 5,
+		RetryMode:        aws.RetryModeStandard,
 	})
 }
 
@@ -63,6 +73,11 @@ func (d *Driver) newServiceQuotasConn() *servicequotas.Client {
 				Source:          "fish-cfg",
 			}, nil
 		}),
+
+		// Using retries in order to handle the transient errors:
+		// https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/retry-backoff.html
+		RetryMaxAttempts: 5,
+		RetryMode:        aws.RetryModeStandard,
 	})
 }
 

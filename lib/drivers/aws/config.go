@@ -110,6 +110,11 @@ func (c *Config) Validate() (err error) {
 				Source:          "fish-cfg",
 			}, nil
 		}),
+
+		// Using retries in order to handle the transient errors:
+		// https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/retry-backoff.html
+		RetryMaxAttempts: 3,
+		RetryMode:        aws.RetryModeStandard,
 	})
 	input := &sts.GetCallerIdentityInput{}
 
