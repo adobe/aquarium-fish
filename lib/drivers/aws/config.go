@@ -22,6 +22,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 
 	"github.com/adobe/aquarium-fish/lib/log"
+	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 type Config struct {
@@ -32,6 +33,47 @@ type Config struct {
 	// Optional
 	AccountIDs   []string          `json:"account_ids"`   // AWS Trusted account IDs to filter vpc, subnet, sg, images, snapshots...
 	InstanceTags map[string]string `json:"instance_tags"` // AWS Instance tags to use when this node provision them
+
+	// Manage the AWS dedicated hosts to keep them busy and deallocate when not needed
+	// Key of the map is name of the pool - will be used for identification of the pool
+	DedicatedPool map[string]DedicatedPoolRecord `json:"dedicated_pool"`
+}
+
+// Stores the configuration of AWS dedicated pool of particular type to manage
+// aws ec2 allocate-hosts --availability-zone "us-west-2c" --auto-placement "on" --host-recovery "off" --host-maintenance "off" --quantity 1 --instance-type "mac2.metal"
+type DedicatedPoolRecord struct {
+	Type string `json:"type"` // Instance type handled by the dedicated hosts pool (example: "mac2.metal")
+	Zone string `json:"zone"` // Where to allocate the dedicated host (example: "us-west-2c")
+	Max  uint   `json:"max"`  // Maximum dedicated hosts to allocate (they sometimes can handle more than 1 capacity slot)
+
+	// Is a special optimization for the Mac dedicated hosts to send them in [scrubbing process] to
+	// save money when we can't release the host due to Apple's license of [24 hours] min limit.
+	//
+	// Details:
+	//
+	// Apple forces AWS and any of their customers to keep the Mac dedicated hosts allocated for at
+	// least [24 hours]. So after allocation you have no way to release the dedicated host even if
+	// you don't need it. This makes the mac hosts very pricey for any kind of dynamic allocation.
+	// In order to workaround this issue - Aquarium implements optimization to keep the Mac hosts
+	// busy with [scrubbing process], which is triggered after the instance stop or termination and
+	// puts Mac host in pending state for 1-2hr. That's the downside of optimization, because you
+	// not be able to use the machine until it will become available again.
+	//
+	// That's why this ScrubbingDelay config exists - we need to give Mac host some time to give
+	// the workload a chance to utilize the host. If it will not be utilized in this duration - the
+	// manager will start the scrubbing process. When the host become old enough - the manager will
+	// release it to clean up space for new fresh mac in the roster.
+	//
+	// * When this option is unset or 0 - no optimization is enabled.
+	// * When it's set - then it's a duration to stay idle and then allocate and terminate empty
+	// instance to trigger scrubbing.
+	//
+	// Current implementation is attached to state update, which could be API consuming, so this
+	// duration should be >= 1 min, otherwise API requests will be too often.
+	//
+	// [24 hours]: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-mac-instances.html#mac-instance-considerations
+	// [scrubbing process]: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/mac-instance-stop.html
+	ScrubbingDelay util.Duration `json:"scrubbing_delay"`
 }
 
 func (c *Config) Apply(config []byte) error {
@@ -68,6 +110,11 @@ func (c *Config) Validate() (err error) {
 				Source:          "fish-cfg",
 			}, nil
 		}),
+
+		// Using retries in order to handle the transient errors:
+		// https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/retry-backoff.html
+		RetryMaxAttempts: 3,
+		RetryMode:        aws.RetryModeStandard,
 	})
 	input := &sts.GetCallerIdentityInput{}
 
@@ -98,6 +145,21 @@ func (c *Config) Validate() (err error) {
 	} else {
 		c.AccountIDs = []string{account}
 		log.Debug("AWS: Using Account IDs:", c.AccountIDs)
+	}
+
+	// Init empty instance tags in case its not set
+	if c.InstanceTags == nil {
+		c.InstanceTags = make(map[string]string)
+	}
+	// Init empty dedicated pool in case its not set
+	if c.DedicatedPool == nil {
+		c.DedicatedPool = make(map[string]DedicatedPoolRecord)
+	}
+	// Make sure the ScrubbingDelay either unset or >= 1min or we will face often update API reqs
+	for name, pool := range c.DedicatedPool {
+		if pool.ScrubbingDelay > 0 && time.Duration(pool.ScrubbingDelay) < 1*time.Minute {
+			return fmt.Errorf("AWS: Scrubbing delay of pool %q is less then 1 minute: %v", name, pool.ScrubbingDelay)
+		}
 	}
 
 	return nil
