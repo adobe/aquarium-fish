@@ -29,7 +29,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi"
-	"github.com/adobe/aquarium-fish/lib/proxy"
+	"github.com/adobe/aquarium-fish/lib/proxy_socks"
 )
 
 func main() {
@@ -125,7 +125,7 @@ func main() {
 			}
 
 			log.Info("Fish starting socks5 proxy...")
-			err = proxy.Init(fish, cfg.ProxyAddress)
+			err = proxy_socks.Init(fish, cfg.ProxyAddress)
 			if err != nil {
 				return err
 			}
