@@ -223,8 +223,11 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 	}
 
 	log.Info("VMX: Allocate of VM completed:", vmx_path)
-
-	return &types.Resource{Identifier: vmx_path, HwAddr: vm_hwaddr}, nil
+	return &types.Resource{
+		Identifier:     vmx_path,
+		HwAddr:         vm_hwaddr,
+		Authentication: def.Authentication,
+	}, nil
 }
 
 func (d *Driver) Status(res *types.Resource) (string, error) {

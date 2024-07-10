@@ -24,10 +24,11 @@ import (
 type Config struct {
 	Directory string `json:"directory"` // Where to store database and other useful data (if relative - to CWD)
 
-	APIAddress   string   `json:"api_address"`   // Where to serve Web UI, API & Meta API
-	ProxyAddress string   `json:"proxy_address"` // Where to serve SOCKS5 proxy for the allocated resources
-	NodeAddress  string   `json:"node_address"`  // What is the external address of the node
-	ClusterJoin  []string `json:"cluster_join"`  // The node addresses to join the cluster
+	APIAddress        string   `json:"api_address"`         // Where to serve Web UI, API & Meta API
+	ProxySocksAddress string   `json:"proxy_socks_address"` // Where to serve SOCKS5 proxy for the allocated resources
+	ProxySshAddress   string   `json:"proxy_ssh_address"`   // Where to serve SSH proxy for the allocated resources
+	NodeAddress       string   `json:"node_address"`        // What is the external address of the node
+	ClusterJoin       []string `json:"cluster_join"`        // The node addresses to join the cluster
 
 	TLSKey   string `json:"tls_key"`    // TLS PEM private key (if relative - to directory)
 	TLSCrt   string `json:"tls_crt"`    // TLS PEM public certificate (if relative - to directory)
@@ -83,7 +84,8 @@ func (c *Config) ReadConfigFile(cfg_path string) error {
 func (c *Config) initDefaults() {
 	c.Directory = "fish_data"
 	c.APIAddress = "0.0.0.0:8001"
-	c.ProxyAddress = "0.0.0.0:1080"
+	c.ProxySocksAddress = "0.0.0.0:1080"
+	c.ProxySshAddress = "0.0.0.0:2022"
 	c.NodeAddress = "127.0.0.1:8001"
 	c.TLSKey = "" // Will be set after read config file from NodeName
 	c.TLSCrt = "" // ...

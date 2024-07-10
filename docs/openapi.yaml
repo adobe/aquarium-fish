@@ -318,6 +318,35 @@ paths:
       security:
         - basic_auth: []
 
+  /api/v1/resource/{uid}/access:
+    get:
+      summary: Get SSH access credentials by Resource UID
+      description: Display any known SSH access information for the Resource
+      operationId: ResourceAccessPut
+      tags:
+        - ResourceAccess
+      parameters:
+        - name: uid
+          in: path
+          description: UID of the object
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceAccess'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Resource not found
+      security:
+        - basic_auth: []
+
   /api/v1/application/:
     get:
       summary: Get list of Applications
@@ -1267,6 +1296,9 @@ components:
         options:
           x-go-type: util.UnparsedJson
           description: Driver-specific options to execute the environment
+        authentication:
+          $ref: '#/components/schemas/Authentication'
+          description: Authentication information to connect.
     Label:
       type: object
       description: >
@@ -1569,6 +1601,66 @@ components:
             JENKINS_AGENT_SECRET: 03839eabcf945b1e780be8f9488d264c4c57bf388546da9a84588345555f29b0
             JENKINS_AGENT_NAME: test-node
             JENKINS_AGENT_WORKSPACE: /Volumes/xcode122
+        authentication:
+          $ref: '#/components/schemas/Authentication'
+          description: Authentication information to connect.
+
+    ResourceAccessUID:
+      type: string
+      format: uuid
+      x-oapi-codegen-extra-tags:
+        gorm: primaryKey
+    ResourceAccess:
+      type: object
+      description: >
+        An accessor entry to be able to identify and look up different
+        (currently running) resources.
+
+        Used to enable SSH pass-through.
+      required:
+        - UID
+        - created_at
+        - resource_UID
+        - username
+        - password
+      properties:
+        UID:
+          $ref: '#/components/schemas/ResourceAccessUID'
+          x-oapi-codegen-extra-tags:
+            gorm: primaryKey
+        created_at:
+          x-go-type: time.Time
+        resource_UID:
+          # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/ResourceAccessUID'
+          type: string
+          format: uuid
+          x-oapi-codegen-extra-tags:
+            yaml: resource_UID
+        username:
+          type: string
+          description: |
+            The username to use when logging into the fish node.
+        password:
+          type: string
+          description: >
+            The password to use when logging into the fish node.
+
+    Authentication:
+      type: object
+      description: >
+        Authentication information to enable connecting to the machine.
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          description: |
+            The username to use when logging into Resource.
+        password:
+          type: string
+          description: >
+            The password to use when loggin into the Resource.
 
     VoteUID:
       type: string
