@@ -53,8 +53,10 @@ import (
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
+// NOTE: this init function and logging information exist to satisfy binary
+// redistribution of the code in this file.  Do not remove this.
 func init() {
-	log.Info("The Fish SSH proxy is a re-implementation of Remco Verhoef's via MIT licensed https://github.com/dutchcoders/sshproxy")
+	log.Info("The Fish SSH proxy is a re-implementation of Remco Verhoef's MIT licensed example (https://github.com/dutchcoders/sshproxy)")
 }
 
 type ProxyAccess struct {
