@@ -136,7 +136,11 @@ func main() {
 			}
 
 			log.Info("Fish starting ssh proxy...")
-			err = proxy_ssh.Init(fish, cfg.ProxySshAddress)
+			id_rsa_path := cfg.NodeSSHKey
+			if !filepath.IsAbs(id_rsa_path) {
+				id_rsa_path = filepath.Join(cfg.Directory, id_rsa_path)
+			}
+			err = proxy_ssh.Init(fish, id_rsa_path, cfg.ProxySshAddress)
 			if err != nil {
 				return err
 			}

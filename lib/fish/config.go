@@ -38,6 +38,8 @@ type Config struct {
 	NodeLocation    string   `json:"node_location"`    // Specify cluster node location for multi-dc configurations
 	NodeIdentifiers []string `json:"node_identifiers"` // The list of node identifiers which could be used to find the right Node for Resource
 
+	NodeSSHKey string `json:"ssh_key"` // The SSH RSA identity private key for the fish node (if relative - to directory)
+
 	DefaultResourceLifetime string `json:"default_resource_lifetime"` // Sets the lifetime of the resource which will be used if label definition one is not set
 
 	// Configuration for the node drivers, if defined - only the listed plugins will be loaded
@@ -71,6 +73,10 @@ func (c *Config) ReadConfigFile(cfg_path string) error {
 	}
 	if c.TLSCrt == "" {
 		c.TLSCrt = c.NodeName + ".crt"
+	}
+
+	if c.NodeSSHKey == "" {
+		c.NodeSSHKey = c.NodeName + "_id_rsa"
 	}
 
 	_, err := time.ParseDuration(c.DefaultResourceLifetime)

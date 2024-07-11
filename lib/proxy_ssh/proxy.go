@@ -36,6 +36,10 @@
 package proxy_ssh
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"net"
@@ -254,18 +258,54 @@ func (p *ProxyAccess) passwordCallback(conn ssh.ConnMetadata, pass []byte) (*ssh
 	return nil, fmt.Errorf("invalid access")
 }
 
-func Init(fish *fish.Fish, address string) error {
-	// TODO: cannot find a way to _not_ do this.
-	// TODO: ref cmd, we do not need to add config entry
-	// ref: https://gist.github.com/devinodaniel/8f9b8a4f31573f428f29ec0e884e6673
-	privateBytes, err := os.ReadFile("id_rsa")
+func Init(fish *fish.Fish, id_rsa_path string, address string) error {
+	// First, try and read the file if it exists already.  Otherwise, it is the
+	// first execution, generate the private / public keys.  The SSH server
+	// requires at least one identity loaded to run.
+	privateBytes, err := os.ReadFile(id_rsa_path)
 	if err != nil {
-		return fmt.Errorf("proxy_ssh: failed to load private key: %v", err)
+		// If it cannot be loaded, this is the first execution, generate it.
+		log.Infof("SSH Proxy: could not load %q, generating now.", id_rsa_path)
+		rsaKey, err := rsa.GenerateKey(rand.Reader, 4096)
+		if err != nil {
+			return fmt.Errorf("proxy_ssh: could not generate private key %q: %w", id_rsa_path, err)
+		}
+		pemKey := pem.EncodeToMemory(
+			&pem.Block{
+				Type:  "RSA PRIVATE KEY",
+				Bytes: x509.MarshalPKCS1PrivateKey(rsaKey),
+			},
+		)
+		// The public key isn't really needed for anything currently, however
+		// generating the public counterpart may as well be done now.
+		pubKey := pem.EncodeToMemory(
+			&pem.Block{
+				Type:  "RSA PUBLIC KEY",
+				Bytes: x509.MarshalPKCS1PublicKey(&rsaKey.PublicKey),
+			},
+		)
+		// Write out the files and load the newly generated key into
+		// `privateBytes` again.
+		if err := os.WriteFile(id_rsa_path, pemKey, 0600); err != nil {
+			return fmt.Errorf("proxy_ssh: could not write %q: %w", id_rsa_path, err)
+		}
+		pub_id_rsa_path := id_rsa_path + ".pub"
+		if err := os.WriteFile(pub_id_rsa_path, pubKey, 0644); err != nil {
+			return fmt.Errorf("proxy_ssh: could not write %q: %w", pub_id_rsa_path, err)
+		}
+		privateBytes, err = os.ReadFile(id_rsa_path)
+		if err != nil {
+			return fmt.Errorf(
+				"proxy_ssh: failed to load private key %q after generating: %w",
+				id_rsa_path,
+				err,
+			)
+		}
 	}
 
 	private, err := ssh.ParsePrivateKey(privateBytes)
 	if err != nil {
-		return fmt.Errorf("proxy_ssh: failed to parse private key: %v", err)
+		return fmt.Errorf("proxy_ssh: failed to parse private key: %w", err)
 	}
 
 	ssh_proxy := ProxyAccess{fish: fish}
