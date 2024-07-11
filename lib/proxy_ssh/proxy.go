@@ -278,22 +278,9 @@ func Init(fish *fish.Fish, id_rsa_path string, address string) error {
 				Bytes: x509.MarshalPKCS1PrivateKey(rsaKey),
 			},
 		)
-		// The public key isn't really needed for anything currently, however
-		// generating the public counterpart may as well be done now.
-		pubKey := pem.EncodeToMemory(
-			&pem.Block{
-				Type:  "RSA PUBLIC KEY",
-				Bytes: x509.MarshalPKCS1PublicKey(&rsaKey.PublicKey),
-			},
-		)
-		// Write out the files and load the newly generated key into
-		// `privateBytes` again.
+		// Write out the new key file and load into `privateBytes` again.
 		if err := os.WriteFile(id_rsa_path, pemKey, 0600); err != nil {
 			return fmt.Errorf("proxy_ssh: could not write %q: %w", id_rsa_path, err)
-		}
-		pub_id_rsa_path := id_rsa_path + ".pub"
-		if err := os.WriteFile(pub_id_rsa_path, pubKey, 0644); err != nil {
-			return fmt.Errorf("proxy_ssh: could not write %q: %w", pub_id_rsa_path, err)
 		}
 		privateBytes, err = os.ReadFile(id_rsa_path)
 		if err != nil {
