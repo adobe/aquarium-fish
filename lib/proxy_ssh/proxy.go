@@ -203,8 +203,6 @@ func (p *ProxyAccess) serveConnection(conn net.Conn, serverConfig *ssh.ServerCon
 	return nil
 }
 
-// NOTE: we assume that the `listener` has already been opened and can be used
-// to `Accept()` new connections.
 func (p *ProxyAccess) listenAndServe(address string) error {
 	// Create the listener and let it wait for new connections in a separate
 	// goroutine.
