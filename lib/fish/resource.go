@@ -69,6 +69,12 @@ func (f *Fish) ResourceCreate(r *types.Resource) error {
 }
 
 func (f *Fish) ResourceDelete(uid types.ResourceUID) error {
+	// First delete any references to this resource.
+	err := f.ResourceAccessDeleteByResource(uid)
+	if err != nil {
+		log.Errorf("Unable to delete ResourceAccess associated with Resource UID=%v: %v", uid, err)
+	}
+	// Now purge the resource.
 	return f.db.Delete(&types.Resource{}, uid).Error
 }
 

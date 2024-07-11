@@ -29,14 +29,16 @@ import (
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi"
-	"github.com/adobe/aquarium-fish/lib/proxy"
+	"github.com/adobe/aquarium-fish/lib/proxy_socks"
+	"github.com/adobe/aquarium-fish/lib/proxy_ssh"
 )
 
 func main() {
 	log.Infof("Aquarium Fish %s (%s)", build.Version, build.Time)
 
 	var api_address string
-	var proxy_address string
+	var proxy_socks_address string
+	var proxy_ssh_address string
 	var node_address string
 	var cluster_join *[]string
 	var cfg_path string
@@ -65,8 +67,11 @@ func main() {
 			if api_address != "" {
 				cfg.APIAddress = api_address
 			}
-			if proxy_address != "" {
-				cfg.ProxyAddress = proxy_address
+			if proxy_socks_address != "" {
+				cfg.ProxySocksAddress = proxy_socks_address
+			}
+			if proxy_ssh_address != "" {
+				cfg.ProxySshAddress = proxy_ssh_address
 			}
 			if node_address != "" {
 				cfg.NodeAddress = node_address
@@ -125,7 +130,17 @@ func main() {
 			}
 
 			log.Info("Fish starting socks5 proxy...")
-			err = proxy.Init(fish, cfg.ProxyAddress)
+			err = proxy_socks.Init(fish, cfg.ProxySocksAddress)
+			if err != nil {
+				return err
+			}
+
+			log.Info("Fish starting ssh proxy...")
+			id_rsa_path := cfg.NodeSSHKey
+			if !filepath.IsAbs(id_rsa_path) {
+				id_rsa_path = filepath.Join(cfg.Directory, id_rsa_path)
+			}
+			err = proxy_ssh.Init(fish, id_rsa_path, cfg.ProxySshAddress)
 			if err != nil {
 				return err
 			}
@@ -166,7 +181,8 @@ func main() {
 
 	flags := cmd.Flags()
 	flags.StringVarP(&api_address, "api", "a", "", "address used to expose the fish API")
-	flags.StringVarP(&proxy_address, "proxy", "p", "", "address used to expose the SOCKS5 proxy")
+	flags.StringVar(&proxy_socks_address, "socks_proxy", "", "address used to expose the SOCKS5 proxy")
+	flags.StringVar(&proxy_ssh_address, "ssh_proxy", "", "address used to expose the SSH proxy")
 	flags.StringVarP(&node_address, "node", "n", "", "node external endpoint to connect to tell the other nodes")
 	cluster_join = flags.StringSliceP("join", "j", nil, "addresses of existing cluster nodes to join, comma separated")
 	flags.StringVarP(&cfg_path, "cfg", "c", "", "yaml configuration file")

@@ -22,6 +22,7 @@ import (
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
 
+	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
@@ -175,6 +176,26 @@ func (e *Processor) ResourceGet(c echo.Context, uid types.ResourceUID) error {
 	}
 
 	return c.JSON(http.StatusOK, out)
+}
+
+func (e *Processor) ResourceAccessPut(c echo.Context, uid types.ResourceUID) error {
+	// NOTE: `user` is already defined / non-nil.
+	user := c.Get("user")
+
+	resource, err := e.fish.ResourceGet(uid)
+	if err != nil {
+		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Resource not found: %v", err)})
+		return fmt.Errorf("Resource not found: %w", err)
+	}
+
+	r_access := types.ResourceAccess{
+		ResourceUID: resource.UID,
+		Username:    user.(*types.User).Name,
+		Password:    crypt.RandString(64),
+	}
+	e.fish.ResourceAccessCreate(&r_access)
+
+	return c.JSON(http.StatusOK, r_access)
 }
 
 func (e *Processor) ApplicationListGet(c echo.Context, params types.ApplicationListGetParams) error {

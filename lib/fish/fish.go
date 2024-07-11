@@ -92,6 +92,7 @@ func (f *Fish) Init() error {
 		&types.ApplicationState{},
 		&types.ApplicationTask{},
 		&types.Resource{},
+		&types.ResourceAccess{},
 		&types.Vote{},
 		&types.Location{},
 		&types.ServiceMapping{},
@@ -616,6 +617,7 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 				res.IpAddr = drv_res.IpAddr
 				res.LabelUID = label.UID
 				res.DefinitionIndex = vote.Available
+				res.Authentication = drv_res.Authentication
 				err := f.ResourceCreate(res)
 				if err != nil {
 					log.Error("Fish: Unable to store Resource for Application:", app.UID, err)

@@ -8,6 +8,7 @@ output-options:
     - Location
     - Node
     - Resource
+    - ResourceAccess
     - ServiceMapping
     - User
 generate:
