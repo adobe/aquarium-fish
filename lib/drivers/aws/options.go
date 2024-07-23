@@ -29,7 +29,7 @@ import (
  *     somekey: somevalue
  */
 type Options struct {
-	Image         string            `json:"image"`          // ID/Name of the image to use
+	Image         string            `json:"image"`          // ID/Name of the image you want to use (name that contains * is usually a bad idea for reproducibility)
 	InstanceType  string            `json:"instance_type"`  // Type of the instance from aws available list
 	SecurityGroup string            `json:"security_group"` // ID/Name of the security group to use for the instance
 	Tags          map[string]string `json:"tags"`           // Tags to add during instance creation
@@ -38,6 +38,10 @@ type Options struct {
 
 	UserDataFormat string `json:"userdata_format"` // If not empty - will store the resource metadata to userdata in defined format
 	UserDataPrefix string `json:"userdata_prefix"` // Optional if need to add custom prefix to the metadata key during formatting
+
+	// TaskImage options
+	TaskImageName       string `json:"task_image_name"`        // Create new image with defined name + "-DATE.TIME" suffix
+	TaskImageEncryptKey string `json:"task_image_encrypt_key"` // KMS Key ID or Alias in format "alias/<name>" if need to re-encrypt the newly created AMI snapshots
 }
 
 func (o *Options) Apply(options util.UnparsedJson) error {

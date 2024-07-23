@@ -679,7 +679,7 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 			// Execute the existing ApplicationTasks. It will be executed during ALLOCATED or prior
 			// to executing deallocation by DEALLOCATE & RECALLED which right now is useful for
 			// `snapshot` tasks.
-			f.executeApplicationTasks(driver, res, app_state.Status)
+			f.executeApplicationTasks(driver, &label_def, res, app_state.Status)
 
 			if app_state.Status == types.ApplicationStatusDEALLOCATE || app_state.Status == types.ApplicationStatusRECALLED {
 				log.Info("Fish: Running Deallocate of the Application:", app.UID)
@@ -732,7 +732,7 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 	return nil
 }
 
-func (f *Fish) executeApplicationTasks(drv drivers.ResourceDriver, res *types.Resource, app_status types.ApplicationStatus) error {
+func (f *Fish) executeApplicationTasks(drv drivers.ResourceDriver, def *types.LabelDefinition, res *types.Resource, app_status types.ApplicationStatus) error {
 	// Execute the associated ApplicationTasks if there is some
 	tasks, err := f.ApplicationTaskListByApplicationAndWhen(res.ApplicationUID, app_status)
 	if err != nil {
@@ -749,7 +749,7 @@ func (f *Fish) executeApplicationTasks(drv drivers.ResourceDriver, res *types.Re
 			task.Result = util.UnparsedJson(`{"error":"task not availble in driver"}`)
 		} else {
 			// Executing the task
-			t.SetInfo(&task, res)
+			t.SetInfo(&task, def, res)
 			result, err := t.Execute()
 			if err != nil {
 				// We're not crashing here because even with error task could have a result
