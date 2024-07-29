@@ -23,6 +23,28 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
 
+  OpenAPI:
+    runs-on: ubuntu-latest
+    name: Swagger Editor Validator Service
+
+    # Service containers to run with `runner-job`
+    services:
+      # Label used to access the service container
+      swagger-editor:
+        # Docker Hub image
+        image: swaggerapi/swagger-editor
+        ports:
+          # Maps port 8080 on service container to the host 80
+          - 80:8080
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Validate OpenAPI definition
+        uses: swaggerexpert/swagger-editor-validate@452076dc45d5d1f09dd55440c9bffc372de4da25  # Jul 29, 2024
+        with:
+          swagger-editor-url: http://localhost/
+          definition-file: docs/openapi.yaml
+
   Build:
     runs-on: ubuntu-latest
     steps:
@@ -46,7 +68,7 @@ jobs:
 
       - name: Test
         run: |
-          go install github.com/jstemmer/go-junit-report/v2@latest
+          go install github.com/jstemmer/go-junit-report/v2@85bf471  # Oct 18, 2023
           name="$(ls aquarium-fish-*.linux_amd64)"
           FISH_PATH="$PWD/$name" go test -v -failfast -parallel 4 -count=1 ./tests/... 2>&1 | go-junit-report -iocopy -set-exit-code -out report.xml
 

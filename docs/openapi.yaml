@@ -745,7 +745,7 @@ paths:
         - name: handler
           in: path
           description: Which pprof handler to use. If empty - will show index
-          required: false
+          required: true
           schema:
             type: string
       responses:
