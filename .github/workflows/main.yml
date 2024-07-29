@@ -8,6 +8,7 @@ on:
 
 jobs:
   CodeQL:
+    name: CodeQL validation
     runs-on: ubuntu-latest
     permissions:
       security-events: write
@@ -25,7 +26,7 @@ jobs:
 
   OpenAPI:
     runs-on: ubuntu-latest
-    name: Swagger Editor Validator Service
+    name: OpenAPI validation
 
     # Service containers to run with `runner-job`
     services:
