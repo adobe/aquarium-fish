@@ -247,7 +247,7 @@ paths:
         - name: uid
           in: path
           description: UID of the Label
-          required: false
+          required: true
           schema:
             type: string
             format: uuid
