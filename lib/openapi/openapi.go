@@ -28,9 +28,9 @@ import (
 	"strings"
 	"time"
 
-	//oapimw "github.com/deepmap/oapi-codegen/pkg/middleware"
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
+	_ "github.com/oapi-codegen/oapi-codegen/v2/pkg/util"
 	"gopkg.in/yaml.v3"
 
 	"github.com/adobe/aquarium-fish/lib/cluster"

@@ -433,19 +433,21 @@ func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 
 	// Verify node filters because some workload can't be running on all the physical nodes
 	// The node becomes fitting only when all the needed node filter patterns are matched
-	needed_idents := def.Resources.NodeFilter
-	current_idents := f.cfg.NodeIdentifiers
-	for _, needed := range needed_idents {
-		found := false
-		for _, value := range current_idents {
-			// We're validating the pattern on error during label creation, so they should be ok
-			if found, _ = path.Match(needed, value); found {
-				break
+	if def.Resources.NodeFilter != nil && len(def.Resources.NodeFilter) > 0 {
+		needed_idents := def.Resources.NodeFilter
+		current_idents := f.cfg.NodeIdentifiers
+		for _, needed := range needed_idents {
+			found := false
+			for _, value := range current_idents {
+				// We're validating the pattern on error during label creation, so they should be ok
+				if found, _ = path.Match(needed, value); found {
+					break
+				}
 			}
-		}
-		if !found {
-			// One of the required node identifiers did not matched the node ones
-			return false
+			if !found {
+				// One of the required node identifiers did not matched the node ones
+				return false
+			}
 		}
 	}
 	// Here all the node filters matched the node identifiers
