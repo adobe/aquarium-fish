@@ -564,6 +564,35 @@ paths:
       security:
         - basic_auth: []
 
+  /api/v1/task/{task_uid}:
+    get:
+      summary: Get ApplicationTask data
+      description: Returns the Application Task
+      operationId: ApplicationTaskGet
+      tags:
+        - Application
+      parameters:
+        - name: task_uid
+          in: path
+          description: UID of the Task
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationTask'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: ApplicationTask not found
+      security:
+        - basic_auth: []
+
   /api/v1/application/{uid}/deallocate:
     get:
       summary: Triggers Application deallocate

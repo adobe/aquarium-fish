@@ -356,6 +356,29 @@ func (e *Processor) ApplicationTaskCreatePost(c echo.Context, app_uid types.Appl
 	return c.JSON(http.StatusOK, data)
 }
 
+func (e *Processor) ApplicationTaskGet(c echo.Context, task_uid types.ApplicationTaskUID) error {
+	task, err := e.fish.ApplicationTaskGet(task_uid)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", task_uid)})
+		return fmt.Errorf("Unable to find the ApplicationTask: %s, %w", task_uid, err)
+	}
+
+	app, err := e.fish.ApplicationGet(task.ApplicationUID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", task.ApplicationUID)})
+		return fmt.Errorf("Unable to find the Application: %s, %w", task.ApplicationUID, err)
+	}
+
+	// Only the owner of the application (or admin) could get the attached task
+	user := c.Get("user")
+	if app.OwnerName != user.(*types.User).Name && user.(*types.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner of Application & admin can get the ApplicationTask")})
+		return fmt.Errorf("Only the owner of Application & admin can get the ApplicationTask")
+	}
+
+	return c.JSON(http.StatusOK, task)
+}
+
 func (e *Processor) ApplicationDeallocateGet(c echo.Context, uid types.ApplicationUID) error {
 	app, err := e.fish.ApplicationGet(uid)
 	if err != nil {
