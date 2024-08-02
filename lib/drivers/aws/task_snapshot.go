@@ -63,6 +63,7 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 	if t.Resource == nil || t.Resource.Identifier == "" {
 		return []byte(`{"error":"internal: invalid resource"}`), log.Error("AWS: Invalid resource:", t.Resource)
 	}
+	log.Infof("AWS: TaskSnapshot %s: Creating snapshot for Application %s", t.ApplicationTask.UID, t.ApplicationTask.ApplicationUID)
 	conn := t.driver.newEC2Conn()
 
 	if t.ApplicationTask.When == types.ApplicationStatusDEALLOCATE {
@@ -71,6 +72,7 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 			InstanceIds: []string{t.Resource.Identifier},
 		}
 
+		log.Infof("AWS: TaskSnapshot %s: Stopping instance %q...", t.ApplicationTask.UID, t.Resource.Identifier)
 		result, err := conn.StopInstances(context.TODO(), &input)
 		if err != nil {
 			// Do not fail hard here - it's still possible to take snapshot of the instance
@@ -118,6 +120,7 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 		}},
 	}
 
+	log.Debugf("AWS: TaskSnapshot %s: Creating snapshot %q...", t.ApplicationTask.UID)
 	resp, err := conn.CreateSnapshots(context.TODO(), &input)
 	if err != nil {
 		return []byte{}, log.Errorf("AWS: Unable to create snapshots for instance %s: %v", t.Resource.Identifier, err)

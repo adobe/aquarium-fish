@@ -674,7 +674,7 @@ func (d *Driver) deleteImage(conn *ec2.Client, id string) (err error) {
 	if !strings.HasPrefix(id, "ami-") {
 		return fmt.Errorf("AWS: Incorrect AMI id: %s", id)
 	}
-	log.Debug("AWS: Delete the image:", id)
+	log.Debugf("AWS: Deleting the image %s...", id)
 
 	// Look for the image snapshots
 	req := ec2.DescribeImagesInput{
@@ -689,17 +689,21 @@ func (d *Driver) deleteImage(conn *ec2.Client, id string) (err error) {
 	// Deregister the image
 	input := ec2.DeregisterImageInput{ImageId: aws.String(id)}
 	_, err = conn.DeregisterImage(context.TODO(), &input)
+	if err != nil {
+		return fmt.Errorf("AWS: Unable to deregister the image %s %q: %w", id, aws.ToString(resp_img.Images[0].Name), err)
+	}
 
-	// Delete the snapshots
+	// Delete the image snapshots
 	for _, disk := range resp_img.Images[0].BlockDeviceMappings {
-		if disk.Ebs.SnapshotId == nil {
+		if disk.Ebs == nil || disk.Ebs.SnapshotId == nil {
 			continue
 		}
+		log.Debugf("AWS: Deleting the image %s associated snapshot %s", id, aws.ToString(disk.Ebs.SnapshotId))
 		input := ec2.DeleteSnapshotInput{SnapshotId: disk.Ebs.SnapshotId}
 		_, err_tmp := conn.DeleteSnapshot(context.TODO(), &input)
 		if err_tmp != nil {
 			// Do not fail hard to try to delete all the snapshots
-			log.Errorf("AWS: Unable to delete image %q snapshot %s: %w", id, aws.ToString(disk.Ebs.SnapshotId), err)
+			log.Errorf("AWS: Unable to delete image %s %q snapshot %s: %v", id, aws.ToString(resp_img.Images[0].Name), aws.ToString(disk.Ebs.SnapshotId), err)
 			err = err_tmp
 		}
 	}

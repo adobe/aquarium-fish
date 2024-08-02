@@ -648,7 +648,7 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 		resource_timeout := res.CreatedAt.Add(resource_lifetime)
 		if app_state.Status == types.ApplicationStatusALLOCATED {
 			if resource_lifetime > 0 {
-				log.Infof("Fish: Resource %s will be deallocated by timeout in %s (%s)", app.UID, resource_lifetime, resource_timeout)
+				log.Infof("Fish: Resource of Application %s will be deallocated by timeout in %s (%s)", app.UID, resource_lifetime, resource_timeout)
 			} else {
 				log.Warn("Fish: Resource have no lifetime set and will live until deallocated by user:", app.UID)
 			}
@@ -680,7 +680,7 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 
 			// Execute the existing ApplicationTasks. It will be executed during ALLOCATED or prior
 			// to executing deallocation by DEALLOCATE & RECALLED which right now is useful for
-			// `snapshot` tasks.
+			// `snapshot` and `image` tasks.
 			f.executeApplicationTasks(driver, &label_def, res, app_state.Status)
 
 			if app_state.Status == types.ApplicationStatusDEALLOCATE || app_state.Status == types.ApplicationStatusRECALLED {
