@@ -273,7 +273,7 @@ func (t *TaskImage) Execute() (result []byte, err error) {
 		image_id = aws.ToString(resp.ImageId)
 	}
 
-	log.Infof("AWS: Created image for the instance %s: %s", t.Resource.Identifier, image_id)
+	log.Infof("AWS: Created image for the instance %s: %s %q", t.Resource.Identifier, image_id, image_name)
 
-	return json.Marshal(map[string]string{"image": image_id})
+	return json.Marshal(map[string]string{"image": image_id, "image_name": image_name})
 }
