@@ -83,6 +83,7 @@ func (d *Driver) Prepare(config []byte) error {
 	// Fill up the available tasks to execute
 	d.tasks_list = append(d.tasks_list,
 		&TaskSnapshot{driver: d},
+		&TaskImage{driver: d},
 	)
 
 	d.quotas_mutex.Lock()

@@ -29,9 +29,21 @@ func (ld *LabelDefinitions) Scan(value any) error {
 	}
 
 	err := json.Unmarshal(bytes, ld)
+	// Need to make sure the array node filter will not be nil
+	for i, r := range *ld {
+		if r.Resources.NodeFilter == nil {
+			(*ld)[i].Resources.NodeFilter = []string{}
+		}
+	}
 	return err
 }
 
 func (ld LabelDefinitions) Value() (driver.Value, error) {
+	// Need to make sure the array node filter will not be nil
+	for i, r := range ld {
+		if r.Resources.NodeFilter == nil {
+			ld[i].Resources.NodeFilter = []string{}
+		}
+	}
 	return json.Marshal(ld)
 }

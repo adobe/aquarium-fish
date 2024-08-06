@@ -32,10 +32,20 @@ func (r *Resources) Scan(value any) error {
 	}
 
 	err := json.Unmarshal(bytes, r)
+
+	// Init the value, otherwise will return undesired nil
+	if err == nil && r.NodeFilter == nil {
+		r.NodeFilter = []string{}
+	}
+
 	return err
 }
 
 func (r Resources) Value() (driver.Value, error) {
+	// Init the value, otherwise will return undesired nil
+	if r.NodeFilter == nil {
+		r.NodeFilter = []string{}
+	}
 	return json.Marshal(r)
 }
 

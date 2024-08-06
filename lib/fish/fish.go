@@ -433,19 +433,21 @@ func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 
 	// Verify node filters because some workload can't be running on all the physical nodes
 	// The node becomes fitting only when all the needed node filter patterns are matched
-	needed_idents := def.Resources.NodeFilter
-	current_idents := f.cfg.NodeIdentifiers
-	for _, needed := range needed_idents {
-		found := false
-		for _, value := range current_idents {
-			// We're validating the pattern on error during label creation, so they should be ok
-			if found, _ = path.Match(needed, value); found {
-				break
+	if def.Resources.NodeFilter != nil && len(def.Resources.NodeFilter) > 0 {
+		needed_idents := def.Resources.NodeFilter
+		current_idents := f.cfg.NodeIdentifiers
+		for _, needed := range needed_idents {
+			found := false
+			for _, value := range current_idents {
+				// We're validating the pattern on error during label creation, so they should be ok
+				if found, _ = path.Match(needed, value); found {
+					break
+				}
 			}
-		}
-		if !found {
-			// One of the required node identifiers did not matched the node ones
-			return false
+			if !found {
+				// One of the required node identifiers did not matched the node ones
+				return false
+			}
 		}
 	}
 	// Here all the node filters matched the node identifiers
@@ -646,7 +648,7 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 		resource_timeout := res.CreatedAt.Add(resource_lifetime)
 		if app_state.Status == types.ApplicationStatusALLOCATED {
 			if resource_lifetime > 0 {
-				log.Infof("Fish: Resource %s will be deallocated by timeout in %s (%s)", app.UID, resource_lifetime, resource_timeout)
+				log.Infof("Fish: Resource of Application %s will be deallocated by timeout in %s (%s)", app.UID, resource_lifetime, resource_timeout)
 			} else {
 				log.Warn("Fish: Resource have no lifetime set and will live until deallocated by user:", app.UID)
 			}
@@ -678,8 +680,8 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 
 			// Execute the existing ApplicationTasks. It will be executed during ALLOCATED or prior
 			// to executing deallocation by DEALLOCATE & RECALLED which right now is useful for
-			// `snapshot` tasks.
-			f.executeApplicationTasks(driver, res, app_state.Status)
+			// `snapshot` and `image` tasks.
+			f.executeApplicationTasks(driver, &label_def, res, app_state.Status)
 
 			if app_state.Status == types.ApplicationStatusDEALLOCATE || app_state.Status == types.ApplicationStatusRECALLED {
 				log.Info("Fish: Running Deallocate of the Application:", app.UID)
@@ -732,7 +734,7 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 	return nil
 }
 
-func (f *Fish) executeApplicationTasks(drv drivers.ResourceDriver, res *types.Resource, app_status types.ApplicationStatus) error {
+func (f *Fish) executeApplicationTasks(drv drivers.ResourceDriver, def *types.LabelDefinition, res *types.Resource, app_status types.ApplicationStatus) error {
 	// Execute the associated ApplicationTasks if there is some
 	tasks, err := f.ApplicationTaskListByApplicationAndWhen(res.ApplicationUID, app_status)
 	if err != nil {
@@ -749,7 +751,7 @@ func (f *Fish) executeApplicationTasks(drv drivers.ResourceDriver, res *types.Re
 			task.Result = util.UnparsedJson(`{"error":"task not availble in driver"}`)
 		} else {
 			// Executing the task
-			t.SetInfo(&task, res)
+			t.SetInfo(&task, def, res)
 			result, err := t.Execute()
 			if err != nil {
 				// We're not crashing here because even with error task could have a result

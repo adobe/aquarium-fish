@@ -23,10 +23,10 @@ export CGO_ENABLED=0
 echo "--- GENERATE CODE FOR AQUARIUM-FISH ---"
 # Install oapi-codegen if it's not available or version is not the same with go.mod
 gopath=$(go env GOPATH)
-req_ver=$(grep -F 'github.com/deepmap/oapi-codegen' go.mod | cut -d' ' -f 2)
+req_ver=$(grep -F 'github.com/oapi-codegen/oapi-codegen/v2' go.mod | cut -d' ' -f 2)
 curr_ver="$(PATH="$gopath/bin:$PATH" oapi-codegen --version 2>/dev/null | tail -1 || true)"
 if [ "$curr_ver" != "$req_ver" ]; then
-    go install "github.com/deepmap/oapi-codegen/cmd/oapi-codegen@$req_ver"
+    go install "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@$req_ver"
 fi
 # Cleanup the old generated files
 find ./lib -name '*.gen.go' -delete

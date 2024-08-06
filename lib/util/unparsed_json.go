@@ -20,8 +20,8 @@ import (
 
 type UnparsedJson string
 
-func (r *UnparsedJson) MarshalJSON() ([]byte, error) {
-	return []byte(*r), nil
+func (r UnparsedJson) MarshalJSON() ([]byte, error) {
+	return []byte(r), nil
 }
 
 func (r *UnparsedJson) UnmarshalJSON(b []byte) error {

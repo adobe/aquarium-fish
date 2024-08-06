@@ -53,11 +53,16 @@ func SetVerbosity(level string) error {
 func InitLoggers() error {
 	flags := log.Lmsgprefix
 
-	// Showing short file for debug verbosity
-	if Verbosity < 2 {
-		flags |= log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile
-	} else if UseTimestamp {
+	// Skip timestamp if not needed
+	if UseTimestamp {
 		flags |= log.Ldate | log.Ltime
+		if Verbosity < 2 {
+			flags |= log.Lmicroseconds
+		}
+	}
+	// Show short file for debug verbosity
+	if Verbosity < 2 {
+		flags |= log.Lshortfile
 	}
 
 	DebugLogger = log.New(os.Stdout, "DEBUG:\t", flags)

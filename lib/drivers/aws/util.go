@@ -229,13 +229,43 @@ func (d *Driver) getImageId(conn *ec2.Client, id_name string) (string, error) {
 		},
 		Owners: d.cfg.AccountIDs,
 	}
+	p := ec2.NewDescribeImagesPaginator(conn, &req)
 	resp, err := conn.DescribeImages(context.TODO(), &req)
 	if err != nil || len(resp.Images) == 0 {
 		return "", fmt.Errorf("AWS: Unable to locate image with specified name: %v", err)
 	}
 	id_name = aws.ToString(resp.Images[0].ImageId)
 
-	return id_name, nil
+	// Getting the images and find the latest one
+	var found_id string
+	var found_time time.Time
+	for p.HasMorePages() {
+		resp, err := p.NextPage(context.TODO())
+		if err != nil {
+			return "", fmt.Errorf("AWS: Error during requesting snapshot: %v", err)
+		}
+		if len(resp.Images) > 100 {
+			log.Warnf("AWS: Over 100 images was found for the name %q, could be slow...", id_name)
+		}
+		for _, r := range resp.Images {
+			// Converting from RFC-3339/ISO-8601 format "2024-03-07T15:53:03.000Z"
+			t, err := time.Parse("2006-01-02T15:04:05.000Z", aws.ToString(r.CreationDate))
+			if err != nil {
+				log.Warnf("AWS: Error during parsing image create time: %v", err)
+				continue
+			}
+			if found_time.Before(t) {
+				found_id = aws.ToString(r.ImageId)
+				found_time = t
+			}
+		}
+	}
+
+	if found_id == "" {
+		return "", fmt.Errorf("AWS: Unable to locate snapshot with specified tag: %s", id_name)
+	}
+
+	return found_id, nil
 }
 
 // Types are used to calculate some not that obvious values
@@ -382,7 +412,7 @@ func (d *Driver) getSnapshotId(conn *ec2.Client, id_tag string) (string, error) 
 	tag_key_val := strings.SplitN(id_tag, ":", 2)
 
 	// Look for VPC with the defined tag over pages
-	p := ec2.NewDescribeSnapshotsPaginator(conn, &ec2.DescribeSnapshotsInput{
+	req := ec2.DescribeSnapshotsInput{
 		Filters: []types.Filter{
 			types.Filter{
 				Name:   aws.String("tag:" + tag_key_val[0]),
@@ -394,9 +424,10 @@ func (d *Driver) getSnapshotId(conn *ec2.Client, id_tag string) (string, error) 
 			},
 		},
 		OwnerIds: d.cfg.AccountIDs,
-	})
+	}
+	p := ec2.NewDescribeSnapshotsPaginator(conn, &req)
 
-	// Getting the images to find the latest one
+	// Getting the snapshots to find the latest one
 	found_id := ""
 	var found_time time.Time
 	for p.HasMorePages() {
@@ -408,7 +439,7 @@ func (d *Driver) getSnapshotId(conn *ec2.Client, id_tag string) (string, error) 
 			log.Warn("AWS: Over 900 snapshots was found for tag, could be slow:", id_tag)
 		}
 		for _, r := range resp.Snapshots {
-			if found_time.Before(*r.StartTime) {
+			if found_time.Before(aws.ToTime(r.StartTime)) {
 				found_id = aws.ToString(r.SnapshotId)
 				found_time = aws.ToTime(r.StartTime)
 			}
@@ -427,7 +458,7 @@ func (d *Driver) getProjectCpuUsage(conn *ec2.Client, inst_types []string) (int6
 
 	// Here is no way to use some filter, so we're getting them all and after that
 	// checking if the instance is actually starts with type+number.
-	p := ec2.NewDescribeInstancesPaginator(conn, &ec2.DescribeInstancesInput{
+	req := ec2.DescribeInstancesInput{
 		Filters: []types.Filter{
 			types.Filter{
 				Name: aws.String("instance-state-name"),
@@ -435,7 +466,8 @@ func (d *Driver) getProjectCpuUsage(conn *ec2.Client, inst_types []string) (int6
 				Values: []string{"pending", "running", "shutting-down", "stopping", "stopped"},
 			},
 		},
-	})
+	}
+	p := ec2.NewDescribeInstancesPaginator(conn, &req)
 
 	// Processing the received instances
 	for p.HasMorePages() {
@@ -487,9 +519,10 @@ func (d *Driver) getKeyId(id_alias string) (string, error) {
 	conn := d.newKMSConn()
 
 	// Look for VPC with the defined tag over pages
-	p := kms.NewListAliasesPaginator(conn, &kms.ListAliasesInput{
+	req := kms.ListAliasesInput{
 		Limit: aws.Int32(100),
-	})
+	}
+	p := kms.NewListAliasesPaginator(conn, &req)
 
 	// Getting the images to find the latest one
 	for p.HasMorePages() {
@@ -524,9 +557,10 @@ func (d *Driver) updateQuotas(force bool) error {
 	conn_sq := d.newServiceQuotasConn()
 
 	// Get the list of quotas
-	p := servicequotas.NewListServiceQuotasPaginator(conn_sq, &servicequotas.ListServiceQuotasInput{
+	req := servicequotas.ListServiceQuotasInput{
 		ServiceCode: aws.String("ec2"),
-	})
+	}
+	p := servicequotas.NewListServiceQuotasPaginator(conn_sq, &req)
 
 	// Processing the received quotas
 	for p.HasMorePages() {
@@ -582,15 +616,16 @@ func (d *Driver) triggerHostScrubbing(host_id, instance_type string) (err error)
 	log.Infof("AWS: scrubbing %s: Selected image: %q", host_id, vm_image)
 
 	// Prepare Instance request information
+	placement := types.Placement{
+		Tenancy: types.TenancyHost,
+		HostId:  aws.String(host_id),
+	}
 	input := ec2.RunInstancesInput{
 		ImageId:      aws.String(vm_image),
 		InstanceType: types.InstanceType(instance_type),
 
 		// Set placement to the target host
-		Placement: &types.Placement{
-			Tenancy: types.TenancyHost,
-			HostId:  aws.String(host_id),
-		},
+		Placement: &placement,
 
 		MinCount: aws.Int32(1),
 		MaxCount: aws.Int32(1),
@@ -632,6 +667,48 @@ func (d *Driver) triggerHostScrubbing(host_id, instance_type string) (err error)
 	log.Infof("AWS: scrubbing %s: Scrubbing process was triggered", host_id)
 
 	return nil
+}
+
+// Will completely delete the image (with associated snapshots) by AMI id
+func (d *Driver) deleteImage(conn *ec2.Client, id string) (err error) {
+	if !strings.HasPrefix(id, "ami-") {
+		return fmt.Errorf("AWS: Incorrect AMI id: %s", id)
+	}
+	log.Debugf("AWS: Deleting the image %s...", id)
+
+	// Look for the image snapshots
+	req := ec2.DescribeImagesInput{
+		ImageIds: []string{id},
+		Owners:   d.cfg.AccountIDs,
+	}
+	resp_img, err := conn.DescribeImages(context.TODO(), &req)
+	if err != nil || len(resp_img.Images) == 0 {
+		return fmt.Errorf("AWS: Unable to describe image with specified id %q: %w", id, err)
+	}
+
+	// Deregister the image
+	input := ec2.DeregisterImageInput{ImageId: aws.String(id)}
+	_, err = conn.DeregisterImage(context.TODO(), &input)
+	if err != nil {
+		return fmt.Errorf("AWS: Unable to deregister the image %s %q: %w", id, aws.ToString(resp_img.Images[0].Name), err)
+	}
+
+	// Delete the image snapshots
+	for _, disk := range resp_img.Images[0].BlockDeviceMappings {
+		if disk.Ebs == nil || disk.Ebs.SnapshotId == nil {
+			continue
+		}
+		log.Debugf("AWS: Deleting the image %s associated snapshot %s", id, aws.ToString(disk.Ebs.SnapshotId))
+		input := ec2.DeleteSnapshotInput{SnapshotId: disk.Ebs.SnapshotId}
+		_, err_tmp := conn.DeleteSnapshot(context.TODO(), &input)
+		if err_tmp != nil {
+			// Do not fail hard to try to delete all the snapshots
+			log.Errorf("AWS: Unable to delete image %s %q snapshot %s: %v", id, aws.ToString(resp_img.Images[0].Name), aws.ToString(disk.Ebs.SnapshotId), err)
+			err = err_tmp
+		}
+	}
+
+	return err
 }
 
 // Returns values for filter to receive only the last year items
