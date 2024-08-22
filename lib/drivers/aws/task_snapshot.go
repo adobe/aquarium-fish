@@ -58,7 +58,7 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 		return []byte(`{"error":"internal: invalid application task"}`), log.Error("AWS: Invalid application task:", t.ApplicationTask)
 	}
 	if t.LabelDefinition == nil {
-		return []byte(`{"error":"internal: invalid label definition"}`), log.Error("TEST: Invalid label definition:", t.LabelDefinition)
+		return []byte(`{"error":"internal: invalid label definition"}`), log.Error("AWS: Invalid label definition:", t.LabelDefinition)
 	}
 	if t.Resource == nil || t.Resource.Identifier == "" {
 		return []byte(`{"error":"internal: invalid resource"}`), log.Error("AWS: Invalid resource:", t.Resource)
@@ -76,11 +76,11 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 		result, err := conn.StopInstances(context.TODO(), &input)
 		if err != nil {
 			// Do not fail hard here - it's still possible to take snapshot of the instance
-			log.Error("AWS: Error during stopping the instance:", t.Resource.Identifier, err)
+			log.Errorf("AWS: TaskSnapshot %s: Error during stopping the instance %s: %v", t.ApplicationTask.UID, t.Resource.Identifier, err)
 		}
 		if len(result.StoppingInstances) < 1 || *result.StoppingInstances[0].InstanceId != t.Resource.Identifier {
 			// Do not fail hard here - it's still possible to take snapshot of the instance
-			log.Error("AWS: Wrong instance id result during stopping:", t.Resource.Identifier)
+			log.Errorf("AWS: TaskSnapshot %s: Wrong instance id result during stopping: %s", t.ApplicationTask.UID, t.Resource.Identifier)
 		}
 
 		// Wait for instance stopped before going forward with snapshot
@@ -93,7 +93,7 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 		}
 		if err := sw.Wait(context.TODO(), &wait_input, max_wait); err != nil {
 			// Do not fail hard here - it's still possible to take snapshot of the instance
-			log.Error("AWS: Error during wait for instance stop:", t.Resource.Identifier, err)
+			log.Errorf("AWS: TaskSnapshot %s: Error during wait for instance %s stop: %v", t.ApplicationTask.UID, t.Resource.Identifier, err)
 		}
 	}
 
@@ -120,20 +120,20 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 		}},
 	}
 
-	log.Debugf("AWS: TaskSnapshot %s: Creating snapshot %q...", t.ApplicationTask.UID)
+	log.Debugf("AWS: TaskSnapshot %s: Creating snapshot for %q...", t.ApplicationTask.UID, t.Resource.Identifier)
 	resp, err := conn.CreateSnapshots(context.TODO(), &input)
 	if err != nil {
-		return []byte{}, log.Errorf("AWS: Unable to create snapshots for instance %s: %v", t.Resource.Identifier, err)
+		return []byte(`{"error":"internal: failed to create snapshots for instance"}`), log.Errorf("AWS: Unable to create snapshots for instance %s: %v", t.Resource.Identifier, err)
 	}
 	if len(resp.Snapshots) < 1 {
-		return []byte{}, log.Errorf("AWS: No snapshots was created for instance %s", t.Resource.Identifier)
+		return []byte(`{"error":"internal: no snapshots was created for instance"}`), log.Errorf("AWS: No snapshots was created for instance %s", t.Resource.Identifier)
 	}
 
 	snapshots := []string{}
 	for _, r := range resp.Snapshots {
 		snapshots = append(snapshots, *r.SnapshotId)
 	}
-	log.Infof("AWS: Created snapshots for instance %s: %s", t.Resource.Identifier, strings.Join(snapshots, ", "))
+	log.Infof("AWS: TaskSnapshot %s: Created snapshots for instance %s: %s", t.ApplicationTask.UID, t.Resource.Identifier, strings.Join(snapshots, ", "))
 
 	return json.Marshal(map[string]any{"snapshots": snapshots})
 }

@@ -232,7 +232,7 @@ func (d *Driver) getImageId(conn *ec2.Client, id_name string) (string, error) {
 	p := ec2.NewDescribeImagesPaginator(conn, &req)
 	resp, err := conn.DescribeImages(context.TODO(), &req)
 	if err != nil || len(resp.Images) == 0 {
-		return "", fmt.Errorf("AWS: Unable to locate image with specified name: %v", err)
+		return "", fmt.Errorf("AWS: Unable to locate image with specified name: %s, err: %v", id_name, err)
 	}
 	id_name = aws.ToString(resp.Images[0].ImageId)
 

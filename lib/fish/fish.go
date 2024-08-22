@@ -606,7 +606,7 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 		// Allocate the resource
 		if app_state.Status == types.ApplicationStatusELECTED {
 			// Run the allocation
-			log.Info("Fish: Allocate the resource using the driver", driver.Name())
+			log.Infof("Fish: Allocate the Application %s resource using driver: %s", app.UID, driver.Name())
 			drv_res, err := driver.Allocate(label_def, metadata)
 			if err != nil {
 				log.Error("Fish: Unable to allocate resource for the Application:", app.UID, err)
@@ -627,6 +627,7 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 				app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusALLOCATED,
 					Description: fmt.Sprint("Driver allocated the resource"),
 				}
+				log.Infof("Fish: Allocated Resource %q for the Application %s", app.UID, res.Identifier)
 			}
 			f.ApplicationStateCreate(app_state)
 		}
@@ -684,7 +685,7 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 			f.executeApplicationTasks(driver, &label_def, res, app_state.Status)
 
 			if app_state.Status == types.ApplicationStatusDEALLOCATE || app_state.Status == types.ApplicationStatusRECALLED {
-				log.Info("Fish: Running Deallocate of the Application:", app.UID)
+				log.Info("Fish: Running Deallocate of the Application and Resource:", app.UID, res.Identifier)
 				// Deallocating and destroy the resource
 				if err := driver.Deallocate(res); err != nil {
 					log.Errorf("Fish: Unable to deallocate the Resource of Application: %s (try: %d): %v", app.UID, deallocate_retry, err)

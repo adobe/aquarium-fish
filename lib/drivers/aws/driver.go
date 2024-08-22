@@ -450,7 +450,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 			}
 			time.Sleep(5 * time.Second)
 
-			inst_tmp, err := d.getInstance(conn, *inst.InstanceId)
+			inst_tmp, err := d.getInstance(conn, aws.ToString(inst.InstanceId))
 			if err == nil && inst_tmp != nil {
 				inst = inst_tmp
 			}
@@ -459,13 +459,13 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 			}
 		}
 		for _, bd := range inst.BlockDeviceMappings {
-			disk, ok := def.Resources.Disks[*bd.DeviceName]
+			disk, ok := def.Resources.Disks[aws.ToString(bd.DeviceName)]
 			if !ok || disk.Label == "" {
 				continue
 			}
 
 			tags_input := ec2.CreateTagsInput{
-				Resources: []string{*bd.Ebs.VolumeId},
+				Resources: []string{aws.ToString(bd.Ebs.VolumeId)},
 				Tags:      []ec2_types.Tag{},
 			}
 
@@ -482,7 +482,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 			}
 			if _, err := conn.CreateTags(context.TODO(), &tags_input); err != nil {
 				// Do not fail hard here - the instance is already running
-				log.Warnf("AWS: %s: Unable to set tags for volume: %q, %q, %q", i_name, *bd.Ebs.VolumeId, *bd.DeviceName, err)
+				log.Warnf("AWS: %s: Unable to set tags for volume: %q, %q, %q", i_name, aws.ToString(bd.Ebs.VolumeId), aws.ToString(bd.DeviceName), err)
 			}
 		}
 	}
@@ -493,7 +493,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 	timeout := 60
 	for {
 		if inst.PrivateIpAddress != nil {
-			log.Infof("AWS: %s: Allocate of instance completed: %q, %q", i_name, *inst.InstanceId, *inst.PrivateIpAddress)
+			log.Infof("AWS: %s: Allocate of instance completed: %q, %q", i_name, aws.ToString(inst.InstanceId), aws.ToString(inst.PrivateIpAddress))
 			res.Identifier = aws.ToString(inst.InstanceId)
 			res.IpAddr = aws.ToString(inst.PrivateIpAddress)
 			return res, nil
@@ -505,17 +505,17 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 		}
 		time.Sleep(5 * time.Second)
 
-		inst_tmp, err := d.getInstance(conn, *inst.InstanceId)
+		inst_tmp, err := d.getInstance(conn, aws.ToString(inst.InstanceId))
 		if err == nil && inst_tmp != nil {
 			inst = inst_tmp
 		}
 		if err != nil {
-			log.Errorf("AWS: %s: Error during getting instance while waiting for IP: %v, %q", i_name, err, *inst.InstanceId)
+			log.Errorf("AWS: %s: Error during getting instance while waiting for IP: %v, %q", i_name, err, aws.ToString(inst.InstanceId))
 		}
 	}
 
 	res.Identifier = aws.ToString(inst.InstanceId)
-	return res, log.Errorf("AWS: %s: Unable to locate the instance IP: %q", i_name, *inst.InstanceId)
+	return res, log.Errorf("AWS: %s: Unable to locate the instance IP: %q", i_name, aws.ToString(inst.InstanceId))
 }
 
 func (d *Driver) Status(res *types.Resource) (string, error) {
@@ -564,14 +564,15 @@ func (d *Driver) Deallocate(res *types.Resource) error {
 	}
 
 	result, err := conn.TerminateInstances(context.TODO(), &input)
-	if err != nil {
+	if err != nil || len(result.TerminatingInstances) < 1 {
 		return fmt.Errorf("AWS: Error during termianting the instance %s: %s", res.Identifier, err)
 	}
-	if *result.TerminatingInstances[0].InstanceId != res.Identifier {
-		return fmt.Errorf("AWS: Wrong instance id result %s during terminating of %s", *result.TerminatingInstances[0].InstanceId, res.Identifier)
+	inst := result.TerminatingInstances[0]
+	if aws.ToString(inst.InstanceId) != res.Identifier {
+		return fmt.Errorf("AWS: Wrong instance id result %s during terminating of %s", aws.ToString(inst.InstanceId), res.Identifier)
 	}
 
-	log.Infof("AWS: Deallocate of Instance %s completed: %s", res.Identifier, result.TerminatingInstances[0].CurrentState.Name)
+	log.Infof("AWS: %s: Deallocate of instance completed: %s", res.Identifier, inst.CurrentState.Name)
 
 	return nil
 }
