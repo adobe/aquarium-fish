@@ -267,7 +267,7 @@ func (t *TaskImage) Execute() (result []byte, err error) {
 		}
 		if err = sw.Wait(context.TODO(), &wait_input, max_wait); err != nil {
 			// Do not fail hard here - we still need to remove the tmp image
-			log.Errorf("AWS: TaskIamge %s: Error during wait for re-encrypted image availability: %s %s, %v", t.ApplicationTask.UID, image_name, aws.ToString(resp.ImageId), err)
+			log.Errorf("AWS: TaskImage %s: Error during wait for re-encrypted image availability: %s %s, %v", t.ApplicationTask.UID, image_name, aws.ToString(resp.ImageId), err)
 		}
 
 		// Delete the temp image & associated snapshots

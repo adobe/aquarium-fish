@@ -131,8 +131,21 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 
 	snapshots := []string{}
 	for _, r := range resp.Snapshots {
-		snapshots = append(snapshots, *r.SnapshotId)
+		snapshots = append(snapshots, aws.ToString(r.SnapshotId))
 	}
+
+	// Wait for snapshots to be available...
+	log.Infof("AWS: TaskSnapshot %s: Wait for snapshots %s availability...", t.ApplicationTask.UID, snapshots)
+	sw := ec2.NewSnapshotCompletedWaiter(conn)
+	max_wait := time.Duration(t.driver.cfg.SnapshotCreateWait)
+	wait_input := ec2.DescribeSnapshotsInput{
+		SnapshotIds: snapshots,
+	}
+	if err = sw.Wait(context.TODO(), &wait_input, max_wait); err != nil {
+		// Do not fail hard here - we still need to remove the tmp image
+		log.Errorf("AWS: TaskSnapshot %s: Error during wait snapshots availability: %s, %v", t.ApplicationTask.UID, snapshots, err)
+	}
+
 	log.Infof("AWS: TaskSnapshot %s: Created snapshots for instance %s: %s", t.ApplicationTask.UID, t.Resource.Identifier, strings.Join(snapshots, ", "))
 
 	return json.Marshal(map[string]any{"snapshots": snapshots})
