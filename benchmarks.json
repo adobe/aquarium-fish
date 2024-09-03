@@ -1,0 +1,3 @@
+[
+  {"Version":"1b7b3dda58471a2db5706b830627291f60abc31b","Date":1725406250,"Tags":["ref=refs/heads/main"],"Suites":[{"Goos":"linux","Goarch":"amd64","Pkg":"github.com/adobe/aquarium-fish/lib/crypt","Benchmarks":[{"Name":"Benchmark_hash_new","Runs":30,"NsPerOp":39392054,"Mem":{"BytesPerOp":67122440,"AllocsPerOp":180,"MBPerSec":0}},{"Name":"Benchmark_hash_new-2","Runs":52,"NsPerOp":22475776,"Mem":{"BytesPerOp":67122445,"AllocsPerOp":180,"MBPerSec":0}},{"Name":"Benchmark_hash_isequal","Runs":55,"NsPerOp":39108075,"Mem":{"BytesPerOp":67122424,"AllocsPerOp":179,"MBPerSec":0}},{"Name":"Benchmark_hash_isequal-2","Runs":54,"NsPerOp":22107519,"Mem":{"BytesPerOp":67122427,"AllocsPerOp":179,"MBPerSec":0}}]}]}
+]
