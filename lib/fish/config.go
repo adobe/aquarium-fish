@@ -24,11 +24,13 @@ import (
 type Config struct {
 	Directory string `json:"directory"` // Where to store database and other useful data (if relative - to CWD)
 
-	APIAddress        string   `json:"api_address"`         // Where to serve Web UI, API & Meta API
-	ProxySocksAddress string   `json:"proxy_socks_address"` // Where to serve SOCKS5 proxy for the allocated resources
-	ProxySshAddress   string   `json:"proxy_ssh_address"`   // Where to serve SSH proxy for the allocated resources
-	NodeAddress       string   `json:"node_address"`        // What is the external address of the node
-	ClusterJoin       []string `json:"cluster_join"`        // The node addresses to join the cluster
+	APIAddress        string         `json:"api_address"`         // Where to serve Web UI, API & Meta API
+	ProxySocksAddress string         `json:"proxy_socks_address"` // Where to serve SOCKS5 proxy for the allocated resources
+	ProxySshAddress   string         `json:"proxy_ssh_address"`   // Where to serve SSH proxy for the allocated resources
+	NodeAddress       string         `json:"node_address"`        // What is the external address of the node
+	CpuLimit          uint16         `json:"cpu_limit"`           // How many CPU threads Node allowed to use (serve API, ...)
+	MemTarget         util.HumanSize `json:"mem_target"`          // What's the target memory utilization by the Node (GC target where it becomes more aggressive)
+	ClusterJoin       []string       `json:"cluster_join"`        // The node addresses to join the cluster
 
 	TLSKey   string `json:"tls_key"`    // TLS PEM private key (if relative - to directory)
 	TLSCrt   string `json:"tls_crt"`    // TLS PEM public certificate (if relative - to directory)

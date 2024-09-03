@@ -24,6 +24,7 @@ import (
 
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/fish"
+	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
@@ -47,6 +48,8 @@ func NewV1Router(e *echo.Echo, fish *fish.Fish) {
 }
 
 func (e *Processor) BasicAuth(username, password string, c echo.Context) (bool, error) {
+	c.Set("uid", crypt.RandString(8))
+	log.Debugf("API: %s: New request received: %s %s", username, c.Get("uid"), c.Path())
 	user := e.fish.UserAuth(username, password)
 
 	// Clean Auth header and set the user

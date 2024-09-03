@@ -23,13 +23,20 @@ import (
 )
 
 const (
-	Algo_Argon2       = "Argon2"
-	Argon2_Memory     = 524288
-	Argon2_Operations = 4
-	Argon2_Time       = 1
-	Argon2_Threads    = 1
-	Argon2_SaltBytes  = 8
-	Argon2_StrBytes   = 128
+	Argon2_Algo = "Argon2id"
+	// Default tuned to process at least 20 API requests/sec on 2CPU
+	Argon2_Memory     = 64 * 1024 // 64MB
+	Argon2_Iterations = 1
+	Argon2_Threads    = 8 // Optimal to quickly execute one request, with not much overhead
+	Argon2_SaltLen    = 8
+	Argon2_HashLen    = 32
+
+	// <= v0.7.4 hash params for backward-compatibility
+	// could easily choke the API system and cause OOMs so not recommended to use them
+	v074_Argon2_Algo       = "Argon2"
+	v074_Argon2_Memory     = 524288
+	v074_Argon2_Iterations = 1
+	v074_Argon2_Threads    = 1
 
 	RandStringCharsetB58 = "abcdefghijkmnopqrstuvwxyz" +
 		"ABCDEFGHJKLMNPQRSTUVWXYZ123456789" // Base58
@@ -38,8 +45,16 @@ const (
 
 type Hash struct {
 	Algo string
+	Prop properties `gorm:"embedded;embeddedPrefix:prop_"`
 	Salt []byte
 	Hash []byte
+}
+
+// Properties of Argon2id algo
+type properties struct {
+	Memory     uint32
+	Iterations uint32
+	Threads    uint8
 }
 
 // Create random bytes of specified size
@@ -70,27 +85,34 @@ func RandStringCharset(size int, charset string) string {
 	return string(data)
 }
 
-// Generate a salted hash for the input string
-func Generate(password string, salt []byte) (hash Hash) {
-	hash.Algo = Algo_Argon2
-
-	// Check salt and if not provided - use generator
+// Generate a salted hash for the input string with default parameters
+func NewHash(input string, salt []byte) (h Hash) {
+	h.Algo = Argon2_Algo
 	if salt != nil {
-		hash.Salt = salt
+		h.Salt = salt
 	} else {
-		hash.Salt = RandBytes(Argon2_SaltBytes)
+		h.Salt = RandBytes(Argon2_SaltLen)
 	}
+	h.Prop.Iterations = Argon2_Iterations
+	h.Prop.Memory = Argon2_Memory
+	h.Prop.Threads = Argon2_Threads
 
 	// Create hash data
-	hash.Hash = argon2.IDKey([]byte(password), hash.Salt,
-		Argon2_Time, Argon2_Memory, Argon2_Threads, Argon2_StrBytes)
+	h.Hash = argon2.IDKey([]byte(input), h.Salt, h.Prop.Iterations, h.Prop.Memory, h.Prop.Threads, Argon2_HashLen)
 
 	return
 }
 
-// Compare string to generated hash
-func (hash *Hash) IsEqual(password string) bool {
-	return bytes.Compare(hash.Hash, Generate(password, hash.Salt).Hash) == 0
+// Check the input equal to the current hashed one
+func (h *Hash) IsEqual(input string) bool {
+	if h.Algo == v074_Argon2_Algo {
+		// Legacy low-performant parameters, not defined in hash
+		h.Prop.Iterations = v074_Argon2_Iterations
+		h.Prop.Memory = v074_Argon2_Memory
+		h.Prop.Threads = v074_Argon2_Threads
+	}
+
+	return bytes.Compare(h.Hash, argon2.IDKey([]byte(input), h.Salt, h.Prop.Iterations, h.Prop.Memory, h.Prop.Threads, uint32(len(h.Hash)))) == 0
 }
 
 func (hash *Hash) IsEmpty() bool {

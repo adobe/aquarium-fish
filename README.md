@@ -91,6 +91,25 @@ check that the server (or client) is the one is approved in the cluster.
 Maybe in the future Fish will allow to manage the cluster CA and issue certificate for a new node,
 but for now just check openssl and https://github.com/jcmoraisjr/simple-ca for reference.
 
+#### Performance
+
+It really depends on how you want to run the Fish node, in general there are 2 cases:
+
+1. **To serve local resources of the machine**: so you run it on the performant node and don't want
+to consume too much of it's precious resources or interfere somehow: then you can use -cpu and -mem
+params to limit the node in CPU and RAM utilization. Of course that will impact the API processing
+performance, but probably you don't need much since you running a cluster and can distribute the
+load across the nodes. You can expect that with 2 vCPU and 512MB of ram it could process ~16 API
+requests per second.
+2. **To serve remote/cloud resources**: It's worth to set the target on RAM by -mem option, but not
+much to CPU. The RAM limit will help you to not get into OOM - just leave ~2GB of RAM for GC and
+you will get the maximum performance. With 16 vCPU Fish can serve ~50 API requests per second.
+
+Most of the time during API request processing is wasted on user password validation, so if you
+need to squeeze more rps from Fish node you can lower the Argon2id parameters in crypt.go, but with
+that you need to make sure you understand the consequences:
+https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-argon2-04#section-4
+
 ### To run as a cluster
 
 **TODO [#30](https://github.com/adobe/aquarium-fish/issues/30):** This functionality is in active
