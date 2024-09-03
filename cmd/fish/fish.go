@@ -16,6 +16,9 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
+	"runtime/debug"
+	"strconv"
 	"time"
 
 	"github.com/glebarez/sqlite"
@@ -31,6 +34,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/openapi"
 	"github.com/adobe/aquarium-fish/lib/proxy_socks"
 	"github.com/adobe/aquarium-fish/lib/proxy_ssh"
+	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 func main() {
@@ -43,6 +47,8 @@ func main() {
 	var cluster_join *[]string
 	var cfg_path string
 	var dir string
+	var cpu_limit string
+	var mem_target string
 	var log_verbosity string
 	var log_timestamp bool
 
@@ -50,18 +56,19 @@ func main() {
 		Use:   "aquarium-fish",
 		Short: "Aquarium fish",
 		Long:  `Part of the Aquarium suite - a distributed resources manager`,
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			err := log.SetVerbosity(log_verbosity)
-			if err != nil {
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
+			if err = log.SetVerbosity(log_verbosity); err != nil {
 				return err
 			}
 			log.UseTimestamp = log_timestamp
 
 			return log.InitLoggers()
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
+			log.Info("Fish init...")
+
 			cfg := &fish.Config{}
-			if err := cfg.ReadConfigFile(cfg_path); err != nil {
+			if err = cfg.ReadConfigFile(cfg_path); err != nil {
 				return log.Error("Fish: Unable to apply config file:", cfg_path, err)
 			}
 			if api_address != "" {
@@ -82,9 +89,31 @@ func main() {
 			if dir != "" {
 				cfg.Directory = dir
 			}
+			if cpu_limit != "" {
+				val, err := strconv.ParseUint(cpu_limit, 10, 16)
+				if err != nil {
+					return log.Errorf("Fish: Unable to parse cpu limit value: %v", err)
+				}
+				cfg.CpuLimit = uint16(val)
+			}
+			if mem_target != "" {
+				if cfg.MemTarget, err = util.NewHumanSize(mem_target); err != nil {
+					return log.Errorf("Fish: Unable to parse mem target value: %v", err)
+				}
+			}
+
+			// Set Fish Node resources limits
+			if cfg.CpuLimit > 0 {
+				log.Info("Fish CPU limited:", cfg.CpuLimit)
+				runtime.GOMAXPROCS(int(cfg.CpuLimit))
+			}
+			if cfg.MemTarget > 0 {
+				log.Info("Fish MEM targeted:", cfg.MemTarget.String())
+				debug.SetMemoryLimit(int64(cfg.MemTarget.Bytes()))
+			}
 
 			dir := filepath.Join(cfg.Directory, cfg.NodeAddress)
-			if err := os.MkdirAll(dir, 0o750); err != nil {
+			if err = os.MkdirAll(dir, 0o750); err != nil {
 				return log.Errorf("Fish: Can't create working directory %s: %v", dir, err)
 			}
 
@@ -101,7 +130,7 @@ func main() {
 			if !filepath.IsAbs(cert_path) {
 				cert_path = filepath.Join(cfg.Directory, cert_path)
 			}
-			if err := crypt.InitTlsPairCa([]string{cfg.NodeName, cfg.NodeAddress}, ca_path, key_path, cert_path); err != nil {
+			if err = crypt.InitTlsPairCa([]string{cfg.NodeName, cfg.NodeAddress}, ca_path, key_path, cert_path); err != nil {
 				return err
 			}
 
@@ -187,7 +216,9 @@ func main() {
 	cluster_join = flags.StringSliceP("join", "j", nil, "addresses of existing cluster nodes to join, comma separated")
 	flags.StringVarP(&cfg_path, "cfg", "c", "", "yaml configuration file")
 	flags.StringVarP(&dir, "dir", "D", "", "database and other fish files directory")
-	flags.StringVarP(&log_verbosity, "verbosity", "v", "info", "log level (debug, info, warn, error")
+	flags.StringVar(&cpu_limit, "cpu", "", "max amount of threads fish node will be able to utilize, default - no limit")
+	flags.StringVar(&mem_target, "mem", "", "target memory utilization for fish node to run GC more aggressively when too close")
+	flags.StringVarP(&log_verbosity, "verbosity", "v", "info", "log level (debug, info, warn, error)")
 	flags.BoolVar(&log_timestamp, "timestamp", true, "prepend timestamps for each log line")
 	flags.Lookup("timestamp").NoOptDefVal = "false"
 

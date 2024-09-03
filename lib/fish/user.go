@@ -65,6 +65,10 @@ func (f *Fish) UserAuth(name string, password string) *types.User {
 		return nil
 	}
 
+	if user.Hash.Algo != crypt.Argon2_Algo {
+		log.Warnf("Please regenerate password for user %q to improve the API performance", name)
+	}
+
 	if !user.Hash.IsEqual(password) {
 		log.Warn("Fish: Incorrect user password:", name)
 		return nil
@@ -78,7 +82,10 @@ func (f *Fish) UserNew(name string, password string) (string, *types.User, error
 		password = crypt.RandString(64)
 	}
 
-	user := &types.User{Name: name, Hash: crypt.Generate(password, nil)}
+	user := &types.User{
+		Name: name,
+		Hash: crypt.NewHash(password, nil),
+	}
 
 	if err := f.UserCreate(user); err != nil {
 		return "", nil, log.Error("Fish: Unable to create new user:", name, err)
