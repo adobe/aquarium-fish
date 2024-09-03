@@ -37,6 +37,10 @@ type Config struct {
 	// Manage the AWS dedicated hosts to keep them busy and deallocate when not needed
 	// Key of the map is name of the pool - will be used for identification of the pool
 	DedicatedPool map[string]DedicatedPoolRecord `json:"dedicated_pool"`
+
+	// Various options to not hardcode the important numbers
+	SnapshotCreateWait util.Duration `json:"snapshot_create_wait"` // Maximum wait time for snapshot availability (create), default: 2h
+	ImageCreateWait    util.Duration `json:"image_create_wait"`    // Maximum wait time for image availability (create/copy), default: 2h
 }
 
 // Stores the configuration of AWS dedicated pool of particular type to manage
@@ -160,6 +164,14 @@ func (c *Config) Validate() (err error) {
 		if pool.ScrubbingDelay > 0 && time.Duration(pool.ScrubbingDelay) < 1*time.Minute {
 			return fmt.Errorf("AWS: Scrubbing delay of pool %q is less then 1 minute: %v", name, pool.ScrubbingDelay)
 		}
+	}
+
+	// Set defaults for other variables
+	if c.SnapshotCreateWait <= 0 {
+		c.SnapshotCreateWait = util.Duration(120 * time.Minute) // 60min is not enough for windows snapshots
+	}
+	if c.ImageCreateWait <= 0 {
+		c.ImageCreateWait = util.Duration(120 * time.Minute) // 60min is not enough for windows image
 	}
 
 	return nil
