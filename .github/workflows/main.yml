@@ -39,7 +39,7 @@ jobs:
           - 80:8080
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Validate OpenAPI definition
         uses: swaggerexpert/swagger-editor-validate@452076dc45d5d1f09dd55440c9bffc372de4da25  # Jul 29, 2024
         with:
@@ -67,11 +67,40 @@ jobs:
           name: binaries
           path: aquarium-fish*.tar.xz
 
-      - name: Test
+      - name: Benchmarks main
+        run: go run go.bobheadxi.dev/gobenchdata@v1 action
+        if: github.ref == 'refs/heads/main'
+        env:
+          INPUT_PUBLISH: true
+          INPUT_CHECKS: true
+          INPUT_PRUNE_COUNT: 30
+          INPUT_GO_TEST_FLAGS: "-run=^# -cpu 1,2 -benchmem"
+          INPUT_CHECKS_CONFIG: gobenchdata-checks.yml
+          GITHUB_TOKEN: '${{ secrets.ACCESS_TOKEN }}'
+
+      - name: Benchmarks PR
+        run: go run go.bobheadxi.dev/gobenchdata@v1 action
+        if: github.ref != 'refs/heads/main'
+        env:
+          INPUT_PUBLISH: false
+          INPUT_CHECKS: true
+          INPUT_PRUNE_COUNT: 30
+          INPUT_GO_TEST_FLAGS: "-run=^# -cpu 1,2 -benchmem"
+          INPUT_CHECKS_CONFIG: gobenchdata-checks.yml
+          GITHUB_TOKEN: '${{ secrets.ACCESS_TOKEN }}'
+
+      - name: Integration Tests
         run: |
           go install github.com/jstemmer/go-junit-report/v2@85bf471  # Oct 18, 2023
           name="$(ls aquarium-fish-*.linux_amd64)"
           FISH_PATH="$PWD/$name" go test -v -failfast -parallel 4 -count=1 ./tests/... 2>&1 | go-junit-report -iocopy -set-exit-code -out report.xml
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tests
+          path: '/tmp/gobenchdata/*'
 
       - name: Test Summary
         uses: test-summary/action@v2
