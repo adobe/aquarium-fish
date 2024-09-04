@@ -76,7 +76,7 @@ jobs:
           INPUT_PRUNE_COUNT: 30
           INPUT_GO_TEST_FLAGS: "-run=^# -cpu 1,2 -benchmem"
           INPUT_CHECKS_CONFIG: gobenchdata-checks.yml
-          GITHUB_TOKEN: '${{ secrets.ACCESS_TOKEN }}'
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
 
       - name: Benchmarks PR
         run: go run go.bobheadxi.dev/gobenchdata@v1 action
@@ -87,7 +87,6 @@ jobs:
           INPUT_PRUNE_COUNT: 30
           INPUT_GO_TEST_FLAGS: "-run=^# -cpu 1,2 -benchmem"
           INPUT_CHECKS_CONFIG: gobenchdata-checks.yml
-          GITHUB_TOKEN: '${{ secrets.ACCESS_TOKEN }}'
 
       - name: Integration Tests
         run: |
