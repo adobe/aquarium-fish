@@ -113,7 +113,7 @@ func (c *Config) Validate() (err error) {
 		if info, err := os.Stat(c.SudoPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate `sudo` path: %s, %s", c.SudoPath, err)
 		} else {
-			if info.Mode()&0111 == 0 {
+			if info.Mode()&0o111 == 0 {
 				return fmt.Errorf("Native: `sudo` binary is not executable: %s", c.SudoPath)
 			}
 		}
@@ -128,7 +128,7 @@ func (c *Config) Validate() (err error) {
 		if info, err := os.Stat(c.SuPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate `su` path: %s, %s", c.SuPath, err)
 		} else {
-			if info.Mode()&0111 == 0 {
+			if info.Mode()&0o111 == 0 {
 				return fmt.Errorf("Native: `su` binary is not executable: %s", c.SuPath)
 			}
 		}
@@ -143,7 +143,7 @@ func (c *Config) Validate() (err error) {
 		if info, err := os.Stat(c.ShPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate `sh` path: %s, %s", c.ShPath, err)
 		} else {
-			if info.Mode()&0111 == 0 {
+			if info.Mode()&0o111 == 0 {
 				return fmt.Errorf("Native: `sh` binary is not executable: %s", c.ShPath)
 			}
 		}
@@ -157,7 +157,7 @@ func (c *Config) Validate() (err error) {
 		if info, err := os.Stat(c.TarPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate `tar` path: %s, %s", c.TarPath, err)
 		} else {
-			if info.Mode()&0111 == 0 {
+			if info.Mode()&0o111 == 0 {
 				return fmt.Errorf("Native: `tar` binary is not executable: %s", c.TarPath)
 			}
 		}
@@ -171,7 +171,7 @@ func (c *Config) Validate() (err error) {
 		if info, err := os.Stat(c.MountPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate `mount` path: %s, %s", c.MountPath, err)
 		} else {
-			if info.Mode()&0111 == 0 {
+			if info.Mode()&0o111 == 0 {
 				return fmt.Errorf("Native: `mount` binary is not executable: %s", c.MountPath)
 			}
 		}
@@ -185,7 +185,7 @@ func (c *Config) Validate() (err error) {
 		if info, err := os.Stat(c.ChownPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate `chown` path: %s, %s", c.ChownPath, err)
 		} else {
-			if info.Mode()&0111 == 0 {
+			if info.Mode()&0o111 == 0 {
 				return fmt.Errorf("Native: `chown` binary is not executable: %s", c.ChownPath)
 			}
 		}
@@ -199,7 +199,7 @@ func (c *Config) Validate() (err error) {
 		if info, err := os.Stat(c.ChmodPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate `chmod` path: %s, %s", c.ChmodPath, err)
 		} else {
-			if info.Mode()&0111 == 0 {
+			if info.Mode()&0o111 == 0 {
 				return fmt.Errorf("Native: `chmod` binary is not executable: %s", c.ChmodPath)
 			}
 		}
@@ -213,7 +213,7 @@ func (c *Config) Validate() (err error) {
 		if info, err := os.Stat(c.KillallPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate `killall` path: %s, %s", c.KillallPath, err)
 		} else {
-			if info.Mode()&0111 == 0 {
+			if info.Mode()&0o111 == 0 {
 				return fmt.Errorf("Native: `killall` binary is not executable: %s", c.KillallPath)
 			}
 		}
@@ -227,7 +227,7 @@ func (c *Config) Validate() (err error) {
 		if info, err := os.Stat(c.RmPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate `rm` path: %s, %s", c.RmPath, err)
 		} else {
-			if info.Mode()&0111 == 0 {
+			if info.Mode()&0o111 == 0 {
 				return fmt.Errorf("Native: `rm` binary is not executable: %s", c.RmPath)
 			}
 		}
@@ -243,7 +243,7 @@ func (c *Config) Validate() (err error) {
 		if info, err := os.Stat(c.DsclPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate macos `dscl` path: %s, %s", c.DsclPath, err)
 		} else {
-			if info.Mode()&0111 == 0 {
+			if info.Mode()&0o111 == 0 {
 				return fmt.Errorf("Native: macos `dscl` binary is not executable: %s", c.DsclPath)
 			}
 		}
@@ -257,7 +257,7 @@ func (c *Config) Validate() (err error) {
 		if info, err := os.Stat(c.HdiutilPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate macos `hdiutil` path: %s, %s", c.HdiutilPath, err)
 		} else {
-			if info.Mode()&0111 == 0 {
+			if info.Mode()&0o111 == 0 {
 				return fmt.Errorf("Native: macos `hdiutil` binary is not executable: %s", c.HdiutilPath)
 			}
 		}
@@ -271,7 +271,7 @@ func (c *Config) Validate() (err error) {
 		if info, err := os.Stat(c.MdutilPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate macos `mdutil` path: %s, %s", c.MdutilPath, err)
 		} else {
-			if info.Mode()&0111 == 0 {
+			if info.Mode()&0o111 == 0 {
 				return fmt.Errorf("Native: macos `mdutil` binary is not executable: %s", c.MdutilPath)
 			}
 		}
@@ -285,7 +285,7 @@ func (c *Config) Validate() (err error) {
 		if info, err := os.Stat(c.CreatehomedirPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate macos `createhomedir` path: %s, %s", c.CreatehomedirPath, err)
 		} else {
-			if info.Mode()&0111 == 0 {
+			if info.Mode()&0o111 == 0 {
 				return fmt.Errorf("Native: macos `createhomedir` binary is not executable: %s", c.CreatehomedirPath)
 			}
 		}
@@ -341,8 +341,8 @@ func (c *Config) Validate() (err error) {
 		return err
 	}
 
-	if c.CpuAlter < 0 && int(cpu_stat) <= -c.CpuAlter {
-		return log.Errorf("Native: |CpuAlter| can't be more or equal the avaialble Host CPUs: |%d| > %d", c.CpuAlter, cpu_stat)
+	if c.CpuAlter < 0 && cpu_stat <= -c.CpuAlter {
+		return log.Errorf("Native: |CpuAlter| can't be more or equal the available Host CPUs: |%d| > %d", c.CpuAlter, cpu_stat)
 	}
 
 	mem_stat, err := mem.VirtualMemory()
@@ -352,7 +352,7 @@ func (c *Config) Validate() (err error) {
 	ram_stat := mem_stat.Total / 1073741824 // Getting GB from Bytes
 
 	if c.RamAlter < 0 && int(ram_stat) <= -c.RamAlter {
-		return log.Errorf("Native: |RamAlter| can't be more or equal the avaialble Host RAM: |%d| > %d", c.RamAlter, ram_stat)
+		return log.Errorf("Native: |RamAlter| can't be more or equal the available Host RAM: |%d| > %d", c.RamAlter, ram_stat)
 	}
 
 	return nil
@@ -363,7 +363,7 @@ func testScriptCreate(user string) (path string, err error) {
 	path = filepath.Join("/tmp", user+"-init.sh")
 
 	script := []byte("#!/bin/sh\nid\n")
-	return path, os.WriteFile(path, script, 0755)
+	return path, os.WriteFile(path, script, 0o755) // #nosec G306
 }
 
 // Will delete the config test script

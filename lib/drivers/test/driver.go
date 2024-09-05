@@ -153,7 +153,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 
 	// Generate random resource id and if exists - regenerate
 	res := &types.Resource{}
-	res_file := ""
+	var res_file string
 	for {
 		res.Identifier = "test-" + crypt.RandString(6)
 		res_file = filepath.Join(d.cfg.WorkspacePath, res.Identifier)
@@ -238,7 +238,7 @@ func randomFail(name string, probability uint8) error {
 	}
 
 	// Fail on probability 1 - low, 254 - high (but still can not fail)
-	if uint8(rand.Intn(254)) < probability {
+	if uint8(rand.Intn(254)) < probability { //nolint:gosec // G402,G404 -- fine for test driver
 		return fmt.Errorf("TEST: %s failed (%d)", name, probability)
 	}
 

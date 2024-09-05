@@ -33,11 +33,9 @@ import (
 	_ "github.com/oapi-codegen/oapi-codegen/v2/pkg/util"
 	"gopkg.in/yaml.v3"
 
-	"github.com/adobe/aquarium-fish/lib/cluster"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/api"
-	cluster_server "github.com/adobe/aquarium-fish/lib/openapi/cluster"
 	"github.com/adobe/aquarium-fish/lib/openapi/meta"
 )
 
@@ -66,7 +64,7 @@ func (cb *YamlBinder) Bind(i any, c echo.Context) (err error) {
 	return
 }
 
-func Init(fish *fish.Fish, cl *cluster.Cluster, api_address, ca_path, cert_path, key_path string) (*http.Server, error) {
+func Init(fish *fish.Fish, api_address, ca_path, cert_path, key_path string) (*http.Server, error) {
 	swagger, err := GetSwagger()
 	if err != nil {
 		return nil, fmt.Errorf("Fish OpenAPI: Error loading swagger spec: %w", err)
@@ -86,9 +84,8 @@ func Init(fish *fish.Fish, cl *cluster.Cluster, api_address, ca_path, cert_path,
 	router.HideBanner = true
 
 	// TODO: Probably it will be a feature an ability to separate those
-	// routers to independance ports if needed
+	// routers to independence ports if needed
 	meta.NewV1Router(router, fish)
-	cluster_server.NewV1Router(router, fish, cl)
 	api.NewV1Router(router, fish)
 	// TODO: web UI router
 
@@ -98,11 +95,10 @@ func Init(fish *fish.Fish, cl *cluster.Cluster, api_address, ca_path, cert_path,
 	}
 	s := router.TLSServer
 	s.Addr = api_address
-	s.TLSConfig = &tls.Config{
+	s.TLSConfig = &tls.Config{ // #nosec G402 , keep the compatibility high since not public access
 		ClientAuth: tls.RequestClientCert, // Need for the client certificate auth
 		ClientCAs:  ca_pool,               // Verify client certificate with the cluster CA
 	}
-	s.TLSConfig.BuildNameToCertificate()
 	errChan := make(chan error)
 	go func() {
 		addr := s.Addr

@@ -51,8 +51,8 @@ func (hs *HumanSize) UnmarshalText(data []byte) error {
 
 	// Detecting unit & multiplier
 	var mult HumanSize = 0
-	unit := ""
-	unit_len := 0
+	var unit string
+	var unit_len int
 	if length > 1 {
 		unit = input[length-2:]
 		unit_len = 2
@@ -82,13 +82,10 @@ func (hs *HumanSize) UnmarshalText(data []byte) error {
 					unit_len = 1
 				} else if unit[1] >= '0' && unit[1] <= '9' {
 					unit_len = 0
-				} else {
-					mult = 0
 				}
 			} else {
 				unit_len = 0
 			}
-			unit = "B"
 			mult = B
 		}
 	}
@@ -119,7 +116,7 @@ func (hs HumanSize) Bytes() uint64 {
 func (hs HumanSize) String() string {
 	switch {
 	case hs == 0:
-		return fmt.Sprint("0B")
+		return "0B"
 	case hs%EB == 0:
 		return fmt.Sprintf("%dEB", hs/EB)
 	case hs%PB == 0:

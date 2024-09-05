@@ -51,6 +51,7 @@ func (m *MockT) Fatalf(format string, args ...any) {
 }
 
 func ExpectFailure(t *testing.T, f func(tt testing.TB)) {
+	t.Helper()
 	var wg sync.WaitGroup
 	mock_t := &MockT{t: t}
 

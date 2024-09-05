@@ -39,51 +39,55 @@ type AFInstance struct {
 }
 
 // Simple creates and run the fish node
-func NewAquariumFish(t testing.TB, name, cfg string, args ...string) *AFInstance {
-	afi := NewAfInstance(t, name, cfg)
-	afi.Start(t, args...)
+func NewAquariumFish(tb testing.TB, name, cfg string, args ...string) *AFInstance {
+	tb.Helper()
+	afi := NewAfInstance(tb, name, cfg)
+	afi.Start(tb, args...)
 
 	return afi
 }
 
 // If you need to create instance without starting it up right away
-func NewAfInstance(t testing.TB, name, cfg string) *AFInstance {
-	t.Log("INFO: Creating new node:", name)
+func NewAfInstance(tb testing.TB, name, cfg string) *AFInstance {
+	tb.Helper()
+	tb.Log("INFO: Creating new node:", name)
 	afi := &AFInstance{
 		node_name: name,
 	}
 
-	afi.workspace = t.TempDir()
-	t.Log("INFO: Created workspace:", afi.node_name, afi.workspace)
+	afi.workspace = tb.TempDir()
+	tb.Log("INFO: Created workspace:", afi.node_name, afi.workspace)
 
 	cfg += fmt.Sprintf("\nnode_name: %q", afi.node_name)
-	os.WriteFile(filepath.Join(afi.workspace, "config.yml"), []byte(cfg), 0644)
-	t.Log("INFO: Stored config:", cfg)
+	os.WriteFile(filepath.Join(afi.workspace, "config.yml"), []byte(cfg), 0o600)
+	tb.Log("INFO: Stored config:", cfg)
 
 	return afi
 }
 
 // Start another node of cluster
 // It will automatically add cluster_join parameter to the config
-func (afi1 *AFInstance) NewClusterNode(t testing.TB, name, cfg string, args ...string) *AFInstance {
-	afi2 := afi1.NewAfInstanceCluster(t, name, cfg)
-	afi2.Start(t, args...)
+func (afi1 *AFInstance) NewClusterNode(tb testing.TB, name, cfg string, args ...string) *AFInstance {
+	tb.Helper()
+	afi2 := afi1.NewAfInstanceCluster(tb, name, cfg)
+	afi2.Start(tb, args...)
 
 	return afi2
 }
 
 // Just create the node based on the existing cluster node
-func (afi1 *AFInstance) NewAfInstanceCluster(t testing.TB, name, cfg string) *AFInstance {
-	t.Log("INFO: Creating new cluster node with seed node:", afi1.node_name)
+func (afi1 *AFInstance) NewAfInstanceCluster(tb testing.TB, name, cfg string) *AFInstance {
+	tb.Helper()
+	tb.Log("INFO: Creating new cluster node with seed node:", afi1.node_name)
 	cfg += fmt.Sprintf("\ncluster_join: [%q]", afi1.endpoint)
-	afi2 := NewAfInstance(t, name, cfg)
+	afi2 := NewAfInstance(tb, name, cfg)
 
 	// Copy seed node CA to generate valid cluster node cert
 	if err := CopyFile(filepath.Join(afi1.workspace, "fish_data", "ca.key"), filepath.Join(afi2.workspace, "fish_data", "ca.key")); err != nil {
-		t.Fatalf("ERROR: Unable to copy CA key: %v", err)
+		tb.Fatalf("ERROR: Unable to copy CA key: %v", err)
 	}
 	if err := CopyFile(filepath.Join(afi1.workspace, "fish_data", "ca.crt"), filepath.Join(afi2.workspace, "fish_data", "ca.crt")); err != nil {
-		t.Fatalf("ERROR: Unable to copy CA crt: %v", err)
+		tb.Fatalf("ERROR: Unable to copy CA crt: %v", err)
 	}
 
 	return afi2
@@ -115,21 +119,24 @@ func (afi *AFInstance) IsRunning() bool {
 }
 
 // Restart the application
-func (afi *AFInstance) Restart(t testing.TB, args ...string) {
-	t.Log("INFO: Restarting:", afi.node_name, afi.workspace)
-	afi.Stop(t)
-	afi.Start(t, args...)
+func (afi *AFInstance) Restart(tb testing.TB, args ...string) {
+	tb.Helper()
+	tb.Log("INFO: Restarting:", afi.node_name, afi.workspace)
+	afi.Stop(tb)
+	afi.Start(tb, args...)
 }
 
 // Cleanup after the test execution
-func (afi *AFInstance) Cleanup(t testing.TB) {
-	t.Log("INFO: Cleaning up:", afi.node_name, afi.workspace)
-	afi.Stop(t)
+func (afi *AFInstance) Cleanup(tb testing.TB) {
+	tb.Helper()
+	tb.Log("INFO: Cleaning up:", afi.node_name, afi.workspace)
+	afi.Stop(tb)
 	os.RemoveAll(afi.workspace)
 }
 
 // Stops the fish node executable
-func (afi *AFInstance) Stop(t testing.TB) {
+func (afi *AFInstance) Stop(tb testing.TB) {
+	tb.Helper()
 	if afi.cmd == nil || !afi.running {
 		return
 	}
@@ -137,7 +144,7 @@ func (afi *AFInstance) Stop(t testing.TB) {
 	afi.cmd.Process.Signal(os.Interrupt)
 
 	// Wait 10 seconds for process to stop
-	t.Log("INFO: Wait 10s for fish node to stop:", afi.node_name, afi.workspace)
+	tb.Log("INFO: Wait 10s for fish node to stop:", afi.node_name, afi.workspace)
 	for i := 1; i < 20; i++ {
 		if !afi.running {
 			return
@@ -150,9 +157,10 @@ func (afi *AFInstance) Stop(t testing.TB) {
 }
 
 // Starts the fish node executable
-func (afi *AFInstance) Start(t testing.TB, args ...string) {
+func (afi *AFInstance) Start(tb testing.TB, args ...string) {
+	tb.Helper()
 	if afi.running {
-		t.Fatalf("ERROR: Fish node %q can't be started since already started", afi.node_name)
+		tb.Fatalf("ERROR: Fish node %q can't be started since already started", afi.node_name)
 		return
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -172,7 +180,7 @@ func (afi *AFInstance) Start(t testing.TB, args ...string) {
 		// Listening for log and scan for token and address
 		for scanner.Scan() {
 			line := scanner.Text()
-			t.Log(afi.node_name, line)
+			tb.Log(afi.node_name, line)
 			if strings.HasPrefix(line, "Admin user pass: ") {
 				val := strings.SplitN(strings.TrimSpace(line), "Admin user pass: ", 2)
 				if len(val) < 2 {
@@ -195,7 +203,7 @@ func (afi *AFInstance) Start(t testing.TB, args ...string) {
 				init_done <- ""
 			}
 		}
-		t.Log("INFO: Reading of AquariumFish output is done")
+		tb.Log("INFO: Reading of AquariumFish output is done")
 	}()
 
 	afi.cmd.Start()
@@ -207,7 +215,7 @@ func (afi *AFInstance) Start(t testing.TB, args ...string) {
 			r.Close()
 		}()
 		if err := afi.cmd.Wait(); err != nil {
-			t.Log("WARN: AquariumFish process was stopped:", err)
+			tb.Log("WARN: AquariumFish process was stopped:", err)
 			init_done <- fmt.Sprintf("ERROR: Fish was stopped with exit code: %v", err)
 		}
 	}()
@@ -215,6 +223,6 @@ func (afi *AFInstance) Start(t testing.TB, args ...string) {
 	failed := <-init_done
 
 	if failed != "" {
-		t.Fatalf("ERROR: Failed to init node %q: %s", afi.node_name, failed)
+		tb.Fatalf("ERROR: Failed to init node %q: %s", afi.node_name, failed)
 	}
 }

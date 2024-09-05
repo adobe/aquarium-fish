@@ -15,7 +15,6 @@ package fish
 import (
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"os"
 	"os/signal"
 	"path"
@@ -58,7 +57,7 @@ type Fish struct {
 	applications_mutex sync.Mutex
 	applications       []types.ApplicationUID
 
-	// Used to temporarly store the won Votes by Application create time
+	// Used to temporary store the won Votes by Application create time
 	won_votes_mutex sync.Mutex
 	won_votes       map[int64]types.Vote
 
@@ -68,9 +67,6 @@ type Fish struct {
 }
 
 func New(db *gorm.DB, cfg *Config) (*Fish, error) {
-	// Init rand generator
-	rand.Seed(time.Now().UnixNano())
-
 	f := &Fish{db: db, cfg: cfg}
 	if err := f.Init(); err != nil {
 		return nil, err
@@ -246,14 +242,15 @@ func (f *Fish) GetLocationName() types.LocationName {
 	return f.node.LocationName
 }
 
-func (f *Fish) checkNewApplicationProcess() error {
+func (f *Fish) checkNewApplicationProcess() {
 	check_ticker := time.NewTicker(5 * time.Second)
 	for {
 		if !f.running {
 			break
 		}
-		select {
-		case <-check_ticker.C:
+		// TODO: Here should be select with quit in case app is stopped to not wait next ticker
+		<-check_ticker.C
+		{
 			// Check new apps available for processing
 			new_apps, err := f.ApplicationListGetStatusNew()
 			if err != nil {
@@ -305,7 +302,6 @@ func (f *Fish) checkNewApplicationProcess() error {
 			f.won_votes_mutex.Unlock()
 		}
 	}
-	return nil
 }
 
 func (f *Fish) voteProcessRound(vote *types.Vote) error {
@@ -433,7 +429,7 @@ func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 
 	// Verify node filters because some workload can't be running on all the physical nodes
 	// The node becomes fitting only when all the needed node filter patterns are matched
-	if def.Resources.NodeFilter != nil && len(def.Resources.NodeFilter) > 0 {
+	if len(def.Resources.NodeFilter) > 0 {
 		needed_idents := def.Resources.NodeFilter
 		current_idents := f.cfg.NodeIdentifiers
 		for _, needed := range needed_idents {
@@ -625,7 +621,7 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 					log.Error("Fish: Unable to store Resource for Application:", app.UID, err)
 				}
 				app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusALLOCATED,
-					Description: fmt.Sprint("Driver allocated the resource"),
+					Description: "Driver allocated the resource",
 				}
 				log.Infof("Fish: Allocated Resource %q for the Application %s", app.UID, res.Identifier)
 			}
@@ -701,7 +697,7 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 				} else {
 					log.Info("Fish: Successful deallocation of the Application:", app.UID)
 					app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusDEALLOCATED,
-						Description: fmt.Sprint("Driver deallocated the resource"),
+						Description: "Driver deallocated the resource",
 					}
 				}
 				// Destroying the resource anyway to not bloat the table - otherwise it will stuck there and
@@ -749,7 +745,7 @@ func (f *Fish) executeApplicationTasks(drv drivers.ResourceDriver, def *types.La
 		t := drv.GetTask(task.Task, string(task.Options))
 		if t == nil {
 			log.Error("Fish: Unable to get associated driver task type for Application:", res.ApplicationUID, task.Task)
-			task.Result = util.UnparsedJson(`{"error":"task not availble in driver"}`)
+			task.Result = util.UnparsedJson(`{"error":"task not available in driver"}`)
 		} else {
 			// Executing the task
 			t.SetInfo(&task, def, res)
@@ -873,7 +869,7 @@ func (f *Fish) activateShutdown() {
 					fire_shutdown <- true
 				}
 			case <-delay_ticker_report.C:
-				log.Infof("Fish: Shutdown: countdown: T-%v", delay_end_time.Sub(time.Now()))
+				log.Infof("Fish: Shutdown: countdown: T-%v", time.Until(delay_end_time))
 			case <-delay_timer.C:
 				// Delay time has passed, triggering shutdown
 				fire_shutdown <- true

@@ -33,7 +33,8 @@ func CreateLock(lock_path string) error {
 	}
 
 	// Writing pid into the file for additional info
-	lock_file.Write([]byte(fmt.Sprintf("%d", os.Getpid())))
+	data := []byte(fmt.Sprintf("%d", os.Getpid()))
+	lock_file.Write(data)
 	lock_file.Close()
 
 	return nil

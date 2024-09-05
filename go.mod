@@ -1,6 +1,6 @@
 module github.com/adobe/aquarium-fish
 
-go 1.21.0
+go 1.22.2
 
 require (
 	github.com/alessio/shellescape v1.4.1
@@ -14,7 +14,6 @@ require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/glebarez/sqlite v1.7.0
 	github.com/google/uuid v1.5.0
-	github.com/gorilla/websocket v1.4.0
 	github.com/hpcloud/tail v1.0.0
 	github.com/labstack/echo/v4 v4.11.4
 	github.com/mostlygeek/arp v0.0.0-20170424181311-541a2129847a

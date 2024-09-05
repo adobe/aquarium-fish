@@ -75,18 +75,17 @@ func (f *Fish) NodeGet(name string) (node *types.Node, err error) {
 	return node, err
 }
 
-func (f *Fish) pingProcess() error {
+func (f *Fish) pingProcess() {
 	// In order to optimize network & database - update just UpdatedAt field
 	ping_ticker := time.NewTicker(types.NODE_PING_DELAY * time.Second)
 	for {
 		if !f.running {
 			break
 		}
-		select {
-		case <-ping_ticker.C:
-			log.Debug("Fish Node: ping")
-			f.NodePing(f.node)
-		}
+
+		// TODO: Here should be select with quit in case app is stopped to not wait next ticker
+		<-ping_ticker.C
+		log.Debug("Fish Node: ping")
+		f.NodePing(f.node)
 	}
-	return nil
 }

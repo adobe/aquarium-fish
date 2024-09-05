@@ -22,7 +22,7 @@ import (
 
 const NODE_PING_DELAY = 10
 
-var NodePingDuplicationErr = fmt.Errorf("Fish Node: Unable to join the Aquarium cluster due to " +
+var ErrNodePingDuplication = fmt.Errorf("Fish Node: Unable to join the Aquarium cluster due to " +
 	"the node with the same name pinged the cluster less then 2xNODE_PING_DELAY time ago")
 
 func (n *Node) Init(node_address, cert_path string) error {
@@ -51,7 +51,7 @@ func (n *Node) Init(node_address, cert_path string) error {
 		n.Pubkey = &pubkey_der
 	} else {
 		// Validate the existing pubkey
-		if bytes.Compare(*n.Pubkey, pubkey_der) != 0 {
+		if !bytes.Equal(*n.Pubkey, pubkey_der) {
 			return fmt.Errorf("Fish Node: The pubkey was changed for Node, that's not supported")
 		}
 	}

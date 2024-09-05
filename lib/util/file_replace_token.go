@@ -16,7 +16,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,7 +35,7 @@ func FileReplaceToken(path string, full_line, add, anycase bool, token_values ..
 	}
 
 	// Open output file
-	out_f, err := ioutil.TempFile(filepath.Dir(path), "tmp")
+	out_f, err := os.CreateTemp(filepath.Dir(path), "tmp")
 	if err != nil {
 		return err
 	}

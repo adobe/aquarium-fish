@@ -26,7 +26,7 @@ func CopyFile(src, dst string) error {
 	}
 	defer fin.Close()
 
-	os.MkdirAll(filepath.Dir(dst), 0755)
+	os.MkdirAll(filepath.Dir(dst), 0o755)
 	fout, err := os.Create(dst)
 	if err != nil {
 		return err

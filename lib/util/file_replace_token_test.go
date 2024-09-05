@@ -31,7 +31,7 @@ func Test_file_replace_token_simple_proceed(t *testing.T) {
 		"test4 test5 test6\n" +
 		"test7 test8 test9\n")
 
-	os.WriteFile(tmp_file, in_data, 0644)
+	os.WriteFile(tmp_file, in_data, 0o644)
 
 	FileReplaceToken(tmp_file,
 		false, false, false,
@@ -57,7 +57,7 @@ func Test_file_replace_token_simple_skip_uppercase_src(t *testing.T) {
 		"test4 <TOKEN> test6\n" +
 		"test7 test8 test9\n")
 
-	os.WriteFile(tmp_file, in_data, 0644)
+	os.WriteFile(tmp_file, in_data, 0o644)
 
 	FileReplaceToken(tmp_file,
 		false, false, false,
@@ -83,7 +83,7 @@ func Test_file_replace_token_simple_skip_uppercase_token(t *testing.T) {
 		"test4 <token> test6\n" +
 		"test7 test8 test9\n")
 
-	os.WriteFile(tmp_file, in_data, 0644)
+	os.WriteFile(tmp_file, in_data, 0o644)
 
 	FileReplaceToken(tmp_file,
 		false, false, false,
@@ -109,7 +109,7 @@ func Test_file_replace_token_anycase_token_proceed(t *testing.T) {
 		"test4 test5 test6\n" +
 		"test7 test8 test9\n")
 
-	os.WriteFile(tmp_file, in_data, 0644)
+	os.WriteFile(tmp_file, in_data, 0o644)
 
 	FileReplaceToken(tmp_file,
 		false, false, true,
@@ -135,7 +135,7 @@ func Test_file_replace_token_anycase_src_proceed(t *testing.T) {
 		"test4 test5 test6\n" +
 		"test7 test8 test9\n")
 
-	os.WriteFile(tmp_file, in_data, 0644)
+	os.WriteFile(tmp_file, in_data, 0o644)
 
 	FileReplaceToken(tmp_file,
 		false, false, true,
@@ -161,7 +161,7 @@ func Test_file_replace_token_anycase_multiple(t *testing.T) {
 		"test4 test5 test5 test6\n" +
 		"test7 test8 test9\n")
 
-	os.WriteFile(tmp_file, in_data, 0644)
+	os.WriteFile(tmp_file, in_data, 0o644)
 
 	FileReplaceToken(tmp_file,
 		false, false, true,
@@ -186,7 +186,7 @@ func Test_file_replace_token_add(t *testing.T) {
 		"test4 test5 test6\n" +
 		"test5\n")
 
-	os.WriteFile(tmp_file, in_data, 0644)
+	os.WriteFile(tmp_file, in_data, 0o644)
 
 	FileReplaceToken(tmp_file,
 		false, true, false,
@@ -212,7 +212,7 @@ func Test_file_replace_token_do_not_add_if_replaced(t *testing.T) {
 		"test4 test5 test6\n" +
 		"test7 test8 test9\n")
 
-	os.WriteFile(tmp_file, in_data, 0644)
+	os.WriteFile(tmp_file, in_data, 0o644)
 
 	FileReplaceToken(tmp_file,
 		false, true, false,
@@ -238,7 +238,7 @@ func Test_file_replace_token_full_line(t *testing.T) {
 		"test5\n" +
 		"test7 test8 test9\n")
 
-	os.WriteFile(tmp_file, in_data, 0644)
+	os.WriteFile(tmp_file, in_data, 0o644)
 
 	FileReplaceToken(tmp_file,
 		true, false, false,

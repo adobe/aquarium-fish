@@ -27,7 +27,6 @@ import (
 	"gorm.io/gorm/logger"
 
 	"github.com/adobe/aquarium-fish/lib/build"
-	"github.com/adobe/aquarium-fish/lib/cluster"
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
@@ -44,7 +43,6 @@ func main() {
 	var proxy_socks_address string
 	var proxy_ssh_address string
 	var node_address string
-	var cluster_join *[]string
 	var cfg_path string
 	var dir string
 	var cpu_limit string
@@ -82,9 +80,6 @@ func main() {
 			}
 			if node_address != "" {
 				cfg.NodeAddress = node_address
-			}
-			if len(*cluster_join) > 0 {
-				cfg.ClusterJoin = *cluster_join
 			}
 			if dir != "" {
 				cfg.Directory = dir
@@ -174,14 +169,8 @@ func main() {
 				return err
 			}
 
-			log.Info("Fish joining cluster...")
-			cl, err := cluster.New(fish, cfg.ClusterJoin, ca_path, cert_path, key_path)
-			if err != nil {
-				return err
-			}
-
 			log.Info("Fish starting API...")
-			srv, err := openapi.Init(fish, cl, cfg.APIAddress, ca_path, cert_path, key_path)
+			srv, err := openapi.Init(fish, cfg.APIAddress, ca_path, cert_path, key_path)
 			if err != nil {
 				return err
 			}
@@ -199,7 +188,6 @@ func main() {
 
 			log.Info("Fish stopping...")
 
-			cl.Stop()
 			fish.Close()
 
 			log.Info("Fish stopped")
@@ -213,7 +201,6 @@ func main() {
 	flags.StringVar(&proxy_socks_address, "socks_proxy", "", "address used to expose the SOCKS5 proxy")
 	flags.StringVar(&proxy_ssh_address, "ssh_proxy", "", "address used to expose the SSH proxy")
 	flags.StringVarP(&node_address, "node", "n", "", "node external endpoint to connect to tell the other nodes")
-	cluster_join = flags.StringSliceP("join", "j", nil, "addresses of existing cluster nodes to join, comma separated")
 	flags.StringVarP(&cfg_path, "cfg", "c", "", "yaml configuration file")
 	flags.StringVarP(&dir, "dir", "D", "", "database and other fish files directory")
 	flags.StringVar(&cpu_limit, "cpu", "", "max amount of threads fish node will be able to utilize, default - no limit")

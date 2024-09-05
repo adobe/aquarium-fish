@@ -101,7 +101,7 @@ func (d *Driver) ValidateDefinition(def types.LabelDefinition) error {
 		// Empty name means user home which is always exists
 		if img.Tag != "" {
 			found := false
-			for d_name, _ := range def.Resources.Disks {
+			for d_name := range def.Resources.Disks {
 				if d_name == img.Tag {
 					found = true
 					break

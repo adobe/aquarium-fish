@@ -126,7 +126,7 @@ func (c *Config) Validate() (err error) {
 	// It helps with the machines where internet is not available right away
 	retries := 6
 	counter := 0
-	account := ""
+	var account string
 	for {
 		res, err := conn.GetCallerIdentity(context.TODO(), input)
 		counter++

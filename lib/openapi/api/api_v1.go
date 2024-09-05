@@ -61,15 +61,25 @@ func (e *Processor) BasicAuth(username, password string, c echo.Context) (bool, 
 }
 
 func (e *Processor) UserMeGet(c echo.Context) error {
-	user := c.Get("user")
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+	// Cleanup the hash to prevent malicious activity
+	user.Hash = crypt.Hash{}
 	return c.JSON(http.StatusOK, user)
 }
 
 func (e *Processor) UserListGet(c echo.Context, params types.UserListGetParams) error {
 	// Only admin can list users
-	user := c.Get("user")
-	if user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can list users")})
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+	if user.Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can list users"})
 		return fmt.Errorf("Only 'admin' user can list users")
 	}
 
@@ -83,9 +93,13 @@ func (e *Processor) UserListGet(c echo.Context, params types.UserListGetParams) 
 }
 
 func (e *Processor) UserGet(c echo.Context, name string) error {
-	user := c.Get("user")
-	if user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can get user")})
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+	if user.Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can get user"})
 		return fmt.Errorf("Only 'admin' user can get user")
 	}
 
@@ -108,11 +122,11 @@ func (e *Processor) UserCreateUpdatePost(c echo.Context) error {
 
 	user, ok := c.Get("user").(*types.User)
 	if !ok {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Not authentified")})
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
 		return fmt.Errorf("Not authentified")
 	}
 	if user.Name != "admin" && user.Name != data.Name {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can create user and user can update itself")})
+		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can create user and user can update itself"})
 		return fmt.Errorf("Only 'admin' user can create user and user can update itself")
 	}
 
@@ -149,9 +163,13 @@ func (e *Processor) UserCreateUpdatePost(c echo.Context) error {
 
 func (e *Processor) UserDelete(c echo.Context, name string) error {
 	// Only admin can delete user
-	user := c.Get("user")
-	if user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can delete user")})
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+	if user.Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can delete user"})
 		return fmt.Errorf("Only 'admin' user can delete user")
 	}
 
@@ -165,9 +183,13 @@ func (e *Processor) UserDelete(c echo.Context, name string) error {
 
 func (e *Processor) ResourceListGet(c echo.Context, params types.ResourceListGetParams) error {
 	// Only admin can list the resources
-	user := c.Get("user")
-	if user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can list resource")})
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+	if user.Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can list resource"})
 		return fmt.Errorf("Only 'admin' user can list resource")
 	}
 
@@ -182,9 +204,13 @@ func (e *Processor) ResourceListGet(c echo.Context, params types.ResourceListGet
 
 func (e *Processor) ResourceGet(c echo.Context, uid types.ResourceUID) error {
 	// Only admin can get the resource directly
-	user := c.Get("user")
-	if user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can get resource")})
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+	if user.Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can get resource"})
 		return fmt.Errorf("Only 'admin' user can get resource")
 	}
 
@@ -198,18 +224,32 @@ func (e *Processor) ResourceGet(c echo.Context, uid types.ResourceUID) error {
 }
 
 func (e *Processor) ResourceAccessPut(c echo.Context, uid types.ResourceUID) error {
-	// NOTE: `user` is already defined / non-nil.
-	user := c.Get("user")
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
 
-	resource, err := e.fish.ResourceGet(uid)
+	res, err := e.fish.ResourceGet(uid)
 	if err != nil {
 		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Resource not found: %v", err)})
 		return fmt.Errorf("Resource not found: %w", err)
 	}
 
+	// Only the owner and admin can create access for application resource
+	app, err := e.fish.ApplicationGet(res.ApplicationUID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", res.ApplicationUID)})
+		return fmt.Errorf("Unable to find the Application: %s, %w", res.ApplicationUID, err)
+	}
+	if app.OwnerName != user.Name && user.Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": "Only the owner & admin can assign service mapping to the Application"})
+		return fmt.Errorf("Only the owner & admin can assign service mapping to the Application")
+	}
+
 	r_access := types.ResourceAccess{
-		ResourceUID: resource.UID,
-		Username:    user.(*types.User).Name,
+		ResourceUID: res.UID,
+		Username:    user.Name,
 		Password:    crypt.RandString(64),
 	}
 	e.fish.ResourceAccessCreate(&r_access)
@@ -225,11 +265,15 @@ func (e *Processor) ApplicationListGet(c echo.Context, params types.ApplicationL
 	}
 
 	// Filter the output by owner
-	user := c.Get("user")
-	if user.(*types.User).Name != "admin" {
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+	if user.Name != "admin" {
 		var owner_out []types.Application
 		for _, app := range out {
-			if app.OwnerName == user.(*types.User).Name {
+			if app.OwnerName == user.Name {
 				owner_out = append(owner_out, app)
 			}
 		}
@@ -247,9 +291,13 @@ func (e *Processor) ApplicationGet(c echo.Context, uid types.ApplicationUID) err
 	}
 
 	// Only the owner of the application (or admin) can request it
-	user := c.Get("user")
-	if app.OwnerName != user.(*types.User).Name && user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner and admin can request the Application")})
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+	if app.OwnerName != user.Name && user.Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": "Only the owner and admin can request the Application"})
 		return fmt.Errorf("Only the owner and admin can request the Application")
 	}
 
@@ -264,8 +312,12 @@ func (e *Processor) ApplicationCreatePost(c echo.Context) error {
 	}
 
 	// Set the User field out of the authorized user
-	user := c.Get("user")
-	data.OwnerName = user.(*types.User).Name
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+	data.OwnerName = user.Name
 
 	if err := e.fish.ApplicationCreate(&data); err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to create application: %v", err)})
@@ -283,9 +335,13 @@ func (e *Processor) ApplicationResourceGet(c echo.Context, uid types.Application
 	}
 
 	// Only the owner of the application (or admin) can request the resource
-	user := c.Get("user")
-	if app.OwnerName != user.(*types.User).Name && user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner and admin can request the Application resource")})
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+	if app.OwnerName != user.Name && user.Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": "Only the owner and admin can request the Application resource"})
 		return fmt.Errorf("Only the owner and admin can request the Application resource")
 	}
 
@@ -306,9 +362,13 @@ func (e *Processor) ApplicationStateGet(c echo.Context, uid types.ApplicationUID
 	}
 
 	// Only the owner of the application (or admin) can request the status
-	user := c.Get("user")
-	if app.OwnerName != user.(*types.User).Name && user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner and admin can request the Application status")})
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+	if app.OwnerName != user.Name && user.Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": "Only the owner and admin can request the Application status"})
 		return fmt.Errorf("Only the owner and admin can request the Application status")
 	}
 
@@ -329,9 +389,13 @@ func (e *Processor) ApplicationTaskListGet(c echo.Context, app_uid types.Applica
 	}
 
 	// Only the owner of the application (or admin) could get the tasks
-	user := c.Get("user")
-	if app.OwnerName != user.(*types.User).Name && user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner of Application & admin can get the Application Tasks")})
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+	if app.OwnerName != user.Name && user.Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": "Only the owner of Application & admin can get the Application Tasks"})
 		return fmt.Errorf("Only the owner of Application & admin can get the Application Tasks")
 	}
 
@@ -352,9 +416,13 @@ func (e *Processor) ApplicationTaskCreatePost(c echo.Context, app_uid types.Appl
 	}
 
 	// Only the owner of the application (or admin) could create the tasks
-	user := c.Get("user")
-	if app.OwnerName != user.(*types.User).Name && user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner of Application & admin can create the Application Tasks")})
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+	if app.OwnerName != user.Name && user.Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": "Only the owner of Application & admin can create the Application Tasks"})
 		return fmt.Errorf("Only the owner of Application & admin can create the Application Tasks")
 	}
 
@@ -389,9 +457,13 @@ func (e *Processor) ApplicationTaskGet(c echo.Context, task_uid types.Applicatio
 	}
 
 	// Only the owner of the application (or admin) could get the attached task
-	user := c.Get("user")
-	if app.OwnerName != user.(*types.User).Name && user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner of Application & admin can get the ApplicationTask")})
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+	if app.OwnerName != user.Name && user.Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": "Only the owner of Application & admin can get the ApplicationTask"})
 		return fmt.Errorf("Only the owner of Application & admin can get the ApplicationTask")
 	}
 
@@ -406,9 +478,13 @@ func (e *Processor) ApplicationDeallocateGet(c echo.Context, uid types.Applicati
 	}
 
 	// Only the owner of the application (or admin) could deallocate it
-	user := c.Get("user")
-	if app.OwnerName != user.(*types.User).Name && user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner & admin can deallocate the Application resource")})
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+	if app.OwnerName != user.Name && user.Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": "Only the owner & admin can deallocate the Application resource"})
 		return fmt.Errorf("Only the owner & admin can deallocate the Application resource")
 	}
 
@@ -428,7 +504,7 @@ func (e *Processor) ApplicationDeallocateGet(c echo.Context, uid types.Applicati
 		new_status = types.ApplicationStatusRECALLED
 	}
 	as := &types.ApplicationState{ApplicationUID: uid, Status: new_status,
-		Description: fmt.Sprintf("Requested by user %s", user.(*types.User).Name),
+		Description: fmt.Sprintf("Requested by user %s", user.Name),
 	}
 	err = e.fish.ApplicationStateCreate(as)
 	if err != nil {
@@ -461,9 +537,13 @@ func (e *Processor) LabelGet(c echo.Context, uid types.LabelUID) error {
 
 func (e *Processor) LabelCreatePost(c echo.Context) error {
 	// Only admin can create label
-	user := c.Get("user")
-	if user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can create label")})
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+	if user.Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can create label"})
 		return fmt.Errorf("Only 'admin' user can create label")
 	}
 
@@ -482,9 +562,13 @@ func (e *Processor) LabelCreatePost(c echo.Context) error {
 
 func (e *Processor) LabelDelete(c echo.Context, uid types.LabelUID) error {
 	// Only admin can delete label
-	user := c.Get("user")
-	if user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can delete Label")})
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+	if user.Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can delete Label"})
 		return fmt.Errorf("Only 'admin' user can delete label")
 	}
 
@@ -514,9 +598,13 @@ func (e *Processor) NodeThisGet(c echo.Context) error {
 }
 
 func (e *Processor) NodeThisMaintenanceGet(c echo.Context, params types.NodeThisMaintenanceGetParams) error {
-	user := c.Get("user")
-	if user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' can set node maintenance")})
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+	if user.Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' can set node maintenance"})
 		return fmt.Errorf("Only 'admin' user can set node maintenance")
 	}
 
@@ -550,11 +638,14 @@ func (e *Processor) NodeThisProfilingIndexGet(c echo.Context) error {
 }
 
 func (e *Processor) NodeThisProfilingGet(c echo.Context, handler string) error {
-	user := c.Get("user")
-	if user.(*types.User).Name != "admin" {
-		message := "Only 'admin' can see profiling info"
-		c.JSON(http.StatusBadRequest, H{"message": message})
-		return fmt.Errorf(message)
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+	if user.Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' can see profiling info"})
+		return fmt.Errorf("Only 'admin' can see profiling info")
 	}
 
 	switch handler {
@@ -573,18 +664,21 @@ func (e *Processor) NodeThisProfilingGet(c echo.Context, handler string) error {
 	case "trace":
 		pprof.Trace(c.Response(), c.Request())
 	default:
-		message := "Unable to find requested profiling handler"
-		c.JSON(http.StatusNotFound, H{"message": message})
-		return fmt.Errorf(message)
+		c.JSON(http.StatusNotFound, H{"message": "Unable to find requested profiling handler"})
+		return fmt.Errorf("Unable to find requested profiling handler")
 	}
 
 	return nil
 }
 
 func (e *Processor) VoteListGet(c echo.Context, params types.VoteListGetParams) error {
-	user := c.Get("user")
-	if user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can get votes")})
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+	if user.Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can get votes"})
 		return fmt.Errorf("Only 'admin' user can get votes")
 	}
 
@@ -598,9 +692,13 @@ func (e *Processor) VoteListGet(c echo.Context, params types.VoteListGetParams) 
 }
 
 func (e *Processor) LocationListGet(c echo.Context, params types.LocationListGetParams) error {
-	user := c.Get("user")
-	if user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can get locations")})
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+	if user.Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can get locations"})
 		return fmt.Errorf("Only 'admin' user can get locations")
 	}
 
@@ -614,9 +712,13 @@ func (e *Processor) LocationListGet(c echo.Context, params types.LocationListGet
 }
 
 func (e *Processor) LocationCreatePost(c echo.Context) error {
-	user := c.Get("user")
-	if user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can create location")})
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+	if user.Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can create location"})
 		return fmt.Errorf("Only 'admin' user can create location")
 	}
 
@@ -635,9 +737,13 @@ func (e *Processor) LocationCreatePost(c echo.Context) error {
 }
 
 func (e *Processor) ServiceMappingGet(c echo.Context, uid types.ServiceMappingUID) error {
-	user := c.Get("user")
-	if user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can get service mapping")})
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+	if user.Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can get service mapping"})
 		return fmt.Errorf("Only 'admin' user can get service mapping")
 	}
 
@@ -651,9 +757,13 @@ func (e *Processor) ServiceMappingGet(c echo.Context, uid types.ServiceMappingUI
 }
 
 func (e *Processor) ServiceMappingListGet(c echo.Context, params types.ServiceMappingListGetParams) error {
-	user := c.Get("user")
-	if user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can get service mappings")})
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+	if user.Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can get service mappings"})
 		return fmt.Errorf("Only 'admin' user can get service mappings")
 	}
 
@@ -673,7 +783,11 @@ func (e *Processor) ServiceMappingCreatePost(c echo.Context) error {
 		return fmt.Errorf("Wrong request body: %w", err)
 	}
 
-	user := c.Get("user")
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
 	if data.ApplicationUID != uuid.Nil {
 		// Only the owner and admin can create servicemapping for his application
 		app, err := e.fish.ApplicationGet(data.ApplicationUID)
@@ -682,12 +796,12 @@ func (e *Processor) ServiceMappingCreatePost(c echo.Context) error {
 			return fmt.Errorf("Unable to find the Application: %s, %w", data.ApplicationUID, err)
 		}
 
-		if app.OwnerName != user.(*types.User).Name && user.(*types.User).Name != "admin" {
-			c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only the owner & admin can assign service mapping to the Application")})
+		if app.OwnerName != user.Name && user.Name != "admin" {
+			c.JSON(http.StatusBadRequest, H{"message": "Only the owner & admin can assign service mapping to the Application"})
 			return fmt.Errorf("Only the owner & admin can assign service mapping to the Application")
 		}
-	} else if user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can create service mapping with undefined Application")})
+	} else if user.Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can create service mapping with undefined Application"})
 		return fmt.Errorf("Only 'admin' user can create service mapping with undefined Application")
 	}
 
@@ -701,9 +815,13 @@ func (e *Processor) ServiceMappingCreatePost(c echo.Context) error {
 
 func (e *Processor) ServiceMappingDelete(c echo.Context, uid types.ServiceMappingUID) error {
 	// Only admin can delete ServiceMapping
-	user := c.Get("user")
-	if user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can delete service mapping")})
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+	if user.Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can delete service mapping"})
 		return fmt.Errorf("Only 'admin' user can delete service mapping")
 	}
 

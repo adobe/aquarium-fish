@@ -59,14 +59,12 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 		return []byte(`{"error":"internal: invalid resource"}`), log.Error("TEST: Invalid resource:", t.Resource)
 	}
 	if err := randomFail(fmt.Sprintf("Snapshot %s", t.Resource.Identifier), t.driver.cfg.FailSnapshot); err != nil {
-		out, _ := json.Marshal(map[string]any{})
-		return out, log.Error("TEST: RandomFail:", err)
+		return []byte(`{}`), log.Error("TEST: RandomFail:", err)
 	}
 
 	res_file := filepath.Join(t.driver.cfg.WorkspacePath, t.Resource.Identifier)
 	if _, err := os.Stat(res_file); os.IsNotExist(err) {
-		out, _ := json.Marshal(map[string]any{})
-		return out, fmt.Errorf("TEST: Unable to snapshot unavailable resource '%s'", t.Resource.Identifier)
+		return []byte(`{}`), fmt.Errorf("TEST: Unable to snapshot unavailable resource '%s'", t.Resource.Identifier)
 	}
 
 	return json.Marshal(map[string]any{"snapshots": []string{"test-snapshot"}, "when": t.ApplicationTask.When})

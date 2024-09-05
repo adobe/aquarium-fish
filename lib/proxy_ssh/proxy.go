@@ -118,7 +118,7 @@ func (p *ProxyAccess) serveConnection(conn net.Conn, serverConfig *ssh.ServerCon
 		Auth: []ssh.AuthMethod{
 			ssh.Password(resource.Authentication.Password),
 		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106 , remote always have new hostkey by design
 	}
 	remoteConn, err := ssh.Dial("tcp", remoteAddr, remoteConfig)
 	if err != nil {

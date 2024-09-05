@@ -62,7 +62,7 @@ func (r *Resources) Validate(disk_types []string, check_net bool) error {
 			return fmt.Errorf("Resources: Disk name can't be empty")
 		}
 		if len(disk_types) > 0 && !util.Contains(disk_types, disk.Type) {
-			return fmt.Errorf(fmt.Sprintf("Resources: Type of disk must be one of: %+q", disk_types))
+			return fmt.Errorf("Resources: Type of disk must be one of: %+q", disk_types)
 		}
 		if disk.Size < 1 {
 			return fmt.Errorf("Resources: Size of the disk can't be less than 1GB")

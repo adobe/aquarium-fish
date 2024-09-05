@@ -125,7 +125,7 @@ func (d *Driver) getAvailResources() (avail_cpu, avail_ram uint) {
 	return
 }
 
-// Returns the standartized container name
+// Returns the standardized container name
 func (d *Driver) getContainerName(hwaddr string) string {
 	return fmt.Sprintf("fish-%s", strings.ReplaceAll(hwaddr, ":", ""))
 }
@@ -138,7 +138,7 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 		log.Info("Docker: Loading the required image:", image.Name, image.Version, image.Url)
 
 		// Running the background routine to download, unpack and process the image
-		// Success will be checked later by existance of the image in local docker registry
+		// Success will be checked later by existence of the image in local docker registry
 		wg.Add(1)
 		go func(image drivers.Image) {
 			defer wg.Done()
@@ -313,7 +313,7 @@ func (d *Driver) disksCreate(c_name string, run_args *[]string, disks map[string
 
 		// Do not recreate the disk if it is exists
 		if _, err := os.Stat(dmg_path); os.IsNotExist(err) {
-			disk_type := ""
+			var disk_type string
 			switch disk.Type {
 			case "hfs+":
 				disk_type = "HFS+"
@@ -370,7 +370,7 @@ func (d *Driver) envCreate(c_name string, metadata map[string]any) (string, erro
 	if err := os.MkdirAll(filepath.Dir(env_file_path), 0o755); err != nil {
 		return "", log.Error("Docker: Unable to create the container directory:", filepath.Dir(env_file_path), err)
 	}
-	fd, err := os.OpenFile(env_file_path, os.O_WRONLY|os.O_CREATE, 0640)
+	fd, err := os.OpenFile(env_file_path, os.O_WRONLY|os.O_CREATE, 0o640)
 	if err != nil {
 		return "", log.Error("Docker: Unable to create env file:", env_file_path, err)
 	}
@@ -378,7 +378,8 @@ func (d *Driver) envCreate(c_name string, metadata map[string]any) (string, erro
 
 	// Write env file line by line
 	for key, value := range metadata {
-		if _, err := fd.Write([]byte(fmt.Sprintf("%s=%s\n", key, value))); err != nil {
+		data := []byte(fmt.Sprintf("%s=%s\n", key, value))
+		if _, err := fd.Write(data); err != nil {
 			return "", log.Error("Docker: Unable to write env file data:", env_file_path, err)
 		}
 	}
@@ -424,8 +425,8 @@ func runAndLog(timeout time.Duration, path string, arg ...string) (string, strin
 	}
 
 	// Replace these for Windows, we only want to deal with Unix style line endings.
-	returnStdout := strings.Replace(stdout.String(), "\r\n", "\n", -1)
-	returnStderr := strings.Replace(stderr.String(), "\r\n", "\n", -1)
+	returnStdout := strings.ReplaceAll(stdout.String(), "\r\n", "\n")
+	returnStderr := strings.ReplaceAll(stderr.String(), "\r\n", "\n")
 
 	return returnStdout, returnStderr, err
 }

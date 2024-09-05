@@ -112,7 +112,7 @@ func (h *Hash) IsEqual(input string) bool {
 		h.Prop.Threads = v074_Argon2_Threads
 	}
 
-	return bytes.Compare(h.Hash, argon2.IDKey([]byte(input), h.Salt, h.Prop.Iterations, h.Prop.Memory, h.Prop.Threads, uint32(len(h.Hash)))) == 0
+	return bytes.Equal(h.Hash, argon2.IDKey([]byte(input), h.Salt, h.Prop.Iterations, h.Prop.Memory, h.Prop.Threads, uint32(len(h.Hash))))
 }
 
 func (hash *Hash) IsEmpty() bool {

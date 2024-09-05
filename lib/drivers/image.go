@@ -14,8 +14,9 @@ package drivers
 
 import (
 	"archive/tar"
-	"crypto/md5"
-	"crypto/sha1"
+	"context"
+	"crypto/md5"  // #nosec G501
+	"crypto/sha1" // #nosec G505
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
@@ -61,7 +62,7 @@ func (i *Image) Validate() error {
 		i.Name = path.Base(i.Url)
 		minus_loc := strings.LastIndexByte(i.Name, '-')
 		if minus_loc != -1 {
-			// Use the part from beginnig to last minus ('-') - useful to separate version part
+			// Use the part from beginning to last minus ('-') - useful to separate version part
 			i.Name = i.Name[0:minus_loc]
 		} else if strings.LastIndexByte(i.Name, '.') != -1 {
 			// Split by extension - need to take into account dual extension of tar archives (ex. ".tar.xz")
@@ -139,7 +140,7 @@ func (i *Image) DownloadUnpack(out_dir, user, password string) error {
 	defer os.Remove(lock_path)
 
 	client := &http.Client{}
-	req, _ := http.NewRequest("GET", i.Url, nil)
+	req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, i.Url, nil)
 	if user != "" && password != "" {
 		req.SetBasicAuth(user, password)
 	}
@@ -150,7 +151,7 @@ func (i *Image) DownloadUnpack(out_dir, user, password string) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		os.RemoveAll(img_path)
 		return fmt.Errorf("Image: Unable to download file %q: %s", i.Url, resp.Status)
 	}
@@ -174,9 +175,9 @@ func (i *Image) DownloadUnpack(out_dir, user, password string) error {
 		// Calculating checksum during reading from the body
 		switch algo_sum[0] {
 		case "md5":
-			hasher = md5.New()
+			hasher = md5.New() // #nosec G401
 		case "sha1":
-			hasher = sha1.New()
+			hasher = sha1.New() // #nosec G401
 		case "sha256":
 			hasher = sha256.New()
 		case "sha512":
@@ -191,12 +192,12 @@ func (i *Image) DownloadUnpack(out_dir, user, password string) error {
 		// Check if headers contains the needed algo:hash for quick validation
 		// We're not completely trust the server, but if it returns the wrong sum - we're dropping.
 		// Header should look like: X-Checksum-Md5 X-Checksum-Sha1 X-Checksum-Sha256 (Artifactory)
-		if remote_sum := resp.Header.Get("X-Checksum-" + strings.Title(algo_sum[0])); remote_sum != "" {
+		if remote_sum := resp.Header.Get("X-Checksum-" + strings.Title(algo_sum[0])); remote_sum != "" { //nolint:staticcheck // SA1019 Strictly ASCII here
 			// Server returned mathing header, so compare it's value to our checksum
 			if remote_sum != algo_sum[1] {
 				os.RemoveAll(img_path)
 				return fmt.Errorf("Image: The remote checksum (from header X-Checksum-%s) doesn't equal the desired one: %q != %q for %q",
-					strings.Title(algo_sum[0]), remote_sum, algo_sum[1], i.Url)
+					strings.Title(algo_sum[0]), remote_sum, algo_sum[1], i.Url) //nolint:staticcheck // SA1019 Strictly ASCII here
 			}
 		}
 	}
@@ -229,7 +230,7 @@ func (i *Image) DownloadUnpack(out_dir, user, password string) error {
 			return fmt.Errorf("Image: The archive filepath contains '..' which is security forbidden: %q", hdr.Name)
 		}
 
-		target := filepath.Join(img_path, hdr.Name)
+		target := filepath.Join(img_path, hdr.Name) // #nosec G305 , checked above
 
 		switch hdr.Typeflag {
 		case tar.TypeDir:
@@ -239,7 +240,7 @@ func (i *Image) DownloadUnpack(out_dir, user, password string) error {
 				os.RemoveAll(img_path)
 				return fmt.Errorf("Image: Unable to create directory %q: %v", target, err)
 			}
-		case tar.TypeReg, tar.TypeRegA:
+		case tar.TypeReg:
 			// Write a file
 			log.Debugf("Util: Extracting '%s': %s", img_path, hdr.Name)
 			err = os.MkdirAll(filepath.Dir(target), 0750)
@@ -255,8 +256,13 @@ func (i *Image) DownloadUnpack(out_dir, user, password string) error {
 			defer w.Close()
 
 			// TODO: Add in-stream sha256 calculation for each file to verify against .sha256 data
-			_, err = io.Copy(w, tr)
-			if err != nil {
+			for {
+				_, err = io.CopyN(w, tr, 8196)
+				if err == nil {
+					continue
+				} else if err == io.EOF {
+					break
+				}
 				os.RemoveAll(img_path)
 				return fmt.Errorf("Image: Unable to unpack content to file %q: %v", target, err)
 			}

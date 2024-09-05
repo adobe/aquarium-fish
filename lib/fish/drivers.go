@@ -35,7 +35,7 @@ func (f *Fish) DriverGet(name string) drivers.ResourceDriver {
 		log.Error("Fish: Resource drivers are not initialized to request the driver instance:", name)
 		return nil
 	}
-	drv, _ := drivers_instances[name]
+	drv := drivers_instances[name]
 	return drv
 }
 

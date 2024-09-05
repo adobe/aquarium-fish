@@ -46,7 +46,7 @@ func (f *Fish) VoteCreate(v *types.Vote) error {
 		return fmt.Errorf("Fish: NodeUID can't be unset")
 	}
 	// Update Vote Rand to be actual rand
-	v.Rand = rand.Uint32()
+	v.Rand = rand.Uint32() // #nosec G404
 	v.UID = f.NewUID()
 	return f.db.Create(v).Error
 }

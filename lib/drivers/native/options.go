@@ -40,7 +40,7 @@ import (
  */
 type Options struct {
 	Images []drivers.Image `json:"images"` // Optional list of image dependencies, they will be unpacked in order
-	//TODO: Setup  string          `json:"setup"`  // Optional path to the executable, it will be started before the Entry with escalated priveleges
+	//TODO: Setup  string          `json:"setup"`  // Optional path to the executable, it will be started before the Entry with escalated privileges
 	Entry  string   `json:"entry"`  // Optional path to the executable, it will be running as workload (default: init.sh / init.ps1)
 	Groups []string `json:"groups"` // Optional user groups user should have, first one is primary (default: staff)
 }
@@ -85,7 +85,7 @@ func (o *Options) Validate() error {
 
 	// Check images
 	var img_err error
-	for index, _ := range o.Images {
+	for index := range o.Images {
 		if err := o.Images[index].Validate(); err != nil {
 			img_err = log.Error("Native: Error during image validation:", err)
 		}

@@ -294,7 +294,7 @@ func userRun(c *Config, env_data *EnvData, user, entry string, metadata map[stri
 
 	// Prepare the command to execute entry from user home directory
 	shell_line := fmt.Sprintf("source %s; %s", env_file.Name(), shellescape.Quote(shellescape.StripUnsafe(entry)))
-	cmd := exec.Command(c.SudoPath, "-n", c.SuPath, "-l", user, "-c", shell_line)
+	cmd := exec.Command(c.SudoPath, "-n", c.SuPath, "-l", user, "-c", shell_line) // #nosec G204
 	if env_data != nil && env_data.Disks != nil {
 		if _, ok := env_data.Disks[""]; ok {
 			cmd.Dir = env_data.Disks[""]
@@ -332,7 +332,7 @@ func userRun(c *Config, env_data *EnvData, user, entry string, metadata map[stri
 }
 
 // Stop the user processes
-func userStop(c *Config, user string) (out_err error) {
+func userStop(c *Config, user string) (out_err error) { //nolint:unparam
 	// In theory we can use `sysadminctl -deleteUser` command instead, which is also stopping all the
 	// user processes and cleans up the home dir, but it asks for elevated previleges so not sure how
 	// useful it will be in automation...
@@ -525,14 +525,14 @@ func runAndLog(timeout time.Duration, stdin io.Reader, path string, arg ...strin
 	}
 
 	// Replace these for Windows, we only want to deal with Unix style line endings.
-	returnStdout := strings.Replace(stdout.String(), "\r\n", "\n", -1)
-	returnStderr := strings.Replace(stderr.String(), "\r\n", "\n", -1)
+	returnStdout := strings.ReplaceAll(stdout.String(), "\r\n", "\n")
+	returnStderr := strings.ReplaceAll(stderr.String(), "\r\n", "\n")
 
 	return returnStdout, returnStderr, err
 }
 
 // Will retry on error and store the retry output and errors to return
-func runAndLogRetry(retry int, timeout time.Duration, stdin io.Reader, path string, arg ...string) (stdout string, stderr string, err error) {
+func runAndLogRetry(retry int, timeout time.Duration, stdin io.Reader, path string, arg ...string) (stdout string, stderr string, err error) { //nolint:unparam
 	counter := 0
 	for {
 		counter++

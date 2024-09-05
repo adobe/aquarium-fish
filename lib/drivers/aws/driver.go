@@ -151,11 +151,11 @@ func (d *Driver) AvailableCapacity(node_usage types.Resources, def types.LabelDe
 		// Quotas for hosts are: "Running Dedicated mac1 Hosts" & "Running Dedicated mac2 Hosts"
 		p := ec2.NewDescribeHostsPaginator(conn_ec2, &ec2.DescribeHostsInput{
 			Filter: []ec2_types.Filter{
-				ec2_types.Filter{
+				{
 					Name:   aws.String("instance-type"),
 					Values: []string{opts.InstanceType},
 				},
-				ec2_types.Filter{
+				{
 					Name:   aws.String("state"),
 					Values: []string{"available"},
 				},
@@ -315,7 +315,6 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 		} else {
 			return nil, fmt.Errorf("AWS: %s: Unable to locate the dedicated pool: %s", i_name, opts.Pool)
 		}
-
 	} else if awsInstTypeAny(opts.InstanceType, "mac") {
 		// For mac machines only dedicated hosts are working, so set the tenancy
 		input.Placement = &ec2_types.Placement{
@@ -329,7 +328,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 		if err != nil {
 			return nil, fmt.Errorf("AWS: %s: Unable to serialize metadata to userdata: %v", i_name, err)
 		}
-		input.UserData = aws.String(base64.StdEncoding.EncodeToString([]byte(userdata)))
+		input.UserData = aws.String(base64.StdEncoding.EncodeToString(userdata))
 	}
 
 	if opts.SecurityGroup != "" {

@@ -128,8 +128,8 @@ func (w *dedicatedPoolWorker) ReserveHost(instance_type string) string {
 	}
 
 	// Pick random one from the list of available hosts to reduce the possibility of conflict
-	host := w.active_hosts[available_hosts[rand.Intn(len(available_hosts))]]
-	// Mark it as reserved temporarly to ease multi-allocation at the same time
+	host := w.active_hosts[available_hosts[rand.Intn(len(available_hosts))]] // #nosec G404
+	// Mark it as reserved temporary to ease multi-allocation at the same time
 	host.State = HOST_RESERVED
 	w.active_hosts[aws.ToString(host.HostId)] = host
 	return aws.ToString(host.HostId)
@@ -271,7 +271,7 @@ func (w *dedicatedPoolWorker) manageHosts() []string {
 
 		// Skipping the hosts that already in managed list
 		found := false
-		for hid, _ := range w.to_manage_at {
+		for hid := range w.to_manage_at {
 			if host_id == hid {
 				found = true
 				break
@@ -315,7 +315,7 @@ func (w *dedicatedPoolWorker) releaseHosts(release_hosts []string) {
 		if host, ok := w.active_hosts[host_id]; ok && host.HostProperties != nil {
 			if isHostMac(&host) {
 				mac_hosts = append(mac_hosts, host_id)
-				// If mac host not reached 24h since allocation - skipping addtion to the release list
+				// If mac host not reached 24h since allocation - skipping addition to the release list
 				if !isHostReadyForRelease(&host) {
 					continue
 				}
@@ -398,7 +398,7 @@ func isHostReadyForRelease(host *ec2_types.Host) bool {
 
 // Check if the host is used
 func isHostUsed(host *ec2_types.Host) bool {
-	if host.State == HOST_RESERVED || host.Instances != nil && len(host.Instances) > 0 {
+	if host.State == HOST_RESERVED || len(host.Instances) > 0 {
 		return true
 	}
 	return false
@@ -456,7 +456,7 @@ func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 	p := ec2.NewDescribeHostsPaginator(conn, &ec2.DescribeHostsInput{
 		Filter: []ec2_types.Filter{
 			// We don't need released hosts, so skipping them
-			ec2_types.Filter{
+			{
 				Name: aws.String("state"),
 				Values: []string{
 					string(ec2_types.AllocationStateAvailable),
@@ -465,15 +465,15 @@ func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 					string(ec2_types.AllocationStatePending),
 				},
 			},
-			ec2_types.Filter{
+			{
 				Name:   aws.String("availability-zone"),
 				Values: []string{w.record.Zone},
 			},
-			ec2_types.Filter{
+			{
 				Name:   aws.String("instance-type"),
 				Values: []string{w.record.Type},
 			},
-			ec2_types.Filter{
+			{
 				Name:   aws.String("tag-key"),
 				Values: []string{"AquariumDedicatedPool-" + w.name},
 			},

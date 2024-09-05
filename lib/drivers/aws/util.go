@@ -98,7 +98,7 @@ func (d *Driver) getSubnetId(conn *ec2.Client, id_tag string) (string, int64, er
 		req := ec2.DescribeVpcsInput{
 			Filters: []types.Filter{
 				filter,
-				types.Filter{
+				{
 					Name:   aws.String("owner-id"),
 					Values: d.cfg.AccountIDs,
 				},
@@ -110,7 +110,7 @@ func (d *Driver) getSubnetId(conn *ec2.Client, id_tag string) (string, int64, er
 			req := ec2.DescribeSubnetsInput{
 				Filters: []types.Filter{
 					filter,
-					types.Filter{
+					{
 						Name:   aws.String("owner-id"),
 						Values: d.cfg.AccountIDs,
 					},
@@ -218,11 +218,11 @@ func (d *Driver) getImageId(conn *ec2.Client, id_name string) (string, error) {
 	// Look for image with the defined name
 	req := ec2.DescribeImagesInput{
 		Filters: []types.Filter{
-			types.Filter{
+			{
 				Name:   aws.String("name"),
 				Values: []string{id_name},
 			},
-			types.Filter{
+			{
 				Name:   aws.String("state"),
 				Values: []string{"available"},
 			},
@@ -321,23 +321,23 @@ func (d *Driver) getImageIdByType(conn *ec2.Client, instance_type string) (strin
 		log.Debugf("AWS: Looking an image: Checking past year from %d", images_till.Year())
 		req := ec2.DescribeImagesInput{
 			Filters: []types.Filter{
-				types.Filter{
+				{
 					Name:   aws.String("architecture"),
 					Values: []string{string(type_arch)},
 				},
-				types.Filter{
+				{
 					Name:   aws.String("creation-date"),
 					Values: awsLastYearFilterValues(images_till),
 				},
-				types.Filter{
+				{
 					Name:   aws.String("is-public"),
 					Values: []string{"true"},
 				},
-				types.Filter{
+				{
 					Name:   aws.String("owner-alias"),
 					Values: []string{"amazon"}, // Use only amazon-provided images
 				},
-				types.Filter{
+				{
 					Name:   aws.String("state"),
 					Values: []string{"available"},
 				},
@@ -377,11 +377,11 @@ func (d *Driver) getSecGroupId(conn *ec2.Client, id_name string) (string, error)
 	// Look for security group with the defined name
 	req := ec2.DescribeSecurityGroupsInput{
 		Filters: []types.Filter{
-			types.Filter{
+			{
 				Name:   aws.String("group-name"),
 				Values: []string{id_name},
 			},
-			types.Filter{
+			{
 				Name:   aws.String("owner-id"),
 				Values: d.cfg.AccountIDs,
 			},
@@ -414,11 +414,11 @@ func (d *Driver) getSnapshotId(conn *ec2.Client, id_tag string) (string, error) 
 	// Look for VPC with the defined tag over pages
 	req := ec2.DescribeSnapshotsInput{
 		Filters: []types.Filter{
-			types.Filter{
+			{
 				Name:   aws.String("tag:" + tag_key_val[0]),
 				Values: []string{tag_key_val[1]},
 			},
-			types.Filter{
+			{
 				Name:   aws.String("status"),
 				Values: []string{"completed"},
 			},
@@ -460,7 +460,7 @@ func (d *Driver) getProjectCpuUsage(conn *ec2.Client, inst_types []string) (int6
 	// checking if the instance is actually starts with type+number.
 	req := ec2.DescribeInstancesInput{
 		Filters: []types.Filter{
-			types.Filter{
+			{
 				Name: aws.String("instance-state-name"),
 				// Confirmed by AWS eng: only terminated instances are not counting in utilization
 				Values: []string{"pending", "running", "shutting-down", "stopping", "stopped"},
@@ -491,7 +491,7 @@ func (d *Driver) getProjectCpuUsage(conn *ec2.Client, inst_types []string) (int6
 func (d *Driver) getInstance(conn *ec2.Client, inst_id string) (*types.Instance, error) {
 	input := ec2.DescribeInstancesInput{
 		Filters: []types.Filter{
-			types.Filter{
+			{
 				Name:   aws.String("instance-id"),
 				Values: []string{inst_id},
 			},
@@ -503,7 +503,7 @@ func (d *Driver) getInstance(conn *ec2.Client, inst_id string) (*types.Instance,
 		return nil, err
 	}
 	if len(resp.Reservations) < 1 || len(resp.Reservations[0].Instances) < 1 {
-		return nil, nil
+		return nil, fmt.Errorf("Returned empty reservations or instances lists")
 	}
 	return &resp.Reservations[0].Instances[0], nil
 }
@@ -609,7 +609,7 @@ func (d *Driver) triggerHostScrubbing(host_id, instance_type string) (err error)
 	conn := d.newEC2Conn()
 
 	// Just need an image, which we could find by looking at the host instance type
-	vm_image := ""
+	var vm_image string
 	if vm_image, err = d.getImageIdByType(conn, instance_type); err != nil {
 		return fmt.Errorf("AWS: scrubbing %s: Unable to find image: %v", host_id, err)
 	}

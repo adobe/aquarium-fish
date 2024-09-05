@@ -61,7 +61,7 @@ func (d *Driver) loadImages(opts *Options, vm_images_dir string) (string, error)
 		log.Info("VMX: Loading the required image:", image.Name, image.Version, image.Url)
 
 		// Running the background routine to download, unpack and process the image
-		// Success will be checked later by existance of the copied image in the vm directory
+		// Success will be checked later by existence of the copied image in the vm directory
 		wg.Add(1)
 		go func(image drivers.Image, index int) error {
 			defer wg.Done()
@@ -214,7 +214,7 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]types.ResourcesDi
 
 		// Create virtual disk
 		dmg_path := disk_path + ".dmg"
-		disk_type := ""
+		var disk_type string
 		switch disk.Type {
 		case "hfs+":
 			disk_type = "HFS+"
@@ -255,7 +255,7 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]types.ResourcesDi
 		}
 
 		// Umount disk (use diskutil to umount for sure)
-		stdout, _, err = runAndLog(10*time.Second, "/usr/sbin/diskutil", "umount", mount_point)
+		_, _, err = runAndLog(10*time.Second, "/usr/sbin/diskutil", "umount", mount_point)
 		if err != nil {
 			return log.Error("VMX: Unable to umount dmg disk:", mount_point, err)
 		}
@@ -271,7 +271,7 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]types.ResourcesDi
 		// mounted at the same time, so avoiding to use it by using template:
 		// `Unable to create the source raw disk: Resource deadlock avoided`
 		// To generate template: vmware-rawdiskCreator create /dev/disk2 1 ./disk_name lsilogic
-		vmdk_tempalte := strings.Join([]string{
+		vmdk_template := strings.Join([]string{
 			`# Disk DescriptorFile`,
 			`version=1`,
 			`encoding="UTF-8"`,
@@ -294,7 +294,7 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]types.ResourcesDi
 			`ddb.virtualHWVersion = "14"`,
 		}, "\n")
 
-		if err := os.WriteFile(disk_path+"_tmp.vmdk", []byte(vmdk_tempalte), 0640); err != nil {
+		if err := os.WriteFile(disk_path+"_tmp.vmdk", []byte(vmdk_template), 0o640); err != nil { //nolint:gosec // G306
 			return log.Error("VMX: Unable to place the template vmdk file:", disk_path+"_tmp.vmdk", err)
 		}
 
@@ -402,14 +402,14 @@ func runAndLog(timeout time.Duration, path string, arg ...string) (string, strin
 	}
 
 	// Replace these for Windows, we only want to deal with Unix style line endings.
-	returnStdout := strings.Replace(stdout.String(), "\r\n", "\n", -1)
-	returnStderr := strings.Replace(stderr.String(), "\r\n", "\n", -1)
+	returnStdout := strings.ReplaceAll(stdout.String(), "\r\n", "\n")
+	returnStderr := strings.ReplaceAll(stderr.String(), "\r\n", "\n")
 
 	return returnStdout, returnStderr, err
 }
 
 // Will retry on error and store the retry output and errors to return
-func runAndLogRetry(retry int, timeout time.Duration, path string, arg ...string) (stdout string, stderr string, err error) {
+func runAndLogRetry(retry int, timeout time.Duration, path string, arg ...string) (stdout string, stderr string, err error) { //nolint:unparam
 	counter := 0
 	for {
 		counter++
