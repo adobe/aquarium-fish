@@ -98,37 +98,53 @@ func (e *Processor) UserGet(c echo.Context, name string) error {
 	return c.JSON(http.StatusOK, out)
 }
 
-func (e *Processor) UserCreatePost(c echo.Context) error {
-	// Only admin can create user
-	user := c.Get("user")
-	if user.(*types.User).Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can create user")})
-		return fmt.Errorf("Only 'admin' user can create user")
-	}
-
+func (e *Processor) UserCreateUpdatePost(c echo.Context) error {
+	// Only admin can create user, or user can update itself
 	var data types.UserAPIPassword
 	if err := c.Bind(&data); err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Wrong request body: %v", err)})
 		return fmt.Errorf("Wrong request body: %w", err)
 	}
 
-	password, new_user, err := e.fish.UserNew(data.Name, data.Password)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to create user: %v", err)})
-		return fmt.Errorf("Unable to create user: %w", err)
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Not authentified")})
+		return fmt.Errorf("Not authentified")
+	}
+	if user.Name != "admin" && user.Name != data.Name {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' user can create user and user can update itself")})
+		return fmt.Errorf("Only 'admin' user can create user and user can update itself")
+	}
+
+	password := data.Password
+	if password == "" {
+		password = crypt.RandString(64)
+	}
+
+	mod_user, err := e.fish.UserGet(data.Name)
+	if err == nil {
+		// Updating existing user
+		mod_user.Hash = crypt.NewHash(password, nil)
+		e.fish.UserSave(mod_user)
+	} else {
+		// Creating new user
+		password, mod_user, err = e.fish.UserNew(data.Name, password)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to create user: %v", err)})
+			return fmt.Errorf("Unable to create user: %w", err)
+		}
 	}
 
 	// Fill the output values
-	data.CreatedAt = new_user.CreatedAt
-	data.UpdatedAt = new_user.UpdatedAt
+	data.CreatedAt = mod_user.CreatedAt
+	data.UpdatedAt = mod_user.UpdatedAt
 	if data.Password == "" {
 		data.Password = password
 	} else {
 		data.Password = ""
 	}
-	data.Hash = new_user.Hash
 
-	return c.JSON(http.StatusOK, new_user)
+	return c.JSON(http.StatusOK, data)
 }
 
 func (e *Processor) UserDelete(c echo.Context, name string) error {
