@@ -44,14 +44,14 @@ func (o *Options) Apply(options util.UnparsedJson) error {
 
 func (o *Options) Validate() error {
 	// Check images
-	var img_err error
+	var imgErr error
 	for index := range o.Images {
 		if err := o.Images[index].Validate(); err != nil {
-			img_err = log.Error("Docker: Error during image validation:", err)
+			imgErr = log.Error("Docker: Error during image validation:", err)
 		}
 	}
-	if img_err != nil {
-		return img_err
+	if imgErr != nil {
+		return imgErr
 	}
 
 	return nil

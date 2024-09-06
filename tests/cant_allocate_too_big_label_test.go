@@ -98,7 +98,7 @@ drivers:
 
 	time.Sleep(10 * time.Second)
 
-	var app_state types.ApplicationState
+	var appState types.ApplicationState
 	t.Run("Application should have state NEW in 10 sec", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
@@ -107,10 +107,10 @@ drivers:
 			Expect(t).
 			Status(http.StatusOK).
 			End().
-			JSON(&app_state)
+			JSON(&appState)
 
-		if app_state.Status != types.ApplicationStatusNEW {
-			t.Fatalf("Application Status is incorrect: %v", app_state.Status)
+		if appState.Status != types.ApplicationStatusNEW {
+			t.Fatalf("Application Status is incorrect: %v", appState.Status)
 		}
 	})
 
@@ -124,10 +124,10 @@ drivers:
 			Expect(t).
 			Status(http.StatusOK).
 			End().
-			JSON(&app_state)
+			JSON(&appState)
 
-		if app_state.Status != types.ApplicationStatusNEW {
-			t.Fatalf("Application Status is incorrect: %v", app_state.Status)
+		if appState.Status != types.ApplicationStatusNEW {
+			t.Fatalf("Application Status is incorrect: %v", appState.Status)
 		}
 	})
 
@@ -141,10 +141,10 @@ drivers:
 			Expect(t).
 			Status(http.StatusOK).
 			End().
-			JSON(&app_state)
+			JSON(&appState)
 
-		if app_state.Status != types.ApplicationStatusNEW {
-			t.Fatalf("Application Status is incorrect: %v", app_state.Status)
+		if appState.Status != types.ApplicationStatusNEW {
+			t.Fatalf("Application Status is incorrect: %v", appState.Status)
 		}
 	})
 
@@ -158,10 +158,10 @@ drivers:
 			Expect(t).
 			Status(http.StatusOK).
 			End().
-			JSON(&app_state)
+			JSON(&appState)
 
-		if app_state.Status != types.ApplicationStatusNEW {
-			t.Fatalf("Application Status is incorrect: %v", app_state.Status)
+		if appState.Status != types.ApplicationStatusNEW {
+			t.Fatalf("Application Status is incorrect: %v", appState.Status)
 		}
 	})
 
@@ -184,10 +184,10 @@ drivers:
 				Expect(r).
 				Status(http.StatusOK).
 				End().
-				JSON(&app_state)
+				JSON(&appState)
 
-			if app_state.Status != types.ApplicationStatusRECALLED {
-				r.Fatalf("Application Status is incorrect: %v", app_state.Status)
+			if appState.Status != types.ApplicationStatusRECALLED {
+				r.Fatalf("Application Status is incorrect: %v", appState.Status)
 			}
 		})
 	})

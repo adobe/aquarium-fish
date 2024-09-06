@@ -81,8 +81,8 @@ func (e *Processor) Return(c echo.Context, code int, obj map[string]any) error {
 func (e *Processor) DataGetList(c echo.Context, params types.DataGetListParams) error {
 	var metadata map[string]any
 
-	res_int := c.Get("resource")
-	res, ok := res_int.(*types.Resource)
+	resInt := c.Get("resource")
+	res, ok := resInt.(*types.Resource)
 	if !ok {
 		e.Return(c, http.StatusNotFound, H{"message": "No data found"})
 		return fmt.Errorf("Unable to get resource from context")

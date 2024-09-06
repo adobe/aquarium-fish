@@ -33,31 +33,31 @@ import (
 )
 
 // Returns the total resources available for the node after alteration
-func (d *Driver) getAvailResources() (avail_cpu, avail_ram uint) {
+func (d *Driver) getAvailResources() (availCpu, availRam uint) {
 	if d.cfg.CpuAlter < 0 {
-		avail_cpu = d.total_cpu - uint(-d.cfg.CpuAlter)
+		availCpu = d.totalCpu - uint(-d.cfg.CpuAlter)
 	} else {
-		avail_cpu = d.total_cpu + uint(d.cfg.CpuAlter)
+		availCpu = d.totalCpu + uint(d.cfg.CpuAlter)
 	}
 
 	if d.cfg.RamAlter < 0 {
-		avail_ram = d.total_ram - uint(-d.cfg.RamAlter)
+		availRam = d.totalRam - uint(-d.cfg.RamAlter)
 	} else {
-		avail_ram = d.total_ram + uint(d.cfg.RamAlter)
+		availRam = d.totalRam + uint(d.cfg.RamAlter)
 	}
 
 	return
 }
 
 // Load images and returns the target image path for cloning
-func (d *Driver) loadImages(opts *Options, vm_images_dir string) (string, error) {
-	if err := os.MkdirAll(vm_images_dir, 0o755); err != nil {
-		return "", log.Error("VMX: Unable to create the VM images dir:", vm_images_dir, err)
+func (d *Driver) loadImages(opts *Options, vmImagesDir string) (string, error) {
+	if err := os.MkdirAll(vmImagesDir, 0o755); err != nil {
+		return "", log.Error("VMX: Unable to create the VM images dir:", vmImagesDir, err)
 	}
 
-	target_path := ""
+	targetPath := ""
 	var wg sync.WaitGroup
-	for image_index, image := range opts.Images {
+	for imageIndex, image := range opts.Images {
 		log.Info("VMX: Loading the required image:", image.Name, image.Version, image.Url)
 
 		// Running the background routine to download, unpack and process the image
@@ -71,16 +71,16 @@ func (d *Driver) loadImages(opts *Options, vm_images_dir string) (string, error)
 
 			// Getting the image subdir name in the unpacked dir
 			subdir := ""
-			image_unpacked := filepath.Join(d.cfg.ImagesPath, image.Name+"-"+image.Version)
-			items, err := os.ReadDir(image_unpacked)
+			imageUnpacked := filepath.Join(d.cfg.ImagesPath, image.Name+"-"+image.Version)
+			items, err := os.ReadDir(imageUnpacked)
 			if err != nil {
-				return log.Error("VMX: Unable to read the unpacked directory:", image_unpacked, err)
+				return log.Error("VMX: Unable to read the unpacked directory:", imageUnpacked, err)
 			}
 			for _, f := range items {
 				if strings.HasPrefix(f.Name(), image.Name) {
 					if f.Type()&fs.ModeSymlink != 0 {
 						// Potentially it can be a symlink (like used in local tests)
-						if _, err := os.Stat(filepath.Join(image_unpacked, f.Name())); err != nil {
+						if _, err := os.Stat(filepath.Join(imageUnpacked, f.Name())); err != nil {
 							log.Warn("VMX: The image symlink is broken:", f.Name(), err)
 							continue
 						}
@@ -90,46 +90,46 @@ func (d *Driver) loadImages(opts *Options, vm_images_dir string) (string, error)
 				}
 			}
 			if subdir == "" {
-				return log.Errorf("VMX: Unpacked image '%s' has no subfolder '%s', only: %q", image_unpacked, image.Name, items)
+				return log.Errorf("VMX: Unpacked image '%s' has no subfolder '%s', only: %q", imageUnpacked, image.Name, items)
 			}
 
 			// The VMware clone operation modifies the image snapshots description so
 			// we walk through the image files, link them to the workspace dir and copy
 			// the files (except for vmdk bins) with path to the workspace images dir
-			root_dir := filepath.Join(image_unpacked, subdir)
-			out_dir := filepath.Join(vm_images_dir, subdir)
+			rootDir := filepath.Join(imageUnpacked, subdir)
+			outDir := filepath.Join(vmImagesDir, subdir)
 			if index+1 == len(opts.Images) {
 				// It's the last image in the list so the target one
-				target_path = filepath.Join(out_dir, image.Name+".vmx")
+				targetPath = filepath.Join(outDir, image.Name+".vmx")
 			}
-			if err := os.MkdirAll(out_dir, 0o755); err != nil {
-				return log.Error("VMX: Unable to create the vm image dir:", out_dir, err)
+			if err := os.MkdirAll(outDir, 0o755); err != nil {
+				return log.Error("VMX: Unable to create the vm image dir:", outDir, err)
 			}
 
-			tocopy_list, err := os.ReadDir(root_dir)
+			tocopyList, err := os.ReadDir(rootDir)
 			if err != nil {
-				os.RemoveAll(out_dir)
-				return log.Error("VMX: Unable to list the image directory:", root_dir, err)
+				os.RemoveAll(outDir)
+				return log.Error("VMX: Unable to list the image directory:", rootDir, err)
 			}
 
-			for _, entry := range tocopy_list {
-				in_path := filepath.Join(root_dir, entry.Name())
-				out_path := filepath.Join(out_dir, entry.Name())
+			for _, entry := range tocopyList {
+				inPath := filepath.Join(rootDir, entry.Name())
+				outPath := filepath.Join(outDir, entry.Name())
 
 				// Check if the file is the big disk
-				if strings.HasSuffix(entry.Name(), ".vmdk") && util.FileStartsWith(in_path, []byte("# Disk DescriptorFile")) != nil {
+				if strings.HasSuffix(entry.Name(), ".vmdk") && util.FileStartsWith(inPath, []byte("# Disk DescriptorFile")) != nil {
 					// Just link the disk image to the vm image dir - we will not modify it anyway
-					if err := os.Symlink(in_path, out_path); err != nil {
-						os.RemoveAll(out_dir)
-						return log.Error("VMX: Unable to symlink the image file:", in_path, out_path, err)
+					if err := os.Symlink(inPath, outPath); err != nil {
+						os.RemoveAll(outDir)
+						return log.Error("VMX: Unable to symlink the image file:", inPath, outPath, err)
 					}
 					continue
 				}
 
 				// Copy VM file in order to prevent the image modification
-				if err := util.FileCopy(in_path, out_path); err != nil {
-					os.RemoveAll(out_dir)
-					return log.Error("VMX: Unable to copy the image file:", in_path, out_path, err)
+				if err := util.FileCopy(inPath, outPath); err != nil {
+					os.RemoveAll(outDir)
+					return log.Error("VMX: Unable to copy the image file:", inPath, outPath, err)
 				}
 
 				// Deprecated functionality
@@ -138,17 +138,17 @@ func (d *Driver) loadImages(opts *Options, vm_images_dir string) (string, error)
 				//
 				// Modify the vmsd file cloneOf0 to replace token - it requires absolute path
 				if strings.HasSuffix(entry.Name(), ".vmsd") {
-					if err := util.FileReplaceToken(out_path,
+					if err := util.FileReplaceToken(outPath,
 						false, false, false,
-						"<REPLACE_PARENT_VM_FULL_PATH>", vm_images_dir,
+						"<REPLACE_PARENT_VM_FULL_PATH>", vmImagesDir,
 					); err != nil {
-						os.RemoveAll(out_dir)
+						os.RemoveAll(outDir)
 						return log.Error("VMX: Unable to replace full path token in vmsd:", image.Name, err)
 					}
 				}
 			}
 			return nil
-		}(image, image_index)
+		}(image, imageIndex)
 	}
 
 	log.Debug("VMX: Wait for all the background image processes to be done...")
@@ -157,16 +157,16 @@ func (d *Driver) loadImages(opts *Options, vm_images_dir string) (string, error)
 	log.Info("VMX: The images are processed.")
 
 	// Check all the images are in place just by number of them
-	vm_images, _ := os.ReadDir(vm_images_dir)
-	if len(opts.Images) != len(vm_images) {
+	vmImages, _ := os.ReadDir(vmImagesDir)
+	if len(opts.Images) != len(vmImages) {
 		return "", log.Error("VMX: The image processes gone wrong, please check log for the errors")
 	}
 
-	return target_path, nil
+	return targetPath, nil
 }
 
 // Returns true if the VM with provided identifier is allocated
-func (d *Driver) isAllocated(vmx_path string) bool {
+func (d *Driver) isAllocated(vmxPath string) bool {
 	// Probably it's better to store the current list in the memory and
 	// update on fnotify or something like that...
 	stdout, _, err := runAndLog(10*time.Second, d.cfg.VmrunPath, "list")
@@ -175,7 +175,7 @@ func (d *Driver) isAllocated(vmx_path string) bool {
 	}
 
 	for _, line := range strings.Split(stdout, "\n") {
-		if vmx_path == line {
+		if vmxPath == line {
 			return true
 		}
 	}
@@ -184,27 +184,27 @@ func (d *Driver) isAllocated(vmx_path string) bool {
 }
 
 // Creates VMDK disks described by the disks map
-func (d *Driver) disksCreate(vmx_path string, disks map[string]types.ResourcesDisk) error {
+func (d *Driver) disksCreate(vmxPath string, disks map[string]types.ResourcesDisk) error {
 	// Create disk files
-	var disk_paths []string
-	for d_name, disk := range disks {
-		disk_path := filepath.Join(filepath.Dir(vmx_path), d_name)
+	var diskPaths []string
+	for dName, disk := range disks {
+		diskPath := filepath.Join(filepath.Dir(vmxPath), dName)
 		if disk.Reuse {
-			disk_path = filepath.Join(d.cfg.WorkspacePath, "disk-"+d_name, d_name)
-			if err := os.MkdirAll(filepath.Dir(disk_path), 0o755); err != nil {
+			diskPath = filepath.Join(d.cfg.WorkspacePath, "disk-"+dName, dName)
+			if err := os.MkdirAll(filepath.Dir(diskPath), 0o755); err != nil {
 				return err
 			}
 		}
 
-		rel_path, err := filepath.Rel(filepath.Dir(vmx_path), disk_path+".vmdk")
+		relPath, err := filepath.Rel(filepath.Dir(vmxPath), diskPath+".vmdk")
 		if err != nil {
-			log.Warn("VMX: Unable to get relative path for disk:", disk_path+".vmdk", err)
-			disk_paths = append(disk_paths, disk_path)
+			log.Warn("VMX: Unable to get relative path for disk:", diskPath+".vmdk", err)
+			diskPaths = append(diskPaths, diskPath)
 		} else {
-			disk_paths = append(disk_paths, rel_path)
+			diskPaths = append(diskPaths, relPath)
 		}
 
-		if _, err := os.Stat(disk_path + ".vmdk"); !os.IsNotExist(err) {
+		if _, err := os.Stat(diskPath + ".vmdk"); !os.IsNotExist(err) {
 			continue
 		}
 
@@ -213,56 +213,56 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]types.ResourcesDi
 		// TODO: Ensure failures doesn't leave the changes behind (like mounted disks or files)
 
 		// Create virtual disk
-		dmg_path := disk_path + ".dmg"
-		var disk_type string
+		dmgPath := diskPath + ".dmg"
+		var diskType string
 		switch disk.Type {
 		case "hfs+":
-			disk_type = "HFS+"
+			diskType = "HFS+"
 		case "fat32":
-			disk_type = "FAT32"
+			diskType = "FAT32"
 		default:
-			disk_type = "ExFAT"
+			diskType = "ExFAT"
 		}
-		label := d_name
+		label := dName
 		if disk.Label != "" {
 			label = disk.Label
 		}
-		args := []string{"create", dmg_path,
-			"-fs", disk_type,
+		args := []string{"create", dmgPath,
+			"-fs", diskType,
 			"-layout", "NONE",
 			"-volname", label,
 			"-size", fmt.Sprintf("%dm", disk.Size*1024),
 		}
 		if _, _, err := runAndLog(10*time.Minute, "/usr/bin/hdiutil", args...); err != nil {
-			return log.Error("VMX: Unable to create dmg disk:", dmg_path, err)
+			return log.Error("VMX: Unable to create dmg disk:", dmgPath, err)
 		}
 
-		vm_name := strings.TrimSuffix(filepath.Base(vmx_path), ".vmx")
-		mount_point := filepath.Join("/Volumes", fmt.Sprintf("%s-%s", vm_name, d_name))
+		vmName := strings.TrimSuffix(filepath.Base(vmxPath), ".vmx")
+		mountPoint := filepath.Join("/Volumes", fmt.Sprintf("%s-%s", vmName, dName))
 
 		// Attach & mount disk
-		stdout, _, err := runAndLog(10*time.Second, "/usr/bin/hdiutil", "attach", dmg_path, "-mountpoint", mount_point)
+		stdout, _, err := runAndLog(10*time.Second, "/usr/bin/hdiutil", "attach", dmgPath, "-mountpoint", mountPoint)
 		if err != nil {
-			return log.Error("VMX: Unable to attach dmg disk:", dmg_path, mount_point, err)
+			return log.Error("VMX: Unable to attach dmg disk:", dmgPath, mountPoint, err)
 		}
 
 		// Get attached disk device
-		dev_path := strings.SplitN(stdout, " ", 2)[0]
+		devPath := strings.SplitN(stdout, " ", 2)[0]
 
 		// Allow anyone to modify the disk content
-		if err := os.Chmod(mount_point, 0o777); err != nil {
-			return log.Error("VMX: Unable to change the disk access rights:", mount_point, err)
+		if err := os.Chmod(mountPoint, 0o777); err != nil {
+			return log.Error("VMX: Unable to change the disk access rights:", mountPoint, err)
 		}
 
 		// Umount disk (use diskutil to umount for sure)
-		_, _, err = runAndLog(10*time.Second, "/usr/sbin/diskutil", "umount", mount_point)
+		_, _, err = runAndLog(10*time.Second, "/usr/sbin/diskutil", "umount", mountPoint)
 		if err != nil {
-			return log.Error("VMX: Unable to umount dmg disk:", mount_point, err)
+			return log.Error("VMX: Unable to umount dmg disk:", mountPoint, err)
 		}
 
 		// Detach disk
-		if _, _, err := runAndLog(10*time.Second, "/usr/bin/hdiutil", "detach", dev_path); err != nil {
-			return log.Error("VMX: Unable to detach dmg disk:", dev_path, err)
+		if _, _, err := runAndLog(10*time.Second, "/usr/bin/hdiutil", "detach", devPath); err != nil {
+			return log.Error("VMX: Unable to detach dmg disk:", devPath, err)
 		}
 
 		// Create vmdk by using the pregenerated vmdk template
@@ -271,7 +271,7 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]types.ResourcesDi
 		// mounted at the same time, so avoiding to use it by using template:
 		// `Unable to create the source raw disk: Resource deadlock avoided`
 		// To generate template: vmware-rawdiskCreator create /dev/disk2 1 ./disk_name lsilogic
-		vmdk_template := strings.Join([]string{
+		vmdkTemplate := strings.Join([]string{
 			`# Disk DescriptorFile`,
 			`version=1`,
 			`encoding="UTF-8"`,
@@ -283,7 +283,7 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]types.ResourcesDi
 			// Format: http://sanbarrow.com/vmdk/disktypes.html
 			// <access type> <size> <vmdk-type> <path to datachunk> <offset>
 			// size, offset - number in amount of sectors
-			fmt.Sprintf(`RW %d FLAT %q 0`, disk.Size*1024*1024*2, dmg_path),
+			fmt.Sprintf(`RW %d FLAT %q 0`, disk.Size*1024*1024*2, dmgPath),
 			``,
 			`# The Disk Data Base`,
 			`#DDB`,
@@ -294,70 +294,70 @@ func (d *Driver) disksCreate(vmx_path string, disks map[string]types.ResourcesDi
 			`ddb.virtualHWVersion = "14"`,
 		}, "\n")
 
-		if err := os.WriteFile(disk_path+"_tmp.vmdk", []byte(vmdk_template), 0o640); err != nil { //nolint:gosec // G306
-			return log.Error("VMX: Unable to place the template vmdk file:", disk_path+"_tmp.vmdk", err)
+		if err := os.WriteFile(diskPath+"_tmp.vmdk", []byte(vmdkTemplate), 0o640); err != nil { //nolint:gosec // G306
+			return log.Error("VMX: Unable to place the template vmdk file:", diskPath+"_tmp.vmdk", err)
 		}
 
 		// Convert linked vmdk to standalone vmdk
-		if _, _, err := runAndLog(10*time.Minute, d.cfg.VdiskmanagerPath, "-r", disk_path+"_tmp.vmdk", "-t", "0", disk_path+".vmdk"); err != nil {
-			return log.Error("VMX: Unable to create vmdk disk:", disk_path+".vmdk", err)
+		if _, _, err := runAndLog(10*time.Minute, d.cfg.VdiskmanagerPath, "-r", diskPath+"_tmp.vmdk", "-t", "0", diskPath+".vmdk"); err != nil {
+			return log.Error("VMX: Unable to create vmdk disk:", diskPath+".vmdk", err)
 		}
 
 		// Remove temp files
-		for _, path := range []string{dmg_path, disk_path + "_tmp.vmdk"} {
+		for _, path := range []string{dmgPath, diskPath + "_tmp.vmdk"} {
 			if err := os.Remove(path); err != nil {
 				return log.Error("VMX: Unable to remove tmp disk files:", path, err)
 			}
 		}
 	}
 
-	if len(disk_paths) == 0 {
+	if len(diskPaths) == 0 {
 		return nil
 	}
 
 	// Connect disk files to vmx
-	var to_replace []string
+	var toReplace []string
 	// Use SCSI adapter
-	to_replace = append(to_replace,
+	toReplace = append(toReplace,
 		"sata1.present =", `sata1.present = "TRUE"`,
 	)
-	for i, disk_path := range disk_paths {
+	for i, diskPath := range diskPaths {
 		prefix := fmt.Sprintf("sata1:%d", i)
-		to_replace = append(to_replace,
+		toReplace = append(toReplace,
 			prefix+".present =", prefix+`.present = "TRUE"`,
-			prefix+".fileName =", fmt.Sprintf("%s.fileName = %q", prefix, disk_path),
+			prefix+".fileName =", fmt.Sprintf("%s.fileName = %q", prefix, diskPath),
 		)
 	}
-	if err := util.FileReplaceToken(vmx_path, true, true, true, to_replace...); err != nil {
-		return log.Error("VMX: Unable to add disks to the VM configuration:", vmx_path, err)
+	if err := util.FileReplaceToken(vmxPath, true, true, true, toReplace...); err != nil {
+		return log.Error("VMX: Unable to add disks to the VM configuration:", vmxPath, err)
 	}
 
 	return nil
 }
 
 // Ensures the VM is not stale by monitoring the log
-func (d *Driver) logMonitor(vm_id, vmx_path string) {
+func (d *Driver) logMonitor(vmId, vmxPath string) {
 	// Monitor the vmware.log file
-	log_path := filepath.Join(filepath.Dir(vmx_path), "vmware.log")
-	t, _ := tail.TailFile(log_path, tail.Config{Follow: true, Poll: true})
-	log.Debug("VMX: Start monitoring of log:", vm_id, log_path)
+	logPath := filepath.Join(filepath.Dir(vmxPath), "vmware.log")
+	t, _ := tail.TailFile(logPath, tail.Config{Follow: true, Poll: true})
+	log.Debug("VMX: Start monitoring of log:", vmId, logPath)
 	for line := range t.Lines {
-		log.Debug("VMX:", vm_id, "vmware.log:", line)
+		log.Debug("VMX:", vmId, "vmware.log:", line)
 		// Send reset if the VM is switched to 0 status
 		if strings.Contains(line.Text, "Tools: Changing running status: 1 => 0") {
-			log.Warn("VMX: Resetting the stale VM", vm_id, vmx_path)
+			log.Warn("VMX: Resetting the stale VM", vmId, vmxPath)
 			// We should not spend much time here, because we can miss
 			// the file delete so running in a separated thread
-			go runAndLog(10*time.Second, d.cfg.VmrunPath, "reset", vmx_path)
+			go runAndLog(10*time.Second, d.cfg.VmrunPath, "reset", vmxPath)
 		}
 	}
-	log.Debug("VMX: Done monitoring of log:", vm_id, log_path)
+	log.Debug("VMX: Done monitoring of log:", vmId, logPath)
 }
 
 // Removes the entire directory for clean up purposes
-func (d *Driver) cleanupVm(vm_dir string) error {
-	if err := os.RemoveAll(vm_dir); err != nil {
-		log.Warn("VMX: Unable to clean up the vm directory:", vm_dir, err)
+func (d *Driver) cleanupVm(vmDir string) error {
+	if err := os.RemoveAll(vmDir); err != nil {
+		log.Warn("VMX: Unable to clean up the vm directory:", vmDir, err)
 		return err
 	}
 

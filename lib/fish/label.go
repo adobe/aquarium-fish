@@ -24,13 +24,13 @@ import (
 func (f *Fish) LabelFind(filter *string) (labels []types.Label, err error) {
 	db := f.db
 	if filter != nil {
-		secured_filter, err := util.ExpressionSqlFilter(*filter)
+		securedFilter, err := util.ExpressionSqlFilter(*filter)
 		if err != nil {
 			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
 			// We do not fail here because we should not give attacker more information
 			return labels, nil
 		}
-		db = db.Where(secured_filter)
+		db = db.Where(securedFilter)
 	}
 	err = db.Find(&labels).Error
 	return labels, err

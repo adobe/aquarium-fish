@@ -20,26 +20,26 @@ import (
 	"os"
 )
 
-const NODE_PING_DELAY = 10
+const NodePingDelay = 10
 
 var ErrNodePingDuplication = fmt.Errorf("Fish Node: Unable to join the Aquarium cluster due to " +
 	"the node with the same name pinged the cluster less then 2xNODE_PING_DELAY time ago")
 
-func (n *Node) Init(node_address, cert_path string) error {
+func (n *Node) Init(nodeAddress, certPath string) error {
 	// Set the node external address
-	n.Address = node_address
+	n.Address = nodeAddress
 
 	// Read certificate's pubkey to put or compare
-	cert_bytes, err := os.ReadFile(cert_path)
+	certBytes, err := os.ReadFile(certPath)
 	if err != nil {
 		return err
 	}
-	block, _ := pem.Decode(cert_bytes)
+	block, _ := pem.Decode(certBytes)
 	cert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
 		return err
 	}
-	pubkey_der, err := x509.MarshalPKIXPublicKey(cert.PublicKey)
+	pubkeyDer, err := x509.MarshalPKIXPublicKey(cert.PublicKey)
 	if err != nil {
 		return err
 	}
@@ -48,10 +48,10 @@ func (n *Node) Init(node_address, cert_path string) error {
 	// maybe later the process of key switch will be implemented
 	if n.Pubkey == nil {
 		// Set the pubkey once
-		n.Pubkey = &pubkey_der
+		n.Pubkey = &pubkeyDer
 	} else {
 		// Validate the existing pubkey
-		if !bytes.Equal(*n.Pubkey, pubkey_der) {
+		if !bytes.Equal(*n.Pubkey, pubkeyDer) {
 			return fmt.Errorf("Fish Node: The pubkey was changed for Node, that's not supported")
 		}
 	}

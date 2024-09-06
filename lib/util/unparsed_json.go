@@ -36,10 +36,10 @@ func (r *UnparsedJson) UnmarshalYAML(node *yaml.Node) error {
 	if err := node.Decode(&value); err != nil {
 		return err
 	}
-	json_data, err := json.Marshal(value)
+	jsonData, err := json.Marshal(value)
 	if err != nil {
 		return err
 	}
-	r.UnmarshalJSON(json_data)
+	r.UnmarshalJSON(jsonData)
 	return nil
 }

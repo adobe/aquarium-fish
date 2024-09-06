@@ -27,13 +27,13 @@ import (
 func (f *Fish) NodeFind(filter *string) (ns []types.Node, err error) {
 	db := f.db
 	if filter != nil {
-		secured_filter, err := util.ExpressionSqlFilter(*filter)
+		securedFilter, err := util.ExpressionSqlFilter(*filter)
 		if err != nil {
 			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
 			// We do not fail here because we should not give attacker more information
 			return ns, nil
 		}
-		db = db.Where(secured_filter)
+		db = db.Where(securedFilter)
 	}
 	err = db.Find(&ns).Error
 	return ns, err
@@ -41,7 +41,7 @@ func (f *Fish) NodeFind(filter *string) (ns []types.Node, err error) {
 
 func (f *Fish) NodeActiveList() (ns []types.Node, err error) {
 	// Only the nodes that pinged at least twice the delay time
-	t := time.Now().Add(-types.NODE_PING_DELAY * 2 * time.Second)
+	t := time.Now().Add(-types.NodePingDelay * 2 * time.Second)
 	err = f.db.Where("updated_at > ?", t).Find(&ns).Error
 	return ns, err
 }
@@ -77,14 +77,14 @@ func (f *Fish) NodeGet(name string) (node *types.Node, err error) {
 
 func (f *Fish) pingProcess() {
 	// In order to optimize network & database - update just UpdatedAt field
-	ping_ticker := time.NewTicker(types.NODE_PING_DELAY * time.Second)
+	pingTicker := time.NewTicker(types.NodePingDelay * time.Second)
 	for {
 		if !f.running {
 			break
 		}
 
 		// TODO: Here should be select with quit in case app is stopped to not wait next ticker
-		<-ping_ticker.C
+		<-pingTicker.C
 		log.Debug("Fish Node: ping")
 		f.NodePing(f.node)
 	}

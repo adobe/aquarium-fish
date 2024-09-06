@@ -46,7 +46,7 @@ func init() {
 type Driver struct {
 	cfg Config
 	// Contains the available tasks of the driver
-	tasks_list []drivers.ResourceDriverTask
+	tasksList []drivers.ResourceDriverTask
 }
 
 func (d *Driver) Name() string {
@@ -66,7 +66,7 @@ func (d *Driver) Prepare(config []byte) error {
 	}
 
 	// Fill up the available tasks
-	d.tasks_list = append(d.tasks_list, &TaskSnapshot{driver: d})
+	d.tasksList = append(d.tasksList, &TaskSnapshot{driver: d})
 
 	return nil
 }
@@ -77,8 +77,8 @@ func (d *Driver) ValidateDefinition(def types.LabelDefinition) error {
 }
 
 // Allow Fish to ask the driver about it's capacity (free slots) of a specific definition
-func (d *Driver) AvailableCapacity(node_usage types.Resources, req types.LabelDefinition) int64 {
-	var out_count int64
+func (d *Driver) AvailableCapacity(nodeUsage types.Resources, req types.LabelDefinition) int64 {
+	var outCount int64
 
 	var opts Options
 	if err := opts.Apply(req.Options); err != nil {
@@ -91,51 +91,51 @@ func (d *Driver) AvailableCapacity(node_usage types.Resources, req types.LabelDe
 		return -1
 	}
 
-	total_cpu := d.cfg.CpuLimit
-	total_ram := d.cfg.RamLimit
+	totalCpu := d.cfg.CpuLimit
+	totalRam := d.cfg.RamLimit
 
-	if total_cpu == 0 && total_ram == 0 {
+	if totalCpu == 0 && totalRam == 0 {
 		// Resources are unlimited
 		return 99999
 	}
 
 	// Check if the node has the required resources - otherwise we can't run it anyhow
-	if req.Resources.Cpu > total_cpu {
+	if req.Resources.Cpu > totalCpu {
 		return 0
 	}
-	if req.Resources.Ram > total_ram {
+	if req.Resources.Ram > totalRam {
 		return 0
 	}
 	// TODO: Check disk requirements
 
 	// Since we have the required resources - let's check if tenancy allows us to expand them to
 	// run more tenants here
-	if node_usage.IsEmpty() {
+	if nodeUsage.IsEmpty() {
 		// In case we dealing with the first one - we need to set usage modificators, otherwise
 		// those values will mess up the next calculations
-		node_usage.Multitenancy = req.Resources.Multitenancy
-		node_usage.CpuOverbook = req.Resources.CpuOverbook
-		node_usage.RamOverbook = req.Resources.RamOverbook
+		nodeUsage.Multitenancy = req.Resources.Multitenancy
+		nodeUsage.CpuOverbook = req.Resources.CpuOverbook
+		nodeUsage.RamOverbook = req.Resources.RamOverbook
 	}
-	if node_usage.Multitenancy && req.Resources.Multitenancy {
+	if nodeUsage.Multitenancy && req.Resources.Multitenancy {
 		// Ok we can run more tenants, let's calculate how much
-		if node_usage.CpuOverbook && req.Resources.CpuOverbook {
-			total_cpu += d.cfg.CpuOverbook
+		if nodeUsage.CpuOverbook && req.Resources.CpuOverbook {
+			totalCpu += d.cfg.CpuOverbook
 		}
-		if node_usage.RamOverbook && req.Resources.RamOverbook {
-			total_ram += d.cfg.RamOverbook
+		if nodeUsage.RamOverbook && req.Resources.RamOverbook {
+			totalRam += d.cfg.RamOverbook
 		}
 	}
 
 	// Calculate how much of those definitions we could run
-	out_count = int64((total_cpu - node_usage.Cpu) / req.Resources.Cpu)
-	ram_count := int64((total_ram - node_usage.Ram) / req.Resources.Ram)
-	if out_count > ram_count {
-		out_count = ram_count
+	outCount = int64((totalCpu - nodeUsage.Cpu) / req.Resources.Cpu)
+	ramCount := int64((totalRam - nodeUsage.Ram) / req.Resources.Ram)
+	if outCount > ramCount {
+		outCount = ramCount
 	}
 	// TODO: Add disks into equation
 
-	return out_count
+	return outCount
 }
 
 /**
@@ -153,19 +153,19 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 
 	// Generate random resource id and if exists - regenerate
 	res := &types.Resource{}
-	var res_file string
+	var resFile string
 	for {
 		res.Identifier = "test-" + crypt.RandString(6)
-		res_file = filepath.Join(d.cfg.WorkspacePath, res.Identifier)
-		if _, err := os.Stat(res_file); os.IsNotExist(err) {
+		resFile = filepath.Join(d.cfg.WorkspacePath, res.Identifier)
+		if _, err := os.Stat(resFile); os.IsNotExist(err) {
 			break
 		}
 	}
 
 	// Write identifier file
-	fh, err := os.Create(res_file)
+	fh, err := os.Create(resFile)
 	if err != nil {
-		return nil, fmt.Errorf("TEST: Unable to open file %q to store identifier: %v", res_file, err)
+		return nil, fmt.Errorf("TEST: Unable to open file %q to store identifier: %v", resFile, err)
 	}
 	defer fh.Close()
 
@@ -180,8 +180,8 @@ func (d *Driver) Status(res *types.Resource) (string, error) {
 		return "", fmt.Errorf("TEST: RandomFail: %v\n", err)
 	}
 
-	res_file := filepath.Join(d.cfg.WorkspacePath, res.Identifier)
-	if _, err := os.Stat(res_file); !os.IsNotExist(err) {
+	resFile := filepath.Join(d.cfg.WorkspacePath, res.Identifier)
+	if _, err := os.Stat(resFile); !os.IsNotExist(err) {
 		return drivers.StatusAllocated, nil
 	}
 	return drivers.StatusNone, nil
@@ -190,7 +190,7 @@ func (d *Driver) Status(res *types.Resource) (string, error) {
 func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
 	// Look for the specified task name
 	var t drivers.ResourceDriverTask
-	for _, task := range d.tasks_list {
+	for _, task := range d.tasksList {
 		if task.Name() == name {
 			t = task.Clone()
 		}
@@ -215,11 +215,11 @@ func (d *Driver) Deallocate(res *types.Resource) error {
 		return log.Error("TEST: RandomFail:", err)
 	}
 
-	res_file := filepath.Join(d.cfg.WorkspacePath, res.Identifier)
-	if _, err := os.Stat(res_file); os.IsNotExist(err) {
+	resFile := filepath.Join(d.cfg.WorkspacePath, res.Identifier)
+	if _, err := os.Stat(resFile); os.IsNotExist(err) {
 		return fmt.Errorf("TEST: Unable to deallocate unavailable resource '%s'", res.Identifier)
 	}
-	if err := os.Remove(res_file); err != nil {
+	if err := os.Remove(resFile); err != nil {
 		return fmt.Errorf("TEST: Unable to deallocate the resource '%s': %v", res.Identifier, err)
 	}
 

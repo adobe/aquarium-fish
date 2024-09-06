@@ -305,22 +305,22 @@ func (c *Config) Validate() (err error) {
 	}
 
 	// Create test init script
-	init_path, err := testScriptCreate(user)
+	initPath, err := testScriptCreate(user)
 	if err != nil {
 		userDelete(c, user)
-		return fmt.Errorf("Native: Unable to create test script in %q: %v", init_path, err)
+		return fmt.Errorf("Native: Unable to create test script in %q: %v", initPath, err)
 	}
 
 	// Run the test init script
-	if err = userRun(c, nil, user, init_path, map[string]any{}); err != nil {
+	if err = userRun(c, nil, user, initPath, map[string]any{}); err != nil {
 		userDelete(c, user)
-		return fmt.Errorf("Native: Unable to run test init script %q: %v", init_path, err)
+		return fmt.Errorf("Native: Unable to run test init script %q: %v", initPath, err)
 	}
 
 	// Cleaning up the test script
-	if err := testScriptDelete(init_path); err != nil {
+	if err := testScriptDelete(initPath); err != nil {
 		userDelete(c, user)
-		return fmt.Errorf("Native: Unable to delete test script in %q: %v", init_path, err)
+		return fmt.Errorf("Native: Unable to delete test script in %q: %v", initPath, err)
 	}
 
 	// Clean after the run
@@ -336,23 +336,23 @@ func (c *Config) Validate() (err error) {
 	// the user, but will require much less changes in the system.
 
 	// Validating CpuAlter & RamAlter to not be less then the current cpu/ram count
-	cpu_stat, err := cpu.Counts(true)
+	cpuStat, err := cpu.Counts(true)
 	if err != nil {
 		return err
 	}
 
-	if c.CpuAlter < 0 && cpu_stat <= -c.CpuAlter {
-		return log.Errorf("Native: |CpuAlter| can't be more or equal the available Host CPUs: |%d| > %d", c.CpuAlter, cpu_stat)
+	if c.CpuAlter < 0 && cpuStat <= -c.CpuAlter {
+		return log.Errorf("Native: |CpuAlter| can't be more or equal the available Host CPUs: |%d| > %d", c.CpuAlter, cpuStat)
 	}
 
-	mem_stat, err := mem.VirtualMemory()
+	memStat, err := mem.VirtualMemory()
 	if err != nil {
 		return err
 	}
-	ram_stat := mem_stat.Total / 1073741824 // Getting GB from Bytes
+	ramStat := memStat.Total / 1073741824 // Getting GB from Bytes
 
-	if c.RamAlter < 0 && int(ram_stat) <= -c.RamAlter {
-		return log.Errorf("Native: |RamAlter| can't be more or equal the available Host RAM: |%d| > %d", c.RamAlter, ram_stat)
+	if c.RamAlter < 0 && int(ramStat) <= -c.RamAlter {
+		return log.Errorf("Native: |RamAlter| can't be more or equal the available Host RAM: |%d| > %d", c.RamAlter, ramStat)
 	}
 
 	return nil

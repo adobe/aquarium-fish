@@ -85,12 +85,12 @@ drivers:
 	wg := &sync.WaitGroup{}
 	for i := 0; i < 50; i++ {
 		wg.Add(1)
-		go allocate_apps_stress_worker(t, wg, i, afi, label.UID.String())
+		go allocateAppsStressWorker(t, wg, i, afi, label.UID.String())
 	}
 	wg.Wait()
 }
 
-func allocate_apps_stress_worker(t *testing.T, wg *sync.WaitGroup, id int, afi *h.AFInstance, label string) {
+func allocateAppsStressWorker(t *testing.T, wg *sync.WaitGroup, id int, afi *h.AFInstance, label string) {
 	defer wg.Done()
 
 	tr := &http.Transport{

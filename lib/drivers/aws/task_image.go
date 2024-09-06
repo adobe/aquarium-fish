@@ -19,7 +19,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
-	ec2_types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/log"
@@ -90,55 +90,55 @@ func (t *TaskImage) Execute() (result []byte, err error) {
 	}
 
 	log.Debugf("AWS: TaskImage %s: Detecting block devices of the instance...", t.ApplicationTask.UID)
-	var block_devices []ec2_types.BlockDeviceMapping
+	var blockDevices []ec2types.BlockDeviceMapping
 
 	// In case we need just the root disk (!Full) - let's get some additional data
 	// We don't need to fill the block devices if we want a full image of the instance
 	if !t.Full {
 		// TODO: Probably better to use DescribeInstances
 		// Look for the root device name of the instance
-		describe_input := ec2.DescribeInstanceAttributeInput{
+		describeInput := ec2.DescribeInstanceAttributeInput{
 			InstanceId: aws.String(t.Resource.Identifier),
-			Attribute:  ec2_types.InstanceAttributeNameRootDeviceName,
+			Attribute:  ec2types.InstanceAttributeNameRootDeviceName,
 		}
-		describe_resp, err := conn.DescribeInstanceAttribute(context.TODO(), &describe_input)
+		describeResp, err := conn.DescribeInstanceAttribute(context.TODO(), &describeInput)
 		if err != nil {
 			return []byte(`{"error":"internal: failed to request instance root device"}`), log.Errorf("AWS: Unable to request the instance RootDeviceName attribute %s: %v", t.Resource.Identifier, err)
 		}
-		root_device := aws.ToString(describe_resp.RootDeviceName.Value)
+		rootDevice := aws.ToString(describeResp.RootDeviceName.Value)
 
 		// Looking for the instance block device mappings to clarify what we need to include in the image
-		describe_input = ec2.DescribeInstanceAttributeInput{
+		describeInput = ec2.DescribeInstanceAttributeInput{
 			InstanceId: aws.String(t.Resource.Identifier),
-			Attribute:  ec2_types.InstanceAttributeNameBlockDeviceMapping,
+			Attribute:  ec2types.InstanceAttributeNameBlockDeviceMapping,
 		}
-		describe_resp, err = conn.DescribeInstanceAttribute(context.TODO(), &describe_input)
+		describeResp, err = conn.DescribeInstanceAttribute(context.TODO(), &describeInput)
 		if err != nil {
 			return []byte(`{"error":"internal: failed to request instance block device mapping"}`), log.Errorf("AWS: Unable to request the instance BlockDeviceMapping attribute %s: %v", t.Resource.Identifier, err)
 		}
 
 		// Filter the block devices in the image if we don't need full one
-		for _, dev := range describe_resp.BlockDeviceMappings {
+		for _, dev := range describeResp.BlockDeviceMappings {
 			// Requesting volume to get necessary data for required Ebs field
-			mapping := ec2_types.BlockDeviceMapping{
+			mapping := ec2types.BlockDeviceMapping{
 				DeviceName: dev.DeviceName,
 			}
-			if root_device != aws.ToString(dev.DeviceName) {
+			if rootDevice != aws.ToString(dev.DeviceName) {
 				mapping.NoDevice = aws.String("")
 			} else {
-				log.Debugf("AWS: TaskImage %s: Only root disk will be used to create image: %s", t.ApplicationTask.UID, root_device)
+				log.Debugf("AWS: TaskImage %s: Only root disk will be used to create image: %s", t.ApplicationTask.UID, rootDevice)
 				if dev.Ebs == nil {
 					return []byte(`{"error":"internal: root disk of instance doesn't have EBS config"}`), log.Errorf("AWS: Root disk doesn't have EBS configuration")
 				}
 				params := ec2.DescribeVolumesInput{
 					VolumeIds: []string{aws.ToString(dev.Ebs.VolumeId)},
 				}
-				vol_resp, err := conn.DescribeVolumes(context.TODO(), &params)
-				if err != nil || len(vol_resp.Volumes) < 1 {
+				volResp, err := conn.DescribeVolumes(context.TODO(), &params)
+				if err != nil || len(volResp.Volumes) < 1 {
 					return []byte(`{"error":"internal: failed to request instance volume info config"}`), log.Errorf("AWS: Unable to request the instance root volume info %s: %v", aws.ToString(dev.Ebs.VolumeId), err)
 				}
-				vol_info := vol_resp.Volumes[0]
-				mapping.Ebs = &ec2_types.EbsBlockDevice{
+				volInfo := volResp.Volumes[0]
+				mapping.Ebs = &ec2types.EbsBlockDevice{
 					DeleteOnTermination: dev.Ebs.DeleteOnTermination,
 					//Encrypted:  vol_info.Encrypted,
 					//Iops:       vol_info.Iops,
@@ -146,30 +146,30 @@ func (t *TaskImage) Execute() (result []byte, err error) {
 					//OutpostArn: vol_info.OutpostArn,
 					//SnapshotId: vol_info.SnapshotId,
 					//Throughput: vol_info.Throughput,
-					VolumeSize: vol_info.Size,
-					VolumeType: vol_info.VolumeType,
+					VolumeSize: volInfo.Size,
+					VolumeType: volInfo.VolumeType,
 				}
 			}
-			block_devices = append(block_devices, mapping)
+			blockDevices = append(blockDevices, mapping)
 		}
 	} else {
 		log.Debugf("AWS: TaskImage %s: All the instance disks will be used for image", t.ApplicationTask.UID)
 	}
 
 	// Preparing the create image request
-	image_name := opts.Image + time.Now().UTC().Format("-060102.150405")
+	imageName := opts.Image + time.Now().UTC().Format("-060102.150405")
 	if opts.TaskImageName != "" {
-		image_name = opts.TaskImageName + time.Now().UTC().Format("-060102.150405")
+		imageName = opts.TaskImageName + time.Now().UTC().Format("-060102.150405")
 	}
 	input := ec2.CreateImageInput{
 		InstanceId:          aws.String(t.Resource.Identifier),
-		Name:                aws.String(image_name),
-		BlockDeviceMappings: block_devices,
+		Name:                aws.String(imageName),
+		BlockDeviceMappings: blockDevices,
 		Description:         aws.String("Created by AquariumFish"),
 		NoReboot:            aws.Bool(true), // Action wants to do that on running instance or already stopped one
-		TagSpecifications: []ec2_types.TagSpecification{{
-			ResourceType: ec2_types.ResourceTypeImage,
-			Tags: []ec2_types.Tag{
+		TagSpecifications: []ec2types.TagSpecification{{
+			ResourceType: ec2types.ResourceTypeImage,
+			Tags: []ec2types.Tag{
 				{
 					Key:   aws.String("InstanceId"),
 					Value: aws.String(t.Resource.Identifier),
@@ -187,20 +187,20 @@ func (t *TaskImage) Execute() (result []byte, err error) {
 	}
 	if opts.TaskImageEncryptKey != "" {
 		// Append tmp to the name since it's just a temporary image for further re-encryption
-		input.Name = aws.String("tmp_" + image_name)
+		input.Name = aws.String("tmp_" + imageName)
 	}
 
 	if t.ApplicationTask.When == types.ApplicationStatusDEALLOCATE {
 		// Wait for instance stopped before going forward with image creation
 		log.Infof("AWS: TaskImage %s: Wait for instance %q stopping...", t.ApplicationTask.UID, t.Resource.Identifier)
 		sw := ec2.NewInstanceStoppedWaiter(conn)
-		max_wait := 10 * time.Minute
-		wait_input := ec2.DescribeInstancesInput{
+		maxWait := 10 * time.Minute
+		waitInput := ec2.DescribeInstancesInput{
 			InstanceIds: []string{
 				t.Resource.Identifier,
 			},
 		}
-		if err := sw.Wait(context.TODO(), &wait_input, max_wait); err != nil {
+		if err := sw.Wait(context.TODO(), &waitInput, maxWait); err != nil {
 			// Do not fail hard here - it's still possible to create image of the instance
 			log.Errorf("AWS: TaskImage %s: Error during wait for instance %s stop: %v", t.ApplicationTask.UID, t.Resource.Identifier, err)
 		}
@@ -214,33 +214,33 @@ func (t *TaskImage) Execute() (result []byte, err error) {
 		return []byte(`{"error":"internal: no image was created from instance"}`), log.Errorf("AWS: No image was created from instance %s", t.Resource.Identifier)
 	}
 
-	image_id := aws.ToString(resp.ImageId)
-	log.Infof("AWS: TaskImage %s: Created image %q with id %q...", t.ApplicationTask.UID, aws.ToString(input.Name), image_id)
+	imageId := aws.ToString(resp.ImageId)
+	log.Infof("AWS: TaskImage %s: Created image %q with id %q...", t.ApplicationTask.UID, aws.ToString(input.Name), imageId)
 
 	// Wait for the image to be completed, otherwise if we will start a copy - it will fail...
-	log.Infof("AWS: TaskImage %s: Wait for image %s %q availability...", t.ApplicationTask.UID, image_id, aws.ToString(input.Name))
+	log.Infof("AWS: TaskImage %s: Wait for image %s %q availability...", t.ApplicationTask.UID, imageId, aws.ToString(input.Name))
 	sw := ec2.NewImageAvailableWaiter(conn)
-	max_wait := time.Duration(t.driver.cfg.ImageCreateWait)
-	wait_input := ec2.DescribeImagesInput{
+	maxWait := time.Duration(t.driver.cfg.ImageCreateWait)
+	waitInput := ec2.DescribeImagesInput{
 		ImageIds: []string{
-			image_id,
+			imageId,
 		},
 	}
-	if err = sw.Wait(context.TODO(), &wait_input, max_wait); err != nil {
+	if err = sw.Wait(context.TODO(), &waitInput, maxWait); err != nil {
 		// Need to make sure tmp image will be removed, while target image could stay and complete
 		if opts.TaskImageEncryptKey != "" {
-			log.Debugf("AWS: TaskImage %s: Cleanup the temp image %q", t.ApplicationTask.UID, image_id)
-			if err := t.driver.deleteImage(conn, image_id); err != nil {
+			log.Debugf("AWS: TaskImage %s: Cleanup the temp image %q", t.ApplicationTask.UID, imageId)
+			if err := t.driver.deleteImage(conn, imageId); err != nil {
 				log.Errorf("AWS: TaskImage %s: Unable to cleanup the temp image %s: %v", t.ApplicationTask.UID, t.Resource.Identifier, err)
 			}
 		}
-		return []byte(`{"error":"internal: timeout on await for the image availability"}`), log.Error("AWS: Error during wait for the image availability:", image_id, aws.ToString(input.Name), err)
+		return []byte(`{"error":"internal: timeout on await for the image availability"}`), log.Error("AWS: Error during wait for the image availability:", imageId, aws.ToString(input.Name), err)
 	}
 
 	// If TaskImageEncryptKey is set - we need to copy the image with enabled encryption and delete the temp one
 	if opts.TaskImageEncryptKey != "" {
-		copy_input := ec2.CopyImageInput{
-			Name:          aws.String(image_name),
+		copyInput := ec2.CopyImageInput{
+			Name:          aws.String(imageName),
 			Description:   input.Description,
 			SourceImageId: resp.ImageId,
 			SourceRegion:  aws.String(t.driver.cfg.Region),
@@ -248,8 +248,8 @@ func (t *TaskImage) Execute() (result []byte, err error) {
 			Encrypted:     aws.Bool(true),
 			KmsKeyId:      aws.String(opts.TaskImageEncryptKey),
 		}
-		log.Infof("AWS: TaskImage %s: Re-encrypting tmp image to final image %q", t.ApplicationTask.UID, aws.ToString(copy_input.Name))
-		resp, err := conn.CopyImage(context.TODO(), &copy_input)
+		log.Infof("AWS: TaskImage %s: Re-encrypting tmp image to final image %q", t.ApplicationTask.UID, aws.ToString(copyInput.Name))
+		resp, err := conn.CopyImage(context.TODO(), &copyInput)
 		if err != nil {
 			return []byte(`{"error":"internal: failed to copy image"}`), log.Errorf("AWS: Unable to copy image from tmp image %s: %v", aws.ToString(resp.ImageId), err)
 		}
@@ -257,29 +257,29 @@ func (t *TaskImage) Execute() (result []byte, err error) {
 			return []byte(`{"error":"internal: no image was copied"}`), log.Errorf("AWS: No image was copied from tmp image %s", aws.ToString(resp.ImageId))
 		}
 		// Wait for the image to be completed, otherwise if we will delete the temp one right away it will fail...
-		log.Infof("AWS: TaskImage %s: Wait for re-encrypted image %s %q availability...", t.ApplicationTask.UID, aws.ToString(resp.ImageId), image_name)
+		log.Infof("AWS: TaskImage %s: Wait for re-encrypted image %s %q availability...", t.ApplicationTask.UID, aws.ToString(resp.ImageId), imageName)
 		sw := ec2.NewImageAvailableWaiter(conn)
-		max_wait := time.Duration(t.driver.cfg.ImageCreateWait)
-		wait_input := ec2.DescribeImagesInput{
+		maxWait := time.Duration(t.driver.cfg.ImageCreateWait)
+		waitInput := ec2.DescribeImagesInput{
 			ImageIds: []string{
 				aws.ToString(resp.ImageId),
 			},
 		}
-		if err = sw.Wait(context.TODO(), &wait_input, max_wait); err != nil {
+		if err = sw.Wait(context.TODO(), &waitInput, maxWait); err != nil {
 			// Do not fail hard here - we still need to remove the tmp image
-			log.Errorf("AWS: TaskImage %s: Error during wait for re-encrypted image availability: %s %s, %v", t.ApplicationTask.UID, image_name, aws.ToString(resp.ImageId), err)
+			log.Errorf("AWS: TaskImage %s: Error during wait for re-encrypted image availability: %s %s, %v", t.ApplicationTask.UID, imageName, aws.ToString(resp.ImageId), err)
 		}
 
 		// Delete the temp image & associated snapshots
-		log.Debugf("AWS: TaskImage %s: Deleting the temp image %q", t.ApplicationTask.UID, image_id)
-		if err = t.driver.deleteImage(conn, image_id); err != nil {
-			return []byte(`{"error":"internal: unable to delete the tmp image"}`), log.Errorf("AWS: Unable to delete the temp image %s: %v", image_id, err)
+		log.Debugf("AWS: TaskImage %s: Deleting the temp image %q", t.ApplicationTask.UID, imageId)
+		if err = t.driver.deleteImage(conn, imageId); err != nil {
+			return []byte(`{"error":"internal: unable to delete the tmp image"}`), log.Errorf("AWS: Unable to delete the temp image %s: %v", imageId, err)
 		}
 
-		image_id = aws.ToString(resp.ImageId)
+		imageId = aws.ToString(resp.ImageId)
 	}
 
-	log.Infof("AWS: Created image for the instance %s: %s %q", t.Resource.Identifier, image_id, image_name)
+	log.Infof("AWS: Created image for the instance %s: %s %q", t.Resource.Identifier, imageId, imageName)
 
-	return json.Marshal(map[string]string{"image": image_id, "image_name": image_name})
+	return json.Marshal(map[string]string{"image": imageId, "image_name": imageName})
 }

@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	TEST_SQL_EXPRESSION_INJECTIONS = map[string]string{
+	TestSqlExpressionInjections = map[string]string{
 		``:                                   ``,
 		`1=1`:                                `1 = 1`,
 		`id = 3; DROP users`:                 `"id" = 3`,
@@ -30,7 +30,7 @@ var (
 )
 
 func Test_expression_sql_filter_where_injections(t *testing.T) {
-	for sql, result := range TEST_SQL_EXPRESSION_INJECTIONS {
+	for sql, result := range TestSqlExpressionInjections {
 		t.Run(fmt.Sprintf("Testing `%s`", sql), func(t *testing.T) {
 			out, err := ExpressionSqlFilter(sql)
 			if out != result {

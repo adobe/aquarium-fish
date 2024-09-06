@@ -25,14 +25,14 @@ import (
 func (f *Fish) ApplicationTaskFindByApplication(uid types.ApplicationUID, filter *string) (at []types.ApplicationTask, err error) {
 	db := f.db.Where("application_uid = ?", uid)
 	if filter != nil {
-		secured_filter, err := util.ExpressionSqlFilter(*filter)
+		securedFilter, err := util.ExpressionSqlFilter(*filter)
 		if err != nil {
 			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
 			// We do not fail here because we should not give attacker more information
 			return at, nil
 		}
 		// Adding parentheses to be sure we're have `application_uid AND (filter)`
-		db = db.Where("(" + secured_filter + ")")
+		db = db.Where("(" + securedFilter + ")")
 	}
 	err = db.Find(&at).Error
 	return at, err
@@ -66,7 +66,7 @@ func (f *Fish) ApplicationTaskGet(uid types.ApplicationTaskUID) (at *types.Appli
 	return at, err
 }
 
-func (f *Fish) ApplicationTaskListByApplicationAndWhen(app_uid types.ApplicationUID, when types.ApplicationStatus) (at []types.ApplicationTask, err error) {
-	err = f.db.Where(`application_uid = ? AND "when" = ?`, app_uid, when).Order("created_at desc").Find(&at).Error
+func (f *Fish) ApplicationTaskListByApplicationAndWhen(appUid types.ApplicationUID, when types.ApplicationStatus) (at []types.ApplicationTask, err error) {
+	err = f.db.Where(`application_uid = ? AND "when" = ?`, appUid, when).Order("created_at desc").Find(&at).Error
 	return at, err
 }

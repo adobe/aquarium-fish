@@ -30,9 +30,9 @@ type StreamLogMonitor struct {
 // Read 'overrides' the underlying io.Reader's Read method
 func (slm *StreamLogMonitor) Write(p []byte) (int, error) {
 	index := 0
-	prev_index := 0
+	prevIndex := 0
 	for index < len(p) {
-		index += bytes.Index(p[prev_index:], LineBreak)
+		index += bytes.Index(p[prevIndex:], LineBreak)
 		if index == -1 {
 			// The data does not contain EOL, so appending to buffer and wait
 			slm.linebuf = append(slm.linebuf, p)
@@ -40,11 +40,11 @@ func (slm *StreamLogMonitor) Write(p []byte) (int, error) {
 		}
 		// The newline was found, so prepending the line buffer and print it out
 		// We don't need the EOF in the line (log.Infof adds), so increment index after processing
-		slm.linebuf = append(slm.linebuf, p[prev_index:index])
+		slm.linebuf = append(slm.linebuf, p[prevIndex:index])
 		log.Info(slm.Prefix + string(bytes.Join(slm.linebuf, EmptyByte)))
 		clear(slm.linebuf)
 		index++
-		prev_index = index
+		prevIndex = index
 	}
 
 	return len(p), nil

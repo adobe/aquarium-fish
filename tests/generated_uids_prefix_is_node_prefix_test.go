@@ -124,7 +124,7 @@ drivers:
 		}
 	})
 
-	var app_state types.ApplicationState
+	var appState types.ApplicationState
 	t.Run("Application should get ALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
@@ -134,18 +134,18 @@ drivers:
 				Expect(r).
 				Status(http.StatusOK).
 				End().
-				JSON(&app_state)
+				JSON(&appState)
 
-			if app_state.UID == uuid.Nil {
-				t.Fatalf("ApplicationState UID is incorrect: %v", app_state.UID)
+			if appState.UID == uuid.Nil {
+				t.Fatalf("ApplicationState UID is incorrect: %v", appState.UID)
 			}
 
-			if app_state.Status != types.ApplicationStatusALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", app_state.Status)
+			if appState.Status != types.ApplicationStatusALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", appState.Status)
 			}
 
-			if !bytes.Equal(app_state.UID[:6], node.UID[:6]) {
-				t.Fatalf("ApplicationState UID prefix != Node UID prefix: %v, %v", app_state.UID, node.UID)
+			if !bytes.Equal(appState.UID[:6], node.UID[:6]) {
+				t.Fatalf("ApplicationState UID prefix != Node UID prefix: %v, %v", appState.UID, node.UID)
 			}
 		})
 	})
@@ -193,10 +193,10 @@ drivers:
 				Expect(r).
 				Status(http.StatusOK).
 				End().
-				JSON(&app_state)
+				JSON(&appState)
 
-			if app_state.Status != types.ApplicationStatusDEALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", app_state.Status)
+			if appState.Status != types.ApplicationStatusDEALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", appState.Status)
 			}
 		})
 	})

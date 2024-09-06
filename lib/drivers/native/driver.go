@@ -45,10 +45,10 @@ func init() {
 type Driver struct {
 	cfg Config
 	// Contains the available tasks of the driver
-	tasks_list []drivers.ResourceDriverTask
+	tasksList []drivers.ResourceDriverTask
 
-	total_cpu uint // In logical threads
-	total_ram uint // In RAM GB
+	totalCpu uint // In logical threads
+	totalRam uint // In RAM GB
 }
 
 // Is used to provide some data to the entry/metadata values which could contain templates
@@ -73,17 +73,17 @@ func (d *Driver) Prepare(config []byte) error {
 	}
 
 	// Collect node resources status
-	cpu_stat, err := cpu.Counts(true)
+	cpuStat, err := cpu.Counts(true)
 	if err != nil {
 		return err
 	}
-	d.total_cpu = uint(cpu_stat)
+	d.totalCpu = uint(cpuStat)
 
-	mem_stat, err := mem.VirtualMemory()
+	memStat, err := mem.VirtualMemory()
 	if err != nil {
 		return err
 	}
-	d.total_ram = uint(mem_stat.Total / 1073741824) // Getting GB from Bytes
+	d.totalRam = uint(memStat.Total / 1073741824) // Getting GB from Bytes
 
 	// TODO: Cleanup the image directory in case the images are not good
 
@@ -101,8 +101,8 @@ func (d *Driver) ValidateDefinition(def types.LabelDefinition) error {
 		// Empty name means user home which is always exists
 		if img.Tag != "" {
 			found := false
-			for d_name := range def.Resources.Disks {
-				if d_name == img.Tag {
+			for dName := range def.Resources.Disks {
+				if dName == img.Tag {
 					found = true
 					break
 				}
@@ -116,8 +116,8 @@ func (d *Driver) ValidateDefinition(def types.LabelDefinition) error {
 }
 
 // Allow Fish to ask the driver about it's capacity (free slots) of a specific definition
-func (d *Driver) AvailableCapacity(node_usage types.Resources, req types.LabelDefinition) int64 {
-	var out_count int64
+func (d *Driver) AvailableCapacity(nodeUsage types.Resources, req types.LabelDefinition) int64 {
+	var outCount int64
 
 	var opts Options
 	if err := opts.Apply(req.Options); err != nil {
@@ -125,43 +125,43 @@ func (d *Driver) AvailableCapacity(node_usage types.Resources, req types.LabelDe
 	}
 
 	// Check if the node has the required resources - otherwise we can't run it anyhow
-	avail_cpu, avail_ram := d.getAvailResources()
-	if req.Resources.Cpu > avail_cpu {
+	availCpu, availRam := d.getAvailResources()
+	if req.Resources.Cpu > availCpu {
 		return 0
 	}
-	if req.Resources.Ram > avail_ram {
+	if req.Resources.Ram > availRam {
 		return 0
 	}
 	// TODO: Check disk requirements
 
 	// Since we have the required resources - let's check if tenancy allows us to expand them to
 	// run more tenants here
-	if node_usage.IsEmpty() {
+	if nodeUsage.IsEmpty() {
 		// In case we dealing with the first one - we need to set usage modificators, otherwise
 		// those values will mess up the next calculations
-		node_usage.Multitenancy = req.Resources.Multitenancy
-		node_usage.CpuOverbook = req.Resources.CpuOverbook
-		node_usage.RamOverbook = req.Resources.RamOverbook
+		nodeUsage.Multitenancy = req.Resources.Multitenancy
+		nodeUsage.CpuOverbook = req.Resources.CpuOverbook
+		nodeUsage.RamOverbook = req.Resources.RamOverbook
 	}
-	if node_usage.Multitenancy && req.Resources.Multitenancy {
+	if nodeUsage.Multitenancy && req.Resources.Multitenancy {
 		// Ok we can run more tenants, let's calculate how much
-		if node_usage.CpuOverbook && req.Resources.CpuOverbook {
-			avail_cpu += d.cfg.CpuOverbook
+		if nodeUsage.CpuOverbook && req.Resources.CpuOverbook {
+			availCpu += d.cfg.CpuOverbook
 		}
-		if node_usage.RamOverbook && req.Resources.RamOverbook {
-			avail_ram += d.cfg.RamOverbook
+		if nodeUsage.RamOverbook && req.Resources.RamOverbook {
+			availRam += d.cfg.RamOverbook
 		}
 	}
 
 	// Calculate how much of those definitions we could run
-	out_count = int64((avail_cpu - node_usage.Cpu) / req.Resources.Cpu)
-	ram_count := int64((avail_ram - node_usage.Ram) / req.Resources.Ram)
-	if out_count > ram_count {
-		out_count = ram_count
+	outCount = int64((availCpu - nodeUsage.Cpu) / req.Resources.Cpu)
+	ramCount := int64((availRam - nodeUsage.Ram) / req.Resources.Ram)
+	if outCount > ramCount {
+		outCount = ramCount
 	}
 	// TODO: Add disks into equation
 
-	return out_count
+	return outCount
 }
 
 /**
@@ -185,7 +185,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 	log.Info("Native: Created user for Application execution:", user)
 
 	// Create and connect volumes to container
-	disk_paths, err := d.disksCreate(user, def.Resources.Disks)
+	diskPaths, err := d.disksCreate(user, def.Resources.Disks)
 	if err != nil {
 		disksDelete(&d.cfg, user)
 		userDelete(&d.cfg, user)
@@ -193,17 +193,17 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 	}
 
 	// Set default path as homedir
-	disk_paths[""] = homedir
+	diskPaths[""] = homedir
 
 	// Loading images and unpack them to home/disks according
-	if err := d.loadImages(user, opts.Images, disk_paths); err != nil {
+	if err := d.loadImages(user, opts.Images, diskPaths); err != nil {
 		disksDelete(&d.cfg, user)
 		userDelete(&d.cfg, user)
 		return nil, log.Error("Native: Unable to load and unpack images:", err)
 	}
 
 	// Running workload
-	if err := userRun(&d.cfg, &EnvData{Disks: disk_paths}, user, opts.Entry, metadata); err != nil {
+	if err := userRun(&d.cfg, &EnvData{Disks: diskPaths}, user, opts.Entry, metadata); err != nil {
 		disksDelete(&d.cfg, user)
 		userDelete(&d.cfg, user)
 		return nil, log.Error("Native: Unable to run the entry workload:", err)
@@ -227,7 +227,7 @@ func (d *Driver) Status(res *types.Resource) (string, error) {
 func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
 	// Look for the specified task name
 	var t drivers.ResourceDriverTask
-	for _, task := range d.tasks_list {
+	for _, task := range d.tasksList {
 		if task.Name() == name {
 			t = task.Clone()
 		}

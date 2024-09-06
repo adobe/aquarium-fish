@@ -24,7 +24,7 @@ import (
 	"time"
 )
 
-var fish_path = os.Getenv("FISH_PATH") // Full path to the aquarium-fish binary
+var fishPath = os.Getenv("FISH_PATH") // Full path to the aquarium-fish binary
 
 // Saves state of the running Aquarium Fish for particular test
 type AFInstance struct {
@@ -33,9 +33,9 @@ type AFInstance struct {
 	running   bool
 	cmd       *exec.Cmd
 
-	node_name   string
-	endpoint    string
-	admin_token string
+	nodeName   string
+	endpoint   string
+	adminToken string
 }
 
 // Simple creates and run the fish node
@@ -52,13 +52,13 @@ func NewAfInstance(tb testing.TB, name, cfg string) *AFInstance {
 	tb.Helper()
 	tb.Log("INFO: Creating new node:", name)
 	afi := &AFInstance{
-		node_name: name,
+		nodeName: name,
 	}
 
 	afi.workspace = tb.TempDir()
-	tb.Log("INFO: Created workspace:", afi.node_name, afi.workspace)
+	tb.Log("INFO: Created workspace:", afi.nodeName, afi.workspace)
 
-	cfg += fmt.Sprintf("\nnode_name: %q", afi.node_name)
+	cfg += fmt.Sprintf("\nnode_name: %q", afi.nodeName)
 	os.WriteFile(filepath.Join(afi.workspace, "config.yml"), []byte(cfg), 0o600)
 	tb.Log("INFO: Stored config:", cfg)
 
@@ -78,7 +78,7 @@ func (afi1 *AFInstance) NewClusterNode(tb testing.TB, name, cfg string, args ...
 // Just create the node based on the existing cluster node
 func (afi1 *AFInstance) NewAfInstanceCluster(tb testing.TB, name, cfg string) *AFInstance {
 	tb.Helper()
-	tb.Log("INFO: Creating new cluster node with seed node:", afi1.node_name)
+	tb.Log("INFO: Creating new cluster node with seed node:", afi1.nodeName)
 	cfg += fmt.Sprintf("\ncluster_join: [%q]", afi1.endpoint)
 	afi2 := NewAfInstance(tb, name, cfg)
 
@@ -110,7 +110,7 @@ func (afi *AFInstance) Workspace() string {
 
 // Returns admin token
 func (afi *AFInstance) AdminToken() string {
-	return afi.admin_token
+	return afi.adminToken
 }
 
 // Check the fish instance is running
@@ -121,7 +121,7 @@ func (afi *AFInstance) IsRunning() bool {
 // Restart the application
 func (afi *AFInstance) Restart(tb testing.TB, args ...string) {
 	tb.Helper()
-	tb.Log("INFO: Restarting:", afi.node_name, afi.workspace)
+	tb.Log("INFO: Restarting:", afi.nodeName, afi.workspace)
 	afi.Stop(tb)
 	afi.Start(tb, args...)
 }
@@ -129,7 +129,7 @@ func (afi *AFInstance) Restart(tb testing.TB, args ...string) {
 // Cleanup after the test execution
 func (afi *AFInstance) Cleanup(tb testing.TB) {
 	tb.Helper()
-	tb.Log("INFO: Cleaning up:", afi.node_name, afi.workspace)
+	tb.Log("INFO: Cleaning up:", afi.nodeName, afi.workspace)
 	afi.Stop(tb)
 	os.RemoveAll(afi.workspace)
 }
@@ -144,7 +144,7 @@ func (afi *AFInstance) Stop(tb testing.TB) {
 	afi.cmd.Process.Signal(os.Interrupt)
 
 	// Wait 10 seconds for process to stop
-	tb.Log("INFO: Wait 10s for fish node to stop:", afi.node_name, afi.workspace)
+	tb.Log("INFO: Wait 10s for fish node to stop:", afi.nodeName, afi.workspace)
 	for i := 1; i < 20; i++ {
 		if !afi.running {
 			return
@@ -160,39 +160,39 @@ func (afi *AFInstance) Stop(tb testing.TB) {
 func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 	tb.Helper()
 	if afi.running {
-		tb.Fatalf("ERROR: Fish node %q can't be started since already started", afi.node_name)
+		tb.Fatalf("ERROR: Fish node %q can't be started since already started", afi.nodeName)
 		return
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	afi.fishKill = cancel
 
-	cmd_args := []string{"-v", "debug", "-c", filepath.Join(afi.workspace, "config.yml")}
-	cmd_args = append(cmd_args, args...)
-	afi.cmd = exec.CommandContext(ctx, fish_path, cmd_args...)
+	cmdArgs := []string{"-v", "debug", "-c", filepath.Join(afi.workspace, "config.yml")}
+	cmdArgs = append(cmdArgs, args...)
+	afi.cmd = exec.CommandContext(ctx, fishPath, cmdArgs...)
 	afi.cmd.Dir = afi.workspace
 	r, _ := afi.cmd.StdoutPipe()
 	afi.cmd.Stderr = afi.cmd.Stdout
 
-	init_done := make(chan string)
+	initDone := make(chan string)
 	scanner := bufio.NewScanner(r)
 	// TODO: Add timeout for waiting of API available
 	go func() {
 		// Listening for log and scan for token and address
 		for scanner.Scan() {
 			line := scanner.Text()
-			tb.Log(afi.node_name, line)
+			tb.Log(afi.nodeName, line)
 			if strings.HasPrefix(line, "Admin user pass: ") {
 				val := strings.SplitN(strings.TrimSpace(line), "Admin user pass: ", 2)
 				if len(val) < 2 {
-					init_done <- "ERROR: No token after 'Admin user pass: '"
+					initDone <- "ERROR: No token after 'Admin user pass: '"
 					break
 				}
-				afi.admin_token = val[1]
+				afi.adminToken = val[1]
 			}
 			if strings.Contains(line, "API listening on: ") {
 				val := strings.SplitN(strings.TrimSpace(line), "API listening on: ", 2)
 				if len(val) < 2 {
-					init_done <- "ERROR: No address after 'API listening on: '"
+					initDone <- "ERROR: No address after 'API listening on: '"
 					break
 				}
 				afi.endpoint = val[1]
@@ -200,7 +200,7 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 			if strings.HasSuffix(line, "Fish initialized") {
 				// Found the needed values and continue to process to print the fish output for
 				// test debugging purposes
-				init_done <- ""
+				initDone <- ""
 			}
 		}
 		tb.Log("INFO: Reading of AquariumFish output is done")
@@ -216,13 +216,13 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 		}()
 		if err := afi.cmd.Wait(); err != nil {
 			tb.Log("WARN: AquariumFish process was stopped:", err)
-			init_done <- fmt.Sprintf("ERROR: Fish was stopped with exit code: %v", err)
+			initDone <- fmt.Sprintf("ERROR: Fish was stopped with exit code: %v", err)
 		}
 	}()
 
-	failed := <-init_done
+	failed := <-initDone
 
 	if failed != "" {
-		tb.Fatalf("ERROR: Failed to init node %q: %s", afi.node_name, failed)
+		tb.Fatalf("ERROR: Failed to init node %q: %s", afi.nodeName, failed)
 	}
 }
