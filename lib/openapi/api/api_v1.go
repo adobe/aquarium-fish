@@ -135,14 +135,14 @@ func (e *Processor) UserCreateUpdatePost(c echo.Context) error {
 		password = crypt.RandString(64)
 	}
 
-	mod_user, err := e.fish.UserGet(data.Name)
+	modUser, err := e.fish.UserGet(data.Name)
 	if err == nil {
 		// Updating existing user
-		mod_user.Hash = crypt.NewHash(password, nil)
-		e.fish.UserSave(mod_user)
+		modUser.Hash = crypt.NewHash(password, nil)
+		e.fish.UserSave(modUser)
 	} else {
 		// Creating new user
-		password, mod_user, err = e.fish.UserNew(data.Name, password)
+		password, modUser, err = e.fish.UserNew(data.Name, password)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to create user: %v", err)})
 			return fmt.Errorf("Unable to create user: %w", err)
@@ -150,8 +150,8 @@ func (e *Processor) UserCreateUpdatePost(c echo.Context) error {
 	}
 
 	// Fill the output values
-	data.CreatedAt = mod_user.CreatedAt
-	data.UpdatedAt = mod_user.UpdatedAt
+	data.CreatedAt = modUser.CreatedAt
+	data.UpdatedAt = modUser.UpdatedAt
 	if data.Password == "" {
 		data.Password = password
 	} else {
@@ -247,14 +247,14 @@ func (e *Processor) ResourceAccessPut(c echo.Context, uid types.ResourceUID) err
 		return fmt.Errorf("Only the owner & admin can assign service mapping to the Application")
 	}
 
-	r_access := types.ResourceAccess{
+	rAccess := types.ResourceAccess{
 		ResourceUID: res.UID,
 		Username:    user.Name,
 		Password:    crypt.RandString(64),
 	}
-	e.fish.ResourceAccessCreate(&r_access)
+	e.fish.ResourceAccessCreate(&rAccess)
 
-	return c.JSON(http.StatusOK, r_access)
+	return c.JSON(http.StatusOK, rAccess)
 }
 
 func (e *Processor) ApplicationListGet(c echo.Context, params types.ApplicationListGetParams) error {
@@ -271,13 +271,13 @@ func (e *Processor) ApplicationListGet(c echo.Context, params types.ApplicationL
 		return fmt.Errorf("Not authentified")
 	}
 	if user.Name != "admin" {
-		var owner_out []types.Application
+		var ownerOut []types.Application
 		for _, app := range out {
 			if app.OwnerName == user.Name {
-				owner_out = append(owner_out, app)
+				ownerOut = append(ownerOut, app)
 			}
 		}
-		out = owner_out
+		out = ownerOut
 	}
 
 	return c.JSON(http.StatusOK, out)
@@ -381,11 +381,11 @@ func (e *Processor) ApplicationStateGet(c echo.Context, uid types.ApplicationUID
 	return c.JSON(http.StatusOK, out)
 }
 
-func (e *Processor) ApplicationTaskListGet(c echo.Context, app_uid types.ApplicationUID, params types.ApplicationTaskListGetParams) error {
-	app, err := e.fish.ApplicationGet(app_uid)
+func (e *Processor) ApplicationTaskListGet(c echo.Context, appUid types.ApplicationUID, params types.ApplicationTaskListGetParams) error {
+	app, err := e.fish.ApplicationGet(appUid)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", app_uid)})
-		return fmt.Errorf("Unable to find the Application: %s, %w", app_uid, err)
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", appUid)})
+		return fmt.Errorf("Unable to find the Application: %s, %w", appUid, err)
 	}
 
 	// Only the owner of the application (or admin) could get the tasks
@@ -399,7 +399,7 @@ func (e *Processor) ApplicationTaskListGet(c echo.Context, app_uid types.Applica
 		return fmt.Errorf("Only the owner of Application & admin can get the Application Tasks")
 	}
 
-	out, err := e.fish.ApplicationTaskFindByApplication(app_uid, params.Filter)
+	out, err := e.fish.ApplicationTaskFindByApplication(appUid, params.Filter)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the Application Tasks list: %v", err)})
 		return fmt.Errorf("Unable to get the Application Tasks list: %w", err)
@@ -408,11 +408,11 @@ func (e *Processor) ApplicationTaskListGet(c echo.Context, app_uid types.Applica
 	return c.JSON(http.StatusOK, out)
 }
 
-func (e *Processor) ApplicationTaskCreatePost(c echo.Context, app_uid types.ApplicationUID) error {
-	app, err := e.fish.ApplicationGet(app_uid)
+func (e *Processor) ApplicationTaskCreatePost(c echo.Context, appUid types.ApplicationUID) error {
+	app, err := e.fish.ApplicationGet(appUid)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", app_uid)})
-		return fmt.Errorf("Unable to find the Application: %s, %w", app_uid, err)
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", appUid)})
+		return fmt.Errorf("Unable to find the Application: %s, %w", appUid, err)
 	}
 
 	// Only the owner of the application (or admin) could create the tasks
@@ -433,7 +433,7 @@ func (e *Processor) ApplicationTaskCreatePost(c echo.Context, app_uid types.Appl
 	}
 
 	// Set Application UID for the task forcefully to not allow creating tasks for the other Apps
-	data.ApplicationUID = app_uid
+	data.ApplicationUID = appUid
 
 	if err := e.fish.ApplicationTaskCreate(&data); err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to create ApplicationTask: %v", err)})
@@ -443,11 +443,11 @@ func (e *Processor) ApplicationTaskCreatePost(c echo.Context, app_uid types.Appl
 	return c.JSON(http.StatusOK, data)
 }
 
-func (e *Processor) ApplicationTaskGet(c echo.Context, task_uid types.ApplicationTaskUID) error {
-	task, err := e.fish.ApplicationTaskGet(task_uid)
+func (e *Processor) ApplicationTaskGet(c echo.Context, taskUid types.ApplicationTaskUID) error {
+	task, err := e.fish.ApplicationTaskGet(taskUid)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", task_uid)})
-		return fmt.Errorf("Unable to find the ApplicationTask: %s, %w", task_uid, err)
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", taskUid)})
+		return fmt.Errorf("Unable to find the ApplicationTask: %s, %w", taskUid, err)
 	}
 
 	app, err := e.fish.ApplicationGet(task.ApplicationUID)
@@ -498,12 +498,12 @@ func (e *Processor) ApplicationDeallocateGet(c echo.Context, uid types.Applicati
 		return fmt.Errorf("Unable to deallocate the Application with status: %s", out.Status)
 	}
 
-	new_status := types.ApplicationStatusDEALLOCATE
+	newStatus := types.ApplicationStatusDEALLOCATE
 	if out.Status != types.ApplicationStatusALLOCATED {
 		// The Application was not yet Allocated so just mark it as Recalled
-		new_status = types.ApplicationStatusRECALLED
+		newStatus = types.ApplicationStatusRECALLED
 	}
-	as := &types.ApplicationState{ApplicationUID: uid, Status: new_status,
+	as := &types.ApplicationState{ApplicationUID: uid, Status: newStatus,
 		Description: fmt.Sprintf("Requested by user %s", user.Name),
 	}
 	err = e.fish.ApplicationStateCreate(as)

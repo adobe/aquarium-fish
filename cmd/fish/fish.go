@@ -39,26 +39,26 @@ import (
 func main() {
 	log.Infof("Aquarium Fish %s (%s)", build.Version, build.Time)
 
-	var api_address string
-	var proxy_socks_address string
-	var proxy_ssh_address string
-	var node_address string
-	var cfg_path string
+	var apiAddress string
+	var proxySocksAddress string
+	var proxySshAddress string
+	var nodeAddress string
+	var cfgPath string
 	var dir string
-	var cpu_limit string
-	var mem_target string
-	var log_verbosity string
-	var log_timestamp bool
+	var cpuLimit string
+	var memTarget string
+	var logVerbosity string
+	var logTimestamp bool
 
 	cmd := &cobra.Command{
 		Use:   "aquarium-fish",
 		Short: "Aquarium fish",
 		Long:  `Part of the Aquarium suite - a distributed resources manager`,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
-			if err = log.SetVerbosity(log_verbosity); err != nil {
+			if err = log.SetVerbosity(logVerbosity); err != nil {
 				return err
 			}
-			log.UseTimestamp = log_timestamp
+			log.UseTimestamp = logTimestamp
 
 			return log.InitLoggers()
 		},
@@ -66,33 +66,33 @@ func main() {
 			log.Info("Fish init...")
 
 			cfg := &fish.Config{}
-			if err = cfg.ReadConfigFile(cfg_path); err != nil {
-				return log.Error("Fish: Unable to apply config file:", cfg_path, err)
+			if err = cfg.ReadConfigFile(cfgPath); err != nil {
+				return log.Error("Fish: Unable to apply config file:", cfgPath, err)
 			}
-			if api_address != "" {
-				cfg.APIAddress = api_address
+			if apiAddress != "" {
+				cfg.APIAddress = apiAddress
 			}
-			if proxy_socks_address != "" {
-				cfg.ProxySocksAddress = proxy_socks_address
+			if proxySocksAddress != "" {
+				cfg.ProxySocksAddress = proxySocksAddress
 			}
-			if proxy_ssh_address != "" {
-				cfg.ProxySshAddress = proxy_ssh_address
+			if proxySshAddress != "" {
+				cfg.ProxySshAddress = proxySshAddress
 			}
-			if node_address != "" {
-				cfg.NodeAddress = node_address
+			if nodeAddress != "" {
+				cfg.NodeAddress = nodeAddress
 			}
 			if dir != "" {
 				cfg.Directory = dir
 			}
-			if cpu_limit != "" {
-				val, err := strconv.ParseUint(cpu_limit, 10, 16)
+			if cpuLimit != "" {
+				val, err := strconv.ParseUint(cpuLimit, 10, 16)
 				if err != nil {
 					return log.Errorf("Fish: Unable to parse cpu limit value: %v", err)
 				}
 				cfg.CpuLimit = uint16(val)
 			}
-			if mem_target != "" {
-				if cfg.MemTarget, err = util.NewHumanSize(mem_target); err != nil {
+			if memTarget != "" {
+				if cfg.MemTarget, err = util.NewHumanSize(memTarget); err != nil {
 					return log.Errorf("Fish: Unable to parse mem target value: %v", err)
 				}
 			}
@@ -113,19 +113,19 @@ func main() {
 			}
 
 			log.Info("Fish init TLS...")
-			ca_path := cfg.TLSCaCrt
-			if !filepath.IsAbs(ca_path) {
-				ca_path = filepath.Join(cfg.Directory, ca_path)
+			caPath := cfg.TLSCaCrt
+			if !filepath.IsAbs(caPath) {
+				caPath = filepath.Join(cfg.Directory, caPath)
 			}
-			key_path := cfg.TLSKey
-			if !filepath.IsAbs(key_path) {
-				key_path = filepath.Join(cfg.Directory, key_path)
+			keyPath := cfg.TLSKey
+			if !filepath.IsAbs(keyPath) {
+				keyPath = filepath.Join(cfg.Directory, keyPath)
 			}
-			cert_path := cfg.TLSCrt
-			if !filepath.IsAbs(cert_path) {
-				cert_path = filepath.Join(cfg.Directory, cert_path)
+			certPath := cfg.TLSCrt
+			if !filepath.IsAbs(certPath) {
+				certPath = filepath.Join(cfg.Directory, certPath)
 			}
-			if err = crypt.InitTlsPairCa([]string{cfg.NodeName, cfg.NodeAddress}, ca_path, key_path, cert_path); err != nil {
+			if err = crypt.InitTlsPairCa([]string{cfg.NodeName, cfg.NodeAddress}, caPath, keyPath, certPath); err != nil {
 				return err
 			}
 
@@ -143,9 +143,9 @@ func main() {
 			}
 
 			// Set one connection and WAL mode to handle "database is locked" errors
-			sql_db, _ := db.DB()
-			sql_db.SetMaxOpenConns(1)
-			sql_db.Exec("PRAGMA journal_mode=WAL;")
+			sqlDb, _ := db.DB()
+			sqlDb.SetMaxOpenConns(1)
+			sqlDb.Exec("PRAGMA journal_mode=WAL;")
 
 			log.Info("Fish starting node...")
 			fish, err := fish.New(db, cfg)
@@ -160,17 +160,17 @@ func main() {
 			}
 
 			log.Info("Fish starting ssh proxy...")
-			id_rsa_path := cfg.NodeSSHKey
-			if !filepath.IsAbs(id_rsa_path) {
-				id_rsa_path = filepath.Join(cfg.Directory, id_rsa_path)
+			idRsaPath := cfg.NodeSSHKey
+			if !filepath.IsAbs(idRsaPath) {
+				idRsaPath = filepath.Join(cfg.Directory, idRsaPath)
 			}
-			err = proxy_ssh.Init(fish, id_rsa_path, cfg.ProxySshAddress)
+			err = proxy_ssh.Init(fish, idRsaPath, cfg.ProxySshAddress)
 			if err != nil {
 				return err
 			}
 
 			log.Info("Fish starting API...")
-			srv, err := openapi.Init(fish, cfg.APIAddress, ca_path, cert_path, key_path)
+			srv, err := openapi.Init(fish, cfg.APIAddress, caPath, certPath, keyPath)
 			if err != nil {
 				return err
 			}
@@ -197,16 +197,16 @@ func main() {
 	}
 
 	flags := cmd.Flags()
-	flags.StringVarP(&api_address, "api", "a", "", "address used to expose the fish API")
-	flags.StringVar(&proxy_socks_address, "socks_proxy", "", "address used to expose the SOCKS5 proxy")
-	flags.StringVar(&proxy_ssh_address, "ssh_proxy", "", "address used to expose the SSH proxy")
-	flags.StringVarP(&node_address, "node", "n", "", "node external endpoint to connect to tell the other nodes")
-	flags.StringVarP(&cfg_path, "cfg", "c", "", "yaml configuration file")
+	flags.StringVarP(&apiAddress, "api", "a", "", "address used to expose the fish API")
+	flags.StringVar(&proxySocksAddress, "socks_proxy", "", "address used to expose the SOCKS5 proxy")
+	flags.StringVar(&proxySshAddress, "ssh_proxy", "", "address used to expose the SSH proxy")
+	flags.StringVarP(&nodeAddress, "node", "n", "", "node external endpoint to connect to tell the other nodes")
+	flags.StringVarP(&cfgPath, "cfg", "c", "", "yaml configuration file")
 	flags.StringVarP(&dir, "dir", "D", "", "database and other fish files directory")
-	flags.StringVar(&cpu_limit, "cpu", "", "max amount of threads fish node will be able to utilize, default - no limit")
-	flags.StringVar(&mem_target, "mem", "", "target memory utilization for fish node to run GC more aggressively when too close")
-	flags.StringVarP(&log_verbosity, "verbosity", "v", "info", "log level (debug, info, warn, error)")
-	flags.BoolVar(&log_timestamp, "timestamp", true, "prepend timestamps for each log line")
+	flags.StringVar(&cpuLimit, "cpu", "", "max amount of threads fish node will be able to utilize, default - no limit")
+	flags.StringVar(&memTarget, "mem", "", "target memory utilization for fish node to run GC more aggressively when too close")
+	flags.StringVarP(&logVerbosity, "verbosity", "v", "info", "log level (debug, info, warn, error)")
+	flags.BoolVar(&logTimestamp, "timestamp", true, "prepend timestamps for each log line")
 	flags.Lookup("timestamp").NoOptDefVal = "false"
 
 	if err := cmd.Execute(); err != nil {

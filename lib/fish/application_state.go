@@ -48,9 +48,9 @@ func (f *Fish) ApplicationStateGet(uid types.ApplicationStateUID) (as *types.App
 	return as, err
 }
 
-func (f *Fish) ApplicationStateGetByApplication(app_uid types.ApplicationUID) (as *types.ApplicationState, err error) {
+func (f *Fish) ApplicationStateGetByApplication(appUid types.ApplicationUID) (as *types.ApplicationState, err error) {
 	as = &types.ApplicationState{}
-	err = f.db.Where("application_uid = ?", app_uid).Order("created_at desc").First(as).Error
+	err = f.db.Where("application_uid = ?", appUid).Order("created_at desc").First(as).Error
 	return as, err
 }
 

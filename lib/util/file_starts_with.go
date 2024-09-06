@@ -26,19 +26,19 @@ var (
 
 func FileStartsWith(path string, prefix []byte) error {
 	// Open input file
-	in_f, err := os.OpenFile(path, os.O_RDONLY, 0o644)
+	inF, err := os.OpenFile(path, os.O_RDONLY, 0o644)
 	if err != nil {
 		return err
 	}
-	defer in_f.Close()
+	defer inF.Close()
 
 	// Check it's not a dir
-	if info, err := in_f.Stat(); err == nil && info.IsDir() {
+	if info, err := inF.Stat(); err == nil && info.IsDir() {
 		return ErrFileStartsWithDirectory
 	}
 
 	buf := make([]byte, len(prefix))
-	length, err := in_f.Read(buf)
+	length, err := inF.Read(buf)
 	if err != nil {
 		return err
 	}

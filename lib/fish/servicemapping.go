@@ -23,13 +23,13 @@ import (
 func (f *Fish) ServiceMappingFind(filter *string) (sms []types.ServiceMapping, err error) {
 	db := f.db
 	if filter != nil {
-		secured_filter, err := util.ExpressionSqlFilter(*filter)
+		securedFilter, err := util.ExpressionSqlFilter(*filter)
 		if err != nil {
 			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
 			// We do not fail here because we should not give attacker more information
 			return sms, nil
 		}
-		db = db.Where(secured_filter)
+		db = db.Where(securedFilter)
 	}
 	err = db.Find(&sms).Error
 	return sms, err

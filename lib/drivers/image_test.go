@@ -21,9 +21,9 @@ import (
 )
 
 // Data for download/unpack tests
-const test_image_ci_sha256 = "48975fe7070f46788898e0729067424a8426ab27fe424500c5046f730d8e2ea5"
-const test_image_ci_path = `/aquarium/image/test/test-image-ci/test-image-ci-20230210.190425_ff1cd1cf.tar.xz`
-const test_image_ci_data = `/Td6WFoAAATm1rRGBMDGBICgASEBHAAAAAAAAHVrYcHgT/8CPl0AOhlKzh19/6MaQrMr9RrXZZWk9zwPnxjjpSvabgz3XRQs+H+dqotO+/DDO4qGxBjzRCfdCYPLz7PwgesGWM6q2rgpyOodGy/fE8D+r8dfs91GlyBovVJc6uZdtbJKrWVnv+jyvbxH55bmsGT0bdLORrG6rcmHQZ8tRr3WakelitUHoo5AljY6fq9RGvSgoeCNlE5bs0W/yJSaxs+Au5fHr1UjwqaqkdobRwtLiDIkjVWx2VutgHqhVR5xKl1ZW01bzOSQqt+Ahqt4HS6ODgp3HQmKNRuIlJa2ydxxdVlZCE6QFngbcp0dyOboWbUTTNi26roufISGmRD2ZIfdnufbPi2Uk8o20R0gaGtVRo64+kBqukRvG9qb1+WvQuCaiJyYAZ9fvf5wGGOzsNERBVvUU0nMK058oqujolnNSlxnugsHj6FNY5PYBzzu31mKfqUQV95/OzsUKfNp8gcWSOj3L8TIzkxB2Njwu5iCFQ96qFBPw/ArUWlxhhQIWKCIOCdsvD4lGP/Pdk8XbZJnjCMV0f8TqsuKUKSzXxCf++3kyJw700Rx4ry2bAPLs0/qxNIsJfhors/MW0B0RrL3p7nLxGlcBCtP3vZZvqSNhPMhG3outPyPlD/bvHLAnQtJTtjphyU7UazpkjcXslP+bSei2X7/t9D4kVqZgasnpEEBpTay5d+n/TKHv9FxLhZWq4mglUsZ7RyNIg2wdJzpe/fJ9SwkQPVxw0q/e21FObbGiwsELvSMPr80buV3ecFzAAAAAMTNLJ0ukWt/AAHiBICgAQCOEmNAscRn+wIAAAAABFla`
+const testImageCiSha256 = "48975fe7070f46788898e0729067424a8426ab27fe424500c5046f730d8e2ea5"
+const testImageCiPath = `/aquarium/image/test/test-image-ci/test-image-ci-20230210.190425_ff1cd1cf.tar.xz`
+const testImageCiData = `/Td6WFoAAATm1rRGBMDGBICgASEBHAAAAAAAAHVrYcHgT/8CPl0AOhlKzh19/6MaQrMr9RrXZZWk9zwPnxjjpSvabgz3XRQs+H+dqotO+/DDO4qGxBjzRCfdCYPLz7PwgesGWM6q2rgpyOodGy/fE8D+r8dfs91GlyBovVJc6uZdtbJKrWVnv+jyvbxH55bmsGT0bdLORrG6rcmHQZ8tRr3WakelitUHoo5AljY6fq9RGvSgoeCNlE5bs0W/yJSaxs+Au5fHr1UjwqaqkdobRwtLiDIkjVWx2VutgHqhVR5xKl1ZW01bzOSQqt+Ahqt4HS6ODgp3HQmKNRuIlJa2ydxxdVlZCE6QFngbcp0dyOboWbUTTNi26roufISGmRD2ZIfdnufbPi2Uk8o20R0gaGtVRo64+kBqukRvG9qb1+WvQuCaiJyYAZ9fvf5wGGOzsNERBVvUU0nMK058oqujolnNSlxnugsHj6FNY5PYBzzu31mKfqUQV95/OzsUKfNp8gcWSOj3L8TIzkxB2Njwu5iCFQ96qFBPw/ArUWlxhhQIWKCIOCdsvD4lGP/Pdk8XbZJnjCMV0f8TqsuKUKSzXxCf++3kyJw700Rx4ry2bAPLs0/qxNIsJfhors/MW0B0RrL3p7nLxGlcBCtP3vZZvqSNhPMhG3outPyPlD/bvHLAnQtJTtjphyU7UazpkjcXslP+bSei2X7/t9D4kVqZgasnpEEBpTay5d+n/TKHv9FxLhZWq4mglUsZ7RyNIg2wdJzpe/fJ9SwkQPVxw0q/e21FObbGiwsELvSMPr80buV3ecFzAAAAAMTNLJ0ukWt/AAHiBICgAQCOEmNAscRn+wIAAAAABFla`
 
 var server *httptest.Server
 
@@ -97,15 +97,15 @@ func Test_image_downloadunpack(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/octet-stream")
 		if _, ok := r.URL.Query()["nosumheader"]; !ok {
-			w.Header().Set("X-Checksum-Sha256", test_image_ci_sha256)
+			w.Header().Set("X-Checksum-Sha256", testImageCiSha256)
 		}
 		w.WriteHeader(http.StatusOK)
-		data, _ := base64.StdEncoding.DecodeString(test_image_ci_data)
+		data, _ := base64.StdEncoding.DecodeString(testImageCiData)
 		w.Write(data)
 	}
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch strings.TrimSpace(r.URL.Path) {
-		case test_image_ci_path:
+		case testImageCiPath:
 			handler(w, r)
 		default:
 			http.NotFoundHandler().ServeHTTP(w, r)
@@ -114,8 +114,8 @@ func Test_image_downloadunpack(t *testing.T) {
 
 	t.Run("good", func(t *testing.T) {
 		image := Image{
-			Url: server.URL + test_image_ci_path,
-			Sum: "sha256:" + test_image_ci_sha256,
+			Url: server.URL + testImageCiPath,
+			Sum: "sha256:" + testImageCiSha256,
 		}
 
 		// Make sure image is ok
@@ -132,7 +132,7 @@ func Test_image_downloadunpack(t *testing.T) {
 	t.Run("bad_url", func(t *testing.T) {
 		image := Image{
 			Url: server.URL + "/not/existing/artifact-version.tar.xz",
-			Sum: "sha256:" + test_image_ci_sha256,
+			Sum: "sha256:" + testImageCiSha256,
 		}
 
 		// Make sure image is ok
@@ -149,7 +149,7 @@ func Test_image_downloadunpack(t *testing.T) {
 
 	t.Run("bad_header_checksum", func(t *testing.T) {
 		image := Image{
-			Url: server.URL + test_image_ci_path,
+			Url: server.URL + testImageCiPath,
 			Sum: "sha256:0123456789abcdef",
 		}
 
@@ -160,14 +160,14 @@ func Test_image_downloadunpack(t *testing.T) {
 
 		// Download/unpack into temp directory
 		err := image.DownloadUnpack(t.TempDir(), "user", "password")
-		if err == nil || err.Error() != `Image: The remote checksum (from header X-Checksum-Sha256) doesn't equal the desired one: "`+test_image_ci_sha256+`" != "0123456789abcdef" for "`+server.URL+test_image_ci_path+`"` {
+		if err == nil || err.Error() != `Image: The remote checksum (from header X-Checksum-Sha256) doesn't equal the desired one: "`+testImageCiSha256+`" != "0123456789abcdef" for "`+server.URL+testImageCiPath+`"` {
 			t.Fatalf(`image.DownloadUnpack() = %q, error expected, but incorrect was returned: %v`, image.Url, err)
 		}
 	})
 
 	t.Run("bad_calculated_checksum", func(t *testing.T) {
 		image := Image{
-			Url: server.URL + test_image_ci_path + "?nosumheader",
+			Url: server.URL + testImageCiPath + "?nosumheader",
 			Sum: "sha256:0123456789abcdef",
 		}
 
@@ -178,7 +178,7 @@ func Test_image_downloadunpack(t *testing.T) {
 
 		// Download/unpack into temp directory
 		err := image.DownloadUnpack(t.TempDir(), "user", "password")
-		if err == nil || err.Error() != `Image: The calculated checksum doesn't equal the desired one: "`+test_image_ci_sha256+`" != "0123456789abcdef" for "`+server.URL+test_image_ci_path+`?nosumheader"` {
+		if err == nil || err.Error() != `Image: The calculated checksum doesn't equal the desired one: "`+testImageCiSha256+`" != "0123456789abcdef" for "`+server.URL+testImageCiPath+`?nosumheader"` {
 			t.Fatalf(`image.DownloadUnpack() = %q, error expected, but incorrect was returned: %v`, image.Url, err)
 		}
 	})

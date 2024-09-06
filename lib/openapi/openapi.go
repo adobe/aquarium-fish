@@ -64,7 +64,7 @@ func (cb *YamlBinder) Bind(i any, c echo.Context) (err error) {
 	return
 }
 
-func Init(fish *fish.Fish, api_address, ca_path, cert_path, key_path string) (*http.Server, error) {
+func Init(fish *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*http.Server, error) {
 	swagger, err := GetSwagger()
 	if err != nil {
 		return nil, fmt.Errorf("Fish OpenAPI: Error loading swagger spec: %w", err)
@@ -89,15 +89,15 @@ func Init(fish *fish.Fish, api_address, ca_path, cert_path, key_path string) (*h
 	api.NewV1Router(router, fish)
 	// TODO: web UI router
 
-	ca_pool := x509.NewCertPool()
-	if ca_bytes, err := os.ReadFile(ca_path); err == nil {
-		ca_pool.AppendCertsFromPEM(ca_bytes)
+	caPool := x509.NewCertPool()
+	if caBytes, err := os.ReadFile(caPath); err == nil {
+		caPool.AppendCertsFromPEM(caBytes)
 	}
 	s := router.TLSServer
-	s.Addr = api_address
+	s.Addr = apiAddress
 	s.TLSConfig = &tls.Config{ // #nosec G402 , keep the compatibility high since not public access
 		ClientAuth: tls.RequestClientCert, // Need for the client certificate auth
-		ClientCAs:  ca_pool,               // Verify client certificate with the cluster CA
+		ClientCAs:  caPool,                // Verify client certificate with the cluster CA
 	}
 	errChan := make(chan error)
 	go func() {
@@ -115,7 +115,7 @@ func Init(fish *fish.Fish, api_address, ca_path, cert_path, key_path string) (*h
 
 		defer router.TLSListener.Close()
 
-		if err := s.ServeTLS(router.TLSListener, cert_path, key_path); err != http.ErrServerClosed {
+		if err := s.ServeTLS(router.TLSListener, certPath, keyPath); err != http.ErrServerClosed {
 			errChan <- err
 			log.Error("API: Unable to start listener:", err)
 		}

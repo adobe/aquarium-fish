@@ -21,32 +21,32 @@ import (
 	"strings"
 )
 
-func FileReplaceToken(path string, full_line, add, anycase bool, token_values ...string) error {
+func FileReplaceToken(path string, fullLine, add, anycase bool, tokenValues ...string) error {
 	// Open input file
-	in_f, err := os.OpenFile(path, os.O_RDONLY, 0o644)
+	inF, err := os.OpenFile(path, os.O_RDONLY, 0o644)
 	if err != nil {
 		return err
 	}
-	defer in_f.Close()
+	defer inF.Close()
 
 	// Check it's not a dir
-	if info, err := in_f.Stat(); err == nil && info.IsDir() {
+	if info, err := inF.Stat(); err == nil && info.IsDir() {
 		return fmt.Errorf("Util: Unable to replace token in directory")
 	}
 
 	// Open output file
-	out_f, err := os.CreateTemp(filepath.Dir(path), "tmp")
+	outF, err := os.CreateTemp(filepath.Dir(path), "tmp")
 	if err != nil {
 		return err
 	}
-	defer out_f.Close()
+	defer outF.Close()
 
 	var tokens []string
 	var values []string
 
 	// Walking through the list of tokens to split them into pairs
 	// 0 - key, 1 - value
-	for i, tv := range token_values {
+	for i, tv := range tokenValues {
 		if i%2 == 0 {
 			if anycase {
 				tokens = append(tokens, strings.ToLower(tv))
@@ -61,17 +61,17 @@ func FileReplaceToken(path string, full_line, add, anycase bool, token_values ..
 	replaced := make([]bool, len(values))
 
 	// Replace while copying
-	sc := bufio.NewScanner(in_f)
+	sc := bufio.NewScanner(inF)
 	for sc.Scan() {
 		line := sc.Text()
-		comp_line := line
+		compLine := line
 		if anycase {
-			comp_line = strings.ToLower(line)
+			compLine = strings.ToLower(line)
 		}
 		for i, value := range values {
-			if strings.Contains(comp_line, tokens[i]) {
+			if strings.Contains(compLine, tokens[i]) {
 				replaced[i] = true
-				if full_line {
+				if fullLine {
 					line = value
 					break // No need to check the other tokens
 				} else {
@@ -79,12 +79,12 @@ func FileReplaceToken(path string, full_line, add, anycase bool, token_values ..
 						// We're not using RE because it's hard to predict the token
 						// and escape it to compile the proper regular expression
 						// so instead we using just regular replace by position of the token
-						idx := strings.Index(comp_line, tokens[i])
+						idx := strings.Index(compLine, tokens[i])
 						for idx != -1 {
 							// To support unicode use runes
 							line = string([]rune(line)[0:idx]) + value + string([]rune(line)[idx+len(tokens[i]):len(line)])
-							comp_line = strings.ToLower(line)
-							idx = strings.Index(comp_line, tokens[i])
+							compLine = strings.ToLower(line)
+							idx = strings.Index(compLine, tokens[i])
 						}
 					} else {
 						line = strings.ReplaceAll(line, tokens[i], value)
@@ -93,7 +93,7 @@ func FileReplaceToken(path string, full_line, add, anycase bool, token_values ..
 			}
 		}
 		// Probably not the best way to assume there was just \n
-		if _, err := io.WriteString(out_f, line+"\n"); err != nil {
+		if _, err := io.WriteString(outF, line+"\n"); err != nil {
 			return err
 		}
 	}
@@ -105,7 +105,7 @@ func FileReplaceToken(path string, full_line, add, anycase bool, token_values ..
 	if add {
 		for i, value := range values {
 			if !replaced[i] {
-				if _, err := io.WriteString(out_f, value+"\n"); err != nil {
+				if _, err := io.WriteString(outF, value+"\n"); err != nil {
 					return err
 				}
 			}
@@ -113,17 +113,17 @@ func FileReplaceToken(path string, full_line, add, anycase bool, token_values ..
 	}
 
 	// Close the out file
-	if err := out_f.Close(); err != nil {
+	if err := outF.Close(); err != nil {
 		return err
 	}
 
 	// Close the input file
-	if err := in_f.Close(); err != nil {
+	if err := inF.Close(); err != nil {
 		return err
 	}
 
 	// Replace input file with out file
-	if err := os.Rename(out_f.Name(), path); err != nil {
+	if err := os.Rename(outF.Name(), path); err != nil {
 		return err
 	}
 

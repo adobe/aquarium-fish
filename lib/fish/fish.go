@@ -34,7 +34,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
-const ELECTION_ROUND_TIME = 30
+const ElectionRoundTime = 30
 
 type Fish struct {
 	db   *gorm.DB
@@ -44,26 +44,26 @@ type Fish struct {
 	// Signal to stop the fish
 	Quit chan os.Signal
 
-	running         bool
-	maintenance     bool
-	shutdown        bool
-	shutdown_cancel chan bool
-	shutdown_delay  time.Duration
+	running        bool
+	maintenance    bool
+	shutdown       bool
+	shutdownCancel chan bool
+	shutdownDelay  time.Duration
 
-	active_votes_mutex sync.Mutex
-	active_votes       []*types.Vote
+	activeVotesMutex sync.Mutex
+	activeVotes      []*types.Vote
 
 	// Stores the currently executing Applications
-	applications_mutex sync.Mutex
-	applications       []types.ApplicationUID
+	applicationsMutex sync.Mutex
+	applications      []types.ApplicationUID
 
 	// Used to temporary store the won Votes by Application create time
-	won_votes_mutex sync.Mutex
-	won_votes       map[int64]types.Vote
+	wonVotesMutex sync.Mutex
+	wonVotes      map[int64]types.Vote
 
 	// Stores the current usage of the node resources
-	node_usage_mutex sync.Mutex // Is needed to protect node resources from concurrent allocations
-	node_usage       types.Resources
+	nodeUsageMutex sync.Mutex // Is needed to protect node resources from concurrent allocations
+	nodeUsage      types.Resources
 }
 
 func New(db *gorm.DB, cfg *Config) (*Fish, error) {
@@ -76,7 +76,7 @@ func New(db *gorm.DB, cfg *Config) (*Fish, error) {
 }
 
 func (f *Fish) Init() error {
-	f.shutdown_cancel = make(chan bool)
+	f.shutdownCancel = make(chan bool)
 	f.Quit = make(chan os.Signal, 1)
 	signal.Notify(f.Quit, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 
@@ -97,7 +97,7 @@ func (f *Fish) Init() error {
 	}
 
 	// Init variables
-	f.won_votes = make(map[int64]types.Vote, 5)
+	f.wonVotes = make(map[int64]types.Vote, 5)
 
 	// Create admin user and ignore errors if it's existing
 	_, err := f.UserGet("admin")
@@ -111,11 +111,11 @@ func (f *Fish) Init() error {
 	}
 
 	// Init node
-	create_node := false
+	createNode := false
 	node, err := f.NodeGet(f.cfg.NodeName)
 	if err != nil {
 		log.Info("Fish: Create new node:", f.cfg.NodeName, f.cfg.NodeLocation)
-		create_node = true
+		createNode = true
 
 		node = &types.Node{
 			Name: f.cfg.NodeName,
@@ -136,16 +136,16 @@ func (f *Fish) Init() error {
 		log.Info("Fish: Use existing node:", node.Name, node.LocationName)
 	}
 
-	cert_path := f.cfg.TLSCrt
-	if !filepath.IsAbs(cert_path) {
-		cert_path = filepath.Join(f.cfg.Directory, cert_path)
+	certPath := f.cfg.TLSCrt
+	if !filepath.IsAbs(certPath) {
+		certPath = filepath.Join(f.cfg.Directory, certPath)
 	}
-	if err := node.Init(f.cfg.NodeAddress, cert_path); err != nil {
+	if err := node.Init(f.cfg.NodeAddress, certPath); err != nil {
 		return fmt.Errorf("Fish: Unable to init node: %v", err)
 	}
 
 	f.node = node
-	if create_node {
+	if createNode {
 		if err = f.NodeCreate(f.node); err != nil {
 			return fmt.Errorf("Fish: Unable to create node: %v", err)
 		}
@@ -200,10 +200,10 @@ func (f *Fish) Init() error {
 			if err := f.ResourceDelete(res.UID); err != nil {
 				log.Error("Fish: Unable to delete Resource of Application:", res.ApplicationUID, err)
 			}
-			app_state := &types.ApplicationState{ApplicationUID: res.ApplicationUID, Status: types.ApplicationStatusERROR,
+			appState := &types.ApplicationState{ApplicationUID: res.ApplicationUID, Status: types.ApplicationStatusERROR,
 				Description: "Found not cleaned up resource",
 			}
-			f.ApplicationStateCreate(app_state)
+			f.ApplicationStateCreate(appState)
 		}
 	}
 
@@ -243,21 +243,21 @@ func (f *Fish) GetLocationName() types.LocationName {
 }
 
 func (f *Fish) checkNewApplicationProcess() {
-	check_ticker := time.NewTicker(5 * time.Second)
+	checkTicker := time.NewTicker(5 * time.Second)
 	for {
 		if !f.running {
 			break
 		}
 		// TODO: Here should be select with quit in case app is stopped to not wait next ticker
-		<-check_ticker.C
+		<-checkTicker.C
 		{
 			// Check new apps available for processing
-			new_apps, err := f.ApplicationListGetStatusNew()
+			newApps, err := f.ApplicationListGetStatusNew()
 			if err != nil {
 				log.Error("Fish: Unable to get NEW ApplicationState list:", err)
 				continue
 			}
-			for _, app := range new_apps {
+			for _, app := range newApps {
 				// Check if Vote is already here
 				if f.voteActive(app.UID) {
 					continue
@@ -265,7 +265,7 @@ func (f *Fish) checkNewApplicationProcess() {
 				log.Info("Fish: NEW Application with no vote:", app.UID, app.CreatedAt)
 
 				// Vote not exists in the active votes - running the process
-				f.active_votes_mutex.Lock()
+				f.activeVotesMutex.Lock()
 				{
 					// Check if it's already exist in the DB (if node was restarted during voting)
 					vote, _ := f.VoteGetNodeApplication(f.node.UID, app.UID)
@@ -274,32 +274,32 @@ func (f *Fish) checkNewApplicationProcess() {
 					vote.ApplicationUID = app.UID
 					vote.NodeUID = f.node.UID
 
-					f.active_votes = append(f.active_votes, vote)
+					f.activeVotes = append(f.activeVotes, vote)
 					go f.voteProcessRound(vote)
 				}
-				f.active_votes_mutex.Unlock()
+				f.activeVotesMutex.Unlock()
 			}
 
 			// Check the Applications ready to be allocated
 			// It's needed to be single-threaded to have some order in allocation - FIFO principle,
 			// who requested first should be processed first.
-			f.won_votes_mutex.Lock()
+			f.wonVotesMutex.Lock()
 			{
 				// We need to sort the won_votes by key which is time they was created
-				keys := make([]int64, 0, len(f.won_votes))
-				for k := range f.won_votes {
+				keys := make([]int64, 0, len(f.wonVotes))
+				for k := range f.wonVotes {
 					keys = append(keys, k)
 				}
 				sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
 
 				for _, k := range keys {
-					if err := f.executeApplication(f.won_votes[k]); err != nil {
-						log.Errorf("Fish: Can't execute Application %s: %v", f.won_votes[k].ApplicationUID, err)
+					if err := f.executeApplication(f.wonVotes[k]); err != nil {
+						log.Errorf("Fish: Can't execute Application %s: %v", f.wonVotes[k].ApplicationUID, err)
 					}
-					delete(f.won_votes, k)
+					delete(f.wonVotes, k)
 				}
 			}
-			f.won_votes_mutex.Unlock()
+			f.wonVotesMutex.Unlock()
 		}
 	}
 }
@@ -319,13 +319,13 @@ func (f *Fish) voteProcessRound(vote *types.Vote) error {
 	}
 
 	for {
-		start_time := time.Now()
+		startTime := time.Now()
 		log.Infof("Fish: Starting Application %s election round %d", vote.ApplicationUID, vote.Round)
 
 		// Determine answer for this round, it will try find the first possible definition to serve
 		// We can't run multiple resources check at a time or together with
 		// allocating application so using mutex here
-		f.node_usage_mutex.Lock()
+		f.nodeUsageMutex.Lock()
 		vote.Available = -1 // Set "nope" answer by default in case all the definitions are not fit
 		for i, def := range label.Definitions {
 			if f.isNodeAvailableForDefinition(def) {
@@ -333,7 +333,7 @@ func (f *Fish) voteProcessRound(vote *types.Vote) error {
 				break
 			}
 		}
-		f.node_usage_mutex.Unlock()
+		f.nodeUsageMutex.Unlock()
 
 		// Create vote if it's required
 		if vote.UID == uuid.Nil {
@@ -356,15 +356,15 @@ func (f *Fish) voteProcessRound(vote *types.Vote) error {
 			if len(votes) == len(nodes) {
 				// Ok, all nodes are voted so let's move to election
 				// Check if there's yes answers
-				available_exists := false
+				availableExists := false
 				for _, vote := range votes {
 					if vote.Available >= 0 {
-						available_exists = true
+						availableExists = true
 						break
 					}
 				}
 
-				if available_exists {
+				if availableExists {
 					// Check if the winner is this node
 					vote, err := f.VoteGetElectionWinner(vote.ApplicationUID, vote.Round)
 					if err != nil {
@@ -376,9 +376,9 @@ func (f *Fish) voteProcessRound(vote *types.Vote) error {
 						if err != nil {
 							return log.Error("Fish: Unable to get the Application:", vote.ApplicationUID, err)
 						}
-						f.won_votes_mutex.Lock()
-						f.won_votes[app.CreatedAt.UnixMicro()] = *vote
-						f.won_votes_mutex.Unlock()
+						f.wonVotesMutex.Lock()
+						f.wonVotes[app.CreatedAt.UnixMicro()] = *vote
+						f.wonVotesMutex.Unlock()
 					} else {
 						log.Infof("Fish: I lose the election for Application %s to Node %s", vote.ApplicationUID, vote.NodeUID)
 					}
@@ -386,8 +386,8 @@ func (f *Fish) voteProcessRound(vote *types.Vote) error {
 
 				// Wait till the next round for ELECTION_ROUND_TIME since round start
 				t := time.Now()
-				to_sleep := start_time.Add(ELECTION_ROUND_TIME * time.Second).Sub(t)
-				time.Sleep(to_sleep)
+				toSleep := startTime.Add(ElectionRoundTime * time.Second).Sub(t)
+				time.Sleep(toSleep)
 
 				// Check if the Application changed state
 				s, err := f.ApplicationStateGetByApplication(vote.ApplicationUID)
@@ -430,11 +430,11 @@ func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 	// Verify node filters because some workload can't be running on all the physical nodes
 	// The node becomes fitting only when all the needed node filter patterns are matched
 	if len(def.Resources.NodeFilter) > 0 {
-		needed_idents := def.Resources.NodeFilter
-		current_idents := f.cfg.NodeIdentifiers
-		for _, needed := range needed_idents {
+		neededIdents := def.Resources.NodeFilter
+		currentIdents := f.cfg.NodeIdentifiers
+		for _, needed := range neededIdents {
 			found := false
-			for _, value := range current_idents {
+			for _, value := range currentIdents {
 				// We're validating the pattern on error during label creation, so they should be ok
 				if found, _ = path.Match(needed, value); found {
 					break
@@ -449,8 +449,8 @@ func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 	// Here all the node filters matched the node identifiers
 
 	// Check with the driver if it's possible to allocate the Application resource
-	node_usage := f.node_usage
-	if capacity := driver.AvailableCapacity(node_usage, def); capacity < 1 {
+	nodeUsage := f.nodeUsage
+	if capacity := driver.AvailableCapacity(nodeUsage, def); capacity < 1 {
 		return false
 	}
 
@@ -459,17 +459,17 @@ func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 
 func (f *Fish) executeApplication(vote types.Vote) error {
 	// Check the application is executed already
-	f.applications_mutex.Lock()
+	f.applicationsMutex.Lock()
 	{
 		for _, uid := range f.applications {
 			if uid == vote.ApplicationUID {
 				// Seems the application is already executing
-				f.applications_mutex.Unlock()
+				f.applicationsMutex.Unlock()
 				return nil
 			}
 		}
 	}
-	f.applications_mutex.Unlock()
+	f.applicationsMutex.Unlock()
 
 	// Check vote have available field >= 0 means it chose the label definition
 	if vote.Available < 0 {
@@ -477,226 +477,226 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 	}
 
 	// Locking the node resources until the app will be allocated
-	f.node_usage_mutex.Lock()
+	f.nodeUsageMutex.Lock()
 
 	app, err := f.ApplicationGet(vote.ApplicationUID)
 	if err != nil {
-		f.node_usage_mutex.Unlock()
+		f.nodeUsageMutex.Unlock()
 		return fmt.Errorf("Fish: Unable to get the Application: %v", err)
 	}
 
 	// Check current Application state
-	app_state, err := f.ApplicationStateGetByApplication(app.UID)
+	appState, err := f.ApplicationStateGetByApplication(app.UID)
 	if err != nil {
-		f.node_usage_mutex.Unlock()
+		f.nodeUsageMutex.Unlock()
 		return fmt.Errorf("Fish: Unable to get the Application state: %v", err)
 	}
 
 	// Get label with the definitions
 	label, err := f.LabelGet(app.LabelUID)
 	if err != nil {
-		f.node_usage_mutex.Unlock()
+		f.nodeUsageMutex.Unlock()
 		return fmt.Errorf("Fish: Unable to find Label %s: %v", app.LabelUID, err)
 	}
 
 	// Extract the vote won Label Definition
 	if len(label.Definitions) <= vote.Available {
-		f.node_usage_mutex.Unlock()
+		f.nodeUsageMutex.Unlock()
 		return fmt.Errorf("Fish: ERROR: The voted Definition not exists in the Label %s: %v (App: %s)", app.LabelUID, vote.Available, app.UID)
 	}
-	label_def := label.Definitions[vote.Available]
+	labelDef := label.Definitions[vote.Available]
 
 	// The already running applications will not consume the additional resources
-	if app_state.Status == types.ApplicationStatusNEW {
+	if appState.Status == types.ApplicationStatusNEW {
 		// In case there is multiple Applications won the election process on the same node it could
 		// just have not enough resources, so skip it for now to allow the other Nodes to try again.
-		if !f.isNodeAvailableForDefinition(label_def) {
+		if !f.isNodeAvailableForDefinition(labelDef) {
 			log.Warn("Fish: Not enough resources to execute the Application", app.UID)
-			f.node_usage_mutex.Unlock()
+			f.nodeUsageMutex.Unlock()
 			return nil
 		}
 	}
 
 	// Locate the required driver
-	driver := f.DriverGet(label_def.Driver)
+	driver := f.DriverGet(labelDef.Driver)
 	if driver == nil {
-		f.node_usage_mutex.Unlock()
-		return fmt.Errorf("Fish: Unable to locate driver for the Application %s: %s", app.UID, label_def.Driver)
+		f.nodeUsageMutex.Unlock()
+		return fmt.Errorf("Fish: Unable to locate driver for the Application %s: %s", app.UID, labelDef.Driver)
 	}
 
 	// If the driver is not using the remote resources - we need to increase the counter
 	if !driver.IsRemote() {
-		f.node_usage.Add(label_def.Resources)
+		f.nodeUsage.Add(labelDef.Resources)
 	}
 
 	// Unlocking the node resources to allow the other Applications allocation
-	f.node_usage_mutex.Unlock()
+	f.nodeUsageMutex.Unlock()
 
 	// Adding the application to list
-	f.applications_mutex.Lock()
+	f.applicationsMutex.Lock()
 	f.applications = append(f.applications, app.UID)
-	f.applications_mutex.Unlock()
+	f.applicationsMutex.Unlock()
 
 	// The main application processing is executed on background because allocation could take a
 	// while, after that the bg process will wait for application state change
 	go func() {
-		log.Info("Fish: Start executing Application", app.UID, app_state.Status)
+		log.Info("Fish: Start executing Application", app.UID, appState.Status)
 
-		if app_state.Status == types.ApplicationStatusNEW {
+		if appState.Status == types.ApplicationStatusNEW {
 			// Set Application state as ELECTED
-			app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusELECTED,
+			appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusELECTED,
 				Description: "Elected node: " + f.node.Name,
 			}
-			err := f.ApplicationStateCreate(app_state)
+			err := f.ApplicationStateCreate(appState)
 			if err != nil {
 				log.Error("Fish: Unable to set Application state:", app.UID, err)
-				f.applications_mutex.Lock()
+				f.applicationsMutex.Lock()
 				f.removeFromExecutingApplincations(app.UID)
-				f.applications_mutex.Unlock()
+				f.applicationsMutex.Unlock()
 				return
 			}
 		}
 
 		// Merge application and label metadata, in this exact order
-		var merged_metadata []byte
+		var mergedMetadata []byte
 		var metadata map[string]any
 		if err := json.Unmarshal([]byte(app.Metadata), &metadata); err != nil {
 			log.Error("Fish: Unable to parse the Application metadata:", app.UID, err)
-			app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
+			appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
 				Description: fmt.Sprint("Unable to parse the app metadata:", err),
 			}
-			f.ApplicationStateCreate(app_state)
+			f.ApplicationStateCreate(appState)
 		}
 		if err := json.Unmarshal([]byte(label.Metadata), &metadata); err != nil {
 			log.Error("Fish: Unable to parse the Label metadata:", label.UID, err)
-			app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
+			appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
 				Description: fmt.Sprint("Unable to parse the label metadata:", err),
 			}
-			f.ApplicationStateCreate(app_state)
+			f.ApplicationStateCreate(appState)
 		}
-		if merged_metadata, err = json.Marshal(metadata); err != nil {
+		if mergedMetadata, err = json.Marshal(metadata); err != nil {
 			log.Error("Fish: Unable to merge metadata:", label.UID, err)
-			app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
+			appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
 				Description: fmt.Sprint("Unable to merge metadata:", err),
 			}
-			f.ApplicationStateCreate(app_state)
+			f.ApplicationStateCreate(appState)
 		}
 
 		// Get or create the new resource object
 		res := &types.Resource{
 			ApplicationUID: app.UID,
 			NodeUID:        f.node.UID,
-			Metadata:       util.UnparsedJson(merged_metadata),
+			Metadata:       util.UnparsedJson(mergedMetadata),
 		}
-		if app_state.Status == types.ApplicationStatusALLOCATED {
+		if appState.Status == types.ApplicationStatusALLOCATED {
 			res, err = f.ResourceGetByApplication(app.UID)
 			if err != nil {
 				log.Error("Fish: Unable to get the allocated Resource for Application:", app.UID, err)
-				app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
+				appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
 					Description: fmt.Sprint("Unable to find the allocated resource:", err),
 				}
-				f.ApplicationStateCreate(app_state)
+				f.ApplicationStateCreate(appState)
 			}
 		}
 
 		// Allocate the resource
-		if app_state.Status == types.ApplicationStatusELECTED {
+		if appState.Status == types.ApplicationStatusELECTED {
 			// Run the allocation
 			log.Infof("Fish: Allocate the Application %s resource using driver: %s", app.UID, driver.Name())
-			drv_res, err := driver.Allocate(label_def, metadata)
+			drvRes, err := driver.Allocate(labelDef, metadata)
 			if err != nil {
 				log.Error("Fish: Unable to allocate resource for the Application:", app.UID, err)
-				app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
+				appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
 					Description: fmt.Sprint("Driver allocate resource error:", err),
 				}
 			} else {
-				res.Identifier = drv_res.Identifier
-				res.HwAddr = drv_res.HwAddr
-				res.IpAddr = drv_res.IpAddr
+				res.Identifier = drvRes.Identifier
+				res.HwAddr = drvRes.HwAddr
+				res.IpAddr = drvRes.IpAddr
 				res.LabelUID = label.UID
 				res.DefinitionIndex = vote.Available
-				res.Authentication = drv_res.Authentication
+				res.Authentication = drvRes.Authentication
 				err := f.ResourceCreate(res)
 				if err != nil {
 					log.Error("Fish: Unable to store Resource for Application:", app.UID, err)
 				}
-				app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusALLOCATED,
+				appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusALLOCATED,
 					Description: "Driver allocated the resource",
 				}
 				log.Infof("Fish: Allocated Resource %q for the Application %s", app.UID, res.Identifier)
 			}
-			f.ApplicationStateCreate(app_state)
+			f.ApplicationStateCreate(appState)
 		}
 
 		// Getting the resource lifetime to know how much time it will live
-		resource_lifetime, err := time.ParseDuration(label_def.Resources.Lifetime)
-		if label_def.Resources.Lifetime != "" && err != nil {
+		resourceLifetime, err := time.ParseDuration(labelDef.Resources.Lifetime)
+		if labelDef.Resources.Lifetime != "" && err != nil {
 			log.Error("Fish: Can't parse the Lifetime from Label Definition:", label.UID, res.DefinitionIndex)
 		}
 		if err != nil {
 			// Try to get default value from fish config
-			resource_lifetime, err = time.ParseDuration(f.cfg.DefaultResourceLifetime)
+			resourceLifetime, err = time.ParseDuration(f.cfg.DefaultResourceLifetime)
 			if err != nil {
 				// Not an error - in worst case the resource will just sit there but at least will
 				// not ruin the workload execution
 				log.Warn("Fish: Default Resource Lifetime is not set in fish config")
 			}
 		}
-		resource_timeout := res.CreatedAt.Add(resource_lifetime)
-		if app_state.Status == types.ApplicationStatusALLOCATED {
-			if resource_lifetime > 0 {
-				log.Infof("Fish: Resource of Application %s will be deallocated by timeout in %s (%s)", app.UID, resource_lifetime, resource_timeout)
+		resourceTimeout := res.CreatedAt.Add(resourceLifetime)
+		if appState.Status == types.ApplicationStatusALLOCATED {
+			if resourceLifetime > 0 {
+				log.Infof("Fish: Resource of Application %s will be deallocated by timeout in %s (%s)", app.UID, resourceLifetime, resourceTimeout)
 			} else {
 				log.Warn("Fish: Resource have no lifetime set and will live until deallocated by user:", app.UID)
 			}
 		}
 
 		// Run the loop to wait for deallocate request
-		var deallocate_retry uint8 = 1
-		for app_state.Status == types.ApplicationStatusALLOCATED {
+		var deallocateRetry uint8 = 1
+		for appState.Status == types.ApplicationStatusALLOCATED {
 			if !f.running {
 				log.Info("Fish: Stopping the Application execution:", app.UID)
 				return
 			}
-			app_state, err = f.ApplicationStateGetByApplication(app.UID)
+			appState, err = f.ApplicationStateGetByApplication(app.UID)
 			if err != nil {
 				log.Error("Fish: Unable to get Status for Application:", app.UID, err)
 			}
 
 			// Check if it's life timeout for the resource
-			if resource_lifetime > 0 {
+			if resourceLifetime > 0 {
 				// The time limit is set - so let's use resource create time and find out timeout
-				if resource_timeout.Before(time.Now()) {
+				if resourceTimeout.Before(time.Now()) {
 					// Seems the timeout has come, so fish asks for application deallocate
-					app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusDEALLOCATE,
-						Description: fmt.Sprint("Resource lifetime timeout reached:", resource_lifetime),
+					appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusDEALLOCATE,
+						Description: fmt.Sprint("Resource lifetime timeout reached:", resourceLifetime),
 					}
-					f.ApplicationStateCreate(app_state)
+					f.ApplicationStateCreate(appState)
 				}
 			}
 
 			// Execute the existing ApplicationTasks. It will be executed during ALLOCATED or prior
 			// to executing deallocation by DEALLOCATE & RECALLED which right now is useful for
 			// `snapshot` and `image` tasks.
-			f.executeApplicationTasks(driver, &label_def, res, app_state.Status)
+			f.executeApplicationTasks(driver, &labelDef, res, appState.Status)
 
-			if app_state.Status == types.ApplicationStatusDEALLOCATE || app_state.Status == types.ApplicationStatusRECALLED {
+			if appState.Status == types.ApplicationStatusDEALLOCATE || appState.Status == types.ApplicationStatusRECALLED {
 				log.Info("Fish: Running Deallocate of the Application and Resource:", app.UID, res.Identifier)
 				// Deallocating and destroy the resource
 				if err := driver.Deallocate(res); err != nil {
-					log.Errorf("Fish: Unable to deallocate the Resource of Application: %s (try: %d): %v", app.UID, deallocate_retry, err)
+					log.Errorf("Fish: Unable to deallocate the Resource of Application: %s (try: %d): %v", app.UID, deallocateRetry, err)
 					// Let's retry to deallocate the resource 10 times before give up
-					if deallocate_retry <= 10 {
-						deallocate_retry += 1
+					if deallocateRetry <= 10 {
+						deallocateRetry += 1
 						time.Sleep(10 * time.Second)
 						continue
 					}
-					app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
+					appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
 						Description: fmt.Sprint("Driver deallocate resource error:", err),
 					}
 				} else {
 					log.Info("Fish: Successful deallocation of the Application:", app.UID)
-					app_state = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusDEALLOCATED,
+					appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusDEALLOCATED,
 						Description: "Driver deallocated the resource",
 					}
 				}
@@ -705,35 +705,35 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 				if err := f.ResourceDelete(res.UID); err != nil {
 					log.Error("Fish: Unable to delete Resource for Application:", app.UID, err)
 				}
-				f.ApplicationStateCreate(app_state)
+				f.ApplicationStateCreate(appState)
 			} else {
 				time.Sleep(5 * time.Second)
 			}
 		}
 
-		f.applications_mutex.Lock()
+		f.applicationsMutex.Lock()
 		{
 			// Decrease the amout of running local apps
 			if !driver.IsRemote() {
-				f.node_usage_mutex.Lock()
-				f.node_usage.Subtract(label_def.Resources)
-				f.node_usage_mutex.Unlock()
+				f.nodeUsageMutex.Lock()
+				f.nodeUsage.Subtract(labelDef.Resources)
+				f.nodeUsageMutex.Unlock()
 			}
 
 			// Clean the executing application
 			f.removeFromExecutingApplincations(app.UID)
 		}
-		f.applications_mutex.Unlock()
+		f.applicationsMutex.Unlock()
 
-		log.Info("Fish: Done executing Application", app.UID, app_state.Status)
+		log.Info("Fish: Done executing Application", app.UID, appState.Status)
 	}()
 
 	return nil
 }
 
-func (f *Fish) executeApplicationTasks(drv drivers.ResourceDriver, def *types.LabelDefinition, res *types.Resource, app_status types.ApplicationStatus) error {
+func (f *Fish) executeApplicationTasks(drv drivers.ResourceDriver, def *types.LabelDefinition, res *types.Resource, appStatus types.ApplicationStatus) error {
 	// Execute the associated ApplicationTasks if there is some
-	tasks, err := f.ApplicationTaskListByApplicationAndWhen(res.ApplicationUID, app_status)
+	tasks, err := f.ApplicationTaskListByApplicationAndWhen(res.ApplicationUID, appStatus)
 	if err != nil {
 		return log.Error("Fish: Unable to get ApplicationTasks:", res.ApplicationUID, err)
 	}
@@ -764,9 +764,9 @@ func (f *Fish) executeApplicationTasks(drv drivers.ResourceDriver, def *types.La
 	return nil
 }
 
-func (f *Fish) removeFromExecutingApplincations(app_uid types.ApplicationUID) {
+func (f *Fish) removeFromExecutingApplincations(appUid types.ApplicationUID) {
 	for i, uid := range f.applications {
-		if uid != app_uid {
+		if uid != appUid {
 			continue
 		}
 		f.applications[i] = f.applications[len(f.applications)-1]
@@ -775,29 +775,29 @@ func (f *Fish) removeFromExecutingApplincations(app_uid types.ApplicationUID) {
 	}
 }
 
-func (f *Fish) voteActive(app_uid types.ApplicationUID) bool {
-	f.active_votes_mutex.Lock()
-	defer f.active_votes_mutex.Unlock()
+func (f *Fish) voteActive(appUid types.ApplicationUID) bool {
+	f.activeVotesMutex.Lock()
+	defer f.activeVotesMutex.Unlock()
 
-	for _, vote := range f.active_votes {
-		if vote.ApplicationUID == app_uid {
+	for _, vote := range f.activeVotes {
+		if vote.ApplicationUID == appUid {
 			return true
 		}
 	}
 	return false
 }
 
-func (f *Fish) voteActiveRemove(vote_uid types.VoteUID) {
-	f.active_votes_mutex.Lock()
-	defer f.active_votes_mutex.Unlock()
-	av := f.active_votes
+func (f *Fish) voteActiveRemove(voteUid types.VoteUID) {
+	f.activeVotesMutex.Lock()
+	defer f.activeVotesMutex.Unlock()
+	av := f.activeVotes
 
-	for i, v := range f.active_votes {
-		if v.UID != vote_uid {
+	for i, v := range f.activeVotes {
+		if v.UID != voteUid {
 			continue
 		}
 		av[i] = av[len(av)-1]
-		f.active_votes = av[:len(av)-1]
+		f.activeVotes = av[:len(av)-1]
 		break
 	}
 }
@@ -822,7 +822,7 @@ func (f *Fish) ShutdownSet(value bool) {
 			f.activateShutdown()
 		} else {
 			log.Info("Fish: Disabled shutdown mode")
-			f.shutdown_cancel <- true
+			f.shutdownCancel <- true
 		}
 	}
 
@@ -831,49 +831,49 @@ func (f *Fish) ShutdownSet(value bool) {
 
 // Set of how much time to wait before executing the node shutdown operation
 func (f *Fish) ShutdownDelaySet(delay time.Duration) {
-	if f.shutdown_delay != delay {
+	if f.shutdownDelay != delay {
 		log.Info("Fish: Shutdown delay is set to:", delay)
 	}
 
-	f.shutdown_delay = delay
+	f.shutdownDelay = delay
 }
 
 func (f *Fish) activateShutdown() {
-	log.Infof("Fish: Enabled shutdown mode with maintenance: %v, delay: %v", f.maintenance, f.shutdown_delay)
+	log.Infof("Fish: Enabled shutdown mode with maintenance: %v, delay: %v", f.maintenance, f.shutdownDelay)
 
-	wait_apps := make(chan bool, 1)
+	waitApps := make(chan bool, 1)
 
 	// Running the main shutdown routine
 	go func() {
-		fire_shutdown := make(chan bool, 1)
-		delay_ticker_report := &time.Ticker{}
-		delay_timer := &time.Timer{}
-		var delay_end_time time.Time
+		fireShutdown := make(chan bool, 1)
+		delayTickerReport := &time.Ticker{}
+		delayTimer := &time.Timer{}
+		var delayEndTime time.Time
 
 		for {
 			select {
-			case <-f.shutdown_cancel:
+			case <-f.shutdownCancel:
 				return
-			case <-wait_apps:
+			case <-waitApps:
 				// Maintenance mode: All the apps are completed so it's safe to shutdown
 				log.Debug("Fish: Shutdown: apps execution completed")
 				// If the delay is set, then running timer to execute shutdown with delay
-				if f.shutdown_delay > 0 {
-					delay_end_time = time.Now().Add(f.shutdown_delay)
-					delay_ticker_report := time.NewTicker(30 * time.Second)
-					defer delay_ticker_report.Stop()
-					delay_timer = time.NewTimer(f.shutdown_delay)
-					defer delay_timer.Stop()
+				if f.shutdownDelay > 0 {
+					delayEndTime = time.Now().Add(f.shutdownDelay)
+					delayTickerReport := time.NewTicker(30 * time.Second)
+					defer delayTickerReport.Stop()
+					delayTimer = time.NewTimer(f.shutdownDelay)
+					defer delayTimer.Stop()
 				} else {
 					// No delay is needed, so shutdown now
-					fire_shutdown <- true
+					fireShutdown <- true
 				}
-			case <-delay_ticker_report.C:
-				log.Infof("Fish: Shutdown: countdown: T-%v", time.Until(delay_end_time))
-			case <-delay_timer.C:
+			case <-delayTickerReport.C:
+				log.Infof("Fish: Shutdown: countdown: T-%v", time.Until(delayEndTime))
+			case <-delayTimer.C:
 				// Delay time has passed, triggering shutdown
-				fire_shutdown <- true
-			case <-fire_shutdown:
+				fireShutdown <- true
+			case <-fireShutdown:
 				log.Info("Fish: Shutdown sends quit signal to Fish")
 				f.Quit <- syscall.SIGQUIT
 			}
@@ -883,29 +883,29 @@ func (f *Fish) activateShutdown() {
 	if f.maintenance {
 		// Running wait for unfinished apps go routine
 		go func() {
-			ticker_check := time.NewTicker(2 * time.Second)
-			defer ticker_check.Stop()
-			ticker_report := time.NewTicker(30 * time.Second)
-			defer ticker_report.Stop()
+			tickerCheck := time.NewTicker(2 * time.Second)
+			defer tickerCheck.Stop()
+			tickerReport := time.NewTicker(30 * time.Second)
+			defer tickerReport.Stop()
 
 			for {
 				select {
-				case <-f.shutdown_cancel:
+				case <-f.shutdownCancel:
 					return
-				case <-ticker_check.C:
+				case <-tickerCheck.C:
 					// Need to make sure we're not executing any workload
 					log.Debug("Fish: Shutdown: checking apps execution:", len(f.applications))
 					if len(f.applications) == 0 {
-						wait_apps <- true
+						waitApps <- true
 						return
 					}
-				case <-ticker_report.C:
+				case <-tickerReport.C:
 					log.Info("Fish: Shutdown: waiting for running Applications:", len(f.applications))
 				}
 			}
 		}()
 	} else {
 		// Sending signal since no need to wait for the apps
-		wait_apps <- true
+		waitApps <- true
 	}
 }

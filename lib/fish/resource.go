@@ -29,20 +29,20 @@ import (
 func (f *Fish) ResourceFind(filter *string) (rs []types.Resource, err error) {
 	db := f.db
 	if filter != nil {
-		secured_filter, err := util.ExpressionSqlFilter(*filter)
+		securedFilter, err := util.ExpressionSqlFilter(*filter)
 		if err != nil {
 			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
 			// We do not fail here because we should not give attacker more information
 			return rs, nil
 		}
-		db = db.Where(secured_filter)
+		db = db.Where(securedFilter)
 	}
 	err = db.Find(&rs).Error
 	return rs, err
 }
 
-func (f *Fish) ResourceListNode(node_uid types.NodeUID) (rs []types.Resource, err error) {
-	err = f.db.Where("node_uid = ?", node_uid).Find(&rs).Error
+func (f *Fish) ResourceListNode(nodeUid types.NodeUID) (rs []types.Resource, err error) {
+	err = f.db.Where("node_uid = ?", nodeUid).Find(&rs).Error
 	return rs, err
 }
 
@@ -119,7 +119,7 @@ func checkIPv4Address(network *net.IPNet, ip net.IP) bool {
 func isControlledNetwork(ip string) bool {
 	// Relatively long process executed for each request, but gives us flexibility
 	// TODO: Could be optimized to collect network data on start or periodically
-	ip_parsed := net.ParseIP(ip)
+	ipParsed := net.ParseIP(ip)
 
 	ifaces, err := net.Interfaces()
 	if err != nil {
@@ -137,7 +137,7 @@ func isControlledNetwork(ip string) bool {
 		for _, a := range addrs {
 			switch v := a.(type) {
 			case *net.IPNet:
-				if checkIPv4Address(v, ip_parsed) {
+				if checkIPv4Address(v, ipParsed) {
 					return true
 				}
 			}
@@ -168,13 +168,13 @@ func (f *Fish) ResourceGetByIP(ip string) (res *types.Resource, err error) {
 
 	// Check by MAC and update IP if found
 	// need to fix due to on mac arp can return just one digit
-	hw_addr := fixHwAddr(arp.Search(ip))
-	if hw_addr == "" {
+	hwAddr := fixHwAddr(arp.Search(ip))
+	if hwAddr == "" {
 		return nil, gorm.ErrRecordNotFound
 	}
-	err = f.db.Where("node_uid = ?", f.GetNodeUID()).Where("hw_addr = ?", hw_addr).First(res).Error
+	err = f.db.Where("node_uid = ?", f.GetNodeUID()).Where("hw_addr = ?", hwAddr).First(res).Error
 	if err != nil {
-		return nil, fmt.Errorf("Fish: %s for HW address %s", err, hw_addr)
+		return nil, fmt.Errorf("Fish: %s for HW address %s", err, hwAddr)
 	}
 
 	// Check if the state is allocated to prevent old resources access
@@ -189,9 +189,9 @@ func (f *Fish) ResourceGetByIP(ip string) (res *types.Resource, err error) {
 	return res, err
 }
 
-func (f *Fish) ResourceGetByApplication(app_uid types.ApplicationUID) (res *types.Resource, err error) {
+func (f *Fish) ResourceGetByApplication(appUid types.ApplicationUID) (res *types.Resource, err error) {
 	res = &types.Resource{}
-	err = f.db.Where("application_uid = ?", app_uid).First(res).Error
+	err = f.db.Where("application_uid = ?", appUid).First(res).Error
 	return res, err
 }
 

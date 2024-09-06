@@ -15,7 +15,7 @@ package native
 import (
 	"encoding/json"
 	"fmt"
-	os_user "os/user"
+	osuser "os/user"
 	"runtime"
 	"text/template"
 
@@ -72,11 +72,11 @@ func (o *Options) Validate() error {
 	// Set default user groups
 	// The user is not complete without the primary group, so using current runtime user group
 	if len(o.Groups) == 0 {
-		u, e := os_user.Current()
+		u, e := osuser.Current()
 		if e != nil {
 			return log.Error("Native: Unable to get the current system user:", e)
 		}
-		group, e := os_user.LookupGroupId(u.Gid)
+		group, e := osuser.LookupGroupId(u.Gid)
 		if e != nil {
 			return log.Error("Native: Unable to get the current system user group name:", u.Gid, e)
 		}
@@ -84,14 +84,14 @@ func (o *Options) Validate() error {
 	}
 
 	// Check images
-	var img_err error
+	var imgErr error
 	for index := range o.Images {
 		if err := o.Images[index].Validate(); err != nil {
-			img_err = log.Error("Native: Error during image validation:", err)
+			imgErr = log.Error("Native: Error during image validation:", err)
 		}
 	}
-	if img_err != nil {
-		return img_err
+	if imgErr != nil {
+		return imgErr
 	}
 
 	return nil

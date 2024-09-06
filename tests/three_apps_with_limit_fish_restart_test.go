@@ -131,7 +131,7 @@ drivers:
 		}
 	})
 
-	var app_state types.ApplicationState
+	var appState types.ApplicationState
 	t.Run("Application 1 should get ALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
@@ -141,10 +141,10 @@ drivers:
 				Expect(r).
 				Status(http.StatusOK).
 				End().
-				JSON(&app_state)
+				JSON(&appState)
 
-			if app_state.Status != types.ApplicationStatusALLOCATED {
-				r.Fatalf("Application 1 Status is incorrect: %v", app_state.Status)
+			if appState.Status != types.ApplicationStatusALLOCATED {
+				r.Fatalf("Application 1 Status is incorrect: %v", appState.Status)
 			}
 		})
 	})
@@ -158,10 +158,10 @@ drivers:
 				Expect(r).
 				Status(http.StatusOK).
 				End().
-				JSON(&app_state)
+				JSON(&appState)
 
-			if app_state.Status != types.ApplicationStatusALLOCATED {
-				r.Fatalf("Application 2 Status is incorrect: %v", app_state.Status)
+			if appState.Status != types.ApplicationStatusALLOCATED {
+				r.Fatalf("Application 2 Status is incorrect: %v", appState.Status)
 			}
 		})
 	})
@@ -174,10 +174,10 @@ drivers:
 			Expect(t).
 			Status(http.StatusOK).
 			End().
-			JSON(&app_state)
+			JSON(&appState)
 
-		if app_state.Status != types.ApplicationStatusNEW {
-			t.Fatalf("Application 3 Status is incorrect: %v", app_state.Status)
+		if appState.Status != types.ApplicationStatusNEW {
+			t.Fatalf("Application 3 Status is incorrect: %v", appState.Status)
 		}
 	})
 
@@ -194,10 +194,10 @@ drivers:
 			Expect(t).
 			Status(http.StatusOK).
 			End().
-			JSON(&app_state)
+			JSON(&appState)
 
-		if app_state.Status != types.ApplicationStatusALLOCATED {
-			t.Fatalf("Application 1 Status is incorrect: %v", app_state.Status)
+		if appState.Status != types.ApplicationStatusALLOCATED {
+			t.Fatalf("Application 1 Status is incorrect: %v", appState.Status)
 		}
 	})
 
@@ -209,10 +209,10 @@ drivers:
 			Expect(t).
 			Status(http.StatusOK).
 			End().
-			JSON(&app_state)
+			JSON(&appState)
 
-		if app_state.Status != types.ApplicationStatusALLOCATED {
-			t.Fatalf("Application 2 Status is incorrect: %v", app_state.Status)
+		if appState.Status != types.ApplicationStatusALLOCATED {
+			t.Fatalf("Application 2 Status is incorrect: %v", appState.Status)
 		}
 	})
 
@@ -224,10 +224,10 @@ drivers:
 			Expect(t).
 			Status(http.StatusOK).
 			End().
-			JSON(&app_state)
+			JSON(&appState)
 
-		if app_state.Status != types.ApplicationStatusNEW {
-			t.Fatalf("Application 3 Status is incorrect: %v", app_state.Status)
+		if appState.Status != types.ApplicationStatusNEW {
+			t.Fatalf("Application 3 Status is incorrect: %v", appState.Status)
 		}
 	})
 
@@ -260,10 +260,10 @@ drivers:
 				Expect(r).
 				Status(http.StatusOK).
 				End().
-				JSON(&app_state)
+				JSON(&appState)
 
-			if app_state.Status != types.ApplicationStatusDEALLOCATED {
-				r.Fatalf("Application 1 Status is incorrect: %v", app_state.Status)
+			if appState.Status != types.ApplicationStatusDEALLOCATED {
+				r.Fatalf("Application 1 Status is incorrect: %v", appState.Status)
 			}
 		})
 	})
@@ -277,10 +277,10 @@ drivers:
 				Expect(r).
 				Status(http.StatusOK).
 				End().
-				JSON(&app_state)
+				JSON(&appState)
 
-			if app_state.Status != types.ApplicationStatusDEALLOCATED {
-				r.Fatalf("Application 2 Status is incorrect: %v", app_state.Status)
+			if appState.Status != types.ApplicationStatusDEALLOCATED {
+				r.Fatalf("Application 2 Status is incorrect: %v", appState.Status)
 			}
 		})
 	})
@@ -294,10 +294,10 @@ drivers:
 				Expect(r).
 				Status(http.StatusOK).
 				End().
-				JSON(&app_state)
+				JSON(&appState)
 
-			if app_state.Status != types.ApplicationStatusALLOCATED {
-				r.Fatalf("Application 3 Status is incorrect: %v", app_state.Status)
+			if appState.Status != types.ApplicationStatusALLOCATED {
+				r.Fatalf("Application 3 Status is incorrect: %v", appState.Status)
 			}
 		})
 	})
@@ -321,10 +321,10 @@ drivers:
 				Expect(r).
 				Status(http.StatusOK).
 				End().
-				JSON(&app_state)
+				JSON(&appState)
 
-			if app_state.Status != types.ApplicationStatusDEALLOCATED {
-				r.Fatalf("Application 3 Status is incorrect: %v", app_state.Status)
+			if appState.Status != types.ApplicationStatusDEALLOCATED {
+				r.Fatalf("Application 3 Status is incorrect: %v", appState.Status)
 			}
 		})
 	})

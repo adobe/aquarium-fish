@@ -107,23 +107,23 @@ func (c *Config) Validate() (err error) {
 	}
 
 	// Validating CpuAlter & RamAlter to not be less then the current cpu/ram count
-	cpu_stat, err := cpu.Counts(true)
+	cpuStat, err := cpu.Counts(true)
 	if err != nil {
 		return err
 	}
 
-	if c.CpuAlter < 0 && cpu_stat <= -c.CpuAlter {
-		return log.Errorf("VMX: |CpuAlter| can't be more or equal the available Host CPUs: |%d| > %d", c.CpuAlter, cpu_stat)
+	if c.CpuAlter < 0 && cpuStat <= -c.CpuAlter {
+		return log.Errorf("VMX: |CpuAlter| can't be more or equal the available Host CPUs: |%d| > %d", c.CpuAlter, cpuStat)
 	}
 
-	mem_stat, err := mem.VirtualMemory()
+	memStat, err := mem.VirtualMemory()
 	if err != nil {
 		return err
 	}
-	ram_stat := mem_stat.Total / 1073741824 // Getting GB from Bytes
+	ramStat := memStat.Total / 1073741824 // Getting GB from Bytes
 
-	if c.RamAlter < 0 && int(ram_stat) <= -c.RamAlter {
-		return log.Errorf("VMX: |RamAlter| can't be more or equal the available Host RAM: |%d| > %d", c.RamAlter, ram_stat)
+	if c.RamAlter < 0 && int(ramStat) <= -c.RamAlter {
+		return log.Errorf("VMX: |RamAlter| can't be more or equal the available Host RAM: |%d| > %d", c.RamAlter, ramStat)
 	}
 
 	return nil

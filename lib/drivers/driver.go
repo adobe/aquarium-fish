@@ -52,7 +52,7 @@ type ResourceDriver interface {
 	// -> node_usage - how much of node resources was used by all the drivers. Usually should not be used by the cloud drivers
 	// -> req - definition describes requirements for the resource
 	// <- capacity - the number of such definitions the driver could run, if -1 - error happened
-	AvailableCapacity(node_usage types.Resources, req types.LabelDefinition) (capacity int64)
+	AvailableCapacity(nodeUsage types.Resources, req types.LabelDefinition) (capacity int64)
 
 	// Allocate the resource by definition and returns hw address
 	// -> def - describes the driver options to allocate the required resource

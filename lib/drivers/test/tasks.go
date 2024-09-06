@@ -62,8 +62,8 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 		return []byte(`{}`), log.Error("TEST: RandomFail:", err)
 	}
 
-	res_file := filepath.Join(t.driver.cfg.WorkspacePath, t.Resource.Identifier)
-	if _, err := os.Stat(res_file); os.IsNotExist(err) {
+	resFile := filepath.Join(t.driver.cfg.WorkspacePath, t.Resource.Identifier)
+	if _, err := os.Stat(resFile); os.IsNotExist(err) {
 		return []byte(`{}`), fmt.Errorf("TEST: Unable to snapshot unavailable resource '%s'", t.Resource.Identifier)
 	}
 

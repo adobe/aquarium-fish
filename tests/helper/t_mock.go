@@ -53,16 +53,16 @@ func (m *MockT) Fatalf(format string, args ...any) {
 func ExpectFailure(t *testing.T, f func(tt testing.TB)) {
 	t.Helper()
 	var wg sync.WaitGroup
-	mock_t := &MockT{t: t}
+	mockT := &MockT{t: t}
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		f(mock_t)
+		f(mockT)
 	}()
 	wg.Wait()
 
-	if !mock_t.FailNowCalled {
+	if !mockT.FailNowCalled {
 		t.Fatalf("ExpectFailure: the function did not fail as expected")
 	}
 }

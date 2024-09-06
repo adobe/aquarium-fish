@@ -24,13 +24,13 @@ import (
 func (f *Fish) UserFind(filter *string) (us []types.User, err error) {
 	db := f.db
 	if filter != nil {
-		secured_filter, err := util.ExpressionSqlFilter(*filter)
+		securedFilter, err := util.ExpressionSqlFilter(*filter)
 		if err != nil {
 			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
 			// We do not fail here because we should not give attacker more information
 			return us, nil
 		}
-		db = db.Where(secured_filter)
+		db = db.Where(securedFilter)
 	}
 	err = db.Find(&us).Error
 	return us, err
@@ -65,7 +65,7 @@ func (f *Fish) UserAuth(name string, password string) *types.User {
 		return nil
 	}
 
-	if user.Hash.Algo != crypt.Argon2_Algo {
+	if user.Hash.Algo != crypt.Argon2Algo {
 		log.Warnf("Please regenerate password for user %q to improve the API performance", name)
 	}
 

@@ -55,12 +55,12 @@ type ConfigDriver struct {
 	Cfg  util.UnparsedJson `json:"cfg"`
 }
 
-func (c *Config) ReadConfigFile(cfg_path string) error {
+func (c *Config) ReadConfigFile(cfgPath string) error {
 	c.initDefaults()
 
-	if cfg_path != "" {
+	if cfgPath != "" {
 		// Open and parse
-		data, err := os.ReadFile(cfg_path)
+		data, err := os.ReadFile(cfgPath)
 		if err != nil {
 			return err
 		}

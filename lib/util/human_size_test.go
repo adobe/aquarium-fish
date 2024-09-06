@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	TEST_HUMAN_SIZE_PARSE_STRING = [][2]string{
+	TestHumanSizeParseString = [][2]string{
 		{`0`, `0B`},
 		{`0B`, `0B`},
 		{`0EB`, `0B`},
@@ -42,7 +42,7 @@ var (
 
 // Verify all the inputs will be parsed correctly
 func Test_human_size_parse_string(t *testing.T) {
-	for _, testcase := range TEST_HUMAN_SIZE_PARSE_STRING {
+	for _, testcase := range TestHumanSizeParseString {
 		t.Run(fmt.Sprintf("Testing `%s`", testcase[0]), func(t *testing.T) {
 			out, err := NewHumanSize(testcase[0])
 			if out.String() != testcase[1] {

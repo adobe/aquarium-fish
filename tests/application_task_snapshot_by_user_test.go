@@ -105,7 +105,7 @@ drivers:
 		}
 	})
 
-	var app_state types.ApplicationState
+	var appState types.ApplicationState
 	t.Run("Application should get ALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
@@ -115,10 +115,10 @@ drivers:
 				Expect(r).
 				Status(http.StatusOK).
 				End().
-				JSON(&app_state)
+				JSON(&appState)
 
-			if app_state.Status != types.ApplicationStatusALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", app_state.Status)
+			if appState.Status != types.ApplicationStatusALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", appState.Status)
 			}
 		})
 	})
@@ -139,7 +139,7 @@ drivers:
 		}
 	})
 
-	var app_task1 types.ApplicationTask
+	var appTask1 types.ApplicationTask
 	t.Run("Create ApplicationTask 1 Snapshot on ALLOCATE", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
@@ -149,14 +149,14 @@ drivers:
 			Expect(t).
 			Status(http.StatusOK).
 			End().
-			JSON(&app_task1)
+			JSON(&appTask1)
 
-		if app_task1.UID == uuid.Nil {
-			t.Fatalf("ApplicationTask 1 UID is incorrect: %v", app_task1.UID)
+		if appTask1.UID == uuid.Nil {
+			t.Fatalf("ApplicationTask 1 UID is incorrect: %v", appTask1.UID)
 		}
 	})
 
-	var app_task2 types.ApplicationTask
+	var appTask2 types.ApplicationTask
 	t.Run("Create ApplicationTask 2 Snapshot on DEALLOCATE", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
@@ -166,14 +166,14 @@ drivers:
 			Expect(t).
 			Status(http.StatusOK).
 			End().
-			JSON(&app_task2)
+			JSON(&appTask2)
 
-		if app_task2.UID == uuid.Nil {
-			t.Fatalf("ApplicationTask 2 UID is incorrect: %v", app_task2.UID)
+		if appTask2.UID == uuid.Nil {
+			t.Fatalf("ApplicationTask 2 UID is incorrect: %v", appTask2.UID)
 		}
 	})
 
-	var app_tasks []types.ApplicationTask
+	var appTasks []types.ApplicationTask
 	t.Run("ApplicationTask 1 should be executed in 10 sec and 2 should not be executed", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
@@ -183,22 +183,22 @@ drivers:
 				Expect(r).
 				Status(http.StatusOK).
 				End().
-				JSON(&app_tasks)
+				JSON(&appTasks)
 
-			if len(app_tasks) != 2 {
+			if len(appTasks) != 2 {
 				r.Fatalf("Application Tasks list does not contain 2 tasks")
 			}
-			if app_tasks[0].UID != app_task1.UID {
-				r.Fatalf("ApplicationTask 1 UID is incorrect: %v != %v", app_tasks[0].UID, app_task1.UID)
+			if appTasks[0].UID != appTask1.UID {
+				r.Fatalf("ApplicationTask 1 UID is incorrect: %v != %v", appTasks[0].UID, appTask1.UID)
 			}
-			if app_tasks[1].UID != app_task2.UID {
-				r.Fatalf("ApplicationTask 2 UID is incorrect: %v != %v", app_tasks[1].UID, app_task2.UID)
+			if appTasks[1].UID != appTask2.UID {
+				r.Fatalf("ApplicationTask 2 UID is incorrect: %v != %v", appTasks[1].UID, appTask2.UID)
 			}
-			if string(app_tasks[0].Result) != `{"snapshots":["test-snapshot"],"when":"ALLOCATED"}` {
-				r.Fatalf("ApplicationTask 1 result is incorrect: %v", app_tasks[0].Result)
+			if string(appTasks[0].Result) != `{"snapshots":["test-snapshot"],"when":"ALLOCATED"}` {
+				r.Fatalf("ApplicationTask 1 result is incorrect: %v", appTasks[0].Result)
 			}
-			if string(app_tasks[1].Result) != `{}` {
-				r.Fatalf("ApplicationTask 2 result is incorrect: %v", app_tasks[1].Result)
+			if string(appTasks[1].Result) != `{}` {
+				r.Fatalf("ApplicationTask 2 result is incorrect: %v", appTasks[1].Result)
 			}
 		})
 	})
@@ -222,16 +222,16 @@ drivers:
 				Expect(r).
 				Status(http.StatusOK).
 				End().
-				JSON(&app_tasks)
+				JSON(&appTasks)
 
-			if len(app_tasks) != 2 {
+			if len(appTasks) != 2 {
 				r.Fatalf("Application Tasks list does not contain 2 tasks")
 			}
-			if app_tasks[1].UID != app_task2.UID {
-				r.Fatalf("ApplicationTask 2 UID is incorrect: %v != %v", app_tasks[1].UID, app_task2.UID)
+			if appTasks[1].UID != appTask2.UID {
+				r.Fatalf("ApplicationTask 2 UID is incorrect: %v != %v", appTasks[1].UID, appTask2.UID)
 			}
-			if string(app_tasks[1].Result) != `{"snapshots":["test-snapshot"],"when":"DEALLOCATE"}` {
-				r.Fatalf("ApplicationTask 2 result is incorrect: %v", app_tasks[1].Result)
+			if string(appTasks[1].Result) != `{"snapshots":["test-snapshot"],"when":"DEALLOCATE"}` {
+				r.Fatalf("ApplicationTask 2 result is incorrect: %v", appTasks[1].Result)
 			}
 		})
 	})
@@ -245,10 +245,10 @@ drivers:
 				Expect(r).
 				Status(http.StatusOK).
 				End().
-				JSON(&app_state)
+				JSON(&appState)
 
-			if app_state.Status != types.ApplicationStatusDEALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", app_state.Status)
+			if appState.Status != types.ApplicationStatusDEALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", appState.Status)
 			}
 		})
 	})

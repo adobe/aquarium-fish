@@ -36,8 +36,8 @@ func (f *Fish) ResourceAccessCreate(r *types.ResourceAccess) error {
 	return f.db.Create(r).Error
 }
 
-func (f *Fish) ResourceAccessDeleteByResource(resource_uid types.ResourceUID) error {
-	ra := types.ResourceAccess{ResourceUID: resource_uid}
+func (f *Fish) ResourceAccessDeleteByResource(resourceUid types.ResourceUID) error {
+	ra := types.ResourceAccess{ResourceUID: resourceUid}
 	return f.db.Where(&ra).Delete(&ra).Error
 }
 

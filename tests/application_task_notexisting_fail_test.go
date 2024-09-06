@@ -89,7 +89,7 @@ drivers:
 		}
 	})
 
-	var app_state types.ApplicationState
+	var appState types.ApplicationState
 	t.Run("Application should get ALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
@@ -99,15 +99,15 @@ drivers:
 				Expect(r).
 				Status(http.StatusOK).
 				End().
-				JSON(&app_state)
+				JSON(&appState)
 
-			if app_state.Status != types.ApplicationStatusALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", app_state.Status)
+			if appState.Status != types.ApplicationStatusALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", appState.Status)
 			}
 		})
 	})
 
-	var app_task types.ApplicationTask
+	var appTask types.ApplicationTask
 	t.Run("Create ApplicationTask Snapshot", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
@@ -117,14 +117,14 @@ drivers:
 			Expect(t).
 			Status(http.StatusOK).
 			End().
-			JSON(&app_task)
+			JSON(&appTask)
 
-		if app_task.UID == uuid.Nil {
-			t.Fatalf("ApplicationTask UID is incorrect: %v", app_task.UID)
+		if appTask.UID == uuid.Nil {
+			t.Fatalf("ApplicationTask UID is incorrect: %v", appTask.UID)
 		}
 	})
 
-	var app_tasks []types.ApplicationTask
+	var appTasks []types.ApplicationTask
 	t.Run("ApplicationTask should be executed as not found in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
@@ -134,16 +134,16 @@ drivers:
 				Expect(r).
 				Status(http.StatusOK).
 				End().
-				JSON(&app_tasks)
+				JSON(&appTasks)
 
-			if len(app_tasks) != 1 {
+			if len(appTasks) != 1 {
 				r.Fatalf("Application Tasks list is empty")
 			}
-			if app_tasks[0].UID != app_task.UID {
-				r.Fatalf("ApplicationTask UID is incorrect: %v != %v", app_tasks[0].UID, app_task.UID)
+			if appTasks[0].UID != appTask.UID {
+				r.Fatalf("ApplicationTask UID is incorrect: %v != %v", appTasks[0].UID, appTask.UID)
 			}
-			if string(app_tasks[0].Result) != `{"error":"task not availble in driver"}` {
-				r.Fatalf("ApplicationTask result is incorrect: %v", app_tasks[0].Result)
+			if string(appTasks[0].Result) != `{"error":"task not availble in driver"}` {
+				r.Fatalf("ApplicationTask result is incorrect: %v", appTasks[0].Result)
 			}
 		})
 	})
@@ -167,10 +167,10 @@ drivers:
 				Expect(r).
 				Status(http.StatusOK).
 				End().
-				JSON(&app_state)
+				JSON(&appState)
 
-			if app_state.Status != types.ApplicationStatusDEALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", app_state.Status)
+			if appState.Status != types.ApplicationStatusDEALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", appState.Status)
 			}
 		})
 	})

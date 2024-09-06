@@ -49,16 +49,16 @@ func (p *ProxyAccess) Allow(ctx context.Context, req *socks5.Request) (context.C
 	if dest == "" {
 		dest = req.DestAddr.IP.String()
 	}
-	over_dest := p.fish.ResourceServiceMapping(res, dest)
-	if over_dest == "" {
+	overDest := p.fish.ResourceServiceMapping(res, dest)
+	if overDest == "" {
 		log.Warn("Proxy: Denied proxy from", req.RemoteAddr, "to", req.DestAddr)
 		return ctx, false
 	}
 
 	// Resolve destination address if it's not an IP
-	req.DestAddr.IP = net.ParseIP(over_dest)
+	req.DestAddr.IP = net.ParseIP(overDest)
 	if req.DestAddr.IP == nil {
-		req.DestAddr.FQDN = over_dest
+		req.DestAddr.FQDN = overDest
 		addr, err := net.ResolveIPAddr("ip", req.DestAddr.FQDN)
 		if err != nil {
 			return ctx, false

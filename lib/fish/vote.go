@@ -26,13 +26,13 @@ import (
 func (f *Fish) VoteFind(filter *string) (vs []types.Vote, err error) {
 	db := f.db
 	if filter != nil {
-		secured_filter, err := util.ExpressionSqlFilter(*filter)
+		securedFilter, err := util.ExpressionSqlFilter(*filter)
 		if err != nil {
 			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
 			// We do not fail here because we should not give attacker more information
 			return vs, nil
 		}
-		db = db.Where(secured_filter)
+		db = db.Where(securedFilter)
 	}
 	err = db.Find(&vs).Error
 	return vs, err
@@ -62,27 +62,27 @@ func (f *Fish) VoteGet(uid types.VoteUID) (v *types.Vote, err error) {
 	return v, err
 }
 
-func (f *Fish) VoteCurrentRoundGet(app_uid types.ApplicationUID) uint16 {
+func (f *Fish) VoteCurrentRoundGet(appUid types.ApplicationUID) uint16 {
 	var result types.Vote
-	f.db.Select("max(round) as round").Where("application_uid = ?", app_uid).First(&result)
+	f.db.Select("max(round) as round").Where("application_uid = ?", appUid).First(&result)
 	return result.Round
 }
 
-func (f *Fish) VoteListGetApplicationRound(app_uid types.ApplicationUID, round uint16) (vs []types.Vote, err error) {
-	err = f.db.Where("application_uid = ?", app_uid).Where("round = ?", round).Find(&vs).Error
+func (f *Fish) VoteListGetApplicationRound(appUid types.ApplicationUID, round uint16) (vs []types.Vote, err error) {
+	err = f.db.Where("application_uid = ?", appUid).Where("round = ?", round).Find(&vs).Error
 	return vs, err
 }
 
-func (f *Fish) VoteGetElectionWinner(app_uid types.ApplicationUID, round uint16) (v *types.Vote, err error) {
+func (f *Fish) VoteGetElectionWinner(appUid types.ApplicationUID, round uint16) (v *types.Vote, err error) {
 	// Current rule is simple - sort everyone answered smallest available number and the first one wins
 	v = &types.Vote{}
-	err = f.db.Where("application_uid = ?", app_uid).Where("round = ?", round).Where("available >= 0").
+	err = f.db.Where("application_uid = ?", appUid).Where("round = ?", round).Where("available >= 0").
 		Order("available ASC").Order("created_at ASC").Order("rand ASC").First(&v).Error
 	return v, err
 }
 
-func (f *Fish) VoteGetNodeApplication(node_uid types.NodeUID, app_uid types.ApplicationUID) (v *types.Vote, err error) {
+func (f *Fish) VoteGetNodeApplication(nodeUid types.NodeUID, appUid types.ApplicationUID) (v *types.Vote, err error) {
 	v = &types.Vote{}
-	err = f.db.Where("application_uid = ?", app_uid).Where("node_uid = ?", node_uid).Order("round DESC").First(&v).Error
+	err = f.db.Where("application_uid = ?", appUid).Where("node_uid = ?", nodeUid).Order("round DESC").First(&v).Error
 	return v, err
 }

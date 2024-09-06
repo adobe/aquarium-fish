@@ -104,7 +104,7 @@ drivers:
 		}
 	})
 
-	var app_state types.ApplicationState
+	var appState types.ApplicationState
 	t.Run("Application should stay NEW for 20 sec", func(t *testing.T) {
 		time.Sleep(20)
 
@@ -115,10 +115,10 @@ drivers:
 			Expect(t).
 			Status(http.StatusOK).
 			End().
-			JSON(&app_state)
+			JSON(&appState)
 
-		if app_state.Status != types.ApplicationStatusNEW {
-			t.Fatalf("Application Status is incorrect: %v", app_state.Status)
+		if appState.Status != types.ApplicationStatusNEW {
+			t.Fatalf("Application Status is incorrect: %v", appState.Status)
 		}
 	})
 
@@ -142,10 +142,10 @@ drivers:
 				Expect(r).
 				Status(http.StatusOK).
 				End().
-				JSON(&app_state)
+				JSON(&appState)
 
-			if app_state.Status != types.ApplicationStatusALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", app_state.Status)
+			if appState.Status != types.ApplicationStatusALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", appState.Status)
 			}
 		})
 	})

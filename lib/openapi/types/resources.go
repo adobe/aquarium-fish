@@ -49,7 +49,7 @@ func (r Resources) Value() (driver.Value, error) {
 	return json.Marshal(r)
 }
 
-func (r *Resources) Validate(disk_types []string, check_net bool) error {
+func (r *Resources) Validate(diskTypes []string, checkNet bool) error {
 	// Check resources
 	if r.Cpu < 1 {
 		return fmt.Errorf("Resources: Number of CPU cores is less then 1")
@@ -61,8 +61,8 @@ func (r *Resources) Validate(disk_types []string, check_net bool) error {
 		if name == "" {
 			return fmt.Errorf("Resources: Disk name can't be empty")
 		}
-		if len(disk_types) > 0 && !util.Contains(disk_types, disk.Type) {
-			return fmt.Errorf("Resources: Type of disk must be one of: %+q", disk_types)
+		if len(diskTypes) > 0 && !util.Contains(diskTypes, disk.Type) {
+			return fmt.Errorf("Resources: Type of disk must be one of: %+q", diskTypes)
 		}
 		if disk.Size < 1 {
 			return fmt.Errorf("Resources: Size of the disk can't be less than 1GB")
@@ -77,7 +77,7 @@ func (r *Resources) Validate(disk_types []string, check_net bool) error {
 			}
 		}
 	}
-	if check_net && r.Network != "" && r.Network != "nat" {
+	if checkNet && r.Network != "" && r.Network != "nat" {
 		return fmt.Errorf("Resources: The network configuration must be either '' (empty for hostonly) or 'nat'")
 	}
 
@@ -110,9 +110,9 @@ func (r *Resources) Subtract(res Resources) (err error) {
 		r.Cpu -= res.Cpu
 	}
 	if r.Ram < res.Ram {
-		mem_err := fmt.Errorf("Resources: Unable to subtract more RAM than we have: %d < %d", r.Ram, res.Ram)
+		memErr := fmt.Errorf("Resources: Unable to subtract more RAM than we have: %d < %d", r.Ram, res.Ram)
 		if err != nil {
-			err = fmt.Errorf("%v, %v", err, mem_err)
+			err = fmt.Errorf("%v, %v", err, memErr)
 		}
 		r.Ram = 0
 	} else {

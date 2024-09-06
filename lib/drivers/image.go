@@ -60,17 +60,17 @@ func (i *Image) Validate() error {
 	// Fill name out of image url
 	if i.Name == "" {
 		i.Name = path.Base(i.Url)
-		minus_loc := strings.LastIndexByte(i.Name, '-')
-		if minus_loc != -1 {
+		minusLoc := strings.LastIndexByte(i.Name, '-')
+		if minusLoc != -1 {
 			// Use the part from beginning to last minus ('-') - useful to separate version part
-			i.Name = i.Name[0:minus_loc]
+			i.Name = i.Name[0:minusLoc]
 		} else if strings.LastIndexByte(i.Name, '.') != -1 {
 			// Split by extension - need to take into account dual extension of tar archives (ex. ".tar.xz")
-			name_split := strings.Split(i.Name, ".")
-			if name_split[len(name_split)-2] == "tar" {
-				i.Name = strings.Join(name_split[0:len(name_split)-2], ".")
+			nameSplit := strings.Split(i.Name, ".")
+			if nameSplit[len(nameSplit)-2] == "tar" {
+				i.Name = strings.Join(nameSplit[0:len(nameSplit)-2], ".")
 			} else {
-				i.Name = strings.Join(name_split[0:len(name_split)-1], ".")
+				i.Name = strings.Join(nameSplit[0:len(nameSplit)-1], ".")
 			}
 		}
 	}
@@ -78,29 +78,29 @@ func (i *Image) Validate() error {
 	// Fill version out of image url
 	if i.Version == "" {
 		i.Version = path.Base(i.Url)
-		minus_loc := strings.LastIndexByte(i.Version, '-')
-		if minus_loc != -1 {
+		minusLoc := strings.LastIndexByte(i.Version, '-')
+		if minusLoc != -1 {
 			// Use the part from the last minus ('-') to the end
-			i.Version = i.Version[minus_loc+1:]
+			i.Version = i.Version[minusLoc+1:]
 		}
 		if strings.LastIndexByte(i.Version, '.') != -1 {
 			// Split by extension - need to take into account dual extension of tar archives (ex. ".tar.xz")
-			version_split := strings.Split(i.Version, ".")
-			if version_split[len(version_split)-2] == "tar" {
-				i.Version = strings.Join(version_split[0:len(version_split)-2], ".")
+			versionSplit := strings.Split(i.Version, ".")
+			if versionSplit[len(versionSplit)-2] == "tar" {
+				i.Version = strings.Join(versionSplit[0:len(versionSplit)-2], ".")
 			} else {
-				i.Version = strings.Join(version_split[0:len(version_split)-1], ".")
+				i.Version = strings.Join(versionSplit[0:len(versionSplit)-1], ".")
 			}
 		}
 	}
 
 	// Check sum format
 	if i.Sum != "" {
-		sum_split := strings.SplitN(i.Sum, ":", 2)
-		if len(i.Sum) > 0 && len(sum_split) != 2 {
+		sumSplit := strings.SplitN(i.Sum, ":", 2)
+		if len(i.Sum) > 0 && len(sumSplit) != 2 {
 			return fmt.Errorf("Image: Checksum should be in format '<algo>:<checksum>': %q", i.Sum)
 		}
-		algo := sum_split[0]
+		algo := sumSplit[0]
 		if algo != "md5" && algo != "sha1" && algo != "sha256" && algo != "sha512" {
 			return fmt.Errorf("Image: Checksum with not supported algorithm (md5, sha1, sha256, sha512): %q", algo)
 		}
@@ -116,28 +116,28 @@ func (i *Image) Validate() error {
 // quick as possible.
 // -> out_dir - is the directory where the image will be placed. It will be unpacked to out_dir/Name-Version/
 // -> user, password - credentials for HTTP Basic auth
-func (i *Image) DownloadUnpack(out_dir, user, password string) error {
-	img_path := filepath.Join(out_dir, i.Name+"-"+i.Version)
-	log.Debug("Image: Downloading & Unpacking image:", i.Url, img_path)
-	lock_path := img_path + ".lock"
+func (i *Image) DownloadUnpack(outDir, user, password string) error {
+	imgPath := filepath.Join(outDir, i.Name+"-"+i.Version)
+	log.Debug("Image: Downloading & Unpacking image:", i.Url, imgPath)
+	lockPath := imgPath + ".lock"
 
 	// Wait for another process to download and unpack the archive
 	// In case it failed to download - will be redownloaded further
-	util.WaitLock(lock_path, func() {
-		log.Debug("Util: Cleaning the abandoned files and begin redownloading:", img_path)
-		os.RemoveAll(img_path)
+	util.WaitLock(lockPath, func() {
+		log.Debug("Util: Cleaning the abandoned files and begin redownloading:", imgPath)
+		os.RemoveAll(imgPath)
 	})
 
-	if _, err := os.Stat(img_path); !os.IsNotExist(err) {
+	if _, err := os.Stat(imgPath); !os.IsNotExist(err) {
 		// The unpacked archive is already here, so nothing to do
 		return nil
 	}
 
 	// Creating lock file in order to not screw it up in multiprocess system
-	if err := util.CreateLock(lock_path); err != nil {
+	if err := util.CreateLock(lockPath); err != nil {
 		return fmt.Errorf("Util: Unable to create lock file: %v", err)
 	}
-	defer os.Remove(lock_path)
+	defer os.Remove(lockPath)
 
 	client := &http.Client{}
 	req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, i.Url, nil)
@@ -146,34 +146,34 @@ func (i *Image) DownloadUnpack(out_dir, user, password string) error {
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		os.RemoveAll(img_path)
+		os.RemoveAll(imgPath)
 		return fmt.Errorf("Image: Unable to request url %q: %v", i.Url, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		os.RemoveAll(img_path)
+		os.RemoveAll(imgPath)
 		return fmt.Errorf("Image: Unable to download file %q: %s", i.Url, resp.Status)
 	}
 
 	// Printing the download progress
 	bodypt := &util.PassThruMonitor{
 		Reader: resp.Body,
-		Name:   fmt.Sprintf("Image: Downloading '%s'", img_path),
+		Name:   fmt.Sprintf("Image: Downloading '%s'", imgPath),
 		Length: resp.ContentLength,
 	}
 
 	// Process checksum
-	var data_reader io.Reader
+	var dataReader io.Reader
 	var hasher hash.Hash
 	if i.Sum == "" {
 		// Just use the passthrough body as the source
-		data_reader = bodypt
+		dataReader = bodypt
 	} else {
-		algo_sum := strings.SplitN(i.Sum, ":", 2)
+		algoSum := strings.SplitN(i.Sum, ":", 2)
 
 		// Calculating checksum during reading from the body
-		switch algo_sum[0] {
+		switch algoSum[0] {
 		case "md5":
 			hasher = md5.New() // #nosec G401
 		case "sha1":
@@ -183,29 +183,29 @@ func (i *Image) DownloadUnpack(out_dir, user, password string) error {
 		case "sha512":
 			hasher = sha512.New()
 		default:
-			os.RemoveAll(img_path)
-			return fmt.Errorf("Image: Not recognized checksum algorithm (md5, sha1, sha256, sha512): %q", algo_sum[0])
+			os.RemoveAll(imgPath)
+			return fmt.Errorf("Image: Not recognized checksum algorithm (md5, sha1, sha256, sha512): %q", algoSum[0])
 		}
 
-		data_reader = io.TeeReader(bodypt, hasher)
+		dataReader = io.TeeReader(bodypt, hasher)
 
 		// Check if headers contains the needed algo:hash for quick validation
 		// We're not completely trust the server, but if it returns the wrong sum - we're dropping.
 		// Header should look like: X-Checksum-Md5 X-Checksum-Sha1 X-Checksum-Sha256 (Artifactory)
-		if remote_sum := resp.Header.Get("X-Checksum-" + strings.Title(algo_sum[0])); remote_sum != "" { //nolint:staticcheck // SA1019 Strictly ASCII here
+		if remoteSum := resp.Header.Get("X-Checksum-" + strings.Title(algoSum[0])); remoteSum != "" { //nolint:staticcheck // SA1019 Strictly ASCII here
 			// Server returned mathing header, so compare it's value to our checksum
-			if remote_sum != algo_sum[1] {
-				os.RemoveAll(img_path)
+			if remoteSum != algoSum[1] {
+				os.RemoveAll(imgPath)
 				return fmt.Errorf("Image: The remote checksum (from header X-Checksum-%s) doesn't equal the desired one: %q != %q for %q",
-					strings.Title(algo_sum[0]), remote_sum, algo_sum[1], i.Url) //nolint:staticcheck // SA1019 Strictly ASCII here
+					strings.Title(algoSum[0]), remoteSum, algoSum[1], i.Url) //nolint:staticcheck // SA1019 Strictly ASCII here
 			}
 		}
 	}
 
 	// Unpack the stream
-	xzr, err := xz.NewReader(data_reader)
+	xzr, err := xz.NewReader(dataReader)
 	if err != nil {
-		os.RemoveAll(img_path)
+		os.RemoveAll(imgPath)
 		return fmt.Errorf("Image: Unable to create XZ reader: %v", err)
 	}
 
@@ -220,37 +220,37 @@ func (i *Image) DownloadUnpack(out_dir, user, password string) error {
 			break
 		}
 		if err != nil {
-			os.RemoveAll(img_path)
+			os.RemoveAll(imgPath)
 			return fmt.Errorf("Image: Tar archive failed to iterate next file: %v", err)
 		}
 
 		// Check the name doesn't contain any traversal elements
 		if strings.Contains(hdr.Name, "..") {
-			os.RemoveAll(img_path)
+			os.RemoveAll(imgPath)
 			return fmt.Errorf("Image: The archive filepath contains '..' which is security forbidden: %q", hdr.Name)
 		}
 
-		target := filepath.Join(img_path, hdr.Name) // #nosec G305 , checked above
+		target := filepath.Join(imgPath, hdr.Name) // #nosec G305 , checked above
 
 		switch hdr.Typeflag {
 		case tar.TypeDir:
 			// Create a directory
 			err = os.MkdirAll(target, os.FileMode(hdr.Mode))
 			if err != nil {
-				os.RemoveAll(img_path)
+				os.RemoveAll(imgPath)
 				return fmt.Errorf("Image: Unable to create directory %q: %v", target, err)
 			}
 		case tar.TypeReg:
 			// Write a file
-			log.Debugf("Util: Extracting '%s': %s", img_path, hdr.Name)
+			log.Debugf("Util: Extracting '%s': %s", imgPath, hdr.Name)
 			err = os.MkdirAll(filepath.Dir(target), 0750)
 			if err != nil {
-				os.RemoveAll(img_path)
+				os.RemoveAll(imgPath)
 				return fmt.Errorf("Image: Unable to create directory for file %q: %v", target, err)
 			}
 			w, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(hdr.Mode))
 			if err != nil {
-				os.RemoveAll(img_path)
+				os.RemoveAll(imgPath)
 				return fmt.Errorf("Image: Unable to open file %q for unpack: %v", target, err)
 			}
 			defer w.Close()
@@ -263,7 +263,7 @@ func (i *Image) DownloadUnpack(out_dir, user, password string) error {
 				} else if err == io.EOF {
 					break
 				}
-				os.RemoveAll(img_path)
+				os.RemoveAll(imgPath)
 				return fmt.Errorf("Image: Unable to unpack content to file %q: %v", target, err)
 			}
 		}
@@ -272,14 +272,14 @@ func (i *Image) DownloadUnpack(out_dir, user, password string) error {
 	// Compare the calculated checksum to the desired one
 	if i.Sum != "" {
 		// Completing read of the stream to calculate the hash properly (tar will not do that)
-		io.ReadAll(data_reader)
+		io.ReadAll(dataReader)
 
-		algo_sum := strings.SplitN(i.Sum, ":", 2)
-		calculated_sum := hex.EncodeToString(hasher.Sum(nil))
-		if calculated_sum != algo_sum[1] {
-			os.RemoveAll(img_path)
+		algoSum := strings.SplitN(i.Sum, ":", 2)
+		calculatedSum := hex.EncodeToString(hasher.Sum(nil))
+		if calculatedSum != algoSum[1] {
+			os.RemoveAll(imgPath)
 			return fmt.Errorf("Image: The calculated checksum doesn't equal the desired one: %q != %q for %q",
-				calculated_sum, algo_sum[1], i.Url)
+				calculatedSum, algoSum[1], i.Url)
 		}
 	}
 

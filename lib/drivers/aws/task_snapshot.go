@@ -20,7 +20,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
-	ec2_types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/log"
@@ -85,29 +85,29 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 
 		// Wait for instance stopped before going forward with snapshot
 		sw := ec2.NewInstanceStoppedWaiter(conn)
-		max_wait := 10 * time.Minute
-		wait_input := ec2.DescribeInstancesInput{
+		maxWait := 10 * time.Minute
+		waitInput := ec2.DescribeInstancesInput{
 			InstanceIds: []string{
 				t.Resource.Identifier,
 			},
 		}
-		if err := sw.Wait(context.TODO(), &wait_input, max_wait); err != nil {
+		if err := sw.Wait(context.TODO(), &waitInput, maxWait); err != nil {
 			// Do not fail hard here - it's still possible to take snapshot of the instance
 			log.Errorf("AWS: TaskSnapshot %s: Error during wait for instance %s stop: %v", t.ApplicationTask.UID, t.Resource.Identifier, err)
 		}
 	}
 
-	spec := ec2_types.InstanceSpecification{
+	spec := ec2types.InstanceSpecification{
 		ExcludeBootVolume: aws.Bool(!t.Full),
 		InstanceId:        aws.String(t.Resource.Identifier),
 	}
 	input := ec2.CreateSnapshotsInput{
 		InstanceSpecification: &spec,
 		Description:           aws.String("Created by AquariumFish"),
-		CopyTagsFromSource:    ec2_types.CopyTagsFromSourceVolume,
-		TagSpecifications: []ec2_types.TagSpecification{{
-			ResourceType: ec2_types.ResourceTypeSnapshot,
-			Tags: []ec2_types.Tag{
+		CopyTagsFromSource:    ec2types.CopyTagsFromSourceVolume,
+		TagSpecifications: []ec2types.TagSpecification{{
+			ResourceType: ec2types.ResourceTypeSnapshot,
+			Tags: []ec2types.Tag{
 				{
 					Key:   aws.String("InstanceId"),
 					Value: aws.String(t.Resource.Identifier),
@@ -137,11 +137,11 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 	// Wait for snapshots to be available...
 	log.Infof("AWS: TaskSnapshot %s: Wait for snapshots %s availability...", t.ApplicationTask.UID, snapshots)
 	sw := ec2.NewSnapshotCompletedWaiter(conn)
-	max_wait := time.Duration(t.driver.cfg.SnapshotCreateWait)
-	wait_input := ec2.DescribeSnapshotsInput{
+	maxWait := time.Duration(t.driver.cfg.SnapshotCreateWait)
+	waitInput := ec2.DescribeSnapshotsInput{
 		SnapshotIds: snapshots,
 	}
-	if err = sw.Wait(context.TODO(), &wait_input, max_wait); err != nil {
+	if err = sw.Wait(context.TODO(), &waitInput, maxWait); err != nil {
 		// Do not fail hard here - we still need to remove the tmp image
 		log.Errorf("AWS: TaskSnapshot %s: Error during wait snapshots availability: %s, %v", t.ApplicationTask.UID, snapshots, err)
 	}

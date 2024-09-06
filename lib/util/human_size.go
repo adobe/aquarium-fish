@@ -52,13 +52,13 @@ func (hs *HumanSize) UnmarshalText(data []byte) error {
 	// Detecting unit & multiplier
 	var mult HumanSize = 0
 	var unit string
-	var unit_len int
+	var unitLen int
 	if length > 1 {
 		unit = input[length-2:]
-		unit_len = 2
+		unitLen = 2
 	} else {
 		unit = input
-		unit_len = length
+		unitLen = length
 	}
 	switch unit {
 	case "KB":
@@ -77,14 +77,14 @@ func (hs *HumanSize) UnmarshalText(data []byte) error {
 		// Could be something incorrect, B or number - so bytes
 		if unit[0] >= '0' && unit[0] <= '9' {
 			// It's byte
-			if unit_len > 1 {
+			if unitLen > 1 {
 				if unit[1] == 'B' {
-					unit_len = 1
+					unitLen = 1
 				} else if unit[1] >= '0' && unit[1] <= '9' {
-					unit_len = 0
+					unitLen = 0
 				}
 			} else {
-				unit_len = 0
+				unitLen = 0
 			}
 			mult = B
 		}
@@ -94,7 +94,7 @@ func (hs *HumanSize) UnmarshalText(data []byte) error {
 	}
 
 	// Detecting value
-	val, err := strconv.ParseUint(input[:length-unit_len], 10, 64)
+	val, err := strconv.ParseUint(input[:length-unitLen], 10, 64)
 	if err != nil {
 		return fmt.Errorf("Unable to parse provided human size value: %s", input)
 	}

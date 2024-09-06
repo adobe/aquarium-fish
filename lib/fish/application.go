@@ -25,13 +25,13 @@ import (
 func (f *Fish) ApplicationFind(filter *string) (as []types.Application, err error) {
 	db := f.db
 	if filter != nil {
-		secured_filter, err := util.ExpressionSqlFilter(*filter)
+		securedFilter, err := util.ExpressionSqlFilter(*filter)
 		if err != nil {
 			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
 			// We do not fail here because we should not give attacker more information
 			return as, nil
 		}
-		db = db.Where(secured_filter)
+		db = db.Where(securedFilter)
 	}
 	err = db.Find(&as).Error
 	return as, err
@@ -81,8 +81,8 @@ func (f *Fish) ApplicationListGetStatusNew() (as []types.Application, err error)
 	return as, err
 }
 
-func (f *Fish) ApplicationIsAllocated(app_uid types.ApplicationUID) (err error) {
-	state, err := f.ApplicationStateGetByApplication(app_uid)
+func (f *Fish) ApplicationIsAllocated(appUid types.ApplicationUID) (err error) {
+	state, err := f.ApplicationStateGetByApplication(appUid)
 	if err != nil {
 		return err
 	} else if state.Status != types.ApplicationStatusALLOCATED {
