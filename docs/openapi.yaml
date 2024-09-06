@@ -49,9 +49,9 @@ paths:
       security:
         - basic_auth: []
     post:
-      summary: Create new User
-      description: Creates & return the created User, it will generate password if not provided
-      operationId: UserCreatePost
+      summary: Create or update User
+      description: Creates or updates & return the User, it will generate password if not provided
+      operationId: UserCreateUpdatePost
       tags:
         - User
       parameters: []
@@ -1250,7 +1250,6 @@ components:
         - created_at
         - updated_at
         - password
-        - hash
       properties:
         name:
           $ref: '#/components/schemas/UserName'
