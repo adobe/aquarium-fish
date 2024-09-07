@@ -21,6 +21,7 @@ import (
 	"strings"
 )
 
+// FileReplaceToken simple replaces tocken in the file
 func FileReplaceToken(path string, fullLine, add, anycase bool, tokenValues ...string) error {
 	// Open input file
 	inF, err := os.OpenFile(path, os.O_RDONLY, 0o644)
@@ -74,21 +75,20 @@ func FileReplaceToken(path string, fullLine, add, anycase bool, tokenValues ...s
 				if fullLine {
 					line = value
 					break // No need to check the other tokens
-				} else {
-					if anycase {
-						// We're not using RE because it's hard to predict the token
-						// and escape it to compile the proper regular expression
-						// so instead we using just regular replace by position of the token
-						idx := strings.Index(compLine, tokens[i])
-						for idx != -1 {
-							// To support unicode use runes
-							line = string([]rune(line)[0:idx]) + value + string([]rune(line)[idx+len(tokens[i]):len(line)])
-							compLine = strings.ToLower(line)
-							idx = strings.Index(compLine, tokens[i])
-						}
-					} else {
-						line = strings.ReplaceAll(line, tokens[i], value)
+				}
+				if anycase {
+					// We're not using RE because it's hard to predict the token
+					// and escape it to compile the proper regular expression
+					// so instead we using just regular replace by position of the token
+					idx := strings.Index(compLine, tokens[i])
+					for idx != -1 {
+						// To support unicode use runes
+						line = string([]rune(line)[0:idx]) + value + string([]rune(line)[idx+len(tokens[i]):len(line)])
+						compLine = strings.ToLower(line)
+						idx = strings.Index(compLine, tokens[i])
 					}
+				} else {
+					line = strings.ReplaceAll(line, tokens[i], value)
 				}
 			}
 		}
@@ -123,9 +123,7 @@ func FileReplaceToken(path string, fullLine, add, anycase bool, tokenValues ...s
 	}
 
 	// Replace input file with out file
-	if err := os.Rename(outF.Name(), path); err != nil {
-		return err
-	}
+	err = os.Rename(outF.Name(), path)
 
-	return nil
+	return err
 }

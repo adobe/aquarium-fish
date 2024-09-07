@@ -21,6 +21,7 @@ import (
 	"strings"
 )
 
+// FileReplaceBlock is a simple block replace in the file
 func FileReplaceBlock(path, blockFrom, blockTo string, lines ...string) error {
 	// Open input file
 	inF, err := os.OpenFile(path, os.O_RDONLY, 0o644)
@@ -96,9 +97,7 @@ func FileReplaceBlock(path, blockFrom, blockTo string, lines ...string) error {
 	}
 
 	// Replace input file with out file
-	if err := os.Rename(outF.Name(), path); err != nil {
-		return err
-	}
+	err = os.Rename(outF.Name(), path)
 
-	return nil
+	return err
 }

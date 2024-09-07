@@ -38,35 +38,42 @@ type R struct {
 	output []string
 }
 
-func (r *R) Helper() {}
+// Helper shows this struct as helper
+func (*R) Helper() {}
 
 var runFailed = struct{}{}
 
+// FailNow will fail the retry
 func (r *R) FailNow() {
 	r.fail = true
 	panic(runFailed)
 }
 
+// Fatal fail and log
 func (r *R) Fatal(args ...any) {
 	r.log(fmt.Sprint(args...))
 	r.FailNow()
 }
 
+// Fatalf fail and log
 func (r *R) Fatalf(format string, args ...any) {
 	r.log(fmt.Sprintf(format, args...))
 	r.FailNow()
 }
 
+// Error log error
 func (r *R) Error(args ...any) {
 	r.log(fmt.Sprint(args...))
 	r.fail = true
 }
 
+// Errorf log error
 func (r *R) Errorf(format string, args ...any) {
 	r.log(fmt.Sprintf(format, args...))
 	r.fail = true
 }
 
+// Check check if everything is ok
 func (r *R) Check(err error) {
 	if err != nil {
 		r.log(err.Error())
@@ -98,6 +105,7 @@ func decorate(s string) string {
 	return fmt.Sprintf("%s:%d: %s", file, line, s)
 }
 
+// Retry again
 func Retry(r Retryer, t Failer, f func(r *R)) {
 	t.Helper()
 	run(r, t, f)
@@ -169,17 +177,18 @@ type Counter struct {
 	Count int
 	Wait  time.Duration
 
-	count int
+	intCount int
 }
 
+// Continue counter
 func (r *Counter) Continue() bool {
-	if r.count == r.Count {
+	if r.intCount == r.Count {
 		return false
 	}
-	if r.count > 0 {
+	if r.intCount > 0 {
 		time.Sleep(r.Wait)
 	}
-	r.count++
+	r.intCount++
 	return true
 }
 
@@ -194,6 +203,7 @@ type Timer struct {
 	stop time.Time
 }
 
+// Continue the timer
 func (r *Timer) Continue() bool {
 	if r.stop.IsZero() {
 		r.stop = time.Now().Add(r.Timeout)

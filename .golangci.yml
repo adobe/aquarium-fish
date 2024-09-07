@@ -8,6 +8,9 @@ run:
 output:
   show-stats: true
 
+issues:
+  max-issues-per-linter: 0  # unlimited
+
 linters:
   # Disable all linters.
   # Default: false
@@ -95,7 +98,7 @@ linters:
     - promlinter
     - protogetter
     - reassign
-    #- revive  # not supporting snake_case for vars
+    - revive
     - rowserrcheck
     - sloglint
     - spancheck
@@ -126,3 +129,30 @@ linters-settings:
   gosec:
     excludes:
       - G115  # integer overflow conversion - disabled due to found no proper way to fix those
+  revive:
+    enable-all-rules: true
+    rules:
+      - name: comment-spacings
+        disabled: true
+      - name: line-length-limit
+        disabled: true
+      - name: add-constant
+        disabled: true
+      - name: unhandled-error
+        disabled: true
+      - name: cognitive-complexity
+        disabled: true
+      - name: bare-return
+        disabled: true
+      - name: modifies-value-receiver
+        disabled: true
+      - name: cyclomatic
+        disabled: true
+      - name: confusing-results
+        disabled: true
+      - name: function-length
+        disabled: true
+      - name: flag-parameter
+        disabled: true
+      - name: max-control-nesting
+        disabled: true

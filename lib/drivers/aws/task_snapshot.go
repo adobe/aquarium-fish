@@ -27,8 +27,9 @@ import (
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
+// TaskSnapshot stores the task data
 type TaskSnapshot struct {
-	driver *Driver `json:"-"`
+	driver *Driver
 
 	*types.ApplicationTask `json:"-"` // Info about the requested task
 	*types.LabelDefinition `json:"-"` // Info about the used label definition
@@ -37,22 +38,25 @@ type TaskSnapshot struct {
 	Full bool `json:"full"` // Make full (all disks including OS image), or just the additional disks snapshot
 }
 
-func (t *TaskSnapshot) Name() string {
+// Name returns name of the task
+func (*TaskSnapshot) Name() string {
 	return "snapshot"
 }
 
+// Clone makes a copy of the initial task to execute
 func (t *TaskSnapshot) Clone() drivers.ResourceDriverTask {
 	n := *t
 	return &n
 }
 
+// SetInfo defines information of the environment
 func (t *TaskSnapshot) SetInfo(task *types.ApplicationTask, def *types.LabelDefinition, res *types.Resource) {
 	t.ApplicationTask = task
 	t.LabelDefinition = def
 	t.Resource = res
 }
 
-// Snapshot could be executed during ALLOCATED & DEALLOCATE ApplicationStatus
+// Execute -  Snapshot task could be executed during ALLOCATED & DEALLOCATE ApplicationStatus
 func (t *TaskSnapshot) Execute() (result []byte, err error) {
 	if t.ApplicationTask == nil {
 		return []byte(`{"error":"internal: invalid application task"}`), log.Error("AWS: Invalid application task:", t.ApplicationTask)

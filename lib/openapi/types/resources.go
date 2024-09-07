@@ -21,10 +21,12 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
-func (r Resources) GormDataType() string {
+// GormDataType describes how to store Resources in database
+func (Resources) GormDataType() string {
 	return "blob"
 }
 
+// Scan converts the Resources to json bytes
 func (r *Resources) Scan(value any) error {
 	bytes, ok := value.([]byte)
 	if !ok {
@@ -41,6 +43,7 @@ func (r *Resources) Scan(value any) error {
 	return err
 }
 
+// Value converts json bytes to Resources
 func (r Resources) Value() (driver.Value, error) {
 	// Init the value, otherwise will return undesired nil
 	if r.NodeFilter == nil {
@@ -49,6 +52,7 @@ func (r Resources) Value() (driver.Value, error) {
 	return json.Marshal(r)
 }
 
+// Validate makes sure the Resources are defined correctly
 func (r *Resources) Validate(diskTypes []string, checkNet bool) error {
 	// Check resources
 	if r.Cpu < 1 {
@@ -84,7 +88,7 @@ func (r *Resources) Validate(diskTypes []string, checkNet bool) error {
 	return nil
 }
 
-// Adds the Resources data to the existing data
+// Add increases the Resources utilization by provided Resources
 func (r *Resources) Add(res Resources) error {
 	if r.Cpu == 0 && r.Ram == 0 {
 		// Set tenancy modificators for the first resource
@@ -101,7 +105,7 @@ func (r *Resources) Add(res Resources) error {
 	return nil
 }
 
-// Subtracts the Resources data to the existing data
+// Subtract decreases utilization of Resources by provided Resources
 func (r *Resources) Subtract(res Resources) (err error) {
 	if r.Cpu < res.Cpu {
 		err = fmt.Errorf("Resources: Unable to subtract more CPU than we have: %d < %d", r.Cpu, res.Cpu)
@@ -124,7 +128,7 @@ func (r *Resources) Subtract(res Resources) (err error) {
 	return
 }
 
-// Checks if the Resources are filled with some values
+// IsEmpty checks if the Resources are filled with some values
 func (r *Resources) IsEmpty() bool {
 	if r.Cpu != 0 {
 		return false

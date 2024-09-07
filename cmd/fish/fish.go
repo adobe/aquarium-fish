@@ -10,6 +10,7 @@
  * governing permissions and limitations under the License.
  */
 
+// Starting point for fish cmd
 package main
 
 import (
@@ -31,8 +32,8 @@ import (
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi"
-	"github.com/adobe/aquarium-fish/lib/proxy_socks"
-	"github.com/adobe/aquarium-fish/lib/proxy_ssh"
+	"github.com/adobe/aquarium-fish/lib/proxysocks"
+	"github.com/adobe/aquarium-fish/lib/proxyssh"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
@@ -41,7 +42,7 @@ func main() {
 
 	var apiAddress string
 	var proxySocksAddress string
-	var proxySshAddress string
+	var proxySSHAddress string
 	var nodeAddress string
 	var cfgPath string
 	var dir string
@@ -54,7 +55,7 @@ func main() {
 		Use:   "aquarium-fish",
 		Short: "Aquarium fish",
 		Long:  `Part of the Aquarium suite - a distributed resources manager`,
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
+		PersistentPreRunE: func(_ /*cmd*/ *cobra.Command, _ /*args*/ []string) (err error) {
 			if err = log.SetVerbosity(logVerbosity); err != nil {
 				return err
 			}
@@ -62,7 +63,7 @@ func main() {
 
 			return log.InitLoggers()
 		},
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
+		RunE: func(_ /*cmd*/ *cobra.Command, _ /*args*/ []string) (err error) {
 			log.Info("Fish init...")
 
 			cfg := &fish.Config{}
@@ -75,8 +76,8 @@ func main() {
 			if proxySocksAddress != "" {
 				cfg.ProxySocksAddress = proxySocksAddress
 			}
-			if proxySshAddress != "" {
-				cfg.ProxySshAddress = proxySshAddress
+			if proxySSHAddress != "" {
+				cfg.ProxySSHAddress = proxySSHAddress
 			}
 			if nodeAddress != "" {
 				cfg.NodeAddress = nodeAddress
@@ -89,7 +90,7 @@ func main() {
 				if err != nil {
 					return log.Errorf("Fish: Unable to parse cpu limit value: %v", err)
 				}
-				cfg.CpuLimit = uint16(val)
+				cfg.CPULimit = uint16(val)
 			}
 			if memTarget != "" {
 				if cfg.MemTarget, err = util.NewHumanSize(memTarget); err != nil {
@@ -98,9 +99,9 @@ func main() {
 			}
 
 			// Set Fish Node resources limits
-			if cfg.CpuLimit > 0 {
-				log.Info("Fish CPU limited:", cfg.CpuLimit)
-				runtime.GOMAXPROCS(int(cfg.CpuLimit))
+			if cfg.CPULimit > 0 {
+				log.Info("Fish CPU limited:", cfg.CPULimit)
+				runtime.GOMAXPROCS(int(cfg.CPULimit))
 			}
 			if cfg.MemTarget > 0 {
 				log.Info("Fish MEM targeted:", cfg.MemTarget.String())
@@ -125,13 +126,13 @@ func main() {
 			if !filepath.IsAbs(certPath) {
 				certPath = filepath.Join(cfg.Directory, certPath)
 			}
-			if err = crypt.InitTlsPairCa([]string{cfg.NodeName, cfg.NodeAddress}, caPath, keyPath, certPath); err != nil {
+			if err = crypt.InitTLSPairCa([]string{cfg.NodeName, cfg.NodeAddress}, caPath, keyPath, certPath); err != nil {
 				return err
 			}
 
 			log.Info("Fish starting ORM...")
 			db, err := gorm.Open(sqlite.Open(filepath.Join(dir, "sqlite.db")), &gorm.Config{
-				Logger: logger.New(log.ErrorLogger, logger.Config{
+				Logger: logger.New(log.GetErrorLogger(), logger.Config{
 					SlowThreshold:             500 * time.Millisecond,
 					LogLevel:                  logger.Error,
 					IgnoreRecordNotFoundError: true,
@@ -154,7 +155,7 @@ func main() {
 			}
 
 			log.Info("Fish starting socks5 proxy...")
-			err = proxy_socks.Init(fish, cfg.ProxySocksAddress)
+			err = proxysocks.Init(fish, cfg.ProxySocksAddress)
 			if err != nil {
 				return err
 			}
@@ -164,7 +165,7 @@ func main() {
 			if !filepath.IsAbs(idRsaPath) {
 				idRsaPath = filepath.Join(cfg.Directory, idRsaPath)
 			}
-			err = proxy_ssh.Init(fish, idRsaPath, cfg.ProxySshAddress)
+			err = proxyssh.Init(fish, idRsaPath, cfg.ProxySSHAddress)
 			if err != nil {
 				return err
 			}
@@ -199,7 +200,7 @@ func main() {
 	flags := cmd.Flags()
 	flags.StringVarP(&apiAddress, "api", "a", "", "address used to expose the fish API")
 	flags.StringVar(&proxySocksAddress, "socks_proxy", "", "address used to expose the SOCKS5 proxy")
-	flags.StringVar(&proxySshAddress, "ssh_proxy", "", "address used to expose the SSH proxy")
+	flags.StringVar(&proxySSHAddress, "ssh_proxy", "", "address used to expose the SSH proxy")
 	flags.StringVarP(&nodeAddress, "node", "n", "", "node external endpoint to connect to tell the other nodes")
 	flags.StringVarP(&cfgPath, "cfg", "c", "", "yaml configuration file")
 	flags.StringVarP(&dir, "dir", "D", "", "database and other fish files directory")

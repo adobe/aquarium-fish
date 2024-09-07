@@ -19,6 +19,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
+// Options for testing
 type Options struct {
 	FailOptionsApply      uint8 `json:"fail_options_apply"`      // Fail on options Apply (0 - not, 1-254 random, 255-yes)
 	FailOptionsValidate   uint8 `json:"fail_options_validate"`   // Fail on options Validate (0 - not, 1-254 random, 255-yes)
@@ -26,7 +27,8 @@ type Options struct {
 	FailAllocate          uint8 `json:"fail_allocate"`           // Fail on Allocate (0 - not, 1-254 random, 255-yes)
 }
 
-func (o *Options) Apply(options util.UnparsedJson) error {
+// Apply takes json and applies it to the options structure
+func (o *Options) Apply(options util.UnparsedJSON) error {
 	if err := json.Unmarshal([]byte(options), o); err != nil {
 		return log.Error("TEST: Unable to apply the driver options:", err)
 	}
@@ -38,6 +40,7 @@ func (o *Options) Apply(options util.UnparsedJson) error {
 	return randomFail("OptionsApply", o.FailOptionsApply)
 }
 
+// Validate makes sure the options have the required defaults & that the required fields are set
 func (o *Options) Validate() error {
 	return randomFail("OptionsValidate", o.FailOptionsValidate)
 }

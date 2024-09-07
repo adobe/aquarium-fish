@@ -15,6 +15,7 @@
 //go:generate oapi-codegen -config api_v1.cfg.yaml ../../docs/openapi.yaml
 //go:generate oapi-codegen -config spec.cfg.yaml ../../docs/openapi.yaml
 
+// Package openapi provides generated from OpenAPI spec API framework
 package openapi
 
 import (
@@ -30,7 +31,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
-	_ "github.com/oapi-codegen/oapi-codegen/v2/pkg/util"
+	_ "github.com/oapi-codegen/oapi-codegen/v2/pkg/util" // We need util here otherwise it will not load the needed imports and fail go.mod vetting
 	"gopkg.in/yaml.v3"
 
 	"github.com/adobe/aquarium-fish/lib/fish"
@@ -39,9 +40,11 @@ import (
 	"github.com/adobe/aquarium-fish/lib/openapi/meta"
 )
 
+// YamlBinder is used to decode yaml requests
 type YamlBinder struct{}
 
-func (cb *YamlBinder) Bind(i any, c echo.Context) (err error) {
+// Bind allows to parse Yaml request data
+func (*YamlBinder) Bind(i any, c echo.Context) (err error) {
 	db := &echo.DefaultBinder{}
 	if err = db.Bind(i, c); err != echo.ErrUnsupportedMediaType {
 		return
@@ -64,7 +67,8 @@ func (cb *YamlBinder) Bind(i any, c echo.Context) (err error) {
 	return
 }
 
-func Init(fish *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*http.Server, error) {
+// Init startups the API server to listen for incoming requests
+func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*http.Server, error) {
 	swagger, err := GetSwagger()
 	if err != nil {
 		return nil, fmt.Errorf("Fish OpenAPI: Error loading swagger spec: %w", err)
@@ -85,8 +89,8 @@ func Init(fish *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*http.
 
 	// TODO: Probably it will be a feature an ability to separate those
 	// routers to independence ports if needed
-	meta.NewV1Router(router, fish)
-	api.NewV1Router(router, fish)
+	meta.NewV1Router(router, f)
+	api.NewV1Router(router, f)
 	// TODO: web UI router
 
 	caPool := x509.NewCertPool()

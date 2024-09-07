@@ -41,17 +41,17 @@ import (
 var userCreateLock sync.Mutex
 
 // Returns the total resources available for the node after alteration
-func (d *Driver) getAvailResources() (availCpu, availRam uint) {
-	if d.cfg.CpuAlter < 0 {
-		availCpu = d.totalCpu - uint(-d.cfg.CpuAlter)
+func (d *Driver) getAvailResources() (availCPU, availRAM uint) {
+	if d.cfg.CPUAlter < 0 {
+		availCPU = d.totalCPU - uint(-d.cfg.CPUAlter)
 	} else {
-		availCpu = d.totalCpu + uint(d.cfg.CpuAlter)
+		availCPU = d.totalCPU + uint(d.cfg.CPUAlter)
 	}
 
-	if d.cfg.RamAlter < 0 {
-		availRam = d.totalRam - uint(-d.cfg.RamAlter)
+	if d.cfg.RAMAlter < 0 {
+		availRAM = d.totalRAM - uint(-d.cfg.RAMAlter)
 	} else {
-		availRam = d.totalRam + uint(d.cfg.RamAlter)
+		availRAM = d.totalRAM + uint(d.cfg.RAMAlter)
 	}
 
 	return
@@ -61,14 +61,14 @@ func (d *Driver) getAvailResources() (availCpu, availRam uint) {
 func (d *Driver) loadImages(user string, images []drivers.Image, diskPaths map[string]string) error {
 	var wg sync.WaitGroup
 	for _, image := range images {
-		log.Info("Native: Loading the required image:", image.Name, image.Version, image.Url)
+		log.Info("Native: Loading the required image:", image.Name, image.Version, image.URL)
 
 		// Running the background routine to download, unpack and process the image
 		wg.Add(1)
 		go func(image drivers.Image) {
 			defer wg.Done()
 			if err := image.DownloadUnpack(d.cfg.ImagesPath, d.cfg.DownloadUser, d.cfg.DownloadPassword); err != nil {
-				log.Error("Native: Unable to download and unpack the image:", image.Name, image.Url, err)
+				log.Error("Native: Unable to download and unpack the image:", image.Name, image.URL, err)
 			}
 		}(image)
 	}
@@ -118,9 +118,9 @@ func (d *Driver) loadImages(user string, images []drivers.Image, diskPaths map[s
 		if err != nil {
 			return log.Error("Native: Unable to read the image:", imageArchive, err)
 		}
-		defer f.Close()
 		log.Info("Native: Unpacking image:", user, imageArchive, unpackPath)
 		_, _, err = runAndLog(5*time.Minute, f, d.cfg.SudoPath, "-n", d.cfg.TarPath, "-xf", "-", "--uname", user, "-C", unpackPath+"/")
+		f.Close()
 		if err != nil {
 			return log.Error("Native: Unable to unpack the image:", imageArchive, err)
 		}
@@ -169,22 +169,22 @@ func userCreate(c *Config, groups []string) (user, homedir string, err error) {
 		}
 
 		// Finding the max user id in the OS
-		userId := int64(1000) // Min 1000 is ok for most of the unix systems
+		userID := int64(1000) // Min 1000 is ok for most of the unix systems
 		splitStdout := strings.Split(strings.TrimSpace(stdout), "\n")
 		for _, line := range splitStdout {
-			lineId := line[strings.LastIndex(line, " ")+1:]
-			lineIdNum, err := strconv.ParseInt(lineId, 10, 64)
+			lineID := line[strings.LastIndex(line, " ")+1:]
+			lineIDNum, err := strconv.ParseInt(lineID, 10, 64)
 			if err != nil {
 				log.Warnf("Native: Unable to parse user id from line: %q", line)
 				continue
 			}
-			if lineIdNum > userId {
-				userId = lineIdNum
+			if lineIDNum > userID {
+				userID = lineIDNum
 			}
 		}
 
 		// Increment max user id and use it as unique id for new user
-		if _, _, err = runAndLog(5*time.Second, nil, c.SudoPath, "-n", c.DsclPath, ".", "create", "/Users/"+user, "UniqueID", fmt.Sprint(userId+1)); err != nil {
+		if _, _, err = runAndLog(5*time.Second, nil, c.SudoPath, "-n", c.DsclPath, ".", "create", "/Users/"+user, "UniqueID", fmt.Sprint(userID+1)); err != nil {
 			userCreateLock.Unlock()
 			err = log.Error("Native: Unable to set user UniqueID:", err)
 			return

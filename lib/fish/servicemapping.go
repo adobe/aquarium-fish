@@ -20,10 +20,11 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
+// ServiceMappingFind returns list of ServiceMappings that fits the filter
 func (f *Fish) ServiceMappingFind(filter *string) (sms []types.ServiceMapping, err error) {
 	db := f.db
 	if filter != nil {
-		securedFilter, err := util.ExpressionSqlFilter(*filter)
+		securedFilter, err := util.ExpressionSQLFilter(*filter)
 		if err != nil {
 			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
 			// We do not fail here because we should not give attacker more information
@@ -35,6 +36,7 @@ func (f *Fish) ServiceMappingFind(filter *string) (sms []types.ServiceMapping, e
 	return sms, err
 }
 
+// ServiceMappingCreate makes new ServiceMapping
 func (f *Fish) ServiceMappingCreate(sm *types.ServiceMapping) error {
 	if sm.Service == "" {
 		return fmt.Errorf("Fish: Service can't be empty")
@@ -47,16 +49,19 @@ func (f *Fish) ServiceMappingCreate(sm *types.ServiceMapping) error {
 	return f.db.Create(sm).Error
 }
 
+// ServiceMappingSave stores ServiceMapping
 func (f *Fish) ServiceMappingSave(sm *types.ServiceMapping) error {
 	return f.db.Save(sm).Error
 }
 
+// ServiceMappingGet returns ServiceMapping by UID
 func (f *Fish) ServiceMappingGet(uid types.ServiceMappingUID) (sm *types.ServiceMapping, err error) {
 	sm = &types.ServiceMapping{}
 	err = f.db.First(sm, uid).Error
 	return sm, err
 }
 
+// ServiceMappingDelete removes ServiceMapping
 func (f *Fish) ServiceMappingDelete(uid types.ServiceMappingUID) error {
 	return f.db.Delete(&types.ServiceMapping{}, uid).Error
 }

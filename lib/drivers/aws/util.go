@@ -30,7 +30,7 @@ import (
 func (d *Driver) newEC2Conn() *ec2.Client {
 	return ec2.NewFromConfig(aws.Config{
 		Region: d.cfg.Region,
-		Credentials: aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
+		Credentials: aws.CredentialsProviderFunc(func(_ /*ctx*/ context.Context) (aws.Credentials, error) {
 			return aws.Credentials{
 				AccessKeyID:     d.cfg.KeyID,
 				SecretAccessKey: d.cfg.SecretKey,
@@ -48,7 +48,7 @@ func (d *Driver) newEC2Conn() *ec2.Client {
 func (d *Driver) newKMSConn() *kms.Client {
 	return kms.NewFromConfig(aws.Config{
 		Region: d.cfg.Region,
-		Credentials: aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
+		Credentials: aws.CredentialsProviderFunc(func(_ /*ctx*/ context.Context) (aws.Credentials, error) {
 			return aws.Credentials{
 				AccessKeyID:     d.cfg.KeyID,
 				SecretAccessKey: d.cfg.SecretKey,
@@ -66,7 +66,7 @@ func (d *Driver) newKMSConn() *kms.Client {
 func (d *Driver) newServiceQuotasConn() *servicequotas.Client {
 	return servicequotas.NewFromConfig(aws.Config{
 		Region: d.cfg.Region,
-		Credentials: aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
+		Credentials: aws.CredentialsProviderFunc(func(_ /*ctx*/ context.Context) (aws.Credentials, error) {
 			return aws.Credentials{
 				AccessKeyID:     d.cfg.KeyID,
 				SecretAccessKey: d.cfg.SecretKey,
@@ -84,7 +84,7 @@ func (d *Driver) newServiceQuotasConn() *servicequotas.Client {
 // Will verify and return subnet id
 // In case vpc id was provided - will chose the subnet with less used ip's
 // Returns the found subnet_id, total count of available ip's and error if some
-func (d *Driver) getSubnetId(conn *ec2.Client, idTag string) (string, int64, error) {
+func (d *Driver) getSubnetID(conn *ec2.Client, idTag string) (string, int64, error) {
 	filter := types.Filter{}
 
 	// Check if the tag is provided ("<Key>:<Value>")
@@ -187,10 +187,10 @@ func (d *Driver) getSubnetId(conn *ec2.Client, idTag string) (string, int64, err
 
 	if strings.HasPrefix(idTag, "vpc-") {
 		// Chose the less used subnet in VPC
-		var currCount int32 = 0
-		var totalIpCount int64 = 0
+		var currCount int32
+		var totalIPCount int64
 		for _, subnet := range resp.Subnets {
-			totalIpCount += int64(aws.ToInt32(subnet.AvailableIpAddressCount))
+			totalIPCount += int64(aws.ToInt32(subnet.AvailableIpAddressCount))
 			if currCount < aws.ToInt32(subnet.AvailableIpAddressCount) {
 				idTag = aws.ToString(subnet.SubnetId)
 				currCount = aws.ToInt32(subnet.AvailableIpAddressCount)
@@ -199,7 +199,7 @@ func (d *Driver) getSubnetId(conn *ec2.Client, idTag string) (string, int64, err
 		if currCount == 0 {
 			return "", 0, fmt.Errorf("AWS: Subnets have no available IP addresses")
 		}
-		return idTag, totalIpCount, nil
+		return idTag, totalIPCount, nil
 	} else if idTag != aws.ToString(resp.Subnets[0].SubnetId) {
 		return "", 0, fmt.Errorf("AWS: Unable to verify the subnet id: %q != %q", idTag, aws.ToString(resp.Subnets[0].SubnetId))
 	}
@@ -208,7 +208,7 @@ func (d *Driver) getSubnetId(conn *ec2.Client, idTag string) (string, int64, err
 }
 
 // Will verify and return image id
-func (d *Driver) getImageId(conn *ec2.Client, idName string) (string, error) {
+func (d *Driver) getImageID(conn *ec2.Client, idName string) (string, error) {
 	if strings.HasPrefix(idName, "ami-") {
 		return idName, nil
 	}
@@ -237,7 +237,7 @@ func (d *Driver) getImageId(conn *ec2.Client, idName string) (string, error) {
 	idName = aws.ToString(resp.Images[0].ImageId)
 
 	// Getting the images and find the latest one
-	var foundId string
+	var foundID string
 	var foundTime time.Time
 	for p.HasMorePages() {
 		resp, err := p.NextPage(context.TODO())
@@ -255,21 +255,21 @@ func (d *Driver) getImageId(conn *ec2.Client, idName string) (string, error) {
 				continue
 			}
 			if foundTime.Before(t) {
-				foundId = aws.ToString(r.ImageId)
+				foundID = aws.ToString(r.ImageId)
 				foundTime = t
 			}
 		}
 	}
 
-	if foundId == "" {
+	if foundID == "" {
 		return "", fmt.Errorf("AWS: Unable to locate snapshot with specified tag: %s", idName)
 	}
 
-	return foundId, nil
+	return foundID, nil
 }
 
 // Types are used to calculate some not that obvious values
-func (d *Driver) getTypes(conn *ec2.Client, instanceTypes []string) (map[string]types.InstanceTypeInfo, error) {
+func (*Driver) getTypes(conn *ec2.Client, instanceTypes []string) (map[string]types.InstanceTypeInfo, error) {
 	out := make(map[string]types.InstanceTypeInfo)
 
 	req := ec2.DescribeInstanceTypesInput{}
@@ -299,7 +299,7 @@ func (d *Driver) getTypes(conn *ec2.Client, instanceTypes []string) (map[string]
 }
 
 // Will return latest available image for the instance type
-func (d *Driver) getImageIdByType(conn *ec2.Client, instanceType string) (string, error) {
+func (d *Driver) getImageIDByType(conn *ec2.Client, instanceType string) (string, error) {
 	log.Debug("AWS: Looking an image for type:", instanceType)
 
 	instTypes, err := d.getTypes(conn, []string{instanceType})
@@ -356,18 +356,18 @@ func (d *Driver) getImageIdByType(conn *ec2.Client, instanceType string) (string
 			continue
 		}
 
-		imageId := aws.ToString(resp.Images[0].ImageId)
+		imageID := aws.ToString(resp.Images[0].ImageId)
 
-		log.Debugf("AWS: Found image for specified type %q (arch %s): %s", instanceType, typeArch, imageId)
+		log.Debugf("AWS: Found image for specified type %q (arch %s): %s", instanceType, typeArch, imageID)
 
-		return imageId, nil
+		return imageID, nil
 	}
 
 	return "", fmt.Errorf("AWS: Unable to locate image for type %q (arch %s) till year %d", instanceType, typeArch, imagesTill.Year()+1)
 }
 
 // Will verify and return security group id
-func (d *Driver) getSecGroupId(conn *ec2.Client, idName string) (string, error) {
+func (d *Driver) getSecGroupID(conn *ec2.Client, idName string) (string, error) {
 	if strings.HasPrefix(idName, "sg-") {
 		return idName, nil
 	}
@@ -400,7 +400,7 @@ func (d *Driver) getSecGroupId(conn *ec2.Client, idName string) (string, error) 
 }
 
 // Will verify and return latest snapshot id
-func (d *Driver) getSnapshotId(conn *ec2.Client, idTag string) (string, error) {
+func (d *Driver) getSnapshotID(conn *ec2.Client, idTag string) (string, error) {
 	if strings.HasPrefix(idTag, "snap-") {
 		return idTag, nil
 	}
@@ -428,7 +428,7 @@ func (d *Driver) getSnapshotId(conn *ec2.Client, idTag string) (string, error) {
 	p := ec2.NewDescribeSnapshotsPaginator(conn, &req)
 
 	// Getting the snapshots to find the latest one
-	foundId := ""
+	foundID := ""
 	var foundTime time.Time
 	for p.HasMorePages() {
 		resp, err := p.NextPage(context.TODO())
@@ -440,20 +440,20 @@ func (d *Driver) getSnapshotId(conn *ec2.Client, idTag string) (string, error) {
 		}
 		for _, r := range resp.Snapshots {
 			if foundTime.Before(aws.ToTime(r.StartTime)) {
-				foundId = aws.ToString(r.SnapshotId)
+				foundID = aws.ToString(r.SnapshotId)
 				foundTime = aws.ToTime(r.StartTime)
 			}
 		}
 	}
 
-	if foundId == "" {
+	if foundID == "" {
 		return "", fmt.Errorf("AWS: Unable to locate snapshot with specified tag: %s", idTag)
 	}
 
-	return foundId, nil
+	return foundID, nil
 }
 
-func (d *Driver) getProjectCpuUsage(conn *ec2.Client, instTypes []string) (int64, error) {
+func (*Driver) getProjectCPUUsage(conn *ec2.Client, instTypes []string) (int64, error) {
 	var cpuCount int64
 
 	// Here is no way to use some filter, so we're getting them all and after that
@@ -488,12 +488,12 @@ func (d *Driver) getProjectCpuUsage(conn *ec2.Client, instTypes []string) (int64
 	return cpuCount, nil
 }
 
-func (d *Driver) getInstance(conn *ec2.Client, instId string) (*types.Instance, error) {
+func (*Driver) getInstance(conn *ec2.Client, instID string) (*types.Instance, error) {
 	input := ec2.DescribeInstancesInput{
 		Filters: []types.Filter{
 			{
 				Name:   aws.String("instance-id"),
-				Values: []string{instId},
+				Values: []string{instID},
 			},
 		},
 	}
@@ -509,7 +509,7 @@ func (d *Driver) getInstance(conn *ec2.Client, instId string) (*types.Instance, 
 }
 
 // Will get the kms key id based on alias if it's specified
-func (d *Driver) getKeyId(idAlias string) (string, error) {
+func (d *Driver) getKeyID(idAlias string) (string, error) {
 	if !strings.HasPrefix(idAlias, "alias/") {
 		return idAlias, nil
 	}
@@ -605,20 +605,20 @@ func awsInstTypeAny(val string, options ...string) bool {
  * Creates and immediately terminates instance to trigger scrubbing process on mac hosts.
  * Used during mac dedicated hosts pool management to deal with 24h limit to save on budget.
  */
-func (d *Driver) triggerHostScrubbing(hostId, instanceType string) (err error) {
+func (d *Driver) triggerHostScrubbing(hostID, instanceType string) (err error) {
 	conn := d.newEC2Conn()
 
 	// Just need an image, which we could find by looking at the host instance type
 	var vmImage string
-	if vmImage, err = d.getImageIdByType(conn, instanceType); err != nil {
-		return fmt.Errorf("AWS: scrubbing %s: Unable to find image: %v", hostId, err)
+	if vmImage, err = d.getImageIDByType(conn, instanceType); err != nil {
+		return fmt.Errorf("AWS: scrubbing %s: Unable to find image: %v", hostID, err)
 	}
-	log.Infof("AWS: scrubbing %s: Selected image: %q", hostId, vmImage)
+	log.Infof("AWS: scrubbing %s: Selected image: %q", hostID, vmImage)
 
 	// Prepare Instance request information
 	placement := types.Placement{
 		Tenancy: types.TenancyHost,
-		HostId:  aws.String(hostId),
+		HostId:  aws.String(hostID),
 	}
 	input := ec2.RunInstancesInput{
 		ImageId:      aws.String(vmImage),
@@ -634,10 +634,10 @@ func (d *Driver) triggerHostScrubbing(hostId, instanceType string) (err error) {
 	// Run the instance
 	result, err := conn.RunInstances(context.TODO(), &input)
 	if err != nil {
-		return log.Errorf("AWS: scrubbing %s: Unable to run instance: %v", hostId, err)
+		return log.Errorf("AWS: scrubbing %s: Unable to run instance: %v", hostID, err)
 	}
 
-	instId := aws.ToString(result.Instances[0].InstanceId)
+	instID := aws.ToString(result.Instances[0].InstanceId)
 
 	// Don't need to wait - let's terminate the instance right away
 	// We need to terminate no matter wat - so repeating until it will be terminated, otherwise
@@ -645,18 +645,18 @@ func (d *Driver) triggerHostScrubbing(hostId, instanceType string) (err error) {
 
 	for {
 		input := ec2.TerminateInstancesInput{
-			InstanceIds: []string{instId},
+			InstanceIds: []string{instID},
 		}
 
 		result, err := conn.TerminateInstances(context.TODO(), &input)
 		if err != nil || len(result.TerminatingInstances) < 1 {
-			log.Errorf("AWS: scrubbing %s: Error during termianting the instance %s: %s", hostId, instId, err)
+			log.Errorf("AWS: scrubbing %s: Error during termianting the instance %s: %s", hostID, instID, err)
 			time.Sleep(10 * time.Second)
 			continue
 		}
 
-		if aws.ToString(result.TerminatingInstances[0].InstanceId) != instId {
-			log.Errorf("AWS: scrubbing %s: Wrong instance id result %s during terminating of %s", hostId, aws.ToString(result.TerminatingInstances[0].InstanceId), instId)
+		if aws.ToString(result.TerminatingInstances[0].InstanceId) != instID {
+			log.Errorf("AWS: scrubbing %s: Wrong instance id result %s during terminating of %s", hostID, aws.ToString(result.TerminatingInstances[0].InstanceId), instID)
 			time.Sleep(10 * time.Second)
 			continue
 		}
@@ -664,7 +664,7 @@ func (d *Driver) triggerHostScrubbing(hostId, instanceType string) (err error) {
 		break
 	}
 
-	log.Infof("AWS: scrubbing %s: Scrubbing process was triggered", hostId)
+	log.Infof("AWS: scrubbing %s: Scrubbing process was triggered", hostID)
 
 	return nil
 }

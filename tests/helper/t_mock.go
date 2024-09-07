@@ -18,7 +18,7 @@ import (
 	"testing"
 )
 
-// Useful to capture the failed test
+// MockT is useful to capture the failed test
 type MockT struct {
 	testing.T
 
@@ -27,29 +27,35 @@ type MockT struct {
 	t *testing.T
 }
 
+// FailNow when it's the right time
 func (m *MockT) FailNow() {
 	m.FailNowCalled = true
 	runtime.Goexit()
 }
 
+// Log message
 func (m *MockT) Log(args ...any) {
 	m.t.Log(args...)
 }
 
+// Logf message
 func (m *MockT) Logf(format string, args ...any) {
 	m.t.Logf(format, args...)
 }
 
+// Fatal message
 func (m *MockT) Fatal(args ...any) {
 	m.t.Log(args...)
 	m.FailNow()
 }
 
+// Fatalf message
 func (m *MockT) Fatalf(format string, args ...any) {
 	m.t.Logf(format, args...)
 	m.FailNow()
 }
 
+// xpectFailure when failure expected
 func ExpectFailure(t *testing.T, f func(tt testing.TB)) {
 	t.Helper()
 	var wg sync.WaitGroup

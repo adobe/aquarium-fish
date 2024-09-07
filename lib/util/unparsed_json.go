@@ -18,20 +18,23 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type UnparsedJson string
+// UnparsedJSON is used to store json as is and not parse it until the right time
+type UnparsedJSON string
 
-func (r UnparsedJson) MarshalJSON() ([]byte, error) {
+// MarshalJSON represents UnparsedJson as bytes
+func (r UnparsedJSON) MarshalJSON() ([]byte, error) {
 	return []byte(r), nil
 }
 
-func (r *UnparsedJson) UnmarshalJSON(b []byte) error {
+// UnmarshalJSON converts bytes to UnparsedJson
+func (r *UnparsedJSON) UnmarshalJSON(b []byte) error {
 	// Store json as string
-	*r = UnparsedJson(b)
+	*r = UnparsedJSON(b)
 	return nil
 }
 
-// To properly convert incoming yaml requests into json
-func (r *UnparsedJson) UnmarshalYAML(node *yaml.Node) error {
+// UnmarshalYAML is needed to properly convert incoming yaml requests into json
+func (r *UnparsedJSON) UnmarshalYAML(node *yaml.Node) error {
 	var value any
 	if err := node.Decode(&value); err != nil {
 		return err

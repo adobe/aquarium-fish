@@ -35,14 +35,16 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
-// Implements drivers.ResourceDriverFactory interface
+// Factory implements drivers.ResourceDriverFactory interface
 type Factory struct{}
 
-func (f *Factory) Name() string {
+// Name shows name of the driver factory
+func (*Factory) Name() string {
 	return "aws"
 }
 
-func (f *Factory) NewResourceDriver() drivers.ResourceDriver {
+// NewResourceDriver creates new resource driver
+func (*Factory) NewResourceDriver() drivers.ResourceDriver {
 	return &Driver{}
 }
 
@@ -50,7 +52,7 @@ func init() {
 	drivers.FactoryList = append(drivers.FactoryList, &Factory{})
 }
 
-// Implements drivers.ResourceDriver interface
+// Driver implements drivers.ResourceDriver interface
 type Driver struct {
 	cfg Config
 	// Contains the available tasks of the driver
@@ -64,14 +66,17 @@ type Driver struct {
 	dedicatedPools map[string]*dedicatedPoolWorker
 }
 
-func (d *Driver) Name() string {
+// Name returns name of the driver
+func (*Driver) Name() string {
 	return "aws"
 }
 
-func (d *Driver) IsRemote() bool {
+// IsRemote needed to detect the out-of-node resources managed by this driver
+func (*Driver) IsRemote() bool {
 	return true
 }
 
+// Prepare initializes the driver
 func (d *Driver) Prepare(config []byte) error {
 	if err := d.cfg.Apply(config); err != nil {
 		return err
@@ -112,7 +117,8 @@ func (d *Driver) Prepare(config []byte) error {
 	return nil
 }
 
-func (d *Driver) ValidateDefinition(def types.LabelDefinition) error {
+// ValidateDefinition checks LabelDefinition is ok
+func (*Driver) ValidateDefinition(def types.LabelDefinition) error {
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
 		return err
@@ -126,8 +132,8 @@ func (d *Driver) ValidateDefinition(def types.LabelDefinition) error {
 	return nil
 }
 
-// Allow Fish to ask the driver about it's capacity (free slots) of a specific definition
-func (d *Driver) AvailableCapacity(nodeUsage types.Resources, def types.LabelDefinition) int64 {
+// AvailableCapacity allows Fish to ask the driver about it's capacity (free slots) of a specific definition
+func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ types.Resources, def types.LabelDefinition) int64 {
 	var instCount int64
 
 	var opts Options
@@ -223,7 +229,7 @@ func (d *Driver) AvailableCapacity(nodeUsage types.Resources, def types.LabelDef
 		}
 
 		// Checking the current usage of CPU's of this project and subtracting it from quota value
-		cpuUsage, err := d.getProjectCpuUsage(connEc2, instTypes)
+		cpuUsage, err := d.getProjectCPUUsage(connEc2, instTypes)
 		if err != nil {
 			return -1
 		}
@@ -236,7 +242,7 @@ func (d *Driver) AvailableCapacity(nodeUsage types.Resources, def types.LabelDef
 	// Make sure we have enough IP's in the selected VPC or subnet
 	var ipCount int64
 	var err error
-	if _, ipCount, err = d.getSubnetId(connEc2, def.Resources.Network); err != nil {
+	if _, ipCount, err = d.getSubnetID(connEc2, def.Resources.Network); err != nil {
 		log.Error("AWS: Error during requesting subnet:", err)
 		return -1
 	}
@@ -250,12 +256,10 @@ func (d *Driver) AvailableCapacity(nodeUsage types.Resources, def types.LabelDef
 	return instCount
 }
 
-/**
- * Allocate Instance with provided image
- *
- * It selects the AMI and run instance
- * Uses metadata to fill EC2 instance userdata
- */
+// Allocate Instance with provided image
+//
+// It selects the AMI and run instance
+// Uses metadata to fill EC2 instance userdata
 func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*types.Resource, error) {
 	// Generate fish name
 	buf := crypt.RandBytes(6)
@@ -271,13 +275,13 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 	// Checking the VPC exists or use default one
 	vmNetwork := def.Resources.Network
 	var err error
-	if vmNetwork, _, err = d.getSubnetId(conn, vmNetwork); err != nil {
+	if vmNetwork, _, err = d.getSubnetID(conn, vmNetwork); err != nil {
 		return nil, fmt.Errorf("AWS: %s: Unable to get subnet: %v", iName, err)
 	}
 	log.Infof("AWS: %s: Selected subnet: %q", iName, vmNetwork)
 
 	vmImage := opts.Image
-	if vmImage, err = d.getImageId(conn, vmImage); err != nil {
+	if vmImage, err = d.getImageID(conn, vmImage); err != nil {
 		return nil, fmt.Errorf("AWS: %s: Unable to get image: %v", iName, err)
 	}
 	log.Infof("AWS: %s: Selected image: %q", iName, vmImage)
@@ -302,19 +306,20 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 
 	if opts.Pool != "" {
 		// Let's reserve or allocate the host for the new instance
-		if p, ok := d.dedicatedPools[opts.Pool]; ok {
-			hostId := p.ReserveAllocateHost(opts.InstanceType)
-			if hostId == "" {
-				return nil, fmt.Errorf("AWS: %s: Unable to reserve host in dedicated pool %q", iName, opts.Pool)
-			}
-			input.Placement = &ec2types.Placement{
-				Tenancy: ec2types.TenancyHost,
-				HostId:  aws.String(hostId),
-			}
-			log.Infof("AWS: %s: Utilizing pool %q host: %s", iName, opts.Pool, hostId)
-		} else {
+		p, ok := d.dedicatedPools[opts.Pool]
+		if !ok {
 			return nil, fmt.Errorf("AWS: %s: Unable to locate the dedicated pool: %s", iName, opts.Pool)
 		}
+
+		hostID := p.ReserveAllocateHost(opts.InstanceType)
+		if hostID == "" {
+			return nil, fmt.Errorf("AWS: %s: Unable to reserve host in dedicated pool %q", iName, opts.Pool)
+		}
+		input.Placement = &ec2types.Placement{
+			Tenancy: ec2types.TenancyHost,
+			HostId:  aws.String(hostID),
+		}
+		log.Infof("AWS: %s: Utilizing pool %q host: %s", iName, opts.Pool, hostID)
 	} else if awsInstTypeAny(opts.InstanceType, "mac") {
 		// For mac machines only dedicated hosts are working, so set the tenancy
 		input.Placement = &ec2types.Placement{
@@ -333,7 +338,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 
 	if opts.SecurityGroup != "" {
 		vmSecgroup := opts.SecurityGroup
-		if vmSecgroup, err = d.getSecGroupId(conn, vmSecgroup); err != nil {
+		if vmSecgroup, err = d.getSecGroupID(conn, vmSecgroup); err != nil {
 			return nil, fmt.Errorf("AWS: %s: Unable to get security group: %v", iName, err)
 		}
 		log.Infof("AWS: %s: Selected security group: %q", iName, vmSecgroup)
@@ -404,7 +409,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 			if disk.Clone != "" {
 				// Use snapshot as the disk source
 				vmSnapshot := disk.Clone
-				if vmSnapshot, err = d.getSnapshotId(conn, vmSnapshot); err != nil {
+				if vmSnapshot, err = d.getSnapshotID(conn, vmSnapshot); err != nil {
 					return nil, fmt.Errorf("AWS: %s: Unable to get snapshot: %v", iName, err)
 				}
 				log.Infof("AWS: %s: Selected snapshot: %q", iName, vmSnapshot)
@@ -414,12 +419,12 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 				mapping.Ebs.VolumeSize = aws.Int32(int32(disk.Size))
 				if opts.EncryptKey != "" {
 					mapping.Ebs.Encrypted = aws.Bool(true)
-					keyId, err := d.getKeyId(opts.EncryptKey)
+					keyID, err := d.getKeyID(opts.EncryptKey)
 					if err != nil {
 						return nil, fmt.Errorf("AWS: %s: Unable to get encrypt key from KMS: %v", iName, err)
 					}
-					log.Infof("AWS: %s: Selected encryption key: %q for disk: %q", iName, keyId, name)
-					mapping.Ebs.KmsKeyId = aws.String(keyId)
+					log.Infof("AWS: %s: Selected encryption key: %q for disk: %q", iName, keyID, name)
+					mapping.Ebs.KmsKeyId = aws.String(keyID)
 				}
 			}
 			input.BlockDeviceMappings = append(input.BlockDeviceMappings, mapping)
@@ -517,6 +522,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 	return res, log.Errorf("AWS: %s: Unable to locate the instance IP: %q", iName, aws.ToString(inst.InstanceId))
 }
 
+// Status shows status of the resource
 func (d *Driver) Status(res *types.Resource) (string, error) {
 	if res == nil || res.Identifier == "" {
 		return "", fmt.Errorf("AWS: Invalid resource: %v", res)
@@ -532,6 +538,7 @@ func (d *Driver) Status(res *types.Resource) (string, error) {
 	return drivers.StatusNone, nil
 }
 
+// GetTask returns task struct by name
 func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
 	// Look for the specified task name
 	var t drivers.ResourceDriverTask
@@ -552,6 +559,7 @@ func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
 	return t
 }
 
+// Deallocate the resource
 func (d *Driver) Deallocate(res *types.Resource) error {
 	if res == nil || res.Identifier == "" {
 		return fmt.Errorf("AWS: Invalid resource: %v", res)

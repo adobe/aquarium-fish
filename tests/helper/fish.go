@@ -26,7 +26,7 @@ import (
 
 var fishPath = os.Getenv("FISH_PATH") // Full path to the aquarium-fish binary
 
-// Saves state of the running Aquarium Fish for particular test
+// AFInstance saves state of the running Aquarium Fish for particular test
 type AFInstance struct {
 	workspace string
 	fishKill  context.CancelFunc
@@ -38,7 +38,7 @@ type AFInstance struct {
 	adminToken string
 }
 
-// Simple creates and run the fish node
+// NewAquariumFish simple creates and run the fish node
 func NewAquariumFish(tb testing.TB, name, cfg string, args ...string) *AFInstance {
 	tb.Helper()
 	afi := NewAfInstance(tb, name, cfg)
@@ -47,7 +47,7 @@ func NewAquariumFish(tb testing.TB, name, cfg string, args ...string) *AFInstanc
 	return afi
 }
 
-// If you need to create instance without starting it up right away
+// NewAfInstance helpful if you need to create instance without starting it up right away
 func NewAfInstance(tb testing.TB, name, cfg string) *AFInstance {
 	tb.Helper()
 	tb.Log("INFO: Creating new node:", name)
@@ -65,55 +65,55 @@ func NewAfInstance(tb testing.TB, name, cfg string) *AFInstance {
 	return afi
 }
 
-// Start another node of cluster
+// NewClusterNode starts another node of cluster
 // It will automatically add cluster_join parameter to the config
-func (afi1 *AFInstance) NewClusterNode(tb testing.TB, name, cfg string, args ...string) *AFInstance {
+func (afi *AFInstance) NewClusterNode(tb testing.TB, name, cfg string, args ...string) *AFInstance {
 	tb.Helper()
-	afi2 := afi1.NewAfInstanceCluster(tb, name, cfg)
+	afi2 := afi.NewAfInstanceCluster(tb, name, cfg)
 	afi2.Start(tb, args...)
 
 	return afi2
 }
 
-// Just create the node based on the existing cluster node
-func (afi1 *AFInstance) NewAfInstanceCluster(tb testing.TB, name, cfg string) *AFInstance {
+// NewAfInstanceCluster just creates the node based on the existing cluster node
+func (afi *AFInstance) NewAfInstanceCluster(tb testing.TB, name, cfg string) *AFInstance {
 	tb.Helper()
-	tb.Log("INFO: Creating new cluster node with seed node:", afi1.nodeName)
-	cfg += fmt.Sprintf("\ncluster_join: [%q]", afi1.endpoint)
+	tb.Log("INFO: Creating new cluster node with seed node:", afi.nodeName)
+	cfg += fmt.Sprintf("\ncluster_join: [%q]", afi.endpoint)
 	afi2 := NewAfInstance(tb, name, cfg)
 
 	// Copy seed node CA to generate valid cluster node cert
-	if err := CopyFile(filepath.Join(afi1.workspace, "fish_data", "ca.key"), filepath.Join(afi2.workspace, "fish_data", "ca.key")); err != nil {
+	if err := CopyFile(filepath.Join(afi.workspace, "fish_data", "ca.key"), filepath.Join(afi2.workspace, "fish_data", "ca.key")); err != nil {
 		tb.Fatalf("ERROR: Unable to copy CA key: %v", err)
 	}
-	if err := CopyFile(filepath.Join(afi1.workspace, "fish_data", "ca.crt"), filepath.Join(afi2.workspace, "fish_data", "ca.crt")); err != nil {
+	if err := CopyFile(filepath.Join(afi.workspace, "fish_data", "ca.crt"), filepath.Join(afi2.workspace, "fish_data", "ca.crt")); err != nil {
 		tb.Fatalf("ERROR: Unable to copy CA crt: %v", err)
 	}
 
 	return afi2
 }
 
-// Will return just IP:PORT
+// Endpoint will return IP:PORT
 func (afi *AFInstance) Endpoint() string {
 	return afi.endpoint
 }
 
-// Will return url to access API of AquariumFish
-func (afi *AFInstance) ApiAddress(path string) string {
+// APIAddress will return url to access API of AquariumFish
+func (afi *AFInstance) APIAddress(path string) string {
 	return fmt.Sprintf("https://%s/%s", afi.endpoint, path)
 }
 
-// Will return workspace of the AquariumFish
+// Workspace will return workspace of the AquariumFish
 func (afi *AFInstance) Workspace() string {
 	return afi.workspace
 }
 
-// Returns admin token
+// AdminToken returns admin token
 func (afi *AFInstance) AdminToken() string {
 	return afi.adminToken
 }
 
-// Check the fish instance is running
+// IsRunning checks the fish instance is running
 func (afi *AFInstance) IsRunning() bool {
 	return afi.running
 }
@@ -134,7 +134,7 @@ func (afi *AFInstance) Cleanup(tb testing.TB) {
 	os.RemoveAll(afi.workspace)
 }
 
-// Stops the fish node executable
+// Stop the fish node executable
 func (afi *AFInstance) Stop(tb testing.TB) {
 	tb.Helper()
 	if afi.cmd == nil || !afi.running {
@@ -156,7 +156,7 @@ func (afi *AFInstance) Stop(tb testing.TB) {
 	afi.fishKill()
 }
 
-// Starts the fish node executable
+// Start the fish node executable
 func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 	tb.Helper()
 	if afi.running {

@@ -19,7 +19,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/log"
 )
 
-// Wraps an existing io.Reader to monitor the stream
+// PassThruMonitor wraps an existing io.Reader to monitor the stream
 //
 // It simply forwards the Read() call, while displaying
 // the results from individual calls to it.

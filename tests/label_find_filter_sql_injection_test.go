@@ -62,7 +62,7 @@ drivers:
 	t.Run("Create Label 1", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Post(afi.ApiAddress("api/v1/label/")).
+			Post(afi.APIAddress("api/v1/label/")).
 			JSON(`{"name":"test-label1", "version":1, "definitions": [{"driver":"test", "resources":{"cpu":1,"ram":2}}]}`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
@@ -79,7 +79,7 @@ drivers:
 	t.Run("Create Label 2", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Post(afi.ApiAddress("api/v1/label/")).
+			Post(afi.APIAddress("api/v1/label/")).
 			JSON(`{"name":"test-label2", "version":1, "definitions": [{"driver":"test", "resources":{"cpu":1,"ram":2}}]}`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
@@ -96,7 +96,7 @@ drivers:
 	t.Run("Find Label 1 with simple SQL injection", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Get(afi.ApiAddress("api/v1/label/")).
+			Get(afi.APIAddress("api/v1/label/")).
 			Query("filter", `name = '`+label1.Name+`'; DROP label`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
@@ -115,7 +115,7 @@ drivers:
 	t.Run("Find no labels with subquery SQL injection", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Get(afi.ApiAddress("api/v1/label/")).
+			Get(afi.APIAddress("api/v1/label/")).
 			Query("filter", `name IN (DROP label)`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
@@ -131,7 +131,7 @@ drivers:
 	t.Run("Find no labels with stupid SQL injection", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Get(afi.ApiAddress("api/v1/label/")).
+			Get(afi.APIAddress("api/v1/label/")).
 			Query("filter", `DROP label`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
@@ -147,7 +147,7 @@ drivers:
 	t.Run("Find Label 1", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Get(afi.ApiAddress("api/v1/label/")).
+			Get(afi.APIAddress("api/v1/label/")).
 			Query("filter", `name='`+label1.Name+`'`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
@@ -166,7 +166,7 @@ drivers:
 	t.Run("Find Label 2", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Get(afi.ApiAddress("api/v1/label/")).
+			Get(afi.APIAddress("api/v1/label/")).
 			Query("filter", `name = '`+label2.Name+`'`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
@@ -185,7 +185,7 @@ drivers:
 	t.Run("Find all labels with LIKE", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Get(afi.ApiAddress("api/v1/label/")).
+			Get(afi.APIAddress("api/v1/label/")).
 			Query("filter", `name LIKE 'test-label%'`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
@@ -201,7 +201,7 @@ drivers:
 	t.Run("Find all labels with IN", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Get(afi.ApiAddress("api/v1/label/")).
+			Get(afi.APIAddress("api/v1/label/")).
 			Query("filter", `name IN ('`+label1.Name+`', '`+label2.Name+`')`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).

@@ -10,20 +10,23 @@
  * governing permissions and limitations under the License.
  */
 
+// Package drivers implements interface for each driver (resource provider)
 package drivers
 
 import (
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
+// Status of the driver returned by Status()
 const (
 	StatusNone      = "NONE"
 	StatusAllocated = "ALLOCATED"
 )
 
+// FactoryList is a list of available drivers factories
 var FactoryList []ResourceDriverFactory
 
-// Factory allows to generate new instances of the drivers
+// ResourceDriverFactory allows to generate new instances of the drivers
 type ResourceDriverFactory interface {
 	// Name of the driver
 	Name() string
@@ -32,6 +35,7 @@ type ResourceDriverFactory interface {
 	NewResourceDriver() ResourceDriver
 }
 
+// ResourceDriver interface of the functions that connects Fish to each driver
 type ResourceDriver interface {
 	// Name of the driver
 	Name() string

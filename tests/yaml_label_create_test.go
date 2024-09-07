@@ -61,7 +61,7 @@ drivers:
 	t.Run("Create & check YAML Label", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Post(afi.ApiAddress("api/v1/label/")).
+			Post(afi.APIAddress("api/v1/label/")).
 			Header("Content-Type", "application/yaml").
 			Body(`---
 name: test-label

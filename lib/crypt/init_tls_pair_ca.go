@@ -29,7 +29,8 @@ import (
 	"time"
 )
 
-func InitTlsPairCa(hosts []string, caPath, keyPath, crtPath string) error {
+// InitTLSPairCa creates a pair of asymmetric keys and CA if needed
+func InitTLSPairCa(hosts []string, caPath, keyPath, crtPath string) error {
 	// Generates simple CA and Node certificate signed by the CA
 	_, caErr := os.Stat(caPath)
 	if os.IsNotExist(caErr) {
@@ -98,22 +99,20 @@ func generateSimpleCa(keyPath, crtPath string) error {
 	}
 
 	// Create private key file
-	if err := createKey(keyPath, priv); err != nil {
-		return err
-	}
+	err = createKey(keyPath, priv)
 
-	return nil
+	return err
 }
 
 func generateSimpleKeyCert(hosts []string, keyPath, crtPath, caPath string) error {
 	// Load the CA key and cert
-	caTls, err := tls.LoadX509KeyPair(caPath, getCaKeyFromCertPath(caPath))
+	caTLS, err := tls.LoadX509KeyPair(caPath, getCaKeyFromCertPath(caPath))
 	if err != nil {
 		return err
 	}
-	caKey := caTls.PrivateKey
+	caKey := caTLS.PrivateKey
 
-	caCrt, err := x509.ParseCertificate(caTls.Certificate[0])
+	caCrt, err := x509.ParseCertificate(caTLS.Certificate[0])
 	if err != nil {
 		return err
 	}
@@ -165,11 +164,9 @@ func generateSimpleKeyCert(hosts []string, keyPath, crtPath, caPath string) erro
 	}
 
 	// Create private key file
-	if err := createKey(keyPath, priv); err != nil {
-		return err
-	}
+	err = createKey(keyPath, priv)
 
-	return nil
+	return err
 }
 
 func createCert(crtPath string, pubkey crypto.PublicKey, caKey crypto.PrivateKey, cert, caCrt *x509.Certificate) error {
@@ -210,9 +207,8 @@ func createKey(keyPath string, key crypto.PrivateKey) error {
 	if err != nil {
 		return err
 	}
-	if err := pem.Encode(keyOut, &pem.Block{Type: "PRIVATE KEY", Bytes: privBytes}); err != nil {
-		return err
-	}
 
-	return nil
+	err = pem.Encode(keyOut, &pem.Block{Type: "PRIVATE KEY", Bytes: privBytes})
+
+	return err
 }

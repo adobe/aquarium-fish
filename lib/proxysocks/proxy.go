@@ -10,7 +10,8 @@
  * governing permissions and limitations under the License.
  */
 
-package proxy_socks
+// Package proxysocks implements socks5 proxy that could be used by the Resource VM to reach outside world
+package proxysocks
 
 import (
 	"net"
@@ -22,18 +23,22 @@ import (
 	"github.com/adobe/aquarium-fish/lib/log"
 )
 
+// ResolverSkip is needed to skip the resolving
 type ResolverSkip struct{}
 
-func (d ResolverSkip) Resolve(ctx context.Context, name string) (context.Context, net.IP, error) {
+// Resolve function makes skip possible
+func (ResolverSkip) Resolve(ctx context.Context, _ /*name*/ string) (context.Context, net.IP, error) {
 	// It's impossible to verify the access of the client
 	// and determine the service mapping here so skipping this step
 	return ctx, net.IP{}, nil
 }
 
+// ProxyAccess configuration to store context while processing the proxy request
 type ProxyAccess struct {
 	fish *fish.Fish
 }
 
+// Allow will be executed to allow or deny proxy request
 func (p *ProxyAccess) Allow(ctx context.Context, req *socks5.Request) (context.Context, bool) {
 	log.Debug("Proxy: Requested proxy from", req.RemoteAddr, "to", req.DestAddr)
 
@@ -49,7 +54,7 @@ func (p *ProxyAccess) Allow(ctx context.Context, req *socks5.Request) (context.C
 	if dest == "" {
 		dest = req.DestAddr.IP.String()
 	}
-	overDest := p.fish.ResourceServiceMapping(res, dest)
+	overDest := p.fish.ResourceServiceMappingByApplicationAndDest(res.ApplicationUID, dest)
 	if overDest == "" {
 		log.Warn("Proxy: Denied proxy from", req.RemoteAddr, "to", req.DestAddr)
 		return ctx, false
@@ -71,10 +76,11 @@ func (p *ProxyAccess) Allow(ctx context.Context, req *socks5.Request) (context.C
 	return ctx, true
 }
 
-func Init(fish *fish.Fish, address string) error {
+// Init will start the socks5 proxy server
+func Init(f *fish.Fish, address string) error {
 	conf := &socks5.Config{
-		Resolver: &ResolverSkip{},    // Skipping the resolver phase until access checked
-		Rules:    &ProxyAccess{fish}, // Allow only known resources to access proxy
+		Resolver: &ResolverSkip{}, // Skipping the resolver phase until access checked
+		Rules:    &ProxyAccess{f}, // Allow only known resources to access proxy
 	}
 
 	server, err := socks5.New(conf)

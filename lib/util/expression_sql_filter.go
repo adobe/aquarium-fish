@@ -18,13 +18,13 @@ import (
 	"github.com/rqlite/sql"
 )
 
-// Ensures the where filter doesn't contain bad things (SQL injections) and returns a good one
-// could be used as Where() in gorm. It expects just an expression, so no other SQL keys will work
+// ExpressionSQLFilter ensures the where filter doesn't contain bad things (SQL injections) and returns a
+// good one could be used as Where() in gorm. It expects just an expression, so no other SQL keys will work
 // here. For example:
 // * `id=1 AND a in (1,2) ORDER BY i; DROP u;` will become just `"id" = 1 AND "a" IN (1, 2)`
 // * `DROP users` - will fail
 // * `id = 1 OR lol in (SELECT * FROM users)` - will fail
-func ExpressionSqlFilter(filter string) (string, error) {
+func ExpressionSQLFilter(filter string) (string, error) {
 	reader := strings.NewReader(filter)
 	exp, err := sql.NewParser(reader).ParseExpr()
 	if err != nil {

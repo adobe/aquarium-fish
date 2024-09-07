@@ -10,6 +10,7 @@
  * governing permissions and limitations under the License.
  */
 
+// Package helper makes our integration tests easier
 package helper
 
 import (
@@ -18,7 +19,7 @@ import (
 	"path/filepath"
 )
 
-// Copy files around
+// CopyFile will copy files around
 func CopyFile(src, dst string) error {
 	fin, err := os.Open(src)
 	if err != nil {

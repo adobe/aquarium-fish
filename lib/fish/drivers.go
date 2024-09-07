@@ -25,12 +25,14 @@ import (
 	_ "github.com/adobe/aquarium-fish/lib/drivers/native"
 	_ "github.com/adobe/aquarium-fish/lib/drivers/vmx"
 
+	// Importing test driver
 	_ "github.com/adobe/aquarium-fish/lib/drivers/test"
 )
 
 var driversInstances map[string]drivers.ResourceDriver
 
-func (f *Fish) DriverGet(name string) drivers.ResourceDriver {
+// driverGet returns specific driver by name
+func (*Fish) driverGet(name string) drivers.ResourceDriver {
 	if driversInstances == nil {
 		log.Error("Fish: Resource drivers are not initialized to request the driver instance:", name)
 		return nil
@@ -39,8 +41,8 @@ func (f *Fish) DriverGet(name string) drivers.ResourceDriver {
 	return drv
 }
 
-// Making the drivers instances map with specified names
-func (f *Fish) DriversSet() error {
+// driversSet making the drivers instances map with specified names
+func (f *Fish) driversSet() error {
 	instances := make(map[string]drivers.ResourceDriver)
 
 	if len(f.cfg.Drivers) == 0 {
@@ -71,7 +73,8 @@ func (f *Fish) DriversSet() error {
 	return nil
 }
 
-func (f *Fish) DriversPrepare(configs []ConfigDriver) (errs []error) {
+// driversPrepare initializes the drivers with provided configs
+func (*Fish) driversPrepare(configs []ConfigDriver) (errs []error) {
 	activatedDriversInstances := make(map[string]drivers.ResourceDriver)
 	for name, drv := range driversInstances {
 		// Looking for the driver config

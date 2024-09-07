@@ -30,12 +30,12 @@ import (
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
-func (d *Driver) getContainersResources(containerIds []string) (types.Resources, error) {
+func (d *Driver) getContainersResources(containerIDs []string) (types.Resources, error) {
 	var out types.Resources
 
 	// Getting current running containers info - will return "<ncpu>,<mem_bytes>\n..." for each one
 	dockerArgs := []string{"inspect", "--format", "{{ .HostConfig.NanoCpus }},{{ .HostConfig.Memory }}"}
-	dockerArgs = append(dockerArgs, containerIds...)
+	dockerArgs = append(dockerArgs, containerIDs...)
 	stdout, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, dockerArgs...)
 	if err != nil {
 		return out, fmt.Errorf("Docker: Unable to inspect the containers to get used resources: %v", err)
@@ -47,19 +47,19 @@ func (d *Driver) getContainersResources(containerIds []string) (types.Resources,
 		if len(cpuMem) < 2 {
 			return out, fmt.Errorf("Docker: Not enough info values in return: %q", resList)
 		}
-		resCpu, err := strconv.ParseUint(cpuMem[0], 10, 64)
+		resCPU, err := strconv.ParseUint(cpuMem[0], 10, 64)
 		if err != nil {
 			return out, fmt.Errorf("Docker: Unable to parse CPU uint: %v (%q)", err, cpuMem[0])
 		}
-		resRam, err := strconv.ParseUint(cpuMem[1], 10, 64)
+		resRAM, err := strconv.ParseUint(cpuMem[1], 10, 64)
 		if err != nil {
 			return out, fmt.Errorf("Docker: Unable to parse RAM uint: %v (%q)", err, cpuMem[1])
 		}
-		if resCpu == 0 || resRam == 0 {
-			return out, fmt.Errorf("Docker: The container is non-Fish controlled zero-cpu/ram ones: %q", containerIds)
+		if resCPU == 0 || resRAM == 0 {
+			return out, fmt.Errorf("Docker: The container is non-Fish controlled zero-cpu/ram ones: %q", containerIDs)
 		}
-		out.Cpu += uint(resCpu / 1000000000) // Originallly in NCPU
-		out.Ram += uint(resRam / 1073741824) // Get in GB
+		out.Cpu += uint(resCPU / 1000000000) // Originallly in NCPU
+		out.Ram += uint(resRAM / 1073741824) // Get in GB
 		// TODO: Add disks too here
 	}
 
@@ -98,10 +98,10 @@ func (d *Driver) getInitialUsage() (types.Resources, error) {
 		// There is more than one container is running so multitenancy is true
 		out.Multitenancy = true
 	}
-	if out.Cpu > d.totalCpu {
+	if out.Cpu > d.totalCPU {
 		out.CpuOverbook = true
 	}
-	if out.Ram > d.totalRam {
+	if out.Ram > d.totalRAM {
 		out.RamOverbook = true
 	}
 
@@ -109,24 +109,24 @@ func (d *Driver) getInitialUsage() (types.Resources, error) {
 }
 
 // Collects the available resource with alteration
-func (d *Driver) getAvailResources() (availCpu, availRam uint) {
-	if d.cfg.CpuAlter < 0 {
-		availCpu = d.totalCpu - uint(-d.cfg.CpuAlter)
+func (d *Driver) getAvailResources() (availCPU, availRAM uint) {
+	if d.cfg.CPUAlter < 0 {
+		availCPU = d.totalCPU - uint(-d.cfg.CPUAlter)
 	} else {
-		availCpu = d.totalCpu + uint(d.cfg.CpuAlter)
+		availCPU = d.totalCPU + uint(d.cfg.CPUAlter)
 	}
 
-	if d.cfg.RamAlter < 0 {
-		availRam = d.totalRam - uint(-d.cfg.RamAlter)
+	if d.cfg.RAMAlter < 0 {
+		availRAM = d.totalRAM - uint(-d.cfg.RAMAlter)
 	} else {
-		availRam = d.totalRam + uint(d.cfg.RamAlter)
+		availRAM = d.totalRAM + uint(d.cfg.RAMAlter)
 	}
 
 	return
 }
 
 // Returns the standardized container name
-func (d *Driver) getContainerName(hwaddr string) string {
+func (*Driver) getContainerName(hwaddr string) string {
 	return fmt.Sprintf("fish-%s", strings.ReplaceAll(hwaddr, ":", ""))
 }
 
@@ -135,7 +135,7 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 	// Download the images and unpack them
 	var wg sync.WaitGroup
 	for _, image := range opts.Images {
-		log.Info("Docker: Loading the required image:", image.Name, image.Version, image.Url)
+		log.Info("Docker: Loading the required image:", image.Name, image.Version, image.URL)
 
 		// Running the background routine to download, unpack and process the image
 		// Success will be checked later by existence of the image in local docker registry
@@ -143,7 +143,7 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 		go func(image drivers.Image) {
 			defer wg.Done()
 			if err := image.DownloadUnpack(d.cfg.ImagesPath, d.cfg.DownloadUser, d.cfg.DownloadPassword); err != nil {
-				log.Error("Docker: Unable to download and unpack the image:", image.Name, image.Url, err)
+				log.Error("Docker: Unable to download and unpack the image:", image.Name, image.URL, err)
 			}
 		}(image)
 	}
@@ -252,7 +252,7 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 }
 
 // Receives the container ID out of the container name
-func (d *Driver) getAllocatedContainerId(cName string) string {
+func (d *Driver) getAllocatedContainerID(cName string) string {
 	// Probably it's better to store the current list in the memory
 	stdout, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, "ps", "-a", "-q", "--filter", "name="+cName)
 	if err != nil {

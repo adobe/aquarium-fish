@@ -20,21 +20,23 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
-/**
- * Options example:
- *   images:
- *     - url: https://artifact-storage/aquarium/image/vmx/macos1015-VERSION/macos1015-VERSION.tar.xz
- *       sum: sha256:1234567890abcdef1234567890abcdef1
- *     - url: https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-VERSION/macos1015-xcode122-VERSION.tar.xz
- *       sum: sha256:1234567890abcdef1234567890abcdef2
- *     - url: https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-ci-VERSION/macos1015-xcode122-ci-VERSION.tar.xz
- *       sum: sha256:1234567890abcdef1234567890abcdef3
- */
+// Options for label definition
+//
+// Example:
+//
+//	images:
+//	  - url: https://artifact-storage/aquarium/image/vmx/macos1015-VERSION/macos1015-VERSION.tar.xz
+//	    sum: sha256:1234567890abcdef1234567890abcdef1
+//	  - url: https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-VERSION/macos1015-xcode122-VERSION.tar.xz
+//	    sum: sha256:1234567890abcdef1234567890abcdef2
+//	  - url: https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-ci-VERSION/macos1015-xcode122-ci-VERSION.tar.xz
+//	    sum: sha256:1234567890abcdef1234567890abcdef3
 type Options struct {
 	Images []drivers.Image `json:"images"` // List of image dependencies, last one is running one
 }
 
-func (o *Options) Apply(options util.UnparsedJson) error {
+// Apply takes json and applies it to the options structure
+func (o *Options) Apply(options util.UnparsedJSON) error {
 	if err := json.Unmarshal([]byte(options), o); err != nil {
 		return log.Error("VMX: Unable to apply the driver options", err)
 	}
@@ -42,6 +44,7 @@ func (o *Options) Apply(options util.UnparsedJson) error {
 	return o.Validate()
 }
 
+// Validate makes sure the options have the required defaults & that the required fields are set
 func (o *Options) Validate() error {
 	// Check images
 	var imgErr error

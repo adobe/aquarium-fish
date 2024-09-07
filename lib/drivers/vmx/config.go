@@ -10,6 +10,7 @@
  * governing permissions and limitations under the License.
  */
 
+// Package vmx implements driver
 package vmx
 
 import (
@@ -24,6 +25,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/log"
 )
 
+// Config - node driver configuration
 type Config struct {
 	VmrunPath        string `json:"vmrun_path"`        // '/Applications/VMware Fusion.app/Contents/Library/vmrun'
 	VdiskmanagerPath string `json:"vdiskmanager_path"` // '/Applications/VMware Fusion.app/Contents/Library/vmware-vdiskmanager'
@@ -37,17 +39,17 @@ type Config struct {
 	//   for disk caching)
 	// * Positive (>0) value could also be available (but check it in your vmware dist in advance)
 	//   Please be careful here - noone wants the VM to fail allocation because of that...
-	CpuAlter int `json:"cpu_alter"` // 0 do nothing, <0 reduces number available CPUs, >0 increases it (dangerous)
-	RamAlter int `json:"ram_alter"` // 0 do nothing, <0 reduces amount of available RAM (GB), >0 increases it (dangerous)
+	CPUAlter int `json:"cpu_alter"` // 0 do nothing, <0 reduces number available CPUs, >0 increases it (dangerous)
+	RAMAlter int `json:"ram_alter"` // 0 do nothing, <0 reduces amount of available RAM (GB), >0 increases it (dangerous)
 
 	// Overbook options allows tenants to reuse the resources
 	// It will be used only when overbook is allowed by the tenants. It works by just adding those
 	// amounts to the existing total before checking availability. For example if you have 16CPU
-	// and want to run 2 tenants with requirement of 14 CPUs each - you can put 12 in CpuOverbook -
+	// and want to run 2 tenants with requirement of 14 CPUs each - you can put 12 in CPUOverbook -
 	// to have virtually 28 CPUs. 3rd will not be running because 2 tenants will eat all 28 virtual
 	// CPUs. Same applies to the RamOverbook.
-	CpuOverbook uint `json:"cpu_overbook"` // How much CPUs could be reused by multiple tenants
-	RamOverbook uint `json:"ram_overbook"` // How much RAM (GB) could be reused by multiple tenants
+	CPUOverbook uint `json:"cpu_overbook"` // How much CPUs could be reused by multiple tenants
+	RAMOverbook uint `json:"ram_overbook"` // How much RAM (GB) could be reused by multiple tenants
 
 	DownloadUser     string `json:"download_user"`     // The user will be used in download operations
 	DownloadPassword string `json:"download_password"` // The password will be used in download operations
@@ -55,6 +57,7 @@ type Config struct {
 	LogMonitor bool `json:"log_monitor"` // Actively monitor the vmware.log of VM and reset it on halt
 }
 
+// Apply takes json and applies it to the config structure
 func (c *Config) Apply(config []byte) error {
 	// Set defaults
 	c.LogMonitor = true
@@ -68,6 +71,7 @@ func (c *Config) Apply(config []byte) error {
 	return nil
 }
 
+// Validate makes sure the config have the required defaults & that the required fields are set
 func (c *Config) Validate() (err error) {
 	// Check that values of the config is filled at least with defaults
 	if c.VmrunPath == "" {
@@ -112,8 +116,8 @@ func (c *Config) Validate() (err error) {
 		return err
 	}
 
-	if c.CpuAlter < 0 && cpuStat <= -c.CpuAlter {
-		return log.Errorf("VMX: |CpuAlter| can't be more or equal the available Host CPUs: |%d| > %d", c.CpuAlter, cpuStat)
+	if c.CPUAlter < 0 && cpuStat <= -c.CPUAlter {
+		return log.Errorf("VMX: |CpuAlter| can't be more or equal the available Host CPUs: |%d| > %d", c.CPUAlter, cpuStat)
 	}
 
 	memStat, err := mem.VirtualMemory()
@@ -122,8 +126,8 @@ func (c *Config) Validate() (err error) {
 	}
 	ramStat := memStat.Total / 1073741824 // Getting GB from Bytes
 
-	if c.RamAlter < 0 && int(ramStat) <= -c.RamAlter {
-		return log.Errorf("VMX: |RamAlter| can't be more or equal the available Host RAM: |%d| > %d", c.RamAlter, ramStat)
+	if c.RAMAlter < 0 && int(ramStat) <= -c.RAMAlter {
+		return log.Errorf("VMX: |RamAlter| can't be more or equal the available Host RAM: |%d| > %d", c.RAMAlter, ramStat)
 	}
 
 	return nil

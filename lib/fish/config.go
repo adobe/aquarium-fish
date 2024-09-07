@@ -21,14 +21,15 @@ import (
 	"github.com/ghodss/yaml"
 )
 
+// Config defines Fish node configuration
 type Config struct {
 	Directory string `json:"directory"` // Where to store database and other useful data (if relative - to CWD)
 
 	APIAddress        string         `json:"api_address"`         // Where to serve Web UI, API & Meta API
 	ProxySocksAddress string         `json:"proxy_socks_address"` // Where to serve SOCKS5 proxy for the allocated resources
-	ProxySshAddress   string         `json:"proxy_ssh_address"`   // Where to serve SSH proxy for the allocated resources
+	ProxySSHAddress   string         `json:"proxy_ssh_address"`   // Where to serve SSH proxy for the allocated resources
 	NodeAddress       string         `json:"node_address"`        // What is the external address of the node
-	CpuLimit          uint16         `json:"cpu_limit"`           // How many CPU threads Node allowed to use (serve API, ...)
+	CPULimit          uint16         `json:"cpu_limit"`           // How many CPU threads Node allowed to use (serve API, ...)
 	MemTarget         util.HumanSize `json:"mem_target"`          // What's the target memory utilization by the Node (GC target where it becomes more aggressive)
 	ClusterJoin       []string       `json:"cluster_join"`        // The node addresses to join the cluster
 
@@ -50,11 +51,13 @@ type Config struct {
 	Drivers []ConfigDriver `json:"drivers"`
 }
 
+// ConfigDriver helper to store driver config without parsing it right away
 type ConfigDriver struct {
 	Name string            `json:"name"`
-	Cfg  util.UnparsedJson `json:"cfg"`
+	Cfg  util.UnparsedJSON `json:"cfg"`
 }
 
+// ReadConfigFile needed to read the config file
 func (c *Config) ReadConfigFile(cfgPath string) error {
 	c.initDefaults()
 
@@ -93,7 +96,7 @@ func (c *Config) initDefaults() {
 	c.Directory = "fish_data"
 	c.APIAddress = "0.0.0.0:8001"
 	c.ProxySocksAddress = "0.0.0.0:1080"
-	c.ProxySshAddress = "0.0.0.0:2022"
+	c.ProxySSHAddress = "0.0.0.0:2022"
 	c.NodeAddress = "127.0.0.1:8001"
 	c.TLSKey = "" // Will be set after read config file from NodeName
 	c.TLSCrt = "" // ...

@@ -25,7 +25,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/log"
 )
 
-// The function creates the lock file, notice - remove it yourself
+// CreateLock creates the lock file, notice - remove it yourself
 func CreateLock(lockPath string) error {
 	lockFile, err := os.Create(lockPath)
 	if err != nil {
@@ -40,7 +40,7 @@ func CreateLock(lockPath string) error {
 	return nil
 }
 
-// Wait for the lock file and clean func will be executed if it's invalid
+// WaitLock waits for the lock file and clean func will be executed if it's invalid
 func WaitLock(lockPath string, clean func()) error {
 	waitCounter := 0
 	for {
@@ -72,7 +72,7 @@ func WaitLock(lockPath string, clean func()) error {
 		}
 
 		time.Sleep(5 * time.Second)
-		waitCounter += 1
+		waitCounter++
 	}
 
 	return nil

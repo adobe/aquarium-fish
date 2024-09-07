@@ -20,11 +20,10 @@ import (
 	"os"
 )
 
+// NodePingDelay defines delay between the pings to keep the node active in the cluster
 const NodePingDelay = 10
 
-var ErrNodePingDuplication = fmt.Errorf("Fish Node: Unable to join the Aquarium cluster due to " +
-	"the node with the same name pinged the cluster less then 2xNODE_PING_DELAY time ago")
-
+// Init prepares Node for usage
 func (n *Node) Init(nodeAddress, certPath string) error {
 	// Set the node external address
 	n.Address = nodeAddress

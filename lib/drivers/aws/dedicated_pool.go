@@ -27,7 +27,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/log"
 )
 
-// Custom status to set in the host for simplifying parallel ops in between the updates
+// HostReserved - custom status to set in the host for simplifying parallel ops in between the updates
 const HostReserved = "reserved"
 
 // TODO: Right now logic pinned to just one node, need to be distributed
@@ -41,8 +41,8 @@ type dedicatedPoolWorker struct {
 	// Amount of instances per dedicated host used in capacity calculations
 	instancesPerHost uint
 
-	// It's better to update active_hosts by calling updateDedicatedHosts()
-	active_hosts       map[string]ec2types.Host
+	// It's better to update activeHosts by calling updateDedicatedHosts()
+	activeHosts        map[string]ec2types.Host
 	activeHostsUpdated time.Time
 	activeHostsMu      sync.RWMutex
 
@@ -57,8 +57,8 @@ func (d *Driver) newDedicatedPoolWorker(name string, record DedicatedPoolRecord)
 		driver: d,
 		record: record,
 
-		active_hosts: make(map[string]ec2types.Host),
-		toManageAt:   make(map[string]time.Time),
+		activeHosts: make(map[string]ec2types.Host),
+		toManageAt:  make(map[string]time.Time),
 	}
 
 	// Receiving amount of instances per dedicated host
@@ -89,13 +89,13 @@ func (w *dedicatedPoolWorker) AvailableCapacity(instanceType string) int64 {
 	// Looking for the available hosts in the list and their capacity
 	w.activeHostsMu.RLock()
 	defer w.activeHostsMu.RUnlock()
-	for _, host := range w.active_hosts {
+	for _, host := range w.activeHosts {
 		// For now support only single-type dedicated hosts, because primary goal is mac machines
 		instCount += int64(getHostCapacity(&host))
 	}
 
 	// Let's add the amount of instances we can allocate
-	instCount += (int64(w.record.Max) - int64(len(w.active_hosts))) * int64(w.instancesPerHost)
+	instCount += (int64(w.record.Max) - int64(len(w.activeHosts))) * int64(w.instancesPerHost)
 
 	log.Debugf("AWS: dedicated %q: AvailableCapacity for dedicated host type %q: %d", w.name, w.record.Type, instCount)
 
@@ -116,9 +116,9 @@ func (w *dedicatedPoolWorker) ReserveHost(instanceType string) string {
 	var availableHosts []string
 
 	// Look for the hosts with capacity
-	for hostId, host := range w.active_hosts {
+	for hostID, host := range w.activeHosts {
 		if getHostCapacity(&host) > 0 {
-			availableHosts = append(availableHosts, hostId)
+			availableHosts = append(availableHosts, hostID)
 		}
 	}
 
@@ -128,10 +128,10 @@ func (w *dedicatedPoolWorker) ReserveHost(instanceType string) string {
 	}
 
 	// Pick random one from the list of available hosts to reduce the possibility of conflict
-	host := w.active_hosts[availableHosts[rand.Intn(len(availableHosts))]] // #nosec G404
+	host := w.activeHosts[availableHosts[rand.Intn(len(availableHosts))]] // #nosec G404
 	// Mark it as reserved temporary to ease multi-allocation at the same time
 	host.State = HostReserved
-	w.active_hosts[aws.ToString(host.HostId)] = host
+	w.activeHosts[aws.ToString(host.HostId)] = host
 	return aws.ToString(host.HostId)
 }
 
@@ -142,7 +142,7 @@ func (w *dedicatedPoolWorker) AllocateHost(instanceType string) string {
 		return ""
 	}
 
-	currActiveHosts := len(w.active_hosts)
+	currActiveHosts := len(w.activeHosts)
 	if w.record.Max <= uint(currActiveHosts) {
 		log.Warnf("AWS: dedicated %q: Unable to request new host due to reached the maximum limit: %d <= %d", w.name, w.record.Max, currActiveHosts)
 		return ""
@@ -233,30 +233,30 @@ func (w *dedicatedPoolWorker) manageHosts() []string {
 	var toRelease []string
 
 	// Going through the process list
-	for hostId, timeout := range w.toManageAt {
-		if host, ok := w.active_hosts[hostId]; !ok || isHostUsed(&host) {
+	for hostID, timeout := range w.toManageAt {
+		if host, ok := w.activeHosts[hostID]; !ok || isHostUsed(&host) {
 			// The host is disappeared or used, we don't need to manage it out anymore
-			toClean = append(toClean, hostId)
+			toClean = append(toClean, hostID)
 			continue
 		}
 
 		// Host seems still exists and not used - check for timeout
 		if timeout.Before(time.Now()) {
 			// Timeout for the host reached - let's put it in the release bucket
-			toRelease = append(toRelease, hostId)
+			toRelease = append(toRelease, hostID)
 		}
 	}
 
 	// Cleaning up the manage list
-	for _, hostId := range toClean {
-		delete(w.toManageAt, hostId)
+	for _, hostID := range toClean {
+		delete(w.toManageAt, hostID)
 	}
 
 	// Going through the active hosts and updating to_manage list
-	for hostId, host := range w.active_hosts {
+	for hostID, host := range w.activeHosts {
 		if host.State == ec2types.AllocationStatePermanentFailure {
 			// Immediately release - we don't need failed hosts in our pool
-			toRelease = append(toRelease, hostId)
+			toRelease = append(toRelease, hostID)
 		}
 
 		// We don't need to manage out the hosts in use
@@ -272,7 +272,7 @@ func (w *dedicatedPoolWorker) manageHosts() []string {
 		// Skipping the hosts that already in managed list
 		found := false
 		for hid := range w.toManageAt {
-			if hostId == hid {
+			if hostID == hid {
 				found = true
 				break
 			}
@@ -284,11 +284,11 @@ func (w *dedicatedPoolWorker) manageHosts() []string {
 		// Check if mac - giving it some time before action release or scrubbing
 		// If not mac or mac is old: giving a chance to be reused - will be processed next cycle
 		if isHostMac(&host) && !isMacTooOld(&host) {
-			w.toManageAt[hostId] = time.Now().Add(time.Duration(w.record.ScrubbingDelay))
+			w.toManageAt[hostID] = time.Now().Add(time.Duration(w.record.ScrubbingDelay))
 		} else {
-			w.toManageAt[hostId] = time.Now()
+			w.toManageAt[hostID] = time.Now()
 		}
-		log.Debugf("AWS: dedicated %q: Added new host to be managed out: %q at %q", w.name, hostId, w.toManageAt[hostId])
+		log.Debugf("AWS: dedicated %q: Added new host to be managed out: %q at %q", w.name, hostID, w.toManageAt[hostID])
 	}
 
 	return toRelease
@@ -309,12 +309,12 @@ func (w *dedicatedPoolWorker) releaseHosts(releaseHosts []string) {
 	// Check if there are macs which need a special treatment
 	var macHosts []string
 	var toRelease []string
-	for _, hostId := range releaseHosts {
+	for _, hostID := range releaseHosts {
 		// Special treatment for mac hosts - it makes not much sense to try to release them until
 		// they've live for 24h due to Apple-AWS license.
-		if host, ok := w.active_hosts[hostId]; ok && host.HostProperties != nil {
+		if host, ok := w.activeHosts[hostID]; ok && host.HostProperties != nil {
 			if isHostMac(&host) {
-				macHosts = append(macHosts, hostId)
+				macHosts = append(macHosts, hostID)
 				// If mac host not reached 24h since allocation - skipping addition to the release list
 				if !isHostReadyForRelease(&host) {
 					continue
@@ -322,7 +322,7 @@ func (w *dedicatedPoolWorker) releaseHosts(releaseHosts []string) {
 			}
 		}
 		// Adding any host to to_release list
-		toRelease = append(toRelease, hostId)
+		toRelease = append(toRelease, hostID)
 	}
 
 	// Run the release process for multiple hosts
@@ -333,21 +333,21 @@ func (w *dedicatedPoolWorker) releaseHosts(releaseHosts []string) {
 	}
 
 	// Cleanup the released hosts from the active hosts list
-	for _, hostId := range toRelease {
+	for _, hostID := range toRelease {
 		// Skipping if release of the host failed for some reason
-		for _, failedHostId := range releaseFailed {
-			if failedHostId == hostId {
+		for _, failedHostID := range releaseFailed {
+			if failedHostID == hostID {
 				continue
 			}
 		}
 
-		delete(w.active_hosts, hostId)
+		delete(w.activeHosts, hostID)
 	}
 
 	// Scrubbing the rest of mac hosts
 	if len(macHosts) > 0 && w.record.ScrubbingDelay != 0 {
-		for _, hostId := range macHosts {
-			host, ok := w.active_hosts[hostId]
+		for _, hostID := range macHosts {
+			host, ok := w.activeHosts[hostID]
 			if !ok || host.State == ec2types.AllocationStatePending {
 				// The host was released or already in scrubbing - skipping it
 				continue
@@ -355,16 +355,16 @@ func (w *dedicatedPoolWorker) releaseHosts(releaseHosts []string) {
 
 			// Reserve the host internally for scrubbing process to prevent allocation issues
 			host.State = HostReserved
-			w.active_hosts[aws.ToString(host.HostId)] = host
+			w.activeHosts[aws.ToString(host.HostId)] = host
 
 			// Triggering the scrubbing process
-			if err := w.driver.triggerHostScrubbing(hostId, aws.ToString(host.HostProperties.InstanceType)); err != nil {
-				log.Errorf("AWS: dedicated %q: Unable to run scrubbing for host %q: %v", w.name, hostId, err)
+			if err := w.driver.triggerHostScrubbing(hostID, aws.ToString(host.HostProperties.InstanceType)); err != nil {
+				log.Errorf("AWS: dedicated %q: Unable to run scrubbing for host %q: %v", w.name, hostID, err)
 				continue
 			}
 
 			// Removing the host from the list
-			delete(w.active_hosts, hostId)
+			delete(w.activeHosts, hostID)
 		}
 	}
 }
@@ -489,11 +489,11 @@ func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 		}
 
 		for _, rh := range resp.Hosts {
-			hostId := aws.ToString(rh.HostId)
-			currActiveHosts[hostId] = rh
+			hostID := aws.ToString(rh.HostId)
+			currActiveHosts[hostID] = rh
 			// If the response host has not changed, use the same object in the active list
-			if ah, ok := w.active_hosts[hostId]; ok && ah.State == rh.State && len(ah.Instances) == len(rh.Instances) {
-				currActiveHosts[hostId] = w.active_hosts[hostId]
+			if ah, ok := w.activeHosts[hostID]; ok && ah.State == rh.State && len(ah.Instances) == len(rh.Instances) {
+				currActiveHosts[hostID] = w.activeHosts[hostID]
 			}
 		}
 	}
@@ -503,13 +503,13 @@ func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 	defer w.activeHostsMu.Unlock()
 
 	w.activeHostsUpdated = time.Now()
-	w.active_hosts = currActiveHosts
+	w.activeHosts = currActiveHosts
 
 	// Printing list for debug purposes
-	if log.Verbosity == 1 {
-		log.Debugf("AWS: dedicated %q: Amount of active hosts in pool: %d", w.name, len(w.active_hosts))
-		for hostId, host := range w.active_hosts {
-			log.Debugf("AWS: dedicated %q: active_hosts item: host_id:%q, allocated:%q, state:%q, capacity:%d (%d)", w.name, hostId, host.AllocationTime, host.State, getHostCapacity(&host), w.instancesPerHost)
+	if log.GetVerbosity() == 1 {
+		log.Debugf("AWS: dedicated %q: Amount of active hosts in pool: %d", w.name, len(w.activeHosts))
+		for hostID, host := range w.activeHosts {
+			log.Debugf("AWS: dedicated %q: active_hosts item: host_id:%q, allocated:%q, state:%q, capacity:%d (%d)", w.name, hostID, host.AllocationTime, host.State, getHostCapacity(&host), w.instancesPerHost)
 		}
 	}
 

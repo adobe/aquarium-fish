@@ -10,6 +10,7 @@
  * governing permissions and limitations under the License.
  */
 
+// Package native implements driver
 package native
 
 import (
@@ -25,6 +26,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/log"
 )
 
+// Config - node driver configuration
 type Config struct {
 	//TODO: Users []string `json:"users"` // List of precreated OS user names in format "user[:password]" to run the workload
 
@@ -52,22 +54,23 @@ type Config struct {
 	//   for disk caching)
 	// * Positive (>0) is also available, but you're going to put more load on the scheduler
 	//   Please be careful here - noone wants the workload to fail allocation because of that...
-	CpuAlter int `json:"cpu_alter"` // 0 do nothing, <0 reduces number available CPUs, >0 increases it (dangerous)
-	RamAlter int `json:"ram_alter"` // 0 do nothing, <0 reduces amount of available RAM (GB), >0 increases it (dangerous)
+	CPUAlter int `json:"cpu_alter"` // 0 do nothing, <0 reduces number available CPUs, >0 increases it (dangerous)
+	RAMAlter int `json:"ram_alter"` // 0 do nothing, <0 reduces amount of available RAM (GB), >0 increases it (dangerous)
 
 	// Overbook options allows tenants to reuse the resources
 	// It will be used only when overbook is allowed by the tenants. It works by just adding those
 	// amounts to the existing total before checking availability. For example if you have 16CPU
-	// and want to run 2 tenants with requirement of 14 CPUs each - you can put 12 in CpuOverbook -
+	// and want to run 2 tenants with requirement of 14 CPUs each - you can put 12 in CPUOverbook -
 	// to have virtually 28 CPUs. 3rd will not be running because 2 tenants will eat all 28 virtual
 	// CPUs. Same applies to the RamOverbook.
-	CpuOverbook uint `json:"cpu_overbook"` // How much CPUs could be reused by multiple tenants
-	RamOverbook uint `json:"ram_overbook"` // How much RAM (GB) could be reused by multiple tenants
+	CPUOverbook uint `json:"cpu_overbook"` // How much CPUs could be reused by multiple tenants
+	RAMOverbook uint `json:"ram_overbook"` // How much RAM (GB) could be reused by multiple tenants
 
 	DownloadUser     string `json:"download_user"`     // The user will be used to auth in download operations
 	DownloadPassword string `json:"download_password"` // The password will be used to auth in download operations
 }
 
+// Apply takes json and applies it to the config structure
 func (c *Config) Apply(config []byte) (err error) {
 	if len(config) > 0 {
 		if err = json.Unmarshal(config, c); err != nil {
@@ -95,13 +98,13 @@ func (c *Config) Apply(config []byte) (err error) {
 	if err = os.MkdirAll(c.ImagesPath, 0o750); err != nil {
 		return err
 	}
-	if err = os.MkdirAll(c.WorkspacePath, 0o750); err != nil {
-		return err
-	}
 
-	return nil
+	err = os.MkdirAll(c.WorkspacePath, 0o750)
+
+	return err
 }
 
+// Validate makes sure the config have the required defaults & that the required fields are set
 func (c *Config) Validate() (err error) {
 	// Sudo is used to run commands from superuser and execute a number of
 	// administrative actions to create/delete the user and cleanup
@@ -112,10 +115,8 @@ func (c *Config) Validate() (err error) {
 	} else {
 		if info, err := os.Stat(c.SudoPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate `sudo` path: %s, %s", c.SudoPath, err)
-		} else {
-			if info.Mode()&0o111 == 0 {
-				return fmt.Errorf("Native: `sudo` binary is not executable: %s", c.SudoPath)
-			}
+		} else if info.Mode()&0o111 == 0 {
+			return fmt.Errorf("Native: `sudo` binary is not executable: %s", c.SudoPath)
 		}
 	}
 
@@ -127,10 +128,8 @@ func (c *Config) Validate() (err error) {
 	} else {
 		if info, err := os.Stat(c.SuPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate `su` path: %s, %s", c.SuPath, err)
-		} else {
-			if info.Mode()&0o111 == 0 {
-				return fmt.Errorf("Native: `su` binary is not executable: %s", c.SuPath)
-			}
+		} else if info.Mode()&0o111 == 0 {
+			return fmt.Errorf("Native: `su` binary is not executable: %s", c.SuPath)
 		}
 	}
 
@@ -142,10 +141,8 @@ func (c *Config) Validate() (err error) {
 	} else {
 		if info, err := os.Stat(c.ShPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate `sh` path: %s, %s", c.ShPath, err)
-		} else {
-			if info.Mode()&0o111 == 0 {
-				return fmt.Errorf("Native: `sh` binary is not executable: %s", c.ShPath)
-			}
+		} else if info.Mode()&0o111 == 0 {
+			return fmt.Errorf("Native: `sh` binary is not executable: %s", c.ShPath)
 		}
 	}
 	// Tar used to unpack the images
@@ -156,10 +153,8 @@ func (c *Config) Validate() (err error) {
 	} else {
 		if info, err := os.Stat(c.TarPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate `tar` path: %s, %s", c.TarPath, err)
-		} else {
-			if info.Mode()&0o111 == 0 {
-				return fmt.Errorf("Native: `tar` binary is not executable: %s", c.TarPath)
-			}
+		} else if info.Mode()&0o111 == 0 {
+			return fmt.Errorf("Native: `tar` binary is not executable: %s", c.TarPath)
 		}
 	}
 	// Mount allows to look at the mounted volumes
@@ -170,10 +165,8 @@ func (c *Config) Validate() (err error) {
 	} else {
 		if info, err := os.Stat(c.MountPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate `mount` path: %s, %s", c.MountPath, err)
-		} else {
-			if info.Mode()&0o111 == 0 {
-				return fmt.Errorf("Native: `mount` binary is not executable: %s", c.MountPath)
-			}
+		} else if info.Mode()&0o111 == 0 {
+			return fmt.Errorf("Native: `mount` binary is not executable: %s", c.MountPath)
 		}
 	}
 	// Chown needed to properly set ownership for the unprevileged user on available resources
@@ -184,10 +177,8 @@ func (c *Config) Validate() (err error) {
 	} else {
 		if info, err := os.Stat(c.ChownPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate `chown` path: %s, %s", c.ChownPath, err)
-		} else {
-			if info.Mode()&0o111 == 0 {
-				return fmt.Errorf("Native: `chown` binary is not executable: %s", c.ChownPath)
-			}
+		} else if info.Mode()&0o111 == 0 {
+			return fmt.Errorf("Native: `chown` binary is not executable: %s", c.ChownPath)
 		}
 	}
 	// Chmod needed to set additional read access for the unprevileged user on env metadata file
@@ -198,10 +189,8 @@ func (c *Config) Validate() (err error) {
 	} else {
 		if info, err := os.Stat(c.ChmodPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate `chmod` path: %s, %s", c.ChmodPath, err)
-		} else {
-			if info.Mode()&0o111 == 0 {
-				return fmt.Errorf("Native: `chmod` binary is not executable: %s", c.ChmodPath)
-			}
+		} else if info.Mode()&0o111 == 0 {
+			return fmt.Errorf("Native: `chmod` binary is not executable: %s", c.ChmodPath)
 		}
 	}
 	// Killall is running to stop all the unprevileged user processes during deallocation
@@ -212,10 +201,8 @@ func (c *Config) Validate() (err error) {
 	} else {
 		if info, err := os.Stat(c.KillallPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate `killall` path: %s, %s", c.KillallPath, err)
-		} else {
-			if info.Mode()&0o111 == 0 {
-				return fmt.Errorf("Native: `killall` binary is not executable: %s", c.KillallPath)
-			}
+		} else if info.Mode()&0o111 == 0 {
+			return fmt.Errorf("Native: `killall` binary is not executable: %s", c.KillallPath)
 		}
 	}
 	// Rm allows to clean up the leftowers after the execution
@@ -226,10 +213,8 @@ func (c *Config) Validate() (err error) {
 	} else {
 		if info, err := os.Stat(c.RmPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate `rm` path: %s, %s", c.RmPath, err)
-		} else {
-			if info.Mode()&0o111 == 0 {
-				return fmt.Errorf("Native: `rm` binary is not executable: %s", c.RmPath)
-			}
+		} else if info.Mode()&0o111 == 0 {
+			return fmt.Errorf("Native: `rm` binary is not executable: %s", c.RmPath)
 		}
 	}
 
@@ -242,10 +227,8 @@ func (c *Config) Validate() (err error) {
 	} else {
 		if info, err := os.Stat(c.DsclPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate macos `dscl` path: %s, %s", c.DsclPath, err)
-		} else {
-			if info.Mode()&0o111 == 0 {
-				return fmt.Errorf("Native: macos `dscl` binary is not executable: %s", c.DsclPath)
-			}
+		} else if info.Mode()&0o111 == 0 {
+			return fmt.Errorf("Native: macos `dscl` binary is not executable: %s", c.DsclPath)
 		}
 	}
 	// Hdiutil allows to create disk images and mount them to restrict user by disk space
@@ -256,10 +239,8 @@ func (c *Config) Validate() (err error) {
 	} else {
 		if info, err := os.Stat(c.HdiutilPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate macos `hdiutil` path: %s, %s", c.HdiutilPath, err)
-		} else {
-			if info.Mode()&0o111 == 0 {
-				return fmt.Errorf("Native: macos `hdiutil` binary is not executable: %s", c.HdiutilPath)
-			}
+		} else if info.Mode()&0o111 == 0 {
+			return fmt.Errorf("Native: macos `hdiutil` binary is not executable: %s", c.HdiutilPath)
 		}
 	}
 	// Mdutil allows to disable the indexing for mounted volume
@@ -270,10 +251,8 @@ func (c *Config) Validate() (err error) {
 	} else {
 		if info, err := os.Stat(c.MdutilPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate macos `mdutil` path: %s, %s", c.MdutilPath, err)
-		} else {
-			if info.Mode()&0o111 == 0 {
-				return fmt.Errorf("Native: macos `mdutil` binary is not executable: %s", c.MdutilPath)
-			}
+		} else if info.Mode()&0o111 == 0 {
+			return fmt.Errorf("Native: macos `mdutil` binary is not executable: %s", c.MdutilPath)
 		}
 	}
 	// Createhomedir creates unprevileged user home directory and fulfills with default subdirs
@@ -284,10 +263,8 @@ func (c *Config) Validate() (err error) {
 	} else {
 		if info, err := os.Stat(c.CreatehomedirPath); os.IsNotExist(err) {
 			return fmt.Errorf("Native: Unable to locate macos `createhomedir` path: %s, %s", c.CreatehomedirPath, err)
-		} else {
-			if info.Mode()&0o111 == 0 {
-				return fmt.Errorf("Native: macos `createhomedir` binary is not executable: %s", c.CreatehomedirPath)
-			}
+		} else if info.Mode()&0o111 == 0 {
+			return fmt.Errorf("Native: macos `createhomedir` binary is not executable: %s", c.CreatehomedirPath)
 		}
 	}
 
@@ -341,8 +318,8 @@ func (c *Config) Validate() (err error) {
 		return err
 	}
 
-	if c.CpuAlter < 0 && cpuStat <= -c.CpuAlter {
-		return log.Errorf("Native: |CpuAlter| can't be more or equal the available Host CPUs: |%d| > %d", c.CpuAlter, cpuStat)
+	if c.CPUAlter < 0 && cpuStat <= -c.CPUAlter {
+		return log.Errorf("Native: |CpuAlter| can't be more or equal the available Host CPUs: |%d| > %d", c.CPUAlter, cpuStat)
 	}
 
 	memStat, err := mem.VirtualMemory()
@@ -351,8 +328,8 @@ func (c *Config) Validate() (err error) {
 	}
 	ramStat := memStat.Total / 1073741824 // Getting GB from Bytes
 
-	if c.RamAlter < 0 && int(ramStat) <= -c.RamAlter {
-		return log.Errorf("Native: |RamAlter| can't be more or equal the available Host RAM: |%d| > %d", c.RamAlter, ramStat)
+	if c.RAMAlter < 0 && int(ramStat) <= -c.RAMAlter {
+		return log.Errorf("Native: |RamAlter| can't be more or equal the available Host RAM: |%d| > %d", c.RAMAlter, ramStat)
 	}
 
 	return nil

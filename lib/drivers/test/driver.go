@@ -27,14 +27,16 @@ import (
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
-// Implements drivers.ResourceDriverFactory interface
+// Factory implements drivers.ResourceDriverFactory interface
 type Factory struct{}
 
-func (f *Factory) Name() string {
+// Name shows name of the driver factory
+func (*Factory) Name() string {
 	return "test"
 }
 
-func (f *Factory) NewResourceDriver() drivers.ResourceDriver {
+// NewResourceDriver creates new resource driver
+func (*Factory) NewResourceDriver() drivers.ResourceDriver {
 	return &Driver{}
 }
 
@@ -42,21 +44,24 @@ func init() {
 	drivers.FactoryList = append(drivers.FactoryList, &Factory{})
 }
 
-// Implements drivers.ResourceDriver interface
+// Driver implements drivers.ResourceDriver interface
 type Driver struct {
 	cfg Config
 	// Contains the available tasks of the driver
 	tasksList []drivers.ResourceDriverTask
 }
 
-func (d *Driver) Name() string {
+// Name returns name of the driver
+func (*Driver) Name() string {
 	return "test"
 }
 
+// IsRemote needed to detect the out-of-node resources managed by this driver
 func (d *Driver) IsRemote() bool {
 	return d.cfg.IsRemote
 }
 
+// Prepare initializes the driver
 func (d *Driver) Prepare(config []byte) error {
 	if err := d.cfg.Apply(config); err != nil {
 		return err
@@ -71,12 +76,13 @@ func (d *Driver) Prepare(config []byte) error {
 	return nil
 }
 
-func (d *Driver) ValidateDefinition(def types.LabelDefinition) error {
+// ValidateDefinition checks LabelDefinition is ok
+func (*Driver) ValidateDefinition(def types.LabelDefinition) error {
 	var opts Options
 	return opts.Apply(def.Options)
 }
 
-// Allow Fish to ask the driver about it's capacity (free slots) of a specific definition
+// AvailableCapacity allows Fish to ask the driver about it's capacity (free slots) of a specific definition
 func (d *Driver) AvailableCapacity(nodeUsage types.Resources, req types.LabelDefinition) int64 {
 	var outCount int64
 
@@ -91,19 +97,19 @@ func (d *Driver) AvailableCapacity(nodeUsage types.Resources, req types.LabelDef
 		return -1
 	}
 
-	totalCpu := d.cfg.CpuLimit
-	totalRam := d.cfg.RamLimit
+	totalCPU := d.cfg.CPULimit
+	totalRAM := d.cfg.RAMLimit
 
-	if totalCpu == 0 && totalRam == 0 {
+	if totalCPU == 0 && totalRAM == 0 {
 		// Resources are unlimited
 		return 99999
 	}
 
 	// Check if the node has the required resources - otherwise we can't run it anyhow
-	if req.Resources.Cpu > totalCpu {
+	if req.Resources.Cpu > totalCPU {
 		return 0
 	}
-	if req.Resources.Ram > totalRam {
+	if req.Resources.Ram > totalRAM {
 		return 0
 	}
 	// TODO: Check disk requirements
@@ -120,16 +126,16 @@ func (d *Driver) AvailableCapacity(nodeUsage types.Resources, req types.LabelDef
 	if nodeUsage.Multitenancy && req.Resources.Multitenancy {
 		// Ok we can run more tenants, let's calculate how much
 		if nodeUsage.CpuOverbook && req.Resources.CpuOverbook {
-			totalCpu += d.cfg.CpuOverbook
+			totalCPU += d.cfg.CPUOverbook
 		}
 		if nodeUsage.RamOverbook && req.Resources.RamOverbook {
-			totalRam += d.cfg.RamOverbook
+			totalRAM += d.cfg.RAMOverbook
 		}
 	}
 
 	// Calculate how much of those definitions we could run
-	outCount = int64((totalCpu - nodeUsage.Cpu) / req.Resources.Cpu)
-	ramCount := int64((totalRam - nodeUsage.Ram) / req.Resources.Ram)
+	outCount = int64((totalCPU - nodeUsage.Cpu) / req.Resources.Cpu)
+	ramCount := int64((totalRAM - nodeUsage.Ram) / req.Resources.Ram)
 	if outCount > ramCount {
 		outCount = ramCount
 	}
@@ -138,10 +144,8 @@ func (d *Driver) AvailableCapacity(nodeUsage types.Resources, req types.LabelDef
 	return outCount
 }
 
-/**
- * Pretend to Allocate (actually not) the Resource
- */
-func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*types.Resource, error) {
+// Allocate - pretends to Allocate (actually not) the Resource
+func (d *Driver) Allocate(def types.LabelDefinition, _ /*metadata*/ map[string]any) (*types.Resource, error) {
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
 		return nil, log.Error("TEST: Unable to apply options:", err)
@@ -172,12 +176,13 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 	return res, nil
 }
 
+// Status shows status of the resource
 func (d *Driver) Status(res *types.Resource) (string, error) {
 	if res == nil || res.Identifier == "" {
 		return "", fmt.Errorf("TEST: Invalid resource: %v", res)
 	}
 	if err := randomFail(fmt.Sprintf("Status %s", res.Identifier), d.cfg.FailStatus); err != nil {
-		return "", fmt.Errorf("TEST: RandomFail: %v\n", err)
+		return "", fmt.Errorf("TEST: RandomFail: %v", err)
 	}
 
 	resFile := filepath.Join(d.cfg.WorkspacePath, res.Identifier)
@@ -187,6 +192,7 @@ func (d *Driver) Status(res *types.Resource) (string, error) {
 	return drivers.StatusNone, nil
 }
 
+// GetTask returns task struct by name
 func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
 	// Look for the specified task name
 	var t drivers.ResourceDriverTask
@@ -207,6 +213,7 @@ func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
 	return t
 }
 
+// Deallocate the resource
 func (d *Driver) Deallocate(res *types.Resource) error {
 	if res == nil || res.Identifier == "" {
 		return log.Error("TEST: Invalid resource:", res)

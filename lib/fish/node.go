@@ -24,10 +24,11 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
+// NodeFind returns list of Nodes that fits filter
 func (f *Fish) NodeFind(filter *string) (ns []types.Node, err error) {
 	db := f.db
 	if filter != nil {
-		securedFilter, err := util.ExpressionSqlFilter(*filter)
+		securedFilter, err := util.ExpressionSQLFilter(*filter)
 		if err != nil {
 			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
 			// We do not fail here because we should not give attacker more information
@@ -39,6 +40,14 @@ func (f *Fish) NodeFind(filter *string) (ns []types.Node, err error) {
 	return ns, err
 }
 
+// NodeGet returns Node by it's unique name
+func (f *Fish) NodeGet(name string) (node *types.Node, err error) {
+	node = &types.Node{}
+	err = f.db.Where("name = ?", name).First(node).Error
+	return node, err
+}
+
+// NodeActiveList lists all the nodes in the cluster
 func (f *Fish) NodeActiveList() (ns []types.Node, err error) {
 	// Only the nodes that pinged at least twice the delay time
 	t := time.Now().Add(-types.NodePingDelay * 2 * time.Second)
@@ -46,6 +55,7 @@ func (f *Fish) NodeActiveList() (ns []types.Node, err error) {
 	return ns, err
 }
 
+// NodeCreate makes new Node
 func (f *Fish) NodeCreate(n *types.Node) error {
 	if n.Name == "" {
 		return fmt.Errorf("Fish: Name can't be empty")
@@ -61,18 +71,14 @@ func (f *Fish) NodeCreate(n *types.Node) error {
 	return f.db.Create(n).Error
 }
 
+// NodeSave stores Node
 func (f *Fish) NodeSave(node *types.Node) error {
 	return f.db.Save(node).Error
 }
 
+// NodePing updates Node and shows that it's active
 func (f *Fish) NodePing(node *types.Node) error {
 	return f.db.Model(node).Update("name", node.Name).Error
-}
-
-func (f *Fish) NodeGet(name string) (node *types.Node, err error) {
-	node = &types.Node{}
-	err = f.db.Where("name = ?", name).First(node).Error
-	return node, err
 }
 
 func (f *Fish) pingProcess() {

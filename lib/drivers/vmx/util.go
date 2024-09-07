@@ -33,17 +33,17 @@ import (
 )
 
 // Returns the total resources available for the node after alteration
-func (d *Driver) getAvailResources() (availCpu, availRam uint) {
-	if d.cfg.CpuAlter < 0 {
-		availCpu = d.totalCpu - uint(-d.cfg.CpuAlter)
+func (d *Driver) getAvailResources() (availCPU, availRAM uint) {
+	if d.cfg.CPUAlter < 0 {
+		availCPU = d.totalCPU - uint(-d.cfg.CPUAlter)
 	} else {
-		availCpu = d.totalCpu + uint(d.cfg.CpuAlter)
+		availCPU = d.totalCPU + uint(d.cfg.CPUAlter)
 	}
 
-	if d.cfg.RamAlter < 0 {
-		availRam = d.totalRam - uint(-d.cfg.RamAlter)
+	if d.cfg.RAMAlter < 0 {
+		availRAM = d.totalRAM - uint(-d.cfg.RAMAlter)
 	} else {
-		availRam = d.totalRam + uint(d.cfg.RamAlter)
+		availRAM = d.totalRAM + uint(d.cfg.RAMAlter)
 	}
 
 	return
@@ -58,7 +58,7 @@ func (d *Driver) loadImages(opts *Options, vmImagesDir string) (string, error) {
 	targetPath := ""
 	var wg sync.WaitGroup
 	for imageIndex, image := range opts.Images {
-		log.Info("VMX: Loading the required image:", image.Name, image.Version, image.Url)
+		log.Info("VMX: Loading the required image:", image.Name, image.Version, image.URL)
 
 		// Running the background routine to download, unpack and process the image
 		// Success will be checked later by existence of the copied image in the vm directory
@@ -66,7 +66,7 @@ func (d *Driver) loadImages(opts *Options, vmImagesDir string) (string, error) {
 		go func(image drivers.Image, index int) error {
 			defer wg.Done()
 			if err := image.DownloadUnpack(d.cfg.ImagesPath, d.cfg.DownloadUser, d.cfg.DownloadPassword); err != nil {
-				return log.Error("VMX: Unable to download and unpack the image:", image.Name, image.Url, err)
+				return log.Error("VMX: Unable to download and unpack the image:", image.Name, image.URL, err)
 			}
 
 			// Getting the image subdir name in the unpacked dir
@@ -336,26 +336,26 @@ func (d *Driver) disksCreate(vmxPath string, disks map[string]types.ResourcesDis
 }
 
 // Ensures the VM is not stale by monitoring the log
-func (d *Driver) logMonitor(vmId, vmxPath string) {
+func (d *Driver) logMonitor(vmID, vmxPath string) {
 	// Monitor the vmware.log file
 	logPath := filepath.Join(filepath.Dir(vmxPath), "vmware.log")
 	t, _ := tail.TailFile(logPath, tail.Config{Follow: true, Poll: true})
-	log.Debug("VMX: Start monitoring of log:", vmId, logPath)
+	log.Debug("VMX: Start monitoring of log:", vmID, logPath)
 	for line := range t.Lines {
-		log.Debug("VMX:", vmId, "vmware.log:", line)
+		log.Debug("VMX:", vmID, "vmware.log:", line)
 		// Send reset if the VM is switched to 0 status
 		if strings.Contains(line.Text, "Tools: Changing running status: 1 => 0") {
-			log.Warn("VMX: Resetting the stale VM", vmId, vmxPath)
+			log.Warn("VMX: Resetting the stale VM", vmID, vmxPath)
 			// We should not spend much time here, because we can miss
 			// the file delete so running in a separated thread
 			go runAndLog(10*time.Second, d.cfg.VmrunPath, "reset", vmxPath)
 		}
 	}
-	log.Debug("VMX: Done monitoring of log:", vmId, logPath)
+	log.Debug("VMX: Done monitoring of log:", vmID, logPath)
 }
 
 // Removes the entire directory for clean up purposes
-func (d *Driver) cleanupVm(vmDir string) error {
+func (*Driver) cleanupVM(vmDir string) error {
 	if err := os.RemoveAll(vmDir); err != nil {
 		log.Warn("VMX: Unable to clean up the vm directory:", vmDir, err)
 		return err

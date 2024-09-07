@@ -17,7 +17,7 @@ import (
 	"reflect"
 )
 
-// Simple serializer to get map as key.subkey=value with dot separation for the keys
+// DotSerialize serializes data to get map as key.subkey=value with dot separation for the keys
 func DotSerialize(prefix string, in any) map[string]string {
 	out := make(map[string]string)
 

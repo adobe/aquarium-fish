@@ -21,10 +21,11 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
+// UserFind returns list of users that fits the filter
 func (f *Fish) UserFind(filter *string) (us []types.User, err error) {
 	db := f.db
 	if filter != nil {
-		securedFilter, err := util.ExpressionSqlFilter(*filter)
+		securedFilter, err := util.ExpressionSQLFilter(*filter)
 		if err != nil {
 			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
 			// We do not fail here because we should not give attacker more information
@@ -36,6 +37,7 @@ func (f *Fish) UserFind(filter *string) (us []types.User, err error) {
 	return us, err
 }
 
+// UserCreate makes new User
 func (f *Fish) UserCreate(u *types.User) error {
 	if u.Name == "" {
 		return fmt.Errorf("Fish: Name can't be empty")
@@ -47,16 +49,19 @@ func (f *Fish) UserCreate(u *types.User) error {
 	return f.db.Create(u).Error
 }
 
+// UserSave stores User
 func (f *Fish) UserSave(u *types.User) error {
 	return f.db.Save(u).Error
 }
 
+// UserGet returns User by unique name
 func (f *Fish) UserGet(name string) (u *types.User, err error) {
 	u = &types.User{}
 	err = f.db.Where("name = ?", name).First(u).Error
 	return u, err
 }
 
+// UserAuth returns User if name and password are correct
 func (f *Fish) UserAuth(name string, password string) *types.User {
 	// TODO: Make auth process to take constant time in case of failure
 	user, err := f.UserGet(name)
@@ -77,6 +82,7 @@ func (f *Fish) UserAuth(name string, password string) *types.User {
 	return user
 }
 
+// UserNew makes new User
 func (f *Fish) UserNew(name string, password string) (string, *types.User, error) {
 	if password == "" {
 		password = crypt.RandString(64)
@@ -94,6 +100,7 @@ func (f *Fish) UserNew(name string, password string) (string, *types.User, error
 	return password, user, nil
 }
 
+// UserDelete removes User
 func (f *Fish) UserDelete(name string) error {
 	return f.db.Where("name = ?", name).Delete(&types.User{}).Error
 }

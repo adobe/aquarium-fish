@@ -66,7 +66,7 @@ drivers:
 	t.Run("Create Label", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Post(afi.ApiAddress("api/v1/label/")).
+			Post(afi.APIAddress("api/v1/label/")).
 			JSON(`{"name":"test-label", "version":1, "definitions": [
 				{"driver":"test", "resources":{"cpu":1,"ram":2}}
 			]}`).
@@ -105,7 +105,7 @@ func allocateAppsStressWorker(t *testing.T, wg *sync.WaitGroup, id int, afi *h.A
 	t.Run(fmt.Sprintf("%04d Create Application", id), func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Post(afi.ApiAddress("api/v1/application/")).
+			Post(afi.APIAddress("api/v1/application/")).
 			JSON(`{"label_UID":"`+label+`"}`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).

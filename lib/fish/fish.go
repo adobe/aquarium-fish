@@ -34,8 +34,10 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
+// ElectionRoundTime defines how long the voting round will take in seconds - so cluster nodes will be able to interchange their responses
 const ElectionRoundTime = 30
 
+// Fish structure is used to store the node internal state
 type Fish struct {
 	db   *gorm.DB
 	cfg  *Config
@@ -66,6 +68,7 @@ type Fish struct {
 	nodeUsage      types.Resources
 }
 
+// New creates new Fish node
 func New(db *gorm.DB, cfg *Config) (*Fish, error) {
 	f := &Fish{db: db, cfg: cfg}
 	if err := f.Init(); err != nil {
@@ -75,6 +78,7 @@ func New(db *gorm.DB, cfg *Config) (*Fish, error) {
 	return f, nil
 }
 
+// Init initializes the Fish node
 func (f *Fish) Init() error {
 	f.shutdownCancel = make(chan bool)
 	f.Quit = make(chan os.Signal, 1)
@@ -121,7 +125,7 @@ func (f *Fish) Init() error {
 			Name: f.cfg.NodeName,
 		}
 		if f.cfg.NodeLocation != "" {
-			loc, err := f.LocationGetByName(f.cfg.NodeLocation)
+			loc, err := f.LocationGet(f.cfg.NodeLocation)
 			if err != nil {
 				log.Info("Fish: Creating new location:", f.cfg.NodeLocation)
 				loc.Name = f.cfg.NodeLocation
@@ -172,10 +176,10 @@ func (f *Fish) Init() error {
 	// Fish is running now
 	f.running = true
 
-	if err := f.DriversSet(); err != nil {
+	if err := f.driversSet(); err != nil {
 		return log.Error("Fish: Unable to set drivers:", err)
 	}
-	if errs := f.DriversPrepare(f.cfg.Drivers); errs != nil {
+	if errs := f.driversPrepare(f.cfg.Drivers); errs != nil {
 		log.Error("Fish: Unable to prepare some resource drivers:", errs)
 	}
 
@@ -219,25 +223,29 @@ func (f *Fish) Init() error {
 	return nil
 }
 
+// Close tells the node that the Fish execution need to be stopped
 func (f *Fish) Close() {
 	f.running = false
 }
 
+// GetNodeUID returns node UID
 func (f *Fish) GetNodeUID() types.ApplicationUID {
 	return f.node.UID
 }
 
+// GetNode returns Fish node spec
 func (f *Fish) GetNode() *types.Node {
 	return f.node
 }
 
-// Creates new UID with 6 starting bytes of Node UID as prefix
+// NewUID Creates new UID with 6 starting bytes of Node UID as prefix
 func (f *Fish) NewUID() uuid.UUID {
 	uid := uuid.New()
 	copy(uid[:], f.node.UID[:6])
 	return uid
 }
 
+// GetLocationName returns node location
 func (f *Fish) GetLocationName() types.LocationName {
 	return f.node.LocationName
 }
@@ -402,7 +410,7 @@ func (f *Fish) voteProcessRound(vote *types.Vote) error {
 				}
 
 				// Next round seems needed
-				vote.Round += 1
+				vote.Round++
 				vote.UID = uuid.Nil
 				break
 			}
@@ -422,7 +430,7 @@ func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 	}
 
 	// Is node supports the required label driver
-	driver := f.DriverGet(def.Driver)
+	driver := f.driverGet(def.Driver)
 	if driver == nil {
 		return false
 	}
@@ -518,7 +526,7 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 	}
 
 	// Locate the required driver
-	driver := f.DriverGet(labelDef.Driver)
+	driver := f.driverGet(labelDef.Driver)
 	if driver == nil {
 		f.nodeUsageMutex.Unlock()
 		return fmt.Errorf("Fish: Unable to locate driver for the Application %s: %s", app.UID, labelDef.Driver)
@@ -586,7 +594,7 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 		res := &types.Resource{
 			ApplicationUID: app.UID,
 			NodeUID:        f.node.UID,
-			Metadata:       util.UnparsedJson(mergedMetadata),
+			Metadata:       util.UnparsedJSON(mergedMetadata),
 		}
 		if appState.Status == types.ApplicationStatusALLOCATED {
 			res, err = f.ResourceGetByApplication(app.UID)
@@ -687,7 +695,7 @@ func (f *Fish) executeApplication(vote types.Vote) error {
 					log.Errorf("Fish: Unable to deallocate the Resource of Application: %s (try: %d): %v", app.UID, deallocateRetry, err)
 					// Let's retry to deallocate the resource 10 times before give up
 					if deallocateRetry <= 10 {
-						deallocateRetry += 1
+						deallocateRetry++
 						time.Sleep(10 * time.Second)
 						continue
 					}
@@ -745,7 +753,7 @@ func (f *Fish) executeApplicationTasks(drv drivers.ResourceDriver, def *types.La
 		t := drv.GetTask(task.Task, string(task.Options))
 		if t == nil {
 			log.Error("Fish: Unable to get associated driver task type for Application:", res.ApplicationUID, task.Task)
-			task.Result = util.UnparsedJson(`{"error":"task not available in driver"}`)
+			task.Result = util.UnparsedJSON(`{"error":"task not available in driver"}`)
 		} else {
 			// Executing the task
 			t.SetInfo(&task, def, res)
@@ -754,7 +762,7 @@ func (f *Fish) executeApplicationTasks(drv drivers.ResourceDriver, def *types.La
 				// We're not crashing here because even with error task could have a result
 				log.Error("Fish: Error happened during executing the task:", task.UID, err)
 			}
-			task.Result = util.UnparsedJson(result)
+			task.Result = util.UnparsedJSON(result)
 		}
 		if err := f.ApplicationTaskSave(&task); err != nil {
 			log.Error("Fish: Error during update the task with result:", task.UID, err)
@@ -764,9 +772,9 @@ func (f *Fish) executeApplicationTasks(drv drivers.ResourceDriver, def *types.La
 	return nil
 }
 
-func (f *Fish) removeFromExecutingApplincations(appUid types.ApplicationUID) {
+func (f *Fish) removeFromExecutingApplincations(appUID types.ApplicationUID) {
 	for i, uid := range f.applications {
-		if uid != appUid {
+		if uid != appUID {
 			continue
 		}
 		f.applications[i] = f.applications[len(f.applications)-1]
@@ -775,25 +783,25 @@ func (f *Fish) removeFromExecutingApplincations(appUid types.ApplicationUID) {
 	}
 }
 
-func (f *Fish) voteActive(appUid types.ApplicationUID) bool {
+func (f *Fish) voteActive(appUID types.ApplicationUID) bool {
 	f.activeVotesMutex.Lock()
 	defer f.activeVotesMutex.Unlock()
 
 	for _, vote := range f.activeVotes {
-		if vote.ApplicationUID == appUid {
+		if vote.ApplicationUID == appUID {
 			return true
 		}
 	}
 	return false
 }
 
-func (f *Fish) voteActiveRemove(voteUid types.VoteUID) {
+func (f *Fish) voteActiveRemove(voteUID types.VoteUID) {
 	f.activeVotesMutex.Lock()
 	defer f.activeVotesMutex.Unlock()
 	av := f.activeVotes
 
 	for i, v := range f.activeVotes {
-		if v.UID != voteUid {
+		if v.UID != voteUID {
 			continue
 		}
 		av[i] = av[len(av)-1]
@@ -802,7 +810,7 @@ func (f *Fish) voteActiveRemove(voteUid types.VoteUID) {
 	}
 }
 
-// Set/unset the maintenance mode which will not allow to accept the additional Applications
+// MaintenanceSet sets/unsets the maintenance mode which will not allow to accept the additional Applications
 func (f *Fish) MaintenanceSet(value bool) {
 	if f.maintenance != value {
 		if value {
@@ -815,7 +823,7 @@ func (f *Fish) MaintenanceSet(value bool) {
 	f.maintenance = value
 }
 
-// Tells node it need to execute graceful shutdown operation
+// ShutdownSet tells node it need to execute graceful shutdown operation
 func (f *Fish) ShutdownSet(value bool) {
 	if f.shutdown != value {
 		if value {
@@ -829,7 +837,7 @@ func (f *Fish) ShutdownSet(value bool) {
 	f.shutdown = value
 }
 
-// Set of how much time to wait before executing the node shutdown operation
+// ShutdownDelaySet set of how much time to wait before executing the node shutdown operation
 func (f *Fish) ShutdownDelaySet(delay time.Duration) {
 	if f.shutdownDelay != delay {
 		log.Info("Fish: Shutdown delay is set to:", delay)
@@ -846,9 +854,12 @@ func (f *Fish) activateShutdown() {
 	// Running the main shutdown routine
 	go func() {
 		fireShutdown := make(chan bool, 1)
-		delayTickerReport := &time.Ticker{}
-		delayTimer := &time.Timer{}
+		var delayTickerReport *time.Ticker
+		var delayTimer *time.Timer
 		var delayEndTime time.Time
+
+		defer delayTickerReport.Stop()
+		defer delayTimer.Stop()
 
 		for {
 			select {
@@ -860,10 +871,8 @@ func (f *Fish) activateShutdown() {
 				// If the delay is set, then running timer to execute shutdown with delay
 				if f.shutdownDelay > 0 {
 					delayEndTime = time.Now().Add(f.shutdownDelay)
-					delayTickerReport := time.NewTicker(30 * time.Second)
-					defer delayTickerReport.Stop()
+					delayTickerReport = time.NewTicker(30 * time.Second)
 					delayTimer = time.NewTimer(f.shutdownDelay)
-					defer delayTimer.Stop()
 				} else {
 					// No delay is needed, so shutdown now
 					fireShutdown <- true

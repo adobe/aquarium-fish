@@ -41,16 +41,16 @@ func TestFileStartsNotEqual(t *testing.T) {
 
 	os.WriteFile(tmpFile, inData, 0o644)
 
-	if err := FileStartsWith(tmpFile, []byte("test2 ")); err != ErrFileStartsWithNotEqual {
-		t.Fatalf(`FileStartsWith("test2 ") = %v, want: %v`, err, ErrFileStartsWithNotEqual)
+	if err := FileStartsWith(tmpFile, []byte("test2 ")); err != errFileStartsWithNotEqual {
+		t.Fatalf(`FileStartsWith("test2 ") = %v, want: %v`, err, errFileStartsWithNotEqual)
 	}
 }
 
 func TestFileStartsDirectory(t *testing.T) {
 	tmpFile := t.TempDir()
 
-	if err := FileStartsWith(tmpFile, []byte("test2 ")); err != ErrFileStartsWithDirectory {
-		t.Fatalf(`FileStartsWith("test2 ") = %v, want: %v`, err, ErrFileStartsWithDirectory)
+	if err := FileStartsWith(tmpFile, []byte("test2 ")); err != errFileStartsWithDirectory {
+		t.Fatalf(`FileStartsWith("test2 ") = %v, want: %v`, err, errFileStartsWithDirectory)
 	}
 }
 
@@ -61,7 +61,7 @@ func TestFileStartsSmall(t *testing.T) {
 
 	os.WriteFile(tmpFile, inData, 0o644)
 
-	if err := FileStartsWith(tmpFile, []byte("biiiiiiiiiig prefix")); err != ErrFileStartsWithFileTooSmall {
-		t.Fatalf(`FileStartsWith("test2 ") = %v, want: %v`, err, ErrFileStartsWithFileTooSmall)
+	if err := FileStartsWith(tmpFile, []byte("biiiiiiiiiig prefix")); err != errFileStartsWithFileTooSmall {
+		t.Fatalf(`FileStartsWith("test2 ") = %v, want: %v`, err, errFileStartsWithFileTooSmall)
 	}
 }

@@ -33,7 +33,8 @@
  * SOFTWARE.
  */
 
-package proxy_ssh
+// Package proxyssh allows to access the remote resources through ssh proxy
+package proxyssh
 
 import (
 	"crypto/rand"
@@ -59,6 +60,7 @@ func init() {
 	log.Info("The Fish SSH proxy is a re-implementation of Remco Verhoef's MIT licensed example (https://github.com/dutchcoders/sshproxy)")
 }
 
+// ProxyAccess keeps state of the SSH server
 type ProxyAccess struct {
 	fish         *fish.Fish
 	serverConfig *ssh.ServerConfig
@@ -68,7 +70,7 @@ type ProxyAccess struct {
 	sessions sync.Map
 }
 
-// Stored in ProxyAccess::sessions.
+// SessionRecord stored in ProxyAccess::sessions.
 type SessionRecord struct {
 	ResourceAccessor *types.ResourceAccess
 	RemoteAddr       net.Addr
@@ -201,8 +203,8 @@ func (p *ProxyAccess) serveConnection(conn net.Conn, serverConfig *ssh.ServerCon
 		// These are kept for safety to ensure the channels are indeed closed,
 		// but in theory the ProxyLoop will close the channels and that will
 		// signal to io.Copy that we are complete.
-		defer localChannel.Close()
-		defer remoteChannel.Close()
+		defer localChannel.Close()  //nolint:revive
+		defer remoteChannel.Close() //nolint:revive
 	}
 
 	log.Debugf("Connection between %q and %q closed.", conn.RemoteAddr(), remoteConn.RemoteAddr())
@@ -260,7 +262,8 @@ func (p *ProxyAccess) passwordCallback(conn ssh.ConnMetadata, pass []byte) (*ssh
 	return nil, fmt.Errorf("invalid access")
 }
 
-func Init(fish *fish.Fish, idRsaPath string, address string) error {
+// Init starts SSH proxy
+func Init(f *fish.Fish, idRsaPath string, address string) error {
 	// First, try and read the file if it exists already.  Otherwise, it is the
 	// first execution, generate the private / public keys.  The SSH server
 	// requires at least one identity loaded to run.
@@ -297,7 +300,7 @@ func Init(fish *fish.Fish, idRsaPath string, address string) error {
 		return fmt.Errorf("proxy_ssh: failed to parse private key: %w", err)
 	}
 
-	sshProxy := ProxyAccess{fish: fish}
+	sshProxy := ProxyAccess{fish: f}
 	sshProxy.serverConfig = &ssh.ServerConfig{
 		PasswordCallback: sshProxy.passwordCallback,
 	}

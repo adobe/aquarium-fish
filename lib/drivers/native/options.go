@@ -24,20 +24,21 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
-/**
- * Options example:
- *   images:
- *     - url: https://artifact-storage/aquarium/image/native/macos-VERSION/macos-VERSION.tar.xz
- *       sum: sha256:1234567890abcdef1234567890abcdef1
- *       tag: ws  # The same as a name of disk in Label resource definition
- *     - url: https://artifact-storage/aquarium/image/native/macos_amd64-ci-VERSION/macos_amd64-ci-VERSION.tar.xz
- *       sum: sha256:1234567890abcdef1234567890abcdef2
- *       tag: ws
- *   entry: "{{ .Disks.ws }}/init.sh"  # CWD is user home
- *   groups:
- *     - staff
- *     - importantgroup
- */
+// Options for label definition
+//
+// Example:
+//
+//	images:
+//	  - url: https://artifact-storage/aquarium/image/native/macos-VERSION/macos-VERSION.tar.xz
+//	    sum: sha256:1234567890abcdef1234567890abcdef1
+//	    tag: ws  # The same as a name of disk in Label resource definition
+//	  - url: https://artifact-storage/aquarium/image/native/macos_amd64-ci-VERSION/macos_amd64-ci-VERSION.tar.xz
+//	    sum: sha256:1234567890abcdef1234567890abcdef2
+//	    tag: ws
+//	entry: "{{ .Disks.ws }}/init.sh"  # CWD is user home
+//	groups:
+//	  - staff
+//	  - importantgroup
 type Options struct {
 	Images []drivers.Image `json:"images"` // Optional list of image dependencies, they will be unpacked in order
 	//TODO: Setup  string          `json:"setup"`  // Optional path to the executable, it will be started before the Entry with escalated privileges
@@ -45,7 +46,8 @@ type Options struct {
 	Groups []string `json:"groups"` // Optional user groups user should have, first one is primary (default: staff)
 }
 
-func (o *Options) Apply(options util.UnparsedJson) error {
+// Apply takes json and applies it to the options structure
+func (o *Options) Apply(options util.UnparsedJSON) error {
 	if err := json.Unmarshal([]byte(options), o); err != nil {
 		return log.Error("Native: Unable to apply the driver definition", err)
 	}
@@ -53,6 +55,7 @@ func (o *Options) Apply(options util.UnparsedJson) error {
 	return o.Validate()
 }
 
+// Validate makes sure the options have the required defaults & that the required fields are set
 // Note: there is no mandatory options, because in theory the native env could be pre-created
 func (o *Options) Validate() error {
 	// Set default entry

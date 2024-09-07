@@ -10,6 +10,7 @@
  * governing permissions and limitations under the License.
  */
 
+// Package types stores generated types and their special functions
 package types
 
 import (
@@ -18,10 +19,12 @@ import (
 	"fmt"
 )
 
-func (auth Authentication) GormDataType() string {
+// GormDataType describes how to store Authentication in database
+func (Authentication) GormDataType() string {
 	return "blob"
 }
 
+// Scan converts the Authentication to json bytes
 func (auth *Authentication) Scan(value any) error {
 	bytes, ok := value.([]byte)
 	if !ok {
@@ -32,6 +35,7 @@ func (auth *Authentication) Scan(value any) error {
 	return err
 }
 
+// Value converts json bytes to Authentication
 func (auth Authentication) Value() (driver.Value, error) {
 	return json.Marshal(auth)
 }

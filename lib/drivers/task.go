@@ -16,6 +16,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
+// ResourceDriverTask is interface for driver tasks execution
 type ResourceDriverTask interface {
 	// Name of the task
 	Name() string

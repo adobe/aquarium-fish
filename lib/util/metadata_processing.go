@@ -8,7 +8,7 @@ import (
 	"github.com/alessio/shellescape"
 )
 
-// Serializes dictionary to usable format
+// SerializeMetadata serializes dictionary to usable format
 func SerializeMetadata(format, prefix string, data map[string]any) (out []byte, err error) {
 	switch format {
 	case "json": // Default json

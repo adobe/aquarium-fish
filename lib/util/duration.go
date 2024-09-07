@@ -18,14 +18,17 @@ import (
 	"time"
 )
 
+// Duration is a simple wrapper to add serialization functions
 type Duration time.Duration
 
+// MarshalJSON represents Duration as JSON string
 func (d Duration) MarshalJSON() ([]byte, error) {
 	return json.Marshal(time.Duration(d).String())
 }
 
+// UnmarshalJSON parses JSON string as Duration
 func (d *Duration) UnmarshalJSON(b []byte) error {
-	var v interface{}
+	var v any
 	if err := json.Unmarshal(b, &v); err != nil {
 		return err
 	}

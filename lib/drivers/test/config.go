@@ -10,6 +10,7 @@
  * governing permissions and limitations under the License.
  */
 
+// Package test implements mock driver
 package test
 
 import (
@@ -20,16 +21,17 @@ import (
 	"github.com/adobe/aquarium-fish/lib/log"
 )
 
+// Config - node driver configuration
 type Config struct {
 	IsRemote bool `json:"is_remote"` // Pretend to be remote or not to check the local node limits
 
 	WorkspacePath string `json:"workspace_path"` // Where to place the files of running resources
 
-	CpuLimit uint `json:"cpu_limit"` // Number of available virtual CPUs, 0 - unlimited
-	RamLimit uint `json:"ram_limit"` // Amount of available virtual RAM (GB), 0 - unlimited
+	CPULimit uint `json:"cpu_limit"` // Number of available virtual CPUs, 0 - unlimited
+	RAMLimit uint `json:"ram_limit"` // Amount of available virtual RAM (GB), 0 - unlimited
 
-	CpuOverbook uint `json:"cpu_overbook"` // How many CPUs available for overbook
-	RamOverbook uint `json:"ram_overbook"` // How much RAM (GB) available for overbook
+	CPUOverbook uint `json:"cpu_overbook"` // How many CPUs available for overbook
+	RAMOverbook uint `json:"ram_overbook"` // How much RAM (GB) available for overbook
 
 	FailConfigApply    uint8 `json:"fail_config_apply"`    // Fail on config Apply (0 - not, 1-254 random, 255-yes)
 	FailConfigValidate uint8 `json:"fail_config_validate"` // Fail on config Validation (0 - not, 1-254 random, 255-yes)
@@ -38,6 +40,7 @@ type Config struct {
 	FailDeallocate     uint8 `json:"fail_deallocate"`      // Fail on Deallocate (0 - not, 1-254 random, 255-yes)
 }
 
+// Apply takes json and applies it to the config structure
 func (c *Config) Apply(config []byte) error {
 	// Parse json
 	if len(config) > 0 {
@@ -49,6 +52,7 @@ func (c *Config) Apply(config []byte) error {
 	return randomFail("ConfigApply", c.FailConfigApply)
 }
 
+// Validate makes sure the config have the required defaults & that the required fields are set
 func (c *Config) Validate() (err error) {
 	if c.WorkspacePath == "" {
 		c.WorkspacePath = "fish_test_workspace"

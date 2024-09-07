@@ -61,7 +61,7 @@ drivers:
 	t.Run("Create & check JSON Label", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Post(afi.ApiAddress("api/v1/label/")).
+			Post(afi.APIAddress("api/v1/label/")).
 			Header("Content-Type", "application/json").
 			Body(`{"name":"test-label","version":1,"definitions":[{"driver":"test","options":{"fail_options_apply":0},"resources":{"cpu":1,"ram":2}}]}`).
 			BasicAuth("admin", afi.AdminToken()).

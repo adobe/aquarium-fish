@@ -37,7 +37,7 @@ import (
 
 // Image definition
 type Image struct {
-	Url string `json:"url"` // Address of the remote image to download it
+	URL string `json:"url"` // Address of the remote image to download it
 	Sum string `json:"sum"` // Optional checksum of the image in format "<algo>:<checksum>"
 
 	Name    string `json:"name"`    // Optional name of the image, if not set will use a part of the Url file name prior to last minus ("-") or ext
@@ -46,20 +46,21 @@ type Image struct {
 	Tag string `json:"tag"` // Optional identifier used by drivers to make sure the images will be processed properly
 }
 
+// Validate makes sure the image spec is good enough
 func (i *Image) Validate() error {
 	// Check url is defined
-	if i.Url == "" {
+	if i.URL == "" {
 		return fmt.Errorf("Image: Url is not provided")
 	}
 
 	// Check url schema is supported
-	if !(strings.HasPrefix(i.Url, "http://") || strings.HasPrefix(i.Url, "https://")) {
-		return fmt.Errorf("Image: Url schema is not supported: %q", i.Url)
+	if !(strings.HasPrefix(i.URL, "http://") || strings.HasPrefix(i.URL, "https://")) {
+		return fmt.Errorf("Image: Url schema is not supported: %q", i.URL)
 	}
 
 	// Fill name out of image url
 	if i.Name == "" {
-		i.Name = path.Base(i.Url)
+		i.Name = path.Base(i.URL)
 		minusLoc := strings.LastIndexByte(i.Name, '-')
 		if minusLoc != -1 {
 			// Use the part from beginning to last minus ('-') - useful to separate version part
@@ -77,7 +78,7 @@ func (i *Image) Validate() error {
 
 	// Fill version out of image url
 	if i.Version == "" {
-		i.Version = path.Base(i.Url)
+		i.Version = path.Base(i.URL)
 		minusLoc := strings.LastIndexByte(i.Version, '-')
 		if minusLoc != -1 {
 			// Use the part from the last minus ('-') to the end
@@ -112,13 +113,13 @@ func (i *Image) Validate() error {
 	return nil
 }
 
-// Stream function to download and unpack image archive without using a storage file to make it as
+// DownloadUnpack is a stream function to download and unpack image archive without using a storage file to make it as
 // quick as possible.
 // -> out_dir - is the directory where the image will be placed. It will be unpacked to out_dir/Name-Version/
 // -> user, password - credentials for HTTP Basic auth
 func (i *Image) DownloadUnpack(outDir, user, password string) error {
 	imgPath := filepath.Join(outDir, i.Name+"-"+i.Version)
-	log.Debug("Image: Downloading & Unpacking image:", i.Url, imgPath)
+	log.Debug("Image: Downloading & Unpacking image:", i.URL, imgPath)
 	lockPath := imgPath + ".lock"
 
 	// Wait for another process to download and unpack the archive
@@ -140,20 +141,20 @@ func (i *Image) DownloadUnpack(outDir, user, password string) error {
 	defer os.Remove(lockPath)
 
 	client := &http.Client{}
-	req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, i.Url, nil)
+	req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, i.URL, nil)
 	if user != "" && password != "" {
 		req.SetBasicAuth(user, password)
 	}
 	resp, err := client.Do(req)
 	if err != nil {
 		os.RemoveAll(imgPath)
-		return fmt.Errorf("Image: Unable to request url %q: %v", i.Url, err)
+		return fmt.Errorf("Image: Unable to request url %q: %v", i.URL, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		os.RemoveAll(imgPath)
-		return fmt.Errorf("Image: Unable to download file %q: %s", i.Url, resp.Status)
+		return fmt.Errorf("Image: Unable to download file %q: %s", i.URL, resp.Status)
 	}
 
 	// Printing the download progress
@@ -197,7 +198,7 @@ func (i *Image) DownloadUnpack(outDir, user, password string) error {
 			if remoteSum != algoSum[1] {
 				os.RemoveAll(imgPath)
 				return fmt.Errorf("Image: The remote checksum (from header X-Checksum-%s) doesn't equal the desired one: %q != %q for %q",
-					strings.Title(algoSum[0]), remoteSum, algoSum[1], i.Url) //nolint:staticcheck // SA1019 Strictly ASCII here
+					strings.Title(algoSum[0]), remoteSum, algoSum[1], i.URL) //nolint:staticcheck // SA1019 Strictly ASCII here
 			}
 		}
 	}
@@ -253,7 +254,6 @@ func (i *Image) DownloadUnpack(outDir, user, password string) error {
 				os.RemoveAll(imgPath)
 				return fmt.Errorf("Image: Unable to open file %q for unpack: %v", target, err)
 			}
-			defer w.Close()
 
 			// TODO: Add in-stream sha256 calculation for each file to verify against .sha256 data
 			for {
@@ -264,8 +264,10 @@ func (i *Image) DownloadUnpack(outDir, user, password string) error {
 					break
 				}
 				os.RemoveAll(imgPath)
+				w.Close()
 				return fmt.Errorf("Image: Unable to unpack content to file %q: %v", target, err)
 			}
+			w.Close()
 		}
 	}
 
@@ -279,7 +281,7 @@ func (i *Image) DownloadUnpack(outDir, user, password string) error {
 		if calculatedSum != algoSum[1] {
 			os.RemoveAll(imgPath)
 			return fmt.Errorf("Image: The calculated checksum doesn't equal the desired one: %q != %q for %q",
-				calculatedSum, algoSum[1], i.Url)
+				calculatedSum, algoSum[1], i.URL)
 		}
 	}
 

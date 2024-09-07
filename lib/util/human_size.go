@@ -18,8 +18,10 @@ import (
 	"strings"
 )
 
+// HumanSize describes data size In Human Form
 type HumanSize uint64
 
+// Definitions of different byte sizes and some maximums
 const (
 	B  HumanSize = 1
 	KB           = B << 10
@@ -29,28 +31,29 @@ const (
 	PB           = TB << 10
 	EB           = PB << 10
 
-	fnUnmarshalText string = "UnmarshalText"
-	maxUint64       uint64 = (1 << 64) - 1
-	cutoff          uint64 = maxUint64 / 10
+	maxUint64 uint64 = (1 << 64) - 1
 )
 
+// NewHumanSize creates human size for you
 func NewHumanSize(input string) (HumanSize, error) {
 	var hs HumanSize
 	err := hs.UnmarshalText([]byte(input))
 	return hs, err
 }
 
+// MarshalText represents HumanSize as string
 func (hs HumanSize) MarshalText() ([]byte, error) {
 	return []byte(hs.String()), nil
 }
 
+// UnmarshalText converts text to HumanSize number
 // To be properly parsed the text should contain number and unit ("B", "KB", "MB"...) in the end
 func (hs *HumanSize) UnmarshalText(data []byte) error {
 	input := strings.TrimSpace(string(data))
 	length := len(input)
 
 	// Detecting unit & multiplier
-	var mult HumanSize = 0
+	var mult HumanSize
 	var unit string
 	var unitLen int
 	if length > 1 {
@@ -109,10 +112,12 @@ func (hs *HumanSize) UnmarshalText(data []byte) error {
 	return nil
 }
 
+// Bytes returns amount of bytes stored in HumanSize
 func (hs HumanSize) Bytes() uint64 {
 	return uint64(hs)
 }
 
+// String represent HumanSize as human readable string
 func (hs HumanSize) String() string {
 	switch {
 	case hs == 0:

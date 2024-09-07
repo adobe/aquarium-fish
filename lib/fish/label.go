@@ -21,10 +21,11 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
+// LabelFind returns list of Labels that fits filter
 func (f *Fish) LabelFind(filter *string) (labels []types.Label, err error) {
 	db := f.db
 	if filter != nil {
-		securedFilter, err := util.ExpressionSqlFilter(*filter)
+		securedFilter, err := util.ExpressionSQLFilter(*filter)
 		if err != nil {
 			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
 			// We do not fail here because we should not give attacker more information
@@ -36,6 +37,7 @@ func (f *Fish) LabelFind(filter *string) (labels []types.Label, err error) {
 	return labels, err
 }
 
+// LabelCreate makes new Label
 func (f *Fish) LabelCreate(l *types.Label) error {
 	if l.Name == "" {
 		return fmt.Errorf("Fish: Name can't be empty")
@@ -72,12 +74,14 @@ func (f *Fish) LabelCreate(l *types.Label) error {
 	return f.db.Save(label).Error
 }*/
 
+// LabelGet returns Label by UID
 func (f *Fish) LabelGet(uid types.LabelUID) (label *types.Label, err error) {
 	label = &types.Label{}
 	err = f.db.First(label, uid).Error
 	return label, err
 }
 
+// LabelDelete deletes the Label by UID
 func (f *Fish) LabelDelete(uid types.LabelUID) error {
 	return f.db.Delete(&types.Label{}, uid).Error
 }
