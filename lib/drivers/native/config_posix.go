@@ -27,7 +27,6 @@ type PosixConfig struct {
 	SuPath      string `json:"su_path"`      // Path to the su (login as user) binary
 	SudoPath    string `json:"sudo_path"`    // Path to the sudo (privilege escalation) binary
 	ShPath      string `json:"sh_path"`      // Path to the sh (simple user shell) binary
-	TarPath     string `json:"tar_path"`     // Path to the tar (unpacking images) binary
 	MountPath   string `json:"mount_path"`   // Path to the mount (list of mounted volumes) binary
 	ChownPath   string `json:"chown_path"`   // Path to the chown (change file/dir ownership) binary
 	ChmodPath   string `json:"chmod_path"`   // Path to the chmod (change file/dir access) binary

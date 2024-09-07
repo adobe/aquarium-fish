@@ -32,6 +32,7 @@ type Config struct {
 	// Embed platform-specific items
 	PlatformConfig
 
+	TarPath       string `json:"tar_path"`       // Path to the tar (unpacking images) binary
 	ImagesPath    string `json:"images_path"`    // Where to store/look the environment images
 	WorkspacePath string `json:"workspace_path"` // Where to place the env disks
 
