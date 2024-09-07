@@ -108,7 +108,7 @@ drivers:
 	})
 
 	var appTask types.ApplicationTask
-	t.Run("Create ApplicationTask Snapshot", func(t *testing.T) {
+	t.Run("Create unavailable ApplicationTask", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
 			Post(afi.APIAddress("api/v1/application/"+app.UID.String()+"/task/")).
@@ -119,6 +119,8 @@ drivers:
 			End().
 			JSON(&appTask)
 
+		// ApplicationTask will be created anyway even with wrong name, because input Fish node could
+		// not be able to validate it, since could have different config or lack of enabled drivers
 		if appTask.UID == uuid.Nil {
 			t.Fatalf("ApplicationTask UID is incorrect: %v", appTask.UID)
 		}
@@ -142,7 +144,7 @@ drivers:
 			if appTasks[0].UID != appTask.UID {
 				r.Fatalf("ApplicationTask UID is incorrect: %v != %v", appTasks[0].UID, appTask.UID)
 			}
-			if string(appTasks[0].Result) != `{"error":"task not availble in driver"}` {
+			if string(appTasks[0].Result) != `{"error":"task not available in driver"}` {
 				r.Fatalf("ApplicationTask result is incorrect: %v", appTasks[0].Result)
 			}
 		})
