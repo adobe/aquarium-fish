@@ -854,12 +854,9 @@ func (f *Fish) activateShutdown() {
 	// Running the main shutdown routine
 	go func() {
 		fireShutdown := make(chan bool, 1)
-		var delayTickerReport *time.Ticker
-		var delayTimer *time.Timer
+		delayTickerReport := &time.Ticker{}
+		delayTimer := &time.Timer{}
 		var delayEndTime time.Time
-
-		defer delayTickerReport.Stop()
-		defer delayTimer.Stop()
 
 		for {
 			select {
@@ -873,6 +870,10 @@ func (f *Fish) activateShutdown() {
 					delayEndTime = time.Now().Add(f.shutdownDelay)
 					delayTickerReport = time.NewTicker(30 * time.Second)
 					delayTimer = time.NewTimer(f.shutdownDelay)
+
+					// Those defers will be executed just once, so no issues with loop & defer
+					defer delayTickerReport.Stop() //nolint:revive
+					defer delayTimer.Stop()        //nolint:revive
 				} else {
 					// No delay is needed, so shutdown now
 					fireShutdown <- true
