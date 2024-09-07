@@ -67,7 +67,7 @@ func userCreate(c *Config, groups []string) (user, homedir string, err error) {
 	}
 
 	// Creates the home directory because it must exist before setting it as a users homedir
-	if err = os.MkdirAll(homedir); err != nil {
+	if err = os.MkdirAll(homedir, 0o750); err != nil {
 		err = log.Error("Native: Unable to create the user home directory:", err)
 	}
 	if _, _, err = runAndLog(30*time.Second, nil, "cmd", "/c", "net", "user", user, "/homedir:"+"\"homedir\""); err != nil {
@@ -100,7 +100,7 @@ func userRun(c *Config, envData *EnvData, user, entry string, metadata map[strin
 	// Prepare the command to execute entry from user home directory
 	cmd := exec.Command("cmd.exe", "/c", "runas", "/user:"+user, "-c", "\""+shellescape.StripUnsafe(entry)+"\"") // #nosec G204
 	cmd.Env = os.Environ()
-	cmd.Env = append(cmd.Env, envVars)
+	cmd.Env = append(cmd.Env, envVars...)
 	if envData != nil && envData.Disks != nil {
 		if _, ok := envData.Disks[""]; ok {
 			cmd.Dir = envData.Disks[""]
@@ -122,7 +122,7 @@ func userRun(c *Config, envData *EnvData, user, entry string, metadata map[strin
 	// TODO: Probably I should run cmd.Wait to make sure the captured OS resources are released,
 	// but not sure about that... Maybe create a goroutine that will sit and wait there?
 
-	log.Debugf("Native: Started entry for user %q in directory %q with PID %d: %s", user, cmd.Dir, cmd.Process.Pid, shellLine)
+	log.Debugf("Native: Started entry for user %q in directory %q with PID %d: %s", user, cmd.Dir, cmd.Process.Pid, entry)
 
 	// Giving the process 1 second to read the env file and not die from some unexpected error
 	time.Sleep(time.Second)
@@ -182,11 +182,11 @@ func userDelete(c *Config, user string) (outErr error) {
 // Unmount user volumes and delete the disk files
 func disksDelete(c *Config, user string) (outErr error) {
 	//TODO: Implement disksDelete for windows
+	return outErr
 }
 
 // Creates disks directories described by the disks map, returns the map of disks to mount paths
 func (d *Driver) disksCreate(user string, disks map[string]types.ResourcesDisk) (map[string]string, error) {
 	//TODO: Implement disksCreate for windows
-
-	return diskPaths, nil
+	return nil, nil
 }

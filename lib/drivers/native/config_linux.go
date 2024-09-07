@@ -23,6 +23,9 @@ type PlatformConfig struct {
 }
 
 func (c *Config) validateForPlatform(err error) (error, error) {
-	//TODO: implement linux validation
-	return error, error
+	err, err2, err3 := c.validatePosix(err)
+	if err3 != nil {
+		return err2, err3
+	}
+	return err, nil
 }

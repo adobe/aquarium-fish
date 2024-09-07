@@ -26,7 +26,8 @@ type PlatformConfig struct {
 }
 
 func (c *Config) validateForPlatform(err error) (error, error) {
-	//TODO: Validate windows specific config items
+	//TODO: implement windows validation
+	return err, nil
 
 }
 
@@ -38,7 +39,7 @@ func testScriptCreate(user string) (tempFile string, err error) {
 	}
 	tempFile = filepath.Join(tempDir, user+"-init.ps1")
 	script := []byte("whoami")
-	return tempFile, os.WriteFile(tempFile, script)
+	return tempFile, os.WriteFile(tempFile, script, 0o644)
 }
 
 // Will delete the config test script
