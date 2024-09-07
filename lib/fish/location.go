@@ -20,21 +20,23 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
+// LocationFind returns list of Locations fits filter
 func (f *Fish) LocationFind(filter *string) (ls []types.Location, err error) {
 	db := f.db
 	if filter != nil {
-		secured_filter, err := util.ExpressionSqlFilter(*filter)
+		securedFilter, err := util.ExpressionSQLFilter(*filter)
 		if err != nil {
 			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
 			// We do not fail here because we should not give attacker more information
 			return ls, nil
 		}
-		db = db.Where(secured_filter)
+		db = db.Where(securedFilter)
 	}
 	err = db.Find(&ls).Error
 	return ls, err
 }
 
+// LocationCreate makes new Location
 func (f *Fish) LocationCreate(l *types.Location) error {
 	if l.Name == "" {
 		return fmt.Errorf("Fish: Name can't be empty")
@@ -43,22 +45,19 @@ func (f *Fish) LocationCreate(l *types.Location) error {
 	return f.db.Create(l).Error
 }
 
+// LocationSave stores the Location
 func (f *Fish) LocationSave(l *types.Location) error {
 	return f.db.Save(l).Error
 }
 
+// LocationGet returns Location by it's unique name
 func (f *Fish) LocationGet(name types.LocationName) (l *types.Location, err error) {
 	l = &types.Location{}
 	err = f.db.First(l, name).Error
 	return l, err
 }
 
-func (f *Fish) LocationGetByName(name string) (l *types.Location, err error) {
-	l = &types.Location{}
-	err = f.db.Where("name = ?", name).First(l).Error
-	return l, err
-}
-
+// LocationDelete removes location
 func (f *Fish) LocationDelete(name types.LocationName) error {
 	return f.db.Delete(&types.Location{}, name).Error
 }

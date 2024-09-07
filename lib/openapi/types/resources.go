@@ -21,10 +21,12 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
-func (r Resources) GormDataType() string {
+// GormDataType describes how to store Resources in database
+func (Resources) GormDataType() string {
 	return "blob"
 }
 
+// Scan converts the Resources to json bytes
 func (r *Resources) Scan(value any) error {
 	bytes, ok := value.([]byte)
 	if !ok {
@@ -41,6 +43,7 @@ func (r *Resources) Scan(value any) error {
 	return err
 }
 
+// Value converts json bytes to Resources
 func (r Resources) Value() (driver.Value, error) {
 	// Init the value, otherwise will return undesired nil
 	if r.NodeFilter == nil {
@@ -49,7 +52,8 @@ func (r Resources) Value() (driver.Value, error) {
 	return json.Marshal(r)
 }
 
-func (r *Resources) Validate(disk_types []string, check_net bool) error {
+// Validate makes sure the Resources are defined correctly
+func (r *Resources) Validate(diskTypes []string, checkNet bool) error {
 	// Check resources
 	if r.Cpu < 1 {
 		return fmt.Errorf("Resources: Number of CPU cores is less then 1")
@@ -61,8 +65,8 @@ func (r *Resources) Validate(disk_types []string, check_net bool) error {
 		if name == "" {
 			return fmt.Errorf("Resources: Disk name can't be empty")
 		}
-		if len(disk_types) > 0 && !util.Contains(disk_types, disk.Type) {
-			return fmt.Errorf(fmt.Sprintf("Resources: Type of disk must be one of: %+q", disk_types))
+		if len(diskTypes) > 0 && !util.Contains(diskTypes, disk.Type) {
+			return fmt.Errorf("Resources: Type of disk must be one of: %+q", diskTypes)
 		}
 		if disk.Size < 1 {
 			return fmt.Errorf("Resources: Size of the disk can't be less than 1GB")
@@ -77,14 +81,14 @@ func (r *Resources) Validate(disk_types []string, check_net bool) error {
 			}
 		}
 	}
-	if check_net && r.Network != "" && r.Network != "nat" {
+	if checkNet && r.Network != "" && r.Network != "nat" {
 		return fmt.Errorf("Resources: The network configuration must be either '' (empty for hostonly) or 'nat'")
 	}
 
 	return nil
 }
 
-// Adds the Resources data to the existing data
+// Add increases the Resources utilization by provided Resources
 func (r *Resources) Add(res Resources) error {
 	if r.Cpu == 0 && r.Ram == 0 {
 		// Set tenancy modificators for the first resource
@@ -101,7 +105,7 @@ func (r *Resources) Add(res Resources) error {
 	return nil
 }
 
-// Subtracts the Resources data to the existing data
+// Subtract decreases utilization of Resources by provided Resources
 func (r *Resources) Subtract(res Resources) (err error) {
 	if r.Cpu < res.Cpu {
 		err = fmt.Errorf("Resources: Unable to subtract more CPU than we have: %d < %d", r.Cpu, res.Cpu)
@@ -110,9 +114,9 @@ func (r *Resources) Subtract(res Resources) (err error) {
 		r.Cpu -= res.Cpu
 	}
 	if r.Ram < res.Ram {
-		mem_err := fmt.Errorf("Resources: Unable to subtract more RAM than we have: %d < %d", r.Ram, res.Ram)
+		memErr := fmt.Errorf("Resources: Unable to subtract more RAM than we have: %d < %d", r.Ram, res.Ram)
 		if err != nil {
-			err = fmt.Errorf("%v, %v", err, mem_err)
+			err = fmt.Errorf("%v, %v", err, memErr)
 		}
 		r.Ram = 0
 	} else {
@@ -124,7 +128,7 @@ func (r *Resources) Subtract(res Resources) (err error) {
 	return
 }
 
-// Checks if the Resources are filled with some values
+// IsEmpty checks if the Resources are filled with some values
 func (r *Resources) IsEmpty() bool {
 	if r.Cpu != 0 {
 		return false

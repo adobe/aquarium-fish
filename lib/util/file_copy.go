@@ -17,6 +17,7 @@ import (
 	"os"
 )
 
+// FileCopy copies from one place to another
 func FileCopy(src string, dst string) error {
 	source, err := os.Open(src)
 	if err != nil {

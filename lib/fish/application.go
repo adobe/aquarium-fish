@@ -10,6 +10,7 @@
  * governing permissions and limitations under the License.
  */
 
+// Package fish core defines all the internals of the Fish processes
 package fish
 
 import (
@@ -22,21 +23,23 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
+// ApplicationFind lists Applications by filter
 func (f *Fish) ApplicationFind(filter *string) (as []types.Application, err error) {
 	db := f.db
 	if filter != nil {
-		secured_filter, err := util.ExpressionSqlFilter(*filter)
+		securedFilter, err := util.ExpressionSQLFilter(*filter)
 		if err != nil {
 			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
 			// We do not fail here because we should not give attacker more information
 			return as, nil
 		}
-		db = db.Where(secured_filter)
+		db = db.Where(securedFilter)
 	}
 	err = db.Find(&as).Error
 	return as, err
 }
 
+// ApplicationCreate makes new Applciation
 func (f *Fish) ApplicationCreate(a *types.Application) error {
 	if a.LabelUID == uuid.Nil {
 		return fmt.Errorf("Fish: LabelUID can't be unset")
@@ -61,12 +64,14 @@ func (f *Fish) ApplicationCreate(a *types.Application) error {
 	return f.db.Save(app).Error
 }*/
 
+// ApplicationGet returns Application by UID
 func (f *Fish) ApplicationGet(uid types.ApplicationUID) (a *types.Application, err error) {
 	a = &types.Application{}
 	err = f.db.First(a, uid).Error
 	return a, err
 }
 
+// ApplicationListGetStatusNew returns new Applications
 func (f *Fish) ApplicationListGetStatusNew() (as []types.Application, err error) {
 	// SELECT * FROM applications WHERE UID in (
 	//    SELECT application_uid FROM (
@@ -81,8 +86,9 @@ func (f *Fish) ApplicationListGetStatusNew() (as []types.Application, err error)
 	return as, err
 }
 
-func (f *Fish) ApplicationIsAllocated(app_uid types.ApplicationUID) (err error) {
-	state, err := f.ApplicationStateGetByApplication(app_uid)
+// ApplicationIsAllocated returns if specific Application is allocated
+func (f *Fish) ApplicationIsAllocated(appUID types.ApplicationUID) (err error) {
+	state, err := f.ApplicationStateGetByApplication(appUID)
 	if err != nil {
 		return err
 	} else if state.Status != types.ApplicationStatusALLOCATED {

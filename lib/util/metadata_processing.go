@@ -8,7 +8,7 @@ import (
 	"github.com/alessio/shellescape"
 )
 
-// Serializes dictionary to usable format
+// SerializeMetadata serializes dictionary to usable format
 func SerializeMetadata(format, prefix string, data map[string]any) (out []byte, err error) {
 	switch format {
 	case "json": // Default json
@@ -16,7 +16,7 @@ func SerializeMetadata(format, prefix string, data map[string]any) (out []byte, 
 	case "env": // Plain format suitable to use in shell
 		m := DotSerialize(prefix, data)
 		for key, val := range m {
-			line := cleanShellKey(strings.Replace(shellescape.StripUnsafe(key), ".", "_", -1))
+			line := cleanShellKey(strings.ReplaceAll(shellescape.StripUnsafe(key), ".", "_"))
 			if len(line) == 0 {
 				continue
 			}
@@ -26,7 +26,7 @@ func SerializeMetadata(format, prefix string, data map[string]any) (out []byte, 
 	case "export": // Format env with exports for easy usage with source
 		m := DotSerialize(prefix, data)
 		for key, val := range m {
-			line := cleanShellKey(strings.Replace(shellescape.StripUnsafe(key), ".", "_", -1))
+			line := cleanShellKey(strings.ReplaceAll(shellescape.StripUnsafe(key), ".", "_"))
 			if len(line) == 0 {
 				continue
 			}
@@ -37,12 +37,12 @@ func SerializeMetadata(format, prefix string, data map[string]any) (out []byte, 
 	case "ps1": // Plain format suitable to use in powershell
 		m := DotSerialize(prefix, data)
 		for key, val := range m {
-			line := cleanShellKey(strings.Replace(shellescape.StripUnsafe(key), ".", "_", -1))
+			line := cleanShellKey(strings.ReplaceAll(shellescape.StripUnsafe(key), ".", "_"))
 			if len(line) == 0 {
 				continue
 			}
 			// Shell quote is not applicable here, so using the custom one
-			value := []byte("='" + strings.Replace(val, "'", "''", -1) + "'\n")
+			value := []byte("='" + strings.ReplaceAll(val, "'", "''") + "'\n")
 			out = append(out, append([]byte("$"), append(line, value...)...)...)
 		}
 	default:

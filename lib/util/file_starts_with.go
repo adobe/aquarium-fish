@@ -19,36 +19,37 @@ import (
 )
 
 var (
-	ErrFileStartsWithDirectory    = fmt.Errorf("FileStartsWith: Unable to check file prefix for directory")
-	ErrFileStartsWithFileTooSmall = fmt.Errorf("FileStartsWith: File is too small for prefix")
-	ErrFileStartsWithNotEqual     = fmt.Errorf("FileStartsWith: File is not starts with the prefix")
+	errFileStartsWithDirectory    = fmt.Errorf("FileStartsWith: Unable to check file prefix for directory")
+	errFileStartsWithFileTooSmall = fmt.Errorf("FileStartsWith: File is too small for prefix")
+	errFileStartsWithNotEqual     = fmt.Errorf("FileStartsWith: File is not starts with the prefix")
 )
 
+// FileStartsWith checks the file starts with required prefix
 func FileStartsWith(path string, prefix []byte) error {
 	// Open input file
-	in_f, err := os.OpenFile(path, os.O_RDONLY, 0o644)
+	inF, err := os.OpenFile(path, os.O_RDONLY, 0o644)
 	if err != nil {
 		return err
 	}
-	defer in_f.Close()
+	defer inF.Close()
 
 	// Check it's not a dir
-	if info, err := in_f.Stat(); err == nil && info.IsDir() {
-		return ErrFileStartsWithDirectory
+	if info, err := inF.Stat(); err == nil && info.IsDir() {
+		return errFileStartsWithDirectory
 	}
 
 	buf := make([]byte, len(prefix))
-	length, err := in_f.Read(buf)
+	length, err := inF.Read(buf)
 	if err != nil {
 		return err
 	}
 	if length != len(prefix) {
-		return ErrFileStartsWithFileTooSmall
+		return errFileStartsWithFileTooSmall
 	}
 
 	if bytes.Equal(prefix, buf) {
 		return nil
 	}
 
-	return ErrFileStartsWithNotEqual
+	return errFileStartsWithNotEqual
 }

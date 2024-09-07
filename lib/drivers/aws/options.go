@@ -20,14 +20,15 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
-/**
- * Options example:
- *   image: ami-abcdef123456
- *   instance_type: c6a.4xlarge
- *   security_group: sg-abcdef123456
- *   tags:
- *     somekey: somevalue
- */
+// Options for label definition
+//
+// Example:
+//
+//	image: ami-abcdef123456
+//	instance_type: c6a.4xlarge
+//	security_group: sg-abcdef123456
+//	tags:
+//	  somekey: somevalue
 type Options struct {
 	Image         string            `json:"image"`          // ID/Name of the image you want to use (name that contains * is usually a bad idea for reproducibility)
 	InstanceType  string            `json:"instance_type"`  // Type of the instance from aws available list
@@ -44,7 +45,8 @@ type Options struct {
 	TaskImageEncryptKey string `json:"task_image_encrypt_key"` // KMS Key ID or Alias in format "alias/<name>" if need to re-encrypt the newly created AMI snapshots
 }
 
-func (o *Options) Apply(options util.UnparsedJson) error {
+// Apply takes json and applies it to the options structure
+func (o *Options) Apply(options util.UnparsedJSON) error {
 	if err := json.Unmarshal([]byte(options), o); err != nil {
 		return log.Error("AWS: Unable to apply the driver options", err)
 	}
@@ -52,6 +54,7 @@ func (o *Options) Apply(options util.UnparsedJson) error {
 	return o.Validate()
 }
 
+// Validate makes sure the options have the required defaults & that the required fields are set
 func (o *Options) Validate() error {
 	// Check image
 	if o.Image == "" {

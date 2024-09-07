@@ -10,6 +10,7 @@
  * governing permissions and limitations under the License.
  */
 
+// Package aws implements driver
 package aws
 
 import (
@@ -25,6 +26,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
+// Config - node driver configuration
 type Config struct {
 	Region    string `json:"region"`     // AWS Region to connect to
 	KeyID     string `json:"key_id"`     // AWS AMI Key ID
@@ -43,7 +45,7 @@ type Config struct {
 	ImageCreateWait    util.Duration `json:"image_create_wait"`    // Maximum wait time for image availability (create/copy), default: 2h
 }
 
-// Stores the configuration of AWS dedicated pool of particular type to manage
+// DedicatedPoolRecord stores the configuration of AWS dedicated pool of particular type to manage
 // aws ec2 allocate-hosts --availability-zone "us-west-2c" --auto-placement "on" --host-recovery "off" --host-maintenance "off" --quantity 1 --instance-type "mac2.metal"
 type DedicatedPoolRecord struct {
 	Type string `json:"type"` // Instance type handled by the dedicated hosts pool (example: "mac2.metal")
@@ -80,6 +82,7 @@ type DedicatedPoolRecord struct {
 	ScrubbingDelay util.Duration `json:"scrubbing_delay"`
 }
 
+// Apply takes json and applies it to the config structure
 func (c *Config) Apply(config []byte) error {
 	// Parse json
 	if len(config) > 0 {
@@ -91,6 +94,7 @@ func (c *Config) Apply(config []byte) error {
 	return nil
 }
 
+// Validate makes sure the config have the required defaults & that the required fields are set
 func (c *Config) Validate() (err error) {
 	// Check that values of the config is filled at least with defaults
 	if c.Region == "" {
@@ -107,7 +111,7 @@ func (c *Config) Validate() (err error) {
 	// Verify that connection is possible with those creds and get the account ID
 	conn := sts.NewFromConfig(aws.Config{
 		Region: c.Region,
-		Credentials: aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
+		Credentials: aws.CredentialsProviderFunc(func(_ /*ctx*/ context.Context) (aws.Credentials, error) {
 			return aws.Credentials{
 				AccessKeyID:     c.KeyID,
 				SecretAccessKey: c.SecretKey,
@@ -126,7 +130,7 @@ func (c *Config) Validate() (err error) {
 	// It helps with the machines where internet is not available right away
 	retries := 6
 	counter := 0
-	account := ""
+	var account string
 	for {
 		res, err := conn.GetCallerIdentity(context.TODO(), input)
 		counter++

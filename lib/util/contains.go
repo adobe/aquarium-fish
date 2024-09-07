@@ -10,8 +10,10 @@
  * governing permissions and limitations under the License.
  */
 
+// Package util contains multiple utils for Fish
 package util
 
+// Contains check the string slice contains string in it
 func Contains(list []string, value string) bool {
 	for _, v := range list {
 		if v == value {

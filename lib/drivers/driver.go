@@ -10,20 +10,23 @@
  * governing permissions and limitations under the License.
  */
 
+// Package drivers implements interface for each driver (resource provider)
 package drivers
 
 import (
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
+// Status of the driver returned by Status()
 const (
 	StatusNone      = "NONE"
 	StatusAllocated = "ALLOCATED"
 )
 
+// FactoryList is a list of available drivers factories
 var FactoryList []ResourceDriverFactory
 
-// Factory allows to generate new instances of the drivers
+// ResourceDriverFactory allows to generate new instances of the drivers
 type ResourceDriverFactory interface {
 	// Name of the driver
 	Name() string
@@ -32,6 +35,7 @@ type ResourceDriverFactory interface {
 	NewResourceDriver() ResourceDriver
 }
 
+// ResourceDriver interface of the functions that connects Fish to each driver
 type ResourceDriver interface {
 	// Name of the driver
 	Name() string
@@ -52,7 +56,7 @@ type ResourceDriver interface {
 	// -> node_usage - how much of node resources was used by all the drivers. Usually should not be used by the cloud drivers
 	// -> req - definition describes requirements for the resource
 	// <- capacity - the number of such definitions the driver could run, if -1 - error happened
-	AvailableCapacity(node_usage types.Resources, req types.LabelDefinition) (capacity int64)
+	AvailableCapacity(nodeUsage types.Resources, req types.LabelDefinition) (capacity int64)
 
 	// Allocate the resource by definition and returns hw address
 	// -> def - describes the driver options to allocate the required resource

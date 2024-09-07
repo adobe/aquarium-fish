@@ -1101,7 +1101,7 @@ components:
           x-oapi-codegen-extra-tags:
             yaml: label_UID
         metadata:
-          x-go-type: util.UnparsedJson
+          x-go-type: util.UnparsedJSON
           description: Additional metadata in JSON format (can't override Label metadata)
           example:
             JENKINS_URL: 'http://172.16.1.1:8085/'
@@ -1203,10 +1203,10 @@ components:
             Used to specify when the task should be executed, right now only ALLOCATED, DEALLOCATE
             and RECALLED (when app is already here) are supported.
         options:
-          x-go-type: util.UnparsedJson
+          x-go-type: util.UnparsedJSON
           description: JSON object with additional options
         result:
-          x-go-type: util.UnparsedJson
+          x-go-type: util.UnparsedJSON
           description: JSON object with the results of task execution
 
     UserName:
@@ -1322,7 +1322,7 @@ components:
           $ref: '#/components/schemas/Resources'
           description: Resources Driver need to provide for the Label execution
         options:
-          x-go-type: util.UnparsedJson
+          x-go-type: util.UnparsedJSON
           description: Driver-specific options to execute the environment
         authentication:
           $ref: '#/components/schemas/Authentication'
@@ -1376,7 +1376,7 @@ components:
         definitions:
           $ref: '#/components/schemas/LabelDefinitions'
         metadata:
-          x-go-type: util.UnparsedJson
+          x-go-type: util.UnparsedJSON
           description: Basic metadata to pass to the Resource
           example:
             JENKINS_AGENT_WORKSPACE: D:\
@@ -1620,7 +1620,7 @@ components:
             MAC or any other type of network address which will allow to properly identify the node
             through network interaction.
         metadata:
-          x-go-type: util.UnparsedJson
+          x-go-type: util.UnparsedJSON
           description: >
             Combined Application and Label metadata (in this order) to make it available through
             `Meta API` to the resource.

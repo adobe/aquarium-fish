@@ -66,7 +66,7 @@ drivers:
 	t.Run("Create Label", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Post(afi.ApiAddress("api/v1/label/")).
+			Post(afi.APIAddress("api/v1/label/")).
 			JSON(`{"name":"test-label", "version":1, "definitions": [
 				{"driver":"test", "resources":{"cpu":1,"ram":2}}
 			]}`).
@@ -85,12 +85,12 @@ drivers:
 	wg := &sync.WaitGroup{}
 	for i := 0; i < 50; i++ {
 		wg.Add(1)
-		go allocate_apps_stress_worker(t, wg, i, afi, label.UID.String())
+		go allocateAppsStressWorker(t, wg, i, afi, label.UID.String())
 	}
 	wg.Wait()
 }
 
-func allocate_apps_stress_worker(t *testing.T, wg *sync.WaitGroup, id int, afi *h.AFInstance, label string) {
+func allocateAppsStressWorker(t *testing.T, wg *sync.WaitGroup, id int, afi *h.AFInstance, label string) {
 	defer wg.Done()
 
 	tr := &http.Transport{
@@ -105,7 +105,7 @@ func allocate_apps_stress_worker(t *testing.T, wg *sync.WaitGroup, id int, afi *
 	t.Run(fmt.Sprintf("%04d Create Application", id), func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Post(afi.ApiAddress("api/v1/application/")).
+			Post(afi.APIAddress("api/v1/application/")).
 			JSON(`{"label_UID":"`+label+`"}`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).

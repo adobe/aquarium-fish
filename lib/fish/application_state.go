@@ -20,11 +20,13 @@ import (
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
+// ApplicationStateList returns list of ApplicationStates
 func (f *Fish) ApplicationStateList() (ass []types.ApplicationState, err error) {
 	err = f.db.Find(&ass).Error
 	return ass, err
 }
 
+// ApplicationStateCreate makes new ApplicationState
 func (f *Fish) ApplicationStateCreate(as *types.ApplicationState) error {
 	if as.ApplicationUID == uuid.Nil {
 		return fmt.Errorf("Fish: ApplicationUID can't be unset")
@@ -42,20 +44,22 @@ func (f *Fish) ApplicationStateCreate(as *types.ApplicationState) error {
 	return f.db.Save(as).Error
 }*/
 
+// ApplicationStateGet returns specific ApplicationState
 func (f *Fish) ApplicationStateGet(uid types.ApplicationStateUID) (as *types.ApplicationState, err error) {
 	as = &types.ApplicationState{}
 	err = f.db.First(as, uid).Error
 	return as, err
 }
 
-func (f *Fish) ApplicationStateGetByApplication(app_uid types.ApplicationUID) (as *types.ApplicationState, err error) {
+// ApplicationStateGetByApplication returns ApplicationState by ApplicationUID
+func (f *Fish) ApplicationStateGetByApplication(appUID types.ApplicationUID) (as *types.ApplicationState, err error) {
 	as = &types.ApplicationState{}
-	err = f.db.Where("application_uid = ?", app_uid).Order("created_at desc").First(as).Error
+	err = f.db.Where("application_uid = ?", appUID).Order("created_at desc").First(as).Error
 	return as, err
 }
 
-// Return false if Status in ERROR, DEALLOCATE or DEALLOCATED state
-func (f *Fish) ApplicationStateIsActive(status types.ApplicationStatus) bool {
+// ApplicationStateIsActive returns false if Status in ERROR, DEALLOCATE or DEALLOCATED state
+func (*Fish) ApplicationStateIsActive(status types.ApplicationStatus) bool {
 	if status == types.ApplicationStatusERROR {
 		return false
 	}

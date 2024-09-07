@@ -59,7 +59,7 @@ drivers:
 	t.Run("Create Label", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Post(afi.ApiAddress("api/v1/label/")).
+			Post(afi.APIAddress("api/v1/label/")).
 			JSON(`{"name":"test-label", "version":1, "definitions": [{"driver":"test", "resources":{"cpu":1,"ram":2}}]}`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
@@ -76,7 +76,7 @@ drivers:
 	t.Run("Create Application", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Post(afi.ApiAddress("api/v1/application/")).
+			Post(afi.APIAddress("api/v1/application/")).
 			JSON(`{"label_UID":"`+label.UID.String()+`"}`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
@@ -89,61 +89,63 @@ drivers:
 		}
 	})
 
-	var app_state types.ApplicationState
+	var appState types.ApplicationState
 	t.Run("Application should get ALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
-				Get(afi.ApiAddress("api/v1/application/"+app.UID.String()+"/state")).
+				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
 				BasicAuth("admin", afi.AdminToken()).
 				Expect(r).
 				Status(http.StatusOK).
 				End().
-				JSON(&app_state)
+				JSON(&appState)
 
-			if app_state.Status != types.ApplicationStatusALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", app_state.Status)
+			if appState.Status != types.ApplicationStatusALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", appState.Status)
 			}
 		})
 	})
 
-	var app_task types.ApplicationTask
-	t.Run("Create ApplicationTask Snapshot", func(t *testing.T) {
+	var appTask types.ApplicationTask
+	t.Run("Create unavailable ApplicationTask", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Post(afi.ApiAddress("api/v1/application/"+app.UID.String()+"/task/")).
+			Post(afi.APIAddress("api/v1/application/"+app.UID.String()+"/task/")).
 			JSON(map[string]any{"task": "NOTEXISTING_TASK", "when": types.ApplicationStatusALLOCATED}).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
 			End().
-			JSON(&app_task)
+			JSON(&appTask)
 
-		if app_task.UID == uuid.Nil {
-			t.Fatalf("ApplicationTask UID is incorrect: %v", app_task.UID)
+		// ApplicationTask will be created anyway even with wrong name, because input Fish node could
+		// not be able to validate it, since could have different config or lack of enabled drivers
+		if appTask.UID == uuid.Nil {
+			t.Fatalf("ApplicationTask UID is incorrect: %v", appTask.UID)
 		}
 	})
 
-	var app_tasks []types.ApplicationTask
+	var appTasks []types.ApplicationTask
 	t.Run("ApplicationTask should be executed as not found in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
-				Get(afi.ApiAddress("api/v1/application/"+app.UID.String()+"/task/")).
+				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/task/")).
 				BasicAuth("admin", afi.AdminToken()).
 				Expect(r).
 				Status(http.StatusOK).
 				End().
-				JSON(&app_tasks)
+				JSON(&appTasks)
 
-			if len(app_tasks) != 1 {
+			if len(appTasks) != 1 {
 				r.Fatalf("Application Tasks list is empty")
 			}
-			if app_tasks[0].UID != app_task.UID {
-				r.Fatalf("ApplicationTask UID is incorrect: %v != %v", app_tasks[0].UID, app_task.UID)
+			if appTasks[0].UID != appTask.UID {
+				r.Fatalf("ApplicationTask UID is incorrect: %v != %v", appTasks[0].UID, appTask.UID)
 			}
-			if string(app_tasks[0].Result) != `{"error":"task not availble in driver"}` {
-				r.Fatalf("ApplicationTask result is incorrect: %v", app_tasks[0].Result)
+			if string(appTasks[0].Result) != `{"error":"task not available in driver"}` {
+				r.Fatalf("ApplicationTask result is incorrect: %v", appTasks[0].Result)
 			}
 		})
 	})
@@ -151,7 +153,7 @@ drivers:
 	t.Run("Deallocate the Application", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Get(afi.ApiAddress("api/v1/application/"+app.UID.String()+"/deallocate")).
+			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/deallocate")).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
@@ -162,15 +164,15 @@ drivers:
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
-				Get(afi.ApiAddress("api/v1/application/"+app.UID.String()+"/state")).
+				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
 				BasicAuth("admin", afi.AdminToken()).
 				Expect(r).
 				Status(http.StatusOK).
 				End().
-				JSON(&app_state)
+				JSON(&appState)
 
-			if app_state.Status != types.ApplicationStatusDEALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", app_state.Status)
+			if appState.Status != types.ApplicationStatusDEALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", appState.Status)
 			}
 		})
 	})

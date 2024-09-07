@@ -26,14 +26,16 @@ import (
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
-// Implements drivers.ResourceDriverFactory interface
+// Factory implements drivers.ResourceDriverFactory interface
 type Factory struct{}
 
-func (f *Factory) Name() string {
+// Name shows name of the driver factory
+func (*Factory) Name() string {
 	return "native"
 }
 
-func (f *Factory) NewResourceDriver() drivers.ResourceDriver {
+// NewResourceDriver creates new resource driver
+func (*Factory) NewResourceDriver() drivers.ResourceDriver {
 	return &Driver{}
 }
 
@@ -41,29 +43,32 @@ func init() {
 	drivers.FactoryList = append(drivers.FactoryList, &Factory{})
 }
 
-// Implements drivers.ResourceDriver interface
+// Driver implements drivers.ResourceDriver interface
 type Driver struct {
 	cfg Config
 	// Contains the available tasks of the driver
-	tasks_list []drivers.ResourceDriverTask
+	tasksList []drivers.ResourceDriverTask
 
-	total_cpu uint // In logical threads
-	total_ram uint // In RAM GB
+	totalCPU uint // In logical threads
+	totalRAM uint // In RAM GB
 }
 
-// Is used to provide some data to the entry/metadata values which could contain templates
+// EnvData is used to provide some data to the entry/metadata values which could contain templates
 type EnvData struct {
 	Disks map[string]string // Map with disk_name = mount_path
 }
 
-func (d *Driver) Name() string {
+// Name returns name of the driver
+func (*Driver) Name() string {
 	return "native"
 }
 
-func (d *Driver) IsRemote() bool {
+// IsRemote needed to detect the out-of-node resources managed by this driver
+func (*Driver) IsRemote() bool {
 	return false
 }
 
+// Prepare initializes the driver
 func (d *Driver) Prepare(config []byte) error {
 	if err := d.cfg.Apply(config); err != nil {
 		return err
@@ -73,24 +78,25 @@ func (d *Driver) Prepare(config []byte) error {
 	}
 
 	// Collect node resources status
-	cpu_stat, err := cpu.Counts(true)
+	cpuStat, err := cpu.Counts(true)
 	if err != nil {
 		return err
 	}
-	d.total_cpu = uint(cpu_stat)
+	d.totalCPU = uint(cpuStat)
 
-	mem_stat, err := mem.VirtualMemory()
+	memStat, err := mem.VirtualMemory()
 	if err != nil {
 		return err
 	}
-	d.total_ram = uint(mem_stat.Total / 1073741824) // Getting GB from Bytes
+	d.totalRAM = uint(memStat.Total / 1073741824) // Getting GB from Bytes
 
 	// TODO: Cleanup the image directory in case the images are not good
 
 	return nil
 }
 
-func (d *Driver) ValidateDefinition(def types.LabelDefinition) error {
+// ValidateDefinition checks LabelDefinition is ok
+func (*Driver) ValidateDefinition(def types.LabelDefinition) error {
 	// Check options
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
@@ -101,8 +107,8 @@ func (d *Driver) ValidateDefinition(def types.LabelDefinition) error {
 		// Empty name means user home which is always exists
 		if img.Tag != "" {
 			found := false
-			for d_name, _ := range def.Resources.Disks {
-				if d_name == img.Tag {
+			for dName := range def.Resources.Disks {
+				if dName == img.Tag {
 					found = true
 					break
 				}
@@ -115,9 +121,9 @@ func (d *Driver) ValidateDefinition(def types.LabelDefinition) error {
 	return nil
 }
 
-// Allow Fish to ask the driver about it's capacity (free slots) of a specific definition
-func (d *Driver) AvailableCapacity(node_usage types.Resources, req types.LabelDefinition) int64 {
-	var out_count int64
+// AvailableCapacity allows Fish to ask the driver about it's capacity (free slots) of a specific definition
+func (d *Driver) AvailableCapacity(nodeUsage types.Resources, req types.LabelDefinition) int64 {
+	var outCount int64
 
 	var opts Options
 	if err := opts.Apply(req.Options); err != nil {
@@ -125,51 +131,49 @@ func (d *Driver) AvailableCapacity(node_usage types.Resources, req types.LabelDe
 	}
 
 	// Check if the node has the required resources - otherwise we can't run it anyhow
-	avail_cpu, avail_ram := d.getAvailResources()
-	if req.Resources.Cpu > avail_cpu {
+	availCPU, availRAM := d.getAvailResources()
+	if req.Resources.Cpu > availCPU {
 		return 0
 	}
-	if req.Resources.Ram > avail_ram {
+	if req.Resources.Ram > availRAM {
 		return 0
 	}
 	// TODO: Check disk requirements
 
 	// Since we have the required resources - let's check if tenancy allows us to expand them to
 	// run more tenants here
-	if node_usage.IsEmpty() {
+	if nodeUsage.IsEmpty() {
 		// In case we dealing with the first one - we need to set usage modificators, otherwise
 		// those values will mess up the next calculations
-		node_usage.Multitenancy = req.Resources.Multitenancy
-		node_usage.CpuOverbook = req.Resources.CpuOverbook
-		node_usage.RamOverbook = req.Resources.RamOverbook
+		nodeUsage.Multitenancy = req.Resources.Multitenancy
+		nodeUsage.CpuOverbook = req.Resources.CpuOverbook
+		nodeUsage.RamOverbook = req.Resources.RamOverbook
 	}
-	if node_usage.Multitenancy && req.Resources.Multitenancy {
+	if nodeUsage.Multitenancy && req.Resources.Multitenancy {
 		// Ok we can run more tenants, let's calculate how much
-		if node_usage.CpuOverbook && req.Resources.CpuOverbook {
-			avail_cpu += d.cfg.CpuOverbook
+		if nodeUsage.CpuOverbook && req.Resources.CpuOverbook {
+			availCPU += d.cfg.CPUOverbook
 		}
-		if node_usage.RamOverbook && req.Resources.RamOverbook {
-			avail_ram += d.cfg.RamOverbook
+		if nodeUsage.RamOverbook && req.Resources.RamOverbook {
+			availRAM += d.cfg.RAMOverbook
 		}
 	}
 
 	// Calculate how much of those definitions we could run
-	out_count = int64((avail_cpu - node_usage.Cpu) / req.Resources.Cpu)
-	ram_count := int64((avail_ram - node_usage.Ram) / req.Resources.Ram)
-	if out_count > ram_count {
-		out_count = ram_count
+	outCount = int64((availCPU - nodeUsage.Cpu) / req.Resources.Cpu)
+	ramCount := int64((availRAM - nodeUsage.Ram) / req.Resources.Ram)
+	if outCount > ramCount {
+		outCount = ramCount
 	}
 	// TODO: Add disks into equation
 
-	return out_count
+	return outCount
 }
 
-/**
- * Allocate workload environment with the provided images
- *
- * It automatically download the required images, unpack them and runs the workload.
- * Using metadata to pass the env to the entry point of the image.
- */
+// Allocate workload environment with the provided images
+//
+// It automatically download the required images, unpack them and runs the workload.
+// Using metadata to pass the env to the entry point of the image.
 func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*types.Resource, error) {
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
@@ -185,7 +189,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 	log.Info("Native: Created user for Application execution:", user)
 
 	// Create and connect volumes to container
-	disk_paths, err := d.disksCreate(user, def.Resources.Disks)
+	diskPaths, err := d.disksCreate(user, def.Resources.Disks)
 	if err != nil {
 		disksDelete(&d.cfg, user)
 		userDelete(&d.cfg, user)
@@ -193,17 +197,17 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 	}
 
 	// Set default path as homedir
-	disk_paths[""] = homedir
+	diskPaths[""] = homedir
 
 	// Loading images and unpack them to home/disks according
-	if err := d.loadImages(user, opts.Images, disk_paths); err != nil {
+	if err := d.loadImages(user, opts.Images, diskPaths); err != nil {
 		disksDelete(&d.cfg, user)
 		userDelete(&d.cfg, user)
 		return nil, log.Error("Native: Unable to load and unpack images:", err)
 	}
 
 	// Running workload
-	if err := userRun(&d.cfg, &EnvData{Disks: disk_paths}, user, opts.Entry, metadata); err != nil {
+	if err := userRun(&d.cfg, &EnvData{Disks: diskPaths}, user, opts.Entry, metadata); err != nil {
 		disksDelete(&d.cfg, user)
 		userDelete(&d.cfg, user)
 		return nil, log.Error("Native: Unable to run the entry workload:", err)
@@ -214,7 +218,8 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 	return &types.Resource{Identifier: user}, nil
 }
 
-func (d *Driver) Status(res *types.Resource) (string, error) {
+// Status shows status of the resource
+func (*Driver) Status(res *types.Resource) (string, error) {
 	if res == nil || res.Identifier == "" {
 		return "", fmt.Errorf("Native: Invalid resource: %v", res)
 	}
@@ -224,10 +229,11 @@ func (d *Driver) Status(res *types.Resource) (string, error) {
 	return drivers.StatusNone, nil
 }
 
+// GetTask returns task struct by name
 func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
 	// Look for the specified task name
 	var t drivers.ResourceDriverTask
-	for _, task := range d.tasks_list {
+	for _, task := range d.tasksList {
 		if task.Name() == name {
 			t = task.Clone()
 		}
@@ -244,6 +250,7 @@ func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
 	return t
 }
 
+// Deallocate the resource
 func (d *Driver) Deallocate(res *types.Resource) error {
 	if res == nil || res.Identifier == "" {
 		return fmt.Errorf("Native: Invalid resource: %v", res)

@@ -17,19 +17,19 @@ import (
 	"reflect"
 )
 
-// Simple serializer to get map as key.subkey=value with dot separation for the keys
+// DotSerialize serializes data to get map as key.subkey=value with dot separation for the keys
 func DotSerialize(prefix string, in any) map[string]string {
 	out := make(map[string]string)
 
 	v := reflect.ValueOf(in)
 	if v.Kind() == reflect.Map {
 		for _, k := range v.MapKeys() {
-			prefix_key := fmt.Sprintf("%v", k.Interface())
+			prefixKey := fmt.Sprintf("%v", k.Interface())
 			if len(prefix) > 0 {
-				prefix_key = prefix + "." + prefix_key
+				prefixKey = prefix + "." + prefixKey
 			}
-			int_out := DotSerialize(prefix_key, v.MapIndex(k).Interface())
-			for key, val := range int_out {
+			intOut := DotSerialize(prefixKey, v.MapIndex(k).Interface())
+			for key, val := range intOut {
 				out[key] = val
 			}
 		}

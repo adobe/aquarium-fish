@@ -15,7 +15,7 @@ package native
 import (
 	"encoding/json"
 	"fmt"
-	os_user "os/user"
+	osuser "os/user"
 	"runtime"
 	"text/template"
 
@@ -24,28 +24,30 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
-/**
- * Options example:
- *   images:
- *     - url: https://artifact-storage/aquarium/image/native/macos-VERSION/macos-VERSION.tar.xz
- *       sum: sha256:1234567890abcdef1234567890abcdef1
- *       tag: ws  # The same as a name of disk in Label resource definition
- *     - url: https://artifact-storage/aquarium/image/native/macos_amd64-ci-VERSION/macos_amd64-ci-VERSION.tar.xz
- *       sum: sha256:1234567890abcdef1234567890abcdef2
- *       tag: ws
- *   entry: "{{ .Disks.ws }}/init.sh"  # CWD is user home
- *   groups:
- *     - staff
- *     - importantgroup
- */
+// Options for label definition
+//
+// Example:
+//
+//	images:
+//	  - url: https://artifact-storage/aquarium/image/native/macos-VERSION/macos-VERSION.tar.xz
+//	    sum: sha256:1234567890abcdef1234567890abcdef1
+//	    tag: ws  # The same as a name of disk in Label resource definition
+//	  - url: https://artifact-storage/aquarium/image/native/macos_amd64-ci-VERSION/macos_amd64-ci-VERSION.tar.xz
+//	    sum: sha256:1234567890abcdef1234567890abcdef2
+//	    tag: ws
+//	entry: "{{ .Disks.ws }}/init.sh"  # CWD is user home
+//	groups:
+//	  - staff
+//	  - importantgroup
 type Options struct {
 	Images []drivers.Image `json:"images"` // Optional list of image dependencies, they will be unpacked in order
-	//TODO: Setup  string          `json:"setup"`  // Optional path to the executable, it will be started before the Entry with escalated priveleges
+	//TODO: Setup  string          `json:"setup"`  // Optional path to the executable, it will be started before the Entry with escalated privileges
 	Entry  string   `json:"entry"`  // Optional path to the executable, it will be running as workload (default: init.sh / init.ps1)
 	Groups []string `json:"groups"` // Optional user groups user should have, first one is primary (default: staff)
 }
 
-func (o *Options) Apply(options util.UnparsedJson) error {
+// Apply takes json and applies it to the options structure
+func (o *Options) Apply(options util.UnparsedJSON) error {
 	if err := json.Unmarshal([]byte(options), o); err != nil {
 		return log.Error("Native: Unable to apply the driver definition", err)
 	}
@@ -53,6 +55,7 @@ func (o *Options) Apply(options util.UnparsedJson) error {
 	return o.Validate()
 }
 
+// Validate makes sure the options have the required defaults & that the required fields are set
 // Note: there is no mandatory options, because in theory the native env could be pre-created
 func (o *Options) Validate() error {
 	// Set default entry
@@ -72,11 +75,11 @@ func (o *Options) Validate() error {
 	// Set default user groups
 	// The user is not complete without the primary group, so using current runtime user group
 	if len(o.Groups) == 0 {
-		u, e := os_user.Current()
+		u, e := osuser.Current()
 		if e != nil {
 			return log.Error("Native: Unable to get the current system user:", e)
 		}
-		group, e := os_user.LookupGroupId(u.Gid)
+		group, e := osuser.LookupGroupId(u.Gid)
 		if e != nil {
 			return log.Error("Native: Unable to get the current system user group name:", u.Gid, e)
 		}
@@ -84,14 +87,14 @@ func (o *Options) Validate() error {
 	}
 
 	// Check images
-	var img_err error
-	for index, _ := range o.Images {
+	var imgErr error
+	for index := range o.Images {
 		if err := o.Images[index].Validate(); err != nil {
-			img_err = log.Error("Native: Error during image validation:", err)
+			imgErr = log.Error("Native: Error during image validation:", err)
 		}
 	}
-	if img_err != nil {
-		return img_err
+	if imgErr != nil {
+		return imgErr
 	}
 
 	return nil

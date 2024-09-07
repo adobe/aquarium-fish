@@ -217,12 +217,40 @@ Is relatively easy - you change logic, you run `./build.sh` to create a binary, 
 the PR when you think it's perfect enough. That will be great if you can ask in the discussions or
 create an issue on GitHub to align with the current direction and the plans.
 
+### Linting
+
+Fish uses golangci-lint to execute a huge number of static checks and you can run it locally like:
+```sh
+$ golangci-lint run -v
+```
+
+It uses the configuration from .golangci.yml file.
+
 ### Integration tests
 
 To verify that everything works as expected you can run integration tests like that:
 ```sh
 $ FISH_PATH=$PWD/aquarium-fish.darwin_amd64 go test -v -failfast -parallel 4 ./tests/...
 ```
+
+### Benchmarks
+
+Fish contains a few benchmarks to make sure the performance of the node & cluster will be stable.
+You can run them locally like that:
+```sh
+$ go test -bench . -benchmem '-run=^#' -cpu 1,2 ./...
+goos: darwin
+goarch: amd64
+pkg: github.com/adobe/aquarium-fish/lib/crypt
+cpu: Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz
+Benchmark_hash_new         	      20	  65924472 ns/op	67122440 B/op	     180 allocs/op
+Benchmark_hash_new-2       	      33	  34709165 ns/op	67122834 B/op	     181 allocs/op
+Benchmark_hash_isequal     	      33	  64242662 ns/op	67122424 B/op	     179 allocs/op
+Benchmark_hash_isequal-2   	      32	  34741325 ns/op	67122526 B/op	     179 allocs/op$ 
+```
+
+CI stores the previous results in branch gh-pages in json format. Unfortunately GitHub actions
+workers perfromance is not stable, so it's recommended to execute the benchmarks on standaline.
 
 ### Profiling
 

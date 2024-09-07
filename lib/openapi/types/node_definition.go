@@ -24,10 +24,12 @@ import (
 	"github.com/shirou/gopsutil/v3/net"
 )
 
-func (nd NodeDefinition) GormDataType() string {
+// GormDataType describes how to store NodeDefinition in database
+func (NodeDefinition) GormDataType() string {
 	return "blob"
 }
 
+// Scan converts the NodeDefinition to json bytes
 func (nd *NodeDefinition) Scan(value any) error {
 	bytes, ok := value.([]byte)
 	if !ok {
@@ -38,10 +40,12 @@ func (nd *NodeDefinition) Scan(value any) error {
 	return err
 }
 
+// Value converts json bytes to NodeDefinition
 func (nd NodeDefinition) Value() (driver.Value, error) {
 	return json.Marshal(nd)
 }
 
+// Update syncs the NodeDefinition to the current machine state
 func (nd *NodeDefinition) Update() {
 	nd.Host, _ = host.Info()
 	nd.Memory, _ = mem.VirtualMemory()

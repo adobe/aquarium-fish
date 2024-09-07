@@ -23,8 +23,9 @@ import (
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
+// TaskSnapshot implements test snapshot task
 type TaskSnapshot struct {
-	driver *Driver `json:"-"`
+	driver *Driver
 
 	*types.ApplicationTask `json:"-"` // Info about the requested task
 	*types.LabelDefinition `json:"-"` // Info about the used label definition
@@ -33,21 +34,25 @@ type TaskSnapshot struct {
 	Full bool `json:"full"` // Make full (all disks including OS image), or just the additional disks snapshot
 }
 
-func (t *TaskSnapshot) Name() string {
+// Name shows name of the task
+func (*TaskSnapshot) Name() string {
 	return "snapshot"
 }
 
+// Clone copies task to use it
 func (t *TaskSnapshot) Clone() drivers.ResourceDriverTask {
 	n := *t
 	return &n
 }
 
+// SetInfo defines the task environment
 func (t *TaskSnapshot) SetInfo(task *types.ApplicationTask, def *types.LabelDefinition, res *types.Resource) {
 	t.ApplicationTask = task
 	t.LabelDefinition = def
 	t.Resource = res
 }
 
+// Execute runs the task
 func (t *TaskSnapshot) Execute() (result []byte, err error) {
 	if t.ApplicationTask == nil {
 		return []byte(`{"error":"internal: invalid application task"}`), log.Error("TEST: Invalid application task:", t.ApplicationTask)
@@ -59,14 +64,12 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 		return []byte(`{"error":"internal: invalid resource"}`), log.Error("TEST: Invalid resource:", t.Resource)
 	}
 	if err := randomFail(fmt.Sprintf("Snapshot %s", t.Resource.Identifier), t.driver.cfg.FailSnapshot); err != nil {
-		out, _ := json.Marshal(map[string]any{})
-		return out, log.Error("TEST: RandomFail:", err)
+		return []byte(`{}`), log.Error("TEST: RandomFail:", err)
 	}
 
-	res_file := filepath.Join(t.driver.cfg.WorkspacePath, t.Resource.Identifier)
-	if _, err := os.Stat(res_file); os.IsNotExist(err) {
-		out, _ := json.Marshal(map[string]any{})
-		return out, fmt.Errorf("TEST: Unable to snapshot unavailable resource '%s'", t.Resource.Identifier)
+	resFile := filepath.Join(t.driver.cfg.WorkspacePath, t.Resource.Identifier)
+	if _, err := os.Stat(resFile); os.IsNotExist(err) {
+		return []byte(`{}`), fmt.Errorf("TEST: Unable to snapshot unavailable resource '%s'", t.Resource.Identifier)
 	}
 
 	return json.Marshal(map[string]any{"snapshots": []string{"test-snapshot"}, "when": t.ApplicationTask.When})

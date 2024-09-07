@@ -30,14 +30,16 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
-// Implements drivers.ResourceDriverFactory interface
+// Factory implements drivers.ResourceDriverFactory interface
 type Factory struct{}
 
-func (f *Factory) Name() string {
+// Name shows name of the driver factory
+func (*Factory) Name() string {
 	return "vmx"
 }
 
-func (f *Factory) NewResourceDriver() drivers.ResourceDriver {
+// NewResourceDriver creates new resource driver
+func (*Factory) NewResourceDriver() drivers.ResourceDriver {
 	return &Driver{}
 }
 
@@ -45,24 +47,27 @@ func init() {
 	drivers.FactoryList = append(drivers.FactoryList, &Factory{})
 }
 
-// Implements drivers.ResourceDriver interface
+// Driver implements drivers.ResourceDriver interface
 type Driver struct {
 	cfg Config
 	// Contains the available tasks of the driver
-	tasks_list []drivers.ResourceDriverTask
+	tasksList []drivers.ResourceDriverTask
 
-	total_cpu uint // In logical threads
-	total_ram uint // In RAM GB
+	totalCPU uint // In logical threads
+	totalRAM uint // In RAM GB
 }
 
-func (d *Driver) Name() string {
+// Name returns name of the driver
+func (*Driver) Name() string {
 	return "vmx"
 }
 
-func (d *Driver) IsRemote() bool {
+// IsRemote needed to detect the out-of-node resources managed by this driver
+func (*Driver) IsRemote() bool {
 	return false
 }
 
+// Prepare initializes the driver
 func (d *Driver) Prepare(config []byte) error {
 	if err := d.cfg.Apply(config); err != nil {
 		return err
@@ -72,24 +77,25 @@ func (d *Driver) Prepare(config []byte) error {
 	}
 
 	// Collect node resources status
-	cpu_stat, err := cpu.Counts(true)
+	cpuStat, err := cpu.Counts(true)
 	if err != nil {
 		return err
 	}
-	d.total_cpu = uint(cpu_stat)
+	d.totalCPU = uint(cpuStat)
 
-	mem_stat, err := mem.VirtualMemory()
+	memStat, err := mem.VirtualMemory()
 	if err != nil {
 		return err
 	}
-	d.total_ram = uint(mem_stat.Total / 1073741824) // Getting GB from Bytes
+	d.totalRAM = uint(memStat.Total / 1073741824) // Getting GB from Bytes
 
 	// TODO: Cleanup the image directory in case the images are not good
 
 	return nil
 }
 
-func (d *Driver) ValidateDefinition(def types.LabelDefinition) error {
+// ValidateDefinition checks LabelDefinition is ok
+func (*Driver) ValidateDefinition(def types.LabelDefinition) error {
 	// Check resources
 	if err := def.Resources.Validate([]string{"hfs+", "exfat", "fat32"}, true); err != nil {
 		return log.Error("VMX: Resources validation failed:", err)
@@ -100,58 +106,56 @@ func (d *Driver) ValidateDefinition(def types.LabelDefinition) error {
 	return opts.Apply(def.Options)
 }
 
-// Allow Fish to ask the driver about it's capacity (free slots) of a specific definition
-func (d *Driver) AvailableCapacity(node_usage types.Resources, req types.LabelDefinition) int64 {
-	var out_count int64
+// AvailableCapacity allows Fish to ask the driver about it's capacity (free slots) of a specific definition
+func (d *Driver) AvailableCapacity(nodeUsage types.Resources, req types.LabelDefinition) int64 {
+	var outCount int64
 
-	avail_cpu, avail_ram := d.getAvailResources()
+	availCPU, availRAM := d.getAvailResources()
 
 	// Check if the node has the required resources - otherwise we can't run it anyhow
-	if req.Resources.Cpu > avail_cpu {
+	if req.Resources.Cpu > availCPU {
 		return 0
 	}
-	if req.Resources.Ram > avail_ram {
+	if req.Resources.Ram > availRAM {
 		return 0
 	}
 	// TODO: Check disk requirements
 
 	// Since we have the required resources - let's check if tenancy allows us to expand them to
 	// run more tenants here
-	if node_usage.IsEmpty() {
+	if nodeUsage.IsEmpty() {
 		// In case we dealing with the first one - we need to set usage modificators, otherwise
 		// those values will mess up the next calculations
-		node_usage.Multitenancy = req.Resources.Multitenancy
-		node_usage.CpuOverbook = req.Resources.CpuOverbook
-		node_usage.RamOverbook = req.Resources.RamOverbook
+		nodeUsage.Multitenancy = req.Resources.Multitenancy
+		nodeUsage.CpuOverbook = req.Resources.CpuOverbook
+		nodeUsage.RamOverbook = req.Resources.RamOverbook
 	}
-	if node_usage.Multitenancy && req.Resources.Multitenancy {
+	if nodeUsage.Multitenancy && req.Resources.Multitenancy {
 		// Ok we can run more tenants, let's calculate how much
-		if node_usage.CpuOverbook && req.Resources.CpuOverbook {
-			avail_cpu += d.cfg.CpuOverbook
+		if nodeUsage.CpuOverbook && req.Resources.CpuOverbook {
+			availCPU += d.cfg.CPUOverbook
 		}
-		if node_usage.RamOverbook && req.Resources.RamOverbook {
-			avail_ram += d.cfg.RamOverbook
+		if nodeUsage.RamOverbook && req.Resources.RamOverbook {
+			availRAM += d.cfg.RAMOverbook
 		}
 	}
 
 	// Calculate how much of those definitions we could run
-	out_count = int64((avail_cpu - node_usage.Cpu) / req.Resources.Cpu)
-	ram_count := int64((avail_ram - node_usage.Ram) / req.Resources.Ram)
-	if out_count > ram_count {
-		out_count = ram_count
+	outCount = int64((availCPU - nodeUsage.Cpu) / req.Resources.Cpu)
+	ramCount := int64((availRAM - nodeUsage.Ram) / req.Resources.Ram)
+	if outCount > ramCount {
+		outCount = ramCount
 	}
 	// TODO: Add disks into equation
 
-	return out_count
+	return outCount
 }
 
-/**
- * Allocate VM with provided images
- *
- * It automatically download the required images, unpack them and runs the VM.
- * Not using metadata because there is no good interfaces to pass it to VM.
- */
-func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*types.Resource, error) {
+// Allocate VM with provided images
+//
+// It automatically download the required images, unpack them and runs the VM.
+// Not using metadata because there is no good interfaces to pass it to VM.
+func (d *Driver) Allocate(def types.LabelDefinition, _ /*metadata*/ map[string]any) (*types.Resource, error) {
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
 		return nil, log.Error("VMX: Unable to apply options:", err)
@@ -160,76 +164,77 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 	// Generate unique id from the hw address and required directories
 	buf := crypt.RandBytes(6)
 	buf[0] = (buf[0] | 2) & 0xfe // Set local bit, ensure unicast address
-	vm_id := fmt.Sprintf("%02x%02x%02x%02x%02x%02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5])
-	vm_hwaddr := fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5])
+	vmID := fmt.Sprintf("%02x%02x%02x%02x%02x%02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5])
+	vmHwaddr := fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5])
 
-	vm_network := def.Resources.Network
-	if vm_network == "" {
-		vm_network = "hostonly"
+	vmNetwork := def.Resources.Network
+	if vmNetwork == "" {
+		vmNetwork = "hostonly"
 	}
 
-	vm_dir := filepath.Join(d.cfg.WorkspacePath, vm_id)
-	vm_images_dir := filepath.Join(vm_dir, "images")
+	vmDir := filepath.Join(d.cfg.WorkspacePath, vmID)
+	vmImagesDir := filepath.Join(vmDir, "images")
 
 	// Load the required images
-	img_path, err := d.loadImages(&opts, vm_images_dir)
+	imgPath, err := d.loadImages(&opts, vmImagesDir)
 	if err != nil {
-		d.cleanupVm(vm_dir)
+		d.cleanupVM(vmDir)
 		return nil, log.Error("VMX: Unable to load the required images:", err)
 	}
 
 	// Clone VM from the image
-	vmx_path := filepath.Join(vm_dir, vm_id+".vmx")
+	vmxPath := filepath.Join(vmDir, vmID+".vmx")
 	args := []string{"-T", "fusion", "clone",
-		img_path, vmx_path,
+		imgPath, vmxPath,
 		"linked", "-snapshot", "original",
-		"-cloneName", vm_id,
+		"-cloneName", vmID,
 	}
 	if _, _, err := runAndLog(120*time.Second, d.cfg.VmrunPath, args...); err != nil {
-		d.cleanupVm(vm_dir)
-		return nil, log.Error("VMX: Unable to clone the target image:", img_path, err)
+		d.cleanupVM(vmDir)
+		return nil, log.Error("VMX: Unable to clone the target image:", imgPath, err)
 	}
 
 	// Change cloned vm configuration
-	if err := util.FileReplaceToken(vmx_path,
+	if err := util.FileReplaceToken(vmxPath,
 		true, true, true,
 		"ethernet0.addressType =", `ethernet0.addressType = "static"`,
-		"ethernet0.address =", fmt.Sprintf("ethernet0.address = %q", vm_hwaddr),
-		"ethernet0.connectiontype =", fmt.Sprintf("ethernet0.connectiontype = %q", vm_network),
+		"ethernet0.address =", fmt.Sprintf("ethernet0.address = %q", vmHwaddr),
+		"ethernet0.connectiontype =", fmt.Sprintf("ethernet0.connectiontype = %q", vmNetwork),
 		"numvcpus =", fmt.Sprintf(`numvcpus = "%d"`, def.Resources.Cpu),
 		"cpuid.corespersocket =", fmt.Sprintf(`cpuid.corespersocket = "%d"`, def.Resources.Cpu),
 		"memsize =", fmt.Sprintf(`memsize = "%d"`, def.Resources.Ram*1024),
 	); err != nil {
-		d.cleanupVm(vm_dir)
-		return nil, log.Error("VMX: Unable to change cloned VM configuration:", vmx_path, err)
+		d.cleanupVM(vmDir)
+		return nil, log.Error("VMX: Unable to change cloned VM configuration:", vmxPath, err)
 	}
 
 	// Create and connect disks to vmx
-	if err := d.disksCreate(vmx_path, def.Resources.Disks); err != nil {
-		d.cleanupVm(vm_dir)
-		return nil, log.Error("VMX: Unable create disks for VM:", vmx_path, err)
+	if err := d.disksCreate(vmxPath, def.Resources.Disks); err != nil {
+		d.cleanupVM(vmDir)
+		return nil, log.Error("VMX: Unable create disks for VM:", vmxPath, err)
 	}
 
 	// Run the background monitoring of the vmware log
 	if d.cfg.LogMonitor {
-		go d.logMonitor(vm_id, vmx_path)
+		go d.logMonitor(vmID, vmxPath)
 	}
 
 	// Run the VM
-	if _, _, err := runAndLog(120*time.Second, d.cfg.VmrunPath, "start", vmx_path, "nogui"); err != nil {
+	if _, _, err := runAndLog(120*time.Second, d.cfg.VmrunPath, "start", vmxPath, "nogui"); err != nil {
 		log.Error("VMX: Check logs in ~/Library/Logs/VMware/ or enable debug to see vmware.log")
-		d.cleanupVm(vm_dir)
-		return nil, log.Error("VMX: Unable to run VM:", vmx_path, err)
+		d.cleanupVM(vmDir)
+		return nil, log.Error("VMX: Unable to run VM:", vmxPath, err)
 	}
 
-	log.Info("VMX: Allocate of VM completed:", vmx_path)
+	log.Info("VMX: Allocate of VM completed:", vmxPath)
 	return &types.Resource{
-		Identifier:     vmx_path,
-		HwAddr:         vm_hwaddr,
+		Identifier:     vmxPath,
+		HwAddr:         vmHwaddr,
 		Authentication: def.Authentication,
 	}, nil
 }
 
+// Status shows status of the resource
 func (d *Driver) Status(res *types.Resource) (string, error) {
 	if res == nil || res.Identifier == "" {
 		return "", fmt.Errorf("VMX: Invalid resource: %v", res)
@@ -240,10 +245,11 @@ func (d *Driver) Status(res *types.Resource) (string, error) {
 	return drivers.StatusNone, nil
 }
 
+// GetTask returns task struct by name
 func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
 	// Look for the specified task name
 	var t drivers.ResourceDriverTask
-	for _, task := range d.tasks_list {
+	for _, task := range d.tasksList {
 		if task.Name() == name {
 			t = task.Clone()
 		}
@@ -260,33 +266,34 @@ func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
 	return t
 }
 
+// Deallocate the resource
 func (d *Driver) Deallocate(res *types.Resource) error {
 	if res == nil || res.Identifier == "" {
 		return fmt.Errorf("VMX: Invalid resource: %v", res)
 	}
-	vmx_path := res.Identifier
-	if len(vmx_path) == 0 {
-		return log.Error("VMX: Unable to find VM:", vmx_path)
+	vmxPath := res.Identifier
+	if len(vmxPath) == 0 {
+		return log.Error("VMX: Unable to find VM:", vmxPath)
 	}
 
 	// Sometimes it's stuck, so try to stop a bit more than usual
-	if _, _, err := runAndLogRetry(3, 60*time.Second, d.cfg.VmrunPath, "stop", vmx_path); err != nil {
-		log.Warn("VMX: Unable to soft stop the VM:", vmx_path, err)
+	if _, _, err := runAndLogRetry(3, 60*time.Second, d.cfg.VmrunPath, "stop", vmxPath); err != nil {
+		log.Warn("VMX: Unable to soft stop the VM:", vmxPath, err)
 		// Ok, it doesn't want to stop, so stopping it hard
-		if _, _, err := runAndLogRetry(3, 60*time.Second, d.cfg.VmrunPath, "stop", vmx_path, "hard"); err != nil {
-			return log.Error("VMX: Unable to deallocate VM:", vmx_path, err)
+		if _, _, err := runAndLogRetry(3, 60*time.Second, d.cfg.VmrunPath, "stop", vmxPath, "hard"); err != nil {
+			return log.Error("VMX: Unable to deallocate VM:", vmxPath, err)
 		}
 	}
 
 	// Delete VM
-	if _, _, err := runAndLogRetry(3, 30*time.Second, d.cfg.VmrunPath, "deleteVM", vmx_path); err != nil {
-		return log.Error("VMX: Unable to delete VM:", vmx_path, err)
+	if _, _, err := runAndLogRetry(3, 30*time.Second, d.cfg.VmrunPath, "deleteVM", vmxPath); err != nil {
+		return log.Error("VMX: Unable to delete VM:", vmxPath, err)
 	}
 
 	// Cleaning the VM images too
-	d.cleanupVm(filepath.Dir(vmx_path))
+	d.cleanupVM(filepath.Dir(vmxPath))
 
-	log.Info("VMX: Deallocate of VM completed:", vmx_path)
+	log.Info("VMX: Deallocate of VM completed:", vmxPath)
 
 	return nil
 }

@@ -15,6 +15,7 @@
 //go:generate oapi-codegen -config api_v1.cfg.yaml ../../docs/openapi.yaml
 //go:generate oapi-codegen -config spec.cfg.yaml ../../docs/openapi.yaml
 
+// Package openapi provides generated from OpenAPI spec API framework
 package openapi
 
 import (
@@ -30,20 +31,20 @@ import (
 
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
-	_ "github.com/oapi-codegen/oapi-codegen/v2/pkg/util"
+	_ "github.com/oapi-codegen/oapi-codegen/v2/pkg/util" // We need util here otherwise it will not load the needed imports and fail go.mod vetting
 	"gopkg.in/yaml.v3"
 
-	"github.com/adobe/aquarium-fish/lib/cluster"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/api"
-	cluster_server "github.com/adobe/aquarium-fish/lib/openapi/cluster"
 	"github.com/adobe/aquarium-fish/lib/openapi/meta"
 )
 
+// YamlBinder is used to decode yaml requests
 type YamlBinder struct{}
 
-func (cb *YamlBinder) Bind(i any, c echo.Context) (err error) {
+// Bind allows to parse Yaml request data
+func (*YamlBinder) Bind(i any, c echo.Context) (err error) {
 	db := &echo.DefaultBinder{}
 	if err = db.Bind(i, c); err != echo.ErrUnsupportedMediaType {
 		return
@@ -66,7 +67,8 @@ func (cb *YamlBinder) Bind(i any, c echo.Context) (err error) {
 	return
 }
 
-func Init(fish *fish.Fish, cl *cluster.Cluster, api_address, ca_path, cert_path, key_path string) (*http.Server, error) {
+// Init startups the API server to listen for incoming requests
+func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*http.Server, error) {
 	swagger, err := GetSwagger()
 	if err != nil {
 		return nil, fmt.Errorf("Fish OpenAPI: Error loading swagger spec: %w", err)
@@ -86,23 +88,21 @@ func Init(fish *fish.Fish, cl *cluster.Cluster, api_address, ca_path, cert_path,
 	router.HideBanner = true
 
 	// TODO: Probably it will be a feature an ability to separate those
-	// routers to independance ports if needed
-	meta.NewV1Router(router, fish)
-	cluster_server.NewV1Router(router, fish, cl)
-	api.NewV1Router(router, fish)
+	// routers to independence ports if needed
+	meta.NewV1Router(router, f)
+	api.NewV1Router(router, f)
 	// TODO: web UI router
 
-	ca_pool := x509.NewCertPool()
-	if ca_bytes, err := os.ReadFile(ca_path); err == nil {
-		ca_pool.AppendCertsFromPEM(ca_bytes)
+	caPool := x509.NewCertPool()
+	if caBytes, err := os.ReadFile(caPath); err == nil {
+		caPool.AppendCertsFromPEM(caBytes)
 	}
 	s := router.TLSServer
-	s.Addr = api_address
-	s.TLSConfig = &tls.Config{
+	s.Addr = apiAddress
+	s.TLSConfig = &tls.Config{ // #nosec G402 , keep the compatibility high since not public access
 		ClientAuth: tls.RequestClientCert, // Need for the client certificate auth
-		ClientCAs:  ca_pool,               // Verify client certificate with the cluster CA
+		ClientCAs:  caPool,                // Verify client certificate with the cluster CA
 	}
-	s.TLSConfig.BuildNameToCertificate()
 	errChan := make(chan error)
 	go func() {
 		addr := s.Addr
@@ -119,7 +119,7 @@ func Init(fish *fish.Fish, cl *cluster.Cluster, api_address, ca_path, cert_path,
 
 		defer router.TLSListener.Close()
 
-		if err := s.ServeTLS(router.TLSListener, cert_path, key_path); err != http.ErrServerClosed {
+		if err := s.ServeTLS(router.TLSListener, certPath, keyPath); err != http.ErrServerClosed {
 			errChan <- err
 			log.Error("API: Unable to start listener:", err)
 		}

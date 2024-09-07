@@ -46,6 +46,29 @@ jobs:
           swagger-editor-url: http://localhost/
           definition-file: docs/openapi.yaml
 
+  GolangCI:
+    runs-on: ubuntu-latest
+    name: Code Lint
+    permissions:
+      # Required: allow read access to the content for analysis.
+      contents: read
+      # Optional: allow write access to checks to allow the action to annotate code in the PR.
+      checks: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable  # Linter will use go.mod file to adjust the rules properly
+
+      - name: Generate code
+        run: ONLYGEN=1 ./build.sh
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.60
+
   Build:
     runs-on: ubuntu-latest
     steps:

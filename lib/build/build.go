@@ -10,8 +10,11 @@
  * governing permissions and limitations under the License.
  */
 
+// Package build contains version of the binary & time when it was built
 package build
 
+// Version of the build
 var Version = "v0.0.0-dev"
 
+// Time of the build
 var Time string

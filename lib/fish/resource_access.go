@@ -20,6 +20,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
+// ResourceAccessCreate makes new ResourceAccess
 func (f *Fish) ResourceAccessCreate(r *types.ResourceAccess) error {
 	if r.ResourceUID == uuid.Nil {
 		return fmt.Errorf("Fish: ResourceUID can't be nil")
@@ -36,16 +37,18 @@ func (f *Fish) ResourceAccessCreate(r *types.ResourceAccess) error {
 	return f.db.Create(r).Error
 }
 
-func (f *Fish) ResourceAccessDeleteByResource(resource_uid types.ResourceUID) error {
-	ra := types.ResourceAccess{ResourceUID: resource_uid}
+// ResourceAccessDeleteByResource removes ResourceAccess by ResourceUID
+func (f *Fish) ResourceAccessDeleteByResource(resourceUID types.ResourceUID) error {
+	ra := types.ResourceAccess{ResourceUID: resourceUID}
 	return f.db.Where(&ra).Delete(&ra).Error
 }
 
+// ResourceAccessDelete removes ResourceAccess by UID
 func (f *Fish) ResourceAccessDelete(uid types.ResourceAccessUID) error {
 	return f.db.Delete(&types.ResourceAccess{}, uid).Error
 }
 
-// Retrieves the password from the database *AND* deletes it.  Users must
+// ResourceAccessSingleUsePassword retrieves the password from the database *AND* deletes it.  Users must
 // issue another curl call to request a new access password.
 func (f *Fish) ResourceAccessSingleUsePassword(username string, password string) (ra *types.ResourceAccess, err error) {
 	ra = &types.ResourceAccess{}

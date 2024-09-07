@@ -19,49 +19,49 @@ import (
 )
 
 func TestFileStartsWithGood(t *testing.T) {
-	tmp_file := path.Join(t.TempDir(), "test.txt")
+	tmpFile := path.Join(t.TempDir(), "test.txt")
 
-	in_data := []byte("" +
+	inData := []byte("" +
 		"test1 test2 test3\n" +
 		"test4 test5 test6\n")
 
-	os.WriteFile(tmp_file, in_data, 0644)
+	os.WriteFile(tmpFile, inData, 0o644)
 
-	if err := FileStartsWith(tmp_file, []byte("test1 ")); err != nil {
+	if err := FileStartsWith(tmpFile, []byte("test1 ")); err != nil {
 		t.Fatalf(`FileStartsWith("test1 ") = %v, want: nil`, err)
 	}
 }
 
 func TestFileStartsNotEqual(t *testing.T) {
-	tmp_file := path.Join(t.TempDir(), "test.txt")
+	tmpFile := path.Join(t.TempDir(), "test.txt")
 
-	in_data := []byte("" +
+	inData := []byte("" +
 		"test1 test2 test3\n" +
 		"test4 test5 test6\n")
 
-	os.WriteFile(tmp_file, in_data, 0644)
+	os.WriteFile(tmpFile, inData, 0o644)
 
-	if err := FileStartsWith(tmp_file, []byte("test2 ")); err != ErrFileStartsWithNotEqual {
-		t.Fatalf(`FileStartsWith("test2 ") = %v, want: %v`, err, ErrFileStartsWithNotEqual)
+	if err := FileStartsWith(tmpFile, []byte("test2 ")); err != errFileStartsWithNotEqual {
+		t.Fatalf(`FileStartsWith("test2 ") = %v, want: %v`, err, errFileStartsWithNotEqual)
 	}
 }
 
 func TestFileStartsDirectory(t *testing.T) {
-	tmp_file := t.TempDir()
+	tmpFile := t.TempDir()
 
-	if err := FileStartsWith(tmp_file, []byte("test2 ")); err != ErrFileStartsWithDirectory {
-		t.Fatalf(`FileStartsWith("test2 ") = %v, want: %v`, err, ErrFileStartsWithDirectory)
+	if err := FileStartsWith(tmpFile, []byte("test2 ")); err != errFileStartsWithDirectory {
+		t.Fatalf(`FileStartsWith("test2 ") = %v, want: %v`, err, errFileStartsWithDirectory)
 	}
 }
 
 func TestFileStartsSmall(t *testing.T) {
-	tmp_file := path.Join(t.TempDir(), "test.txt")
+	tmpFile := path.Join(t.TempDir(), "test.txt")
 
-	in_data := []byte("small file\n")
+	inData := []byte("small file\n")
 
-	os.WriteFile(tmp_file, in_data, 0644)
+	os.WriteFile(tmpFile, inData, 0o644)
 
-	if err := FileStartsWith(tmp_file, []byte("biiiiiiiiiig prefix")); err != ErrFileStartsWithFileTooSmall {
-		t.Fatalf(`FileStartsWith("test2 ") = %v, want: %v`, err, ErrFileStartsWithFileTooSmall)
+	if err := FileStartsWith(tmpFile, []byte("biiiiiiiiiig prefix")); err != errFileStartsWithFileTooSmall {
+		t.Fatalf(`FileStartsWith("test2 ") = %v, want: %v`, err, errFileStartsWithFileTooSmall)
 	}
 }

@@ -18,10 +18,12 @@ import (
 	"fmt"
 )
 
-func (ld LabelDefinitions) GormDataType() string {
+// GormDataType describes how to store LabelDefinitions in database
+func (LabelDefinitions) GormDataType() string {
 	return "blob"
 }
 
+// Scan converts the LabelDefinitions to json bytes
 func (ld *LabelDefinitions) Scan(value any) error {
 	bytes, ok := value.([]byte)
 	if !ok {
@@ -38,6 +40,7 @@ func (ld *LabelDefinitions) Scan(value any) error {
 	return err
 }
 
+// Value converts json bytes to LabelDefinitions
 func (ld LabelDefinitions) Value() (driver.Value, error) {
 	// Need to make sure the array node filter will not be nil
 	for i, r := range ld {

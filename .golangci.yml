@@ -1,0 +1,158 @@
+run:
+  concurrency: 4
+  timeout: 10m
+  tests: false
+  allow-parallel-runners: true
+  allow-serial-runners: true
+
+output:
+  show-stats: true
+
+issues:
+  max-issues-per-linter: 0  # unlimited
+
+linters:
+  # Disable all linters.
+  # Default: false
+  disable-all: true
+  # Enable specific linter
+  # https://golangci-lint.run/usage/linters/#enabled-by-default
+  enable:
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - canonicalheader
+    - containedctx
+    - contextcheck
+    - copyloopvar
+    #- cyclop
+    - decorder
+    #- depguard
+    - dogsled
+    #- dupl
+    - dupword
+    - durationcheck
+    #- err113
+    #- errcheck  # Maybe in the future?
+    - errchkjson
+    - errname
+    #- errorlint
+    - exhaustive
+    #- exhaustruct
+    - fatcontext
+    #- forbidigo
+    - forcetypeassert
+    #- funlen
+    #- gci
+    - ginkgolinter
+    - gocheckcompilerdirectives
+    #- gochecknoglobals
+    #- gochecknoinits
+    - gochecksumtype
+    #- gocognit
+    #- goconst
+    #- gocritic
+    #- gocyclo
+    #- godot
+    #- godox
+    - gofmt
+    #- gofumpt
+    - goheader
+    - goimports
+    - gomoddirectives
+    - gomodguard
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - gosmopolitan
+    - govet
+    - grouper
+    - importas
+    - inamedparam
+    - ineffassign
+    - interfacebloat
+    - intrange
+    #- ireturn
+    #- lll
+    - loggercheck
+    #- maintidx
+    - makezero
+    - mirror
+    - misspell
+    #- mnd
+    - musttag
+    #- nakedret
+    #- nestif
+    - nilerr
+    #- nilnil
+    #- nlreturn
+    - noctx
+    - nolintlint
+    #- nonamedreturns
+    - nosprintfhostport
+    - paralleltest
+    #- perfsprint
+    #- prealloc
+    - predeclared
+    - promlinter
+    - protogetter
+    - reassign
+    - revive
+    - rowserrcheck
+    - sloglint
+    - spancheck
+    - sqlclosecheck
+    - staticcheck
+    #- stylecheck
+    - tagalign
+    #- tagliatelle
+    - tenv
+    - testableexamples
+    - testifylint
+    - testpackage
+    - thelper
+    - tparallel
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - usestdlibvars
+    #- varnamelen
+    - wastedassign
+    - whitespace
+    #- wrapcheck
+    #- wsl
+    - zerologlint
+
+linters-settings:
+  gosec:
+    excludes:
+      - G115  # integer overflow conversion - disabled due to found no proper way to fix those
+  revive:
+    enable-all-rules: true
+    rules:
+      - name: comment-spacings
+        disabled: true
+      - name: line-length-limit
+        disabled: true
+      - name: add-constant
+        disabled: true
+      - name: unhandled-error
+        disabled: true
+      - name: cognitive-complexity
+        disabled: true
+      - name: bare-return
+        disabled: true
+      - name: modifies-value-receiver
+        disabled: true
+      - name: cyclomatic
+        disabled: true
+      - name: confusing-results
+        disabled: true
+      - name: function-length
+        disabled: true
+      - name: flag-parameter
+        disabled: true
+      - name: max-control-nesting
+        disabled: true

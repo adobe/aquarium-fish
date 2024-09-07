@@ -30,36 +30,36 @@ import (
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
-func (d *Driver) getContainersResources(container_ids []string) (types.Resources, error) {
+func (d *Driver) getContainersResources(containerIDs []string) (types.Resources, error) {
 	var out types.Resources
 
 	// Getting current running containers info - will return "<ncpu>,<mem_bytes>\n..." for each one
-	docker_args := []string{"inspect", "--format", "{{ .HostConfig.NanoCpus }},{{ .HostConfig.Memory }}"}
-	docker_args = append(docker_args, container_ids...)
-	stdout, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, docker_args...)
+	dockerArgs := []string{"inspect", "--format", "{{ .HostConfig.NanoCpus }},{{ .HostConfig.Memory }}"}
+	dockerArgs = append(dockerArgs, containerIDs...)
+	stdout, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, dockerArgs...)
 	if err != nil {
 		return out, fmt.Errorf("Docker: Unable to inspect the containers to get used resources: %v", err)
 	}
 
-	res_list := strings.Split(strings.TrimSpace(stdout), "\n")
-	for _, res := range res_list {
-		cpu_mem := strings.Split(res, ",")
-		if len(cpu_mem) < 2 {
-			return out, fmt.Errorf("Docker: Not enough info values in return: %q", res_list)
+	resList := strings.Split(strings.TrimSpace(stdout), "\n")
+	for _, res := range resList {
+		cpuMem := strings.Split(res, ",")
+		if len(cpuMem) < 2 {
+			return out, fmt.Errorf("Docker: Not enough info values in return: %q", resList)
 		}
-		res_cpu, err := strconv.ParseUint(cpu_mem[0], 10, 64)
+		resCPU, err := strconv.ParseUint(cpuMem[0], 10, 64)
 		if err != nil {
-			return out, fmt.Errorf("Docker: Unable to parse CPU uint: %v (%q)", err, cpu_mem[0])
+			return out, fmt.Errorf("Docker: Unable to parse CPU uint: %v (%q)", err, cpuMem[0])
 		}
-		res_ram, err := strconv.ParseUint(cpu_mem[1], 10, 64)
+		resRAM, err := strconv.ParseUint(cpuMem[1], 10, 64)
 		if err != nil {
-			return out, fmt.Errorf("Docker: Unable to parse RAM uint: %v (%q)", err, cpu_mem[1])
+			return out, fmt.Errorf("Docker: Unable to parse RAM uint: %v (%q)", err, cpuMem[1])
 		}
-		if res_cpu == 0 || res_ram == 0 {
-			return out, fmt.Errorf("Docker: The container is non-Fish controlled zero-cpu/ram ones: %q", container_ids)
+		if resCPU == 0 || resRAM == 0 {
+			return out, fmt.Errorf("Docker: The container is non-Fish controlled zero-cpu/ram ones: %q", containerIDs)
 		}
-		out.Cpu += uint(res_cpu / 1000000000) // Originallly in NCPU
-		out.Ram += uint(res_ram / 1073741824) // Get in GB
+		out.Cpu += uint(resCPU / 1000000000) // Originallly in NCPU
+		out.Ram += uint(resRAM / 1073741824) // Get in GB
 		// TODO: Add disks too here
 	}
 
@@ -77,31 +77,31 @@ func (d *Driver) getInitialUsage() (types.Resources, error) {
 		return out, fmt.Errorf("Docker: Unable to list the running containers: %v", err)
 	}
 
-	ids_list := strings.Split(strings.TrimSpace(stdout), "\n")
-	if len(ids_list) == 1 && ids_list[0] == "" {
+	idsList := strings.Split(strings.TrimSpace(stdout), "\n")
+	if len(idsList) == 1 && idsList[0] == "" {
 		// It's actually empty so skip it
 		return out, nil
 	}
 
-	out, err = d.getContainersResources(ids_list)
+	out, err = d.getContainersResources(idsList)
 	if err != nil {
 		return out, err
 	}
 
-	if out.IsEmpty() || len(ids_list) == 1 {
+	if out.IsEmpty() || len(idsList) == 1 {
 		// There is no or one container is allocated - so for safety use false for modifiers
 		return out, nil
 	}
 
 	// Let's try to find the modificators that is used
-	if len(ids_list) > 1 {
+	if len(idsList) > 1 {
 		// There is more than one container is running so multitenancy is true
 		out.Multitenancy = true
 	}
-	if out.Cpu > d.total_cpu {
+	if out.Cpu > d.totalCPU {
 		out.CpuOverbook = true
 	}
-	if out.Ram > d.total_ram {
+	if out.Ram > d.totalRAM {
 		out.RamOverbook = true
 	}
 
@@ -109,24 +109,24 @@ func (d *Driver) getInitialUsage() (types.Resources, error) {
 }
 
 // Collects the available resource with alteration
-func (d *Driver) getAvailResources() (avail_cpu, avail_ram uint) {
-	if d.cfg.CpuAlter < 0 {
-		avail_cpu = d.total_cpu - uint(-d.cfg.CpuAlter)
+func (d *Driver) getAvailResources() (availCPU, availRAM uint) {
+	if d.cfg.CPUAlter < 0 {
+		availCPU = d.totalCPU - uint(-d.cfg.CPUAlter)
 	} else {
-		avail_cpu = d.total_cpu + uint(d.cfg.CpuAlter)
+		availCPU = d.totalCPU + uint(d.cfg.CPUAlter)
 	}
 
-	if d.cfg.RamAlter < 0 {
-		avail_ram = d.total_ram - uint(-d.cfg.RamAlter)
+	if d.cfg.RAMAlter < 0 {
+		availRAM = d.totalRAM - uint(-d.cfg.RAMAlter)
 	} else {
-		avail_ram = d.total_ram + uint(d.cfg.RamAlter)
+		availRAM = d.totalRAM + uint(d.cfg.RAMAlter)
 	}
 
 	return
 }
 
-// Returns the standartized container name
-func (d *Driver) getContainerName(hwaddr string) string {
+// Returns the standardized container name
+func (*Driver) getContainerName(hwaddr string) string {
 	return fmt.Sprintf("fish-%s", strings.ReplaceAll(hwaddr, ":", ""))
 }
 
@@ -135,15 +135,15 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 	// Download the images and unpack them
 	var wg sync.WaitGroup
 	for _, image := range opts.Images {
-		log.Info("Docker: Loading the required image:", image.Name, image.Version, image.Url)
+		log.Info("Docker: Loading the required image:", image.Name, image.Version, image.URL)
 
 		// Running the background routine to download, unpack and process the image
-		// Success will be checked later by existance of the image in local docker registry
+		// Success will be checked later by existence of the image in local docker registry
 		wg.Add(1)
 		go func(image drivers.Image) {
 			defer wg.Done()
 			if err := image.DownloadUnpack(d.cfg.ImagesPath, d.cfg.DownloadUser, d.cfg.DownloadPassword); err != nil {
-				log.Error("Docker: Unable to download and unpack the image:", image.Name, image.Url, err)
+				log.Error("Docker: Unable to download and unpack the image:", image.Name, image.URL, err)
 			}
 		}(image)
 	}
@@ -155,23 +155,23 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 	// They needed to be processed sequentially because the childs does not
 	// contains the parent's layers so parents should be loaded first
 
-	target_out := ""
-	var loaded_images []string
-	for image_index, image := range opts.Images {
-		image_unpacked := filepath.Join(d.cfg.ImagesPath, image.Name+"-"+image.Version)
+	targetOut := ""
+	var loadedImages []string
+	for imageIndex, image := range opts.Images {
+		imageUnpacked := filepath.Join(d.cfg.ImagesPath, image.Name+"-"+image.Version)
 
 		// Getting the image subdir name in the unpacked dir
 		subdir := ""
-		items, err := os.ReadDir(image_unpacked)
+		items, err := os.ReadDir(imageUnpacked)
 		if err != nil {
-			log.Error("Docker: Unable to read the unpacked directory:", image_unpacked, err)
+			log.Error("Docker: Unable to read the unpacked directory:", imageUnpacked, err)
 			return "", fmt.Errorf("Docker: The image was unpacked incorrectly, please check log for the errors")
 		}
 		for _, f := range items {
 			if strings.HasPrefix(f.Name(), image.Name) {
 				if f.Type()&fs.ModeSymlink != 0 {
 					// Potentially it can be a symlink (like used in local tests)
-					if _, err := os.Stat(filepath.Join(image_unpacked, f.Name())); err != nil {
+					if _, err := os.Stat(filepath.Join(imageUnpacked, f.Name())); err != nil {
 						log.Warn("Docker: The image symlink is broken:", f.Name(), err)
 						continue
 					}
@@ -181,61 +181,61 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 			}
 		}
 		if subdir == "" {
-			log.Errorf("Docker: Unpacked image '%s' has no subfolder '%s', only: %q", image_unpacked, image.Name, items)
+			log.Errorf("Docker: Unpacked image '%s' has no subfolder '%s', only: %q", imageUnpacked, image.Name, items)
 			return "", fmt.Errorf("Docker: The image was unpacked incorrectly, please check log for the errors")
 		}
 
 		// Optimization to check if the image exists and not load it again
-		subdir_ver_end := strings.LastIndexByte(subdir, '_')
-		if subdir_ver_end > 0 {
-			image_found := ""
+		subdirVerEnd := strings.LastIndexByte(subdir, '_')
+		if subdirVerEnd > 0 {
+			imageFound := ""
 			// Search the image by image ID prefix and list the image tags
-			image_tags, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, "image", "inspect",
-				fmt.Sprintf("sha256:%s", subdir[subdir_ver_end+1:]),
+			imageTags, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, "image", "inspect",
+				fmt.Sprintf("sha256:%s", subdir[subdirVerEnd+1:]),
 				"--format", "{{ range .RepoTags }}{{ println . }}{{ end }}",
 			)
 			if err == nil {
 				// The image could contain a number of tags so check them all
-				found_images := strings.Split(strings.TrimSpace(image_tags), "\n")
-				for _, tag := range found_images {
+				foundImages := strings.Split(strings.TrimSpace(imageTags), "\n")
+				for _, tag := range foundImages {
 					if strings.HasSuffix(strings.Replace(tag, ":", "-", 1), subdir) {
-						image_found = tag
-						loaded_images = append(loaded_images, image_found)
+						imageFound = tag
+						loadedImages = append(loadedImages, imageFound)
 
 						// If it's the last image then it's the target one
-						if image_index+1 == len(opts.Images) {
-							target_out = image_found
+						if imageIndex+1 == len(opts.Images) {
+							targetOut = imageFound
 						}
 						break
 					}
 				}
 			}
 
-			if image_found != "" {
-				log.Debug("Docker: The image was found in the local docker registry:", image_found)
+			if imageFound != "" {
+				log.Debug("Docker: The image was found in the local docker registry:", imageFound)
 				continue
 			}
 		}
 
 		// Load the docker image
 		// sha256 prefix the same
-		image_archive := filepath.Join(image_unpacked, subdir, image.Name+".tar")
-		stdout, _, err := runAndLog(5*time.Minute, d.cfg.DockerPath, "image", "load", "-q", "-i", image_archive)
+		imageArchive := filepath.Join(imageUnpacked, subdir, image.Name+".tar")
+		stdout, _, err := runAndLog(5*time.Minute, d.cfg.DockerPath, "image", "load", "-q", "-i", imageArchive)
 		if err != nil {
-			log.Error("Docker: Unable to load the image:", image_archive, err)
+			log.Error("Docker: Unable to load the image:", imageArchive, err)
 			return "", fmt.Errorf("Docker: The image was unpacked incorrectly, please check log for the errors")
 		}
 		for _, line := range strings.Split(stdout, "\n") {
 			if !strings.HasPrefix(line, "Loaded image: ") {
 				continue
 			}
-			image_name_version := strings.Split(line, ": ")[1]
+			imageNameVersion := strings.Split(line, ": ")[1]
 
-			loaded_images = append(loaded_images, image_name_version)
+			loadedImages = append(loadedImages, imageNameVersion)
 
 			// If it's the last image then it's the target one
-			if image_index+1 == len(opts.Images) {
-				target_out = image_name_version
+			if imageIndex+1 == len(opts.Images) {
+				targetOut = imageNameVersion
 			}
 			break
 		}
@@ -244,17 +244,17 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 	log.Info("Docker: All the images are processed.")
 
 	// Check all the images are in place just by number of them
-	if len(opts.Images) != len(loaded_images) {
-		return "", log.Errorf("Docker: Not all the images are ok (%d out of %d), please check log for the errors", len(loaded_images), len(opts.Images))
+	if len(opts.Images) != len(loadedImages) {
+		return "", log.Errorf("Docker: Not all the images are ok (%d out of %d), please check log for the errors", len(loadedImages), len(opts.Images))
 	}
 
-	return target_out, nil
+	return targetOut, nil
 }
 
 // Receives the container ID out of the container name
-func (d *Driver) getAllocatedContainerId(c_name string) string {
+func (d *Driver) getAllocatedContainerID(cName string) string {
 	// Probably it's better to store the current list in the memory
-	stdout, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, "ps", "-a", "-q", "--filter", "name="+c_name)
+	stdout, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, "ps", "-a", "-q", "--filter", "name="+cName)
 	if err != nil {
 		return ""
 	}
@@ -274,16 +274,16 @@ func (d *Driver) isNetworkExists(name string) bool {
 }
 
 // Creates disks directories described by the disks map
-func (d *Driver) disksCreate(c_name string, run_args *[]string, disks map[string]types.ResourcesDisk) error {
+func (d *Driver) disksCreate(cName string, runArgs *[]string, disks map[string]types.ResourcesDisk) error {
 	// Create disks
-	disk_paths := make(map[string]string, len(disks))
+	diskPaths := make(map[string]string, len(disks))
 
-	for d_name, disk := range disks {
-		disk_path := filepath.Join(d.cfg.WorkspacePath, c_name, "disk-"+d_name)
+	for dName, disk := range disks {
+		diskPath := filepath.Join(d.cfg.WorkspacePath, cName, "disk-"+dName)
 		if disk.Reuse {
-			disk_path = filepath.Join(d.cfg.WorkspacePath, "disk-"+d_name)
+			diskPath = filepath.Join(d.cfg.WorkspacePath, "disk-"+dName)
 		}
-		if err := os.MkdirAll(filepath.Dir(disk_path), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(diskPath), 0o755); err != nil {
 			return err
 		}
 
@@ -292,18 +292,18 @@ func (d *Driver) disksCreate(c_name string, run_args *[]string, disks map[string
 		// TODO: Ensure failures doesn't leave the changes behind (like mounted disks or files)
 
 		if disk.Type == "dir" {
-			if err := os.MkdirAll(disk_path, 0o777); err != nil {
+			if err := os.MkdirAll(diskPath, 0o777); err != nil {
 				return err
 			}
-			disk_paths[disk_path] = disk.Label
+			diskPaths[diskPath] = disk.Label
 			// TODO: Validate the available disk space for disk.Size
 			continue
 		}
 
 		// Create virtual disk in order to restrict the disk space
-		dmg_path := disk_path + ".dmg"
+		dmgPath := diskPath + ".dmg"
 
-		label := d_name
+		label := dName
 		if disk.Label != "" {
 			// Label can be used as mount point so cut the path separator out
 			label = strings.ReplaceAll(disk.Label, "/", "")
@@ -312,78 +312,79 @@ func (d *Driver) disksCreate(c_name string, run_args *[]string, disks map[string
 		}
 
 		// Do not recreate the disk if it is exists
-		if _, err := os.Stat(dmg_path); os.IsNotExist(err) {
-			disk_type := ""
+		if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
+			var diskType string
 			switch disk.Type {
 			case "hfs+":
-				disk_type = "HFS+"
+				diskType = "HFS+"
 			case "fat32":
-				disk_type = "FAT32"
+				diskType = "FAT32"
 			default:
-				disk_type = "ExFAT"
+				diskType = "ExFAT"
 			}
-			args := []string{"create", dmg_path,
-				"-fs", disk_type,
+			args := []string{"create", dmgPath,
+				"-fs", diskType,
 				"-layout", "NONE",
 				"-volname", label,
 				"-size", fmt.Sprintf("%dm", disk.Size*1024),
 			}
 			if _, _, err := runAndLog(10*time.Minute, "/usr/bin/hdiutil", args...); err != nil {
-				return log.Error("Docker: Unable to create dmg disk:", dmg_path, err)
+				return log.Error("Docker: Unable to create dmg disk:", dmgPath, err)
 			}
 		}
 
-		mount_point := filepath.Join("/Volumes", fmt.Sprintf("%s-%s", c_name, d_name))
+		mountPoint := filepath.Join("/Volumes", fmt.Sprintf("%s-%s", cName, dName))
 
 		// Attach & mount disk
-		if _, _, err := runAndLog(10*time.Second, "/usr/bin/hdiutil", "attach", dmg_path, "-mountpoint", mount_point); err != nil {
-			return log.Error("Docker: Unable to attach dmg disk:", dmg_path, mount_point, err)
+		if _, _, err := runAndLog(10*time.Second, "/usr/bin/hdiutil", "attach", dmgPath, "-mountpoint", mountPoint); err != nil {
+			return log.Error("Docker: Unable to attach dmg disk:", dmgPath, mountPoint, err)
 		}
 
 		// Allow anyone to modify the disk content
-		if err := os.Chmod(mount_point, 0o777); err != nil {
-			return log.Error("Docker: Unable to change the disk access rights:", mount_point, err)
+		if err := os.Chmod(mountPoint, 0o777); err != nil {
+			return log.Error("Docker: Unable to change the disk access rights:", mountPoint, err)
 		}
 
-		disk_paths[mount_point] = disk.Label
+		diskPaths[mountPoint] = disk.Label
 	}
 
-	if len(disk_paths) == 0 {
+	if len(diskPaths) == 0 {
 		return nil
 	}
 
 	// Connect disk files to container via cmd
-	for mount_path, mount_point := range disk_paths {
+	for mountPath, mountPoint := range diskPaths {
 		// If the label is not an absolute path than use mnt dir
-		if !strings.HasPrefix(mount_point, "/") {
-			mount_point = filepath.Join("/mnt", mount_point)
+		if !strings.HasPrefix(mountPoint, "/") {
+			mountPoint = filepath.Join("/mnt", mountPoint)
 		}
-		*run_args = append(*run_args, "-v", fmt.Sprintf("%s:%s", mount_path, mount_point))
+		*runArgs = append(*runArgs, "-v", fmt.Sprintf("%s:%s", mountPath, mountPoint))
 	}
 
 	return nil
 }
 
 // Creates the env file for the container out of metadata specification
-func (d *Driver) envCreate(c_name string, metadata map[string]any) (string, error) {
-	env_file_path := filepath.Join(d.cfg.WorkspacePath, c_name, ".env")
-	if err := os.MkdirAll(filepath.Dir(env_file_path), 0o755); err != nil {
-		return "", log.Error("Docker: Unable to create the container directory:", filepath.Dir(env_file_path), err)
+func (d *Driver) envCreate(cName string, metadata map[string]any) (string, error) {
+	envFilePath := filepath.Join(d.cfg.WorkspacePath, cName, ".env")
+	if err := os.MkdirAll(filepath.Dir(envFilePath), 0o755); err != nil {
+		return "", log.Error("Docker: Unable to create the container directory:", filepath.Dir(envFilePath), err)
 	}
-	fd, err := os.OpenFile(env_file_path, os.O_WRONLY|os.O_CREATE, 0640)
+	fd, err := os.OpenFile(envFilePath, os.O_WRONLY|os.O_CREATE, 0o640)
 	if err != nil {
-		return "", log.Error("Docker: Unable to create env file:", env_file_path, err)
+		return "", log.Error("Docker: Unable to create env file:", envFilePath, err)
 	}
 	defer fd.Close()
 
 	// Write env file line by line
 	for key, value := range metadata {
-		if _, err := fd.Write([]byte(fmt.Sprintf("%s=%s\n", key, value))); err != nil {
-			return "", log.Error("Docker: Unable to write env file data:", env_file_path, err)
+		data := []byte(fmt.Sprintf("%s=%s\n", key, value))
+		if _, err := fd.Write(data); err != nil {
+			return "", log.Error("Docker: Unable to write env file data:", envFilePath, err)
 		}
 	}
 
-	return env_file_path, nil
+	return envFilePath, nil
 }
 
 // Runs & logs the executable command
@@ -424,8 +425,8 @@ func runAndLog(timeout time.Duration, path string, arg ...string) (string, strin
 	}
 
 	// Replace these for Windows, we only want to deal with Unix style line endings.
-	returnStdout := strings.Replace(stdout.String(), "\r\n", "\n", -1)
-	returnStderr := strings.Replace(stderr.String(), "\r\n", "\n", -1)
+	returnStdout := strings.ReplaceAll(stdout.String(), "\r\n", "\n")
+	returnStderr := strings.ReplaceAll(stderr.String(), "\r\n", "\n")
 
 	return returnStdout, returnStderr, err
 }

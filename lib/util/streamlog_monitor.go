@@ -18,21 +18,21 @@ import (
 	"github.com/adobe/aquarium-fish/lib/log"
 )
 
-var LineBreak = []byte("\n")
-var EmptyByte = []byte{}
+var lineBreak = []byte("\n")
+var emptyByte = []byte{}
 
-// Wraps an existing io.Reader to monitor the log stream and adds prefix before each line
+// StreamLogMonitor wraps an existing io.Reader to monitor the log stream and adds prefix before each line
 type StreamLogMonitor struct {
 	Prefix  string   // Prefix for the line
 	linebuf [][]byte // Where line will live until EOL or close
 }
 
-// Read 'overrides' the underlying io.Reader's Read method
+// Write will read 'overrides' the underlying io.Reader's Read method
 func (slm *StreamLogMonitor) Write(p []byte) (int, error) {
 	index := 0
-	prev_index := 0
+	prevIndex := 0
 	for index < len(p) {
-		index += bytes.Index(p[prev_index:], LineBreak)
+		index += bytes.Index(p[prevIndex:], lineBreak)
 		if index == -1 {
 			// The data does not contain EOL, so appending to buffer and wait
 			slm.linebuf = append(slm.linebuf, p)
@@ -40,11 +40,11 @@ func (slm *StreamLogMonitor) Write(p []byte) (int, error) {
 		}
 		// The newline was found, so prepending the line buffer and print it out
 		// We don't need the EOF in the line (log.Infof adds), so increment index after processing
-		slm.linebuf = append(slm.linebuf, p[prev_index:index])
-		log.Info(slm.Prefix + string(bytes.Join(slm.linebuf, EmptyByte)))
+		slm.linebuf = append(slm.linebuf, p[prevIndex:index])
+		log.Info(slm.Prefix + string(bytes.Join(slm.linebuf, emptyByte)))
 		clear(slm.linebuf)
 		index++
-		prev_index = index
+		prevIndex = index
 	}
 
 	return len(p), nil

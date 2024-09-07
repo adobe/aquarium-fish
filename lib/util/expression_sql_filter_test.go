@@ -18,23 +18,23 @@ import (
 )
 
 var (
-	TEST_SQL_EXPRESSION_INJECTIONS = map[string]string{
-		``:                                   ``,
-		`1=1`:                                `1 = 1`,
-		`id = 3; DROP users`:                 `"id" = 3`,
-		`a IN (1,2) ORDER BY id; DROP users`: `"a" IN (1, 2)`,
+	testSQLExpressionInjections = [][2]string{
+		{``, ``},
+		{`1=1`, `1 = 1`},
+		{`id = 3; DROP users`, `"id" = 3`},
+		{`a IN (1,2) ORDER BY id; DROP users`, `"a" IN (1, 2)`},
 		// Fails
-		`SELECT * FROM users WHERE a = 1; DROP users`: ``, // Invalid expression
-		`a in (SELECT * FROM users)`:                  ``, // Subquery could be dangerous
+		{`SELECT * FROM users WHERE a = 1; DROP users`, ``}, // Invalid expression
+		{`a in (SELECT * FROM users)`, ``},                  // Subquery could be dangerous
 	}
 )
 
 func Test_expression_sql_filter_where_injections(t *testing.T) {
-	for sql, result := range TEST_SQL_EXPRESSION_INJECTIONS {
-		t.Run(fmt.Sprintf("Testing `%s`", sql), func(t *testing.T) {
-			out, err := ExpressionSqlFilter(sql)
-			if out != result {
-				t.Fatalf("ExpressionSQLFilter(`%s`) = `%s`, %v; want: `%s`", sql, out, err, result)
+	for _, sqlAndResult := range testSQLExpressionInjections {
+		t.Run(fmt.Sprintf("Testing `%s`", sqlAndResult[0]), func(t *testing.T) {
+			out, err := ExpressionSQLFilter(sqlAndResult[0])
+			if out != sqlAndResult[1] {
+				t.Fatalf("ExpressionSQLFilter(`%s`) = `%s`, %v; want: `%s`", sqlAndResult[0], out, err, sqlAndResult[1])
 			}
 		})
 	}

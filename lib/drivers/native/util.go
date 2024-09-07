@@ -20,7 +20,7 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
-	os_user "os/user"
+	osuser "os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -38,37 +38,37 @@ import (
 )
 
 // Common lock to properly acquire unique User ID
-var user_create_lock sync.Mutex
+var userCreateLock sync.Mutex
 
 // Returns the total resources available for the node after alteration
-func (d *Driver) getAvailResources() (avail_cpu, avail_ram uint) {
-	if d.cfg.CpuAlter < 0 {
-		avail_cpu = d.total_cpu - uint(-d.cfg.CpuAlter)
+func (d *Driver) getAvailResources() (availCPU, availRAM uint) {
+	if d.cfg.CPUAlter < 0 {
+		availCPU = d.totalCPU - uint(-d.cfg.CPUAlter)
 	} else {
-		avail_cpu = d.total_cpu + uint(d.cfg.CpuAlter)
+		availCPU = d.totalCPU + uint(d.cfg.CPUAlter)
 	}
 
-	if d.cfg.RamAlter < 0 {
-		avail_ram = d.total_ram - uint(-d.cfg.RamAlter)
+	if d.cfg.RAMAlter < 0 {
+		availRAM = d.totalRAM - uint(-d.cfg.RAMAlter)
 	} else {
-		avail_ram = d.total_ram + uint(d.cfg.RamAlter)
+		availRAM = d.totalRAM + uint(d.cfg.RAMAlter)
 	}
 
 	return
 }
 
 // Load images and unpack them according the tags
-func (d *Driver) loadImages(user string, images []drivers.Image, disk_paths map[string]string) error {
+func (d *Driver) loadImages(user string, images []drivers.Image, diskPaths map[string]string) error {
 	var wg sync.WaitGroup
 	for _, image := range images {
-		log.Info("Native: Loading the required image:", image.Name, image.Version, image.Url)
+		log.Info("Native: Loading the required image:", image.Name, image.Version, image.URL)
 
 		// Running the background routine to download, unpack and process the image
 		wg.Add(1)
 		go func(image drivers.Image) {
 			defer wg.Done()
 			if err := image.DownloadUnpack(d.cfg.ImagesPath, d.cfg.DownloadUser, d.cfg.DownloadPassword); err != nil {
-				log.Error("Native: Unable to download and unpack the image:", image.Name, image.Url, err)
+				log.Error("Native: Unable to download and unpack the image:", image.Name, image.URL, err)
 			}
 		}(image)
 	}
@@ -78,19 +78,19 @@ func (d *Driver) loadImages(user string, images []drivers.Image, disk_paths map[
 
 	// The images have to be processed sequentially - child images could override the parent files
 	for _, image := range images {
-		image_unpacked := filepath.Join(d.cfg.ImagesPath, image.Name+"-"+image.Version)
+		imageUnpacked := filepath.Join(d.cfg.ImagesPath, image.Name+"-"+image.Version)
 
 		// Getting the image subdir name in the unpacked dir
 		subdir := ""
-		items, err := os.ReadDir(image_unpacked)
+		items, err := os.ReadDir(imageUnpacked)
 		if err != nil {
-			return log.Error("Native: Unable to read the unpacked directory:", image_unpacked, err)
+			return log.Error("Native: Unable to read the unpacked directory:", imageUnpacked, err)
 		}
 		for _, f := range items {
 			if strings.HasPrefix(f.Name(), image.Name) {
 				if f.Type()&fs.ModeSymlink != 0 {
 					// Potentially it can be a symlink (like used in local tests)
-					if _, err := os.Stat(filepath.Join(image_unpacked, f.Name())); err != nil {
+					if _, err := os.Stat(filepath.Join(imageUnpacked, f.Name())); err != nil {
 						log.Warn("Native: The image symlink is broken:", f.Name(), err)
 						continue
 					}
@@ -100,29 +100,29 @@ func (d *Driver) loadImages(user string, images []drivers.Image, disk_paths map[
 			}
 		}
 		if subdir == "" {
-			log.Errorf("Native: Unpacked image '%s' has no subfolder '%s', only: %q", image_unpacked, image.Name, items)
+			log.Errorf("Native: Unpacked image '%s' has no subfolder '%s', only: %q", imageUnpacked, image.Name, items)
 			return fmt.Errorf("Native: The image was unpacked incorrectly, please check log for the errors")
 		}
 
 		// Unpacking the image according its specified tag. If tag is empty - unpacks to home dir,
 		// otherwise if tag exists in the disks map - then use its path to unpack there
-		image_archive := filepath.Join(image_unpacked, subdir, image.Name+".tar")
-		unpack_path, ok := disk_paths[image.Tag]
+		imageArchive := filepath.Join(imageUnpacked, subdir, image.Name+".tar")
+		unpackPath, ok := diskPaths[image.Tag]
 		if !ok {
-			return log.Error("Native: Unable to find where to unpack the image:", image.Tag, image_archive, err)
+			return log.Error("Native: Unable to find where to unpack the image:", image.Tag, imageArchive, err)
 		}
 
 		// Since the image is under Fish node control and user could have no read access to the file
 		// it's a good idea to use stdin of the tar command to unpack properly.
-		f, err := os.Open(image_archive)
+		f, err := os.Open(imageArchive)
 		if err != nil {
-			return log.Error("Native: Unable to read the image:", image_archive, err)
+			return log.Error("Native: Unable to read the image:", imageArchive, err)
 		}
-		defer f.Close()
-		log.Info("Native: Unpacking image:", user, image_archive, unpack_path)
-		_, _, err = runAndLog(5*time.Minute, f, d.cfg.SudoPath, "-n", d.cfg.TarPath, "-xf", "-", "--uname", user, "-C", unpack_path+"/")
+		log.Info("Native: Unpacking image:", user, imageArchive, unpackPath)
+		_, _, err = runAndLog(5*time.Minute, f, d.cfg.SudoPath, "-n", d.cfg.TarPath, "-xf", "-", "--uname", user, "-C", unpackPath+"/")
+		f.Close()
 		if err != nil {
-			return log.Error("Native: Unable to unpack the image:", image_archive, err)
+			return log.Error("Native: Unable to unpack the image:", imageArchive, err)
 		}
 	}
 
@@ -158,49 +158,49 @@ func userCreate(c *Config, groups []string) (user, homedir string, err error) {
 	}
 
 	// Choose the UniqueID for the new user
-	user_create_lock.Lock()
+	userCreateLock.Lock()
 	{
 		// Locate the unassigned user id
 		var stdout string
 		if stdout, _, err = runAndLog(5*time.Second, nil, c.DsclPath, ".", "list", "/Users", "UniqueID"); err != nil {
-			user_create_lock.Unlock()
+			userCreateLock.Unlock()
 			err = log.Error("Native: Unable to list directory users:", err)
 			return
 		}
 
 		// Finding the max user id in the OS
-		user_id := int64(1000) // Min 1000 is ok for most of the unix systems
-		split_stdout := strings.Split(strings.TrimSpace(stdout), "\n")
-		for _, line := range split_stdout {
-			line_id := line[strings.LastIndex(line, " ")+1:]
-			line_id_num, err := strconv.ParseInt(line_id, 10, 64)
+		userID := int64(1000) // Min 1000 is ok for most of the unix systems
+		splitStdout := strings.Split(strings.TrimSpace(stdout), "\n")
+		for _, line := range splitStdout {
+			lineID := line[strings.LastIndex(line, " ")+1:]
+			lineIDNum, err := strconv.ParseInt(lineID, 10, 64)
 			if err != nil {
 				log.Warnf("Native: Unable to parse user id from line: %q", line)
 				continue
 			}
-			if line_id_num > user_id {
-				user_id = line_id_num
+			if lineIDNum > userID {
+				userID = lineIDNum
 			}
 		}
 
 		// Increment max user id and use it as unique id for new user
-		if _, _, err = runAndLog(5*time.Second, nil, c.SudoPath, "-n", c.DsclPath, ".", "create", "/Users/"+user, "UniqueID", fmt.Sprint(user_id+1)); err != nil {
-			user_create_lock.Unlock()
+		if _, _, err = runAndLog(5*time.Second, nil, c.SudoPath, "-n", c.DsclPath, ".", "create", "/Users/"+user, "UniqueID", fmt.Sprint(userID+1)); err != nil {
+			userCreateLock.Unlock()
 			err = log.Error("Native: Unable to set user UniqueID:", err)
 			return
 		}
 	}
-	user_create_lock.Unlock()
+	userCreateLock.Unlock()
 
 	// Locate the primary user group id
-	primary_group, e := os_user.LookupGroup(groups[0])
+	primaryGroup, e := osuser.LookupGroup(groups[0])
 	if e != nil {
 		err = log.Error("Native: Unable to locate group GID for:", groups[0], e)
 		return
 	}
 
 	// Set user primary group
-	if _, _, err = runAndLog(5*time.Second, nil, c.SudoPath, "-n", c.DsclPath, ".", "create", "/Users/"+user, "PrimaryGroupID", primary_group.Gid); err != nil {
+	if _, _, err = runAndLog(5*time.Second, nil, c.SudoPath, "-n", c.DsclPath, ".", "create", "/Users/"+user, "PrimaryGroupID", primaryGroup.Gid); err != nil {
 		err = log.Error("Native: Unable to set user PrimaryGroupID:", err)
 		return
 	}
@@ -231,8 +231,8 @@ func userCreate(c *Config, groups []string) (user, homedir string, err error) {
 	return
 }
 
-func processTemplate(tpl_data *EnvData, value string) (string, error) {
-	if tpl_data == nil {
+func processTemplate(tplData *EnvData, value string) (string, error) {
+	if tplData == nil {
 		return value, nil
 	}
 	tmpl, err := template.New("").Parse(value)
@@ -241,7 +241,7 @@ func processTemplate(tpl_data *EnvData, value string) (string, error) {
 		return "", fmt.Errorf("Native: Unable to parse template: %v, %v", value, err)
 	}
 	var buf bytes.Buffer
-	err = tmpl.Execute(&buf, *tpl_data)
+	err = tmpl.Execute(&buf, *tplData)
 	if err != nil {
 		return "", fmt.Errorf("Native: Unable to execute template: %v, %v", value, err)
 	}
@@ -250,54 +250,54 @@ func processTemplate(tpl_data *EnvData, value string) (string, error) {
 }
 
 // Runs the executable as defined user
-func userRun(c *Config, env_data *EnvData, user, entry string, metadata map[string]any) (err error) {
+func userRun(c *Config, envData *EnvData, user, entry string, metadata map[string]any) (err error) {
 	// Entry value could contain template data
-	var tmp_data string
-	if tmp_data, err = processTemplate(env_data, entry); err != nil {
+	var tmpData string
+	if tmpData, err = processTemplate(envData, entry); err != nil {
 		return log.Error("Native: Unable to process `entry` template:", entry, err)
 	}
-	entry = tmp_data
+	entry = tmpData
 
 	// Metadata values could contain template data
-	env_vars := make(map[string]any)
+	envVars := make(map[string]any)
 	for key, val := range metadata {
-		if tmp_data, err = processTemplate(env_data, fmt.Sprintf("%v", val)); err != nil {
+		if tmpData, err = processTemplate(envData, fmt.Sprintf("%v", val)); err != nil {
 			return log.Errorf("Native: Unable to process metadata `%s` template: %v", key, err)
 		}
 		// Add to the map of the variables to store
-		env_vars[key] = tmp_data
+		envVars[key] = tmpData
 	}
 
 	// Unfortunately passing the environment through the cmd.Env and sudo/su is not that easy, so
 	// using a temp file instead, which is removed right after the entry is started.
-	env_file_data, err := util.SerializeMetadata("export", "", env_vars)
+	envFileData, err := util.SerializeMetadata("export", "", envVars)
 	if err != nil {
 		return log.Errorf("Native: Unable to serialize metadata into 'export' format: %v", err)
 	}
 	// Using common /tmp dir available for each user in the system
-	env_file, err := os.CreateTemp("/tmp", "*.metadata.sh")
+	envFile, err := os.CreateTemp("/tmp", "*.metadata.sh")
 	if err != nil {
 		return log.Error("Native: Unable to create temp env file:", err)
 	}
-	defer os.Remove(env_file.Name())
-	if _, err := env_file.Write(env_file_data); err != nil {
+	defer os.Remove(envFile.Name())
+	if _, err := envFile.Write(envFileData); err != nil {
 		return log.Error("Native: Unable to write temp env file:", err)
 	}
-	if err := env_file.Close(); err != nil {
+	if err := envFile.Close(); err != nil {
 		return log.Error("Native: Unable to close temp env file:", err)
 	}
 
 	// Add ACL permission to the env file to allow to read it by unprevileged user
-	if _, _, err := runAndLogRetry(5, 5*time.Second, nil, c.ChmodPath, "+a", fmt.Sprintf("user:%s:allow read,readattr,readextattr,readsecurity", user), env_file.Name()); err != nil {
+	if _, _, err := runAndLogRetry(5, 5*time.Second, nil, c.ChmodPath, "+a", fmt.Sprintf("user:%s:allow read,readattr,readextattr,readsecurity", user), envFile.Name()); err != nil {
 		return log.Error("Native: Unable to set ACL for temp env file:", err)
 	}
 
 	// Prepare the command to execute entry from user home directory
-	shell_line := fmt.Sprintf("source %s; %s", env_file.Name(), shellescape.Quote(shellescape.StripUnsafe(entry)))
-	cmd := exec.Command(c.SudoPath, "-n", c.SuPath, "-l", user, "-c", shell_line)
-	if env_data != nil && env_data.Disks != nil {
-		if _, ok := env_data.Disks[""]; ok {
-			cmd.Dir = env_data.Disks[""]
+	shellLine := fmt.Sprintf("source %s; %s", envFile.Name(), shellescape.Quote(shellescape.StripUnsafe(entry)))
+	cmd := exec.Command(c.SudoPath, "-n", c.SuPath, "-l", user, "-c", shellLine) // #nosec G204
+	if envData != nil && envData.Disks != nil {
+		if _, ok := envData.Disks[""]; ok {
+			cmd.Dir = envData.Disks[""]
 		}
 	}
 
@@ -316,7 +316,7 @@ func userRun(c *Config, env_data *EnvData, user, entry string, metadata map[stri
 	// TODO: Probably I should run cmd.Wait to make sure the captured OS resources are released,
 	// but not sure about that... Maybe create a goroutine that will sit and wait there?
 
-	log.Debugf("Native: Started entry for user %q in directory %q with PID %d: %s", user, cmd.Dir, cmd.Process.Pid, shell_line)
+	log.Debugf("Native: Started entry for user %q in directory %q with PID %d: %s", user, cmd.Dir, cmd.Process.Pid, shellLine)
 
 	// Giving the process 1 second to read the env file and not die from some unexpected error
 	time.Sleep(time.Second)
@@ -332,7 +332,7 @@ func userRun(c *Config, env_data *EnvData, user, entry string, metadata map[stri
 }
 
 // Stop the user processes
-func userStop(c *Config, user string) (out_err error) {
+func userStop(c *Config, user string) (outErr error) { //nolint:unparam
 	// In theory we can use `sysadminctl -deleteUser` command instead, which is also stopping all the
 	// user processes and cleans up the home dir, but it asks for elevated previleges so not sure how
 	// useful it will be in automation...
@@ -356,58 +356,58 @@ func userStop(c *Config, user string) (out_err error) {
 }
 
 // Delete user and clean up
-func userDelete(c *Config, user string) (out_err error) {
+func userDelete(c *Config, user string) (outErr error) {
 	// Stopping the processes because they could cause user lock
-	out_err = userStop(c, user)
+	outErr = userStop(c, user)
 
 	// Sometimes delete of the user could not be done due to MacOS blocking it, so retrying 5 times
 	// Native: Command exited with error: exit status 40: <main> delete status: eDSPermissionError <dscl_cmd> DS Error: -14120 (eDSPermissionError)
 	if _, _, err := runAndLogRetry(5, 5*time.Second, nil, c.SudoPath, "-n", c.DsclPath, ".", "delete", "/Users/"+user); err != nil {
-		out_err = log.Error("Native: Unable to delete user:", err)
+		outErr = log.Error("Native: Unable to delete user:", err)
 	}
 
 	if _, _, err := runAndLog(5*time.Second, nil, c.SudoPath, "-n", c.RmPath, "-rf", "/Users/"+user); err != nil {
-		out_err = log.Error("Native: Unable to remove the user home directory:", err)
+		outErr = log.Error("Native: Unable to remove the user home directory:", err)
 	}
 
 	return
 }
 
 // Unmount user volumes and delete the disk files
-func disksDelete(c *Config, user string) (out_err error) {
+func disksDelete(c *Config, user string) (outErr error) {
 	// Stopping the processes because they could cause user lock
-	out_err = userStop(c, user)
+	outErr = userStop(c, user)
 
 	// Getting the list of the mounted volumes
 	volumes, err := os.ReadDir("/Volumes")
 	if err != nil {
-		out_err = log.Error("Native: Unable to list mounted volumes:", err)
+		outErr = log.Error("Native: Unable to list mounted volumes:", err)
 	}
-	env_volumes := []string{}
+	envVolumes := []string{}
 	for _, file := range volumes {
 		if file.IsDir() && strings.HasPrefix(file.Name(), user) {
-			env_volumes = append(env_volumes, filepath.Join("/Volumes", file.Name()))
+			envVolumes = append(envVolumes, filepath.Join("/Volumes", file.Name()))
 		}
 	}
 
 	// Umount the disk volumes if needed
 	mounts, _, err := runAndLog(3*time.Second, nil, c.MountPath)
 	if err != nil {
-		out_err = log.Error("Native: Unable to list the mount points:", user, err)
+		outErr = log.Error("Native: Unable to list the mount points:", user, err)
 	}
-	for _, vol_path := range env_volumes {
-		if strings.Contains(mounts, vol_path) {
-			if _, _, err := runAndLog(5*time.Second, nil, c.HdiutilPath, "detach", vol_path); err != nil {
-				out_err = log.Error("Native: Unable to detach the volume disk:", user, vol_path, err)
+	for _, volPath := range envVolumes {
+		if strings.Contains(mounts, volPath) {
+			if _, _, err := runAndLog(5*time.Second, nil, c.HdiutilPath, "detach", volPath); err != nil {
+				outErr = log.Error("Native: Unable to detach the volume disk:", user, volPath, err)
 			}
 		}
 	}
 
 	// Cleaning the env work directory with disks
-	workspace_path := filepath.Join(c.WorkspacePath, user)
-	if _, err := os.Stat(workspace_path); !os.IsNotExist(err) {
-		if err := os.RemoveAll(workspace_path); err != nil {
-			out_err = log.Error("Native: Unable to remove user env workspace:", user, err)
+	workspacePath := filepath.Join(c.WorkspacePath, user)
+	if _, err := os.Stat(workspacePath); !os.IsNotExist(err) {
+		if err := os.RemoveAll(workspacePath); err != nil {
+			outErr = log.Error("Native: Unable to remove user env workspace:", user, err)
 		}
 	}
 
@@ -417,30 +417,30 @@ func disksDelete(c *Config, user string) (out_err error) {
 // Creates disks directories described by the disks map, returns the map of disks to mount paths
 func (d *Driver) disksCreate(user string, disks map[string]types.ResourcesDisk) (map[string]string, error) {
 	// Create disks
-	disk_paths := make(map[string]string, len(disks))
+	diskPaths := make(map[string]string, len(disks))
 
-	for d_name, disk := range disks {
-		disk_path := filepath.Join(d.cfg.WorkspacePath, user, "disk-"+d_name)
-		if err := os.MkdirAll(filepath.Dir(disk_path), 0o755); err != nil {
-			return disk_paths, err
+	for dName, disk := range disks {
+		diskPath := filepath.Join(d.cfg.WorkspacePath, user, "disk-"+dName)
+		if err := os.MkdirAll(filepath.Dir(diskPath), 0o755); err != nil {
+			return diskPaths, err
 		}
 
 		// Create disk
 		// TODO: Ensure failures doesn't leave the changes behind (like mounted disks or files)
 
 		if disk.Type == "dir" {
-			if err := os.MkdirAll(disk_path, 0o777); err != nil {
-				return disk_paths, err
+			if err := os.MkdirAll(diskPath, 0o777); err != nil {
+				return diskPaths, err
 			}
-			disk_paths[d_name] = disk_path
+			diskPaths[dName] = diskPath
 			// TODO: Validate the available disk space for disk.Size
 			continue
 		}
 
 		// Create virtual disk in order to restrict the disk space
-		dmg_path := disk_path + ".dmg"
+		dmgPath := diskPath + ".dmg"
 
-		label := d_name
+		label := dName
 		if disk.Label != "" {
 			// Label can be used as mount point so cut the path separator out
 			label = strings.ReplaceAll(disk.Label, "/", "")
@@ -449,39 +449,39 @@ func (d *Driver) disksCreate(user string, disks map[string]types.ResourcesDisk) 
 		}
 
 		// Do not recreate the disk if it is exists
-		if _, err := os.Stat(dmg_path); os.IsNotExist(err) {
-			args := []string{"create", dmg_path,
+		if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
+			args := []string{"create", dmgPath,
 				"-fs", "HFS+",
 				"-layout", "NONE",
 				"-volname", label,
 				"-size", fmt.Sprintf("%dm", disk.Size*1024),
 			}
 			if _, _, err := runAndLog(10*time.Minute, nil, d.cfg.HdiutilPath, args...); err != nil {
-				return disk_paths, log.Error("Native: Unable to create dmg disk:", dmg_path, err)
+				return diskPaths, log.Error("Native: Unable to create dmg disk:", dmgPath, err)
 			}
 		}
 
-		mount_point := filepath.Join("/Volumes", fmt.Sprintf("%s_%s", user, d_name))
+		mountPoint := filepath.Join("/Volumes", fmt.Sprintf("%s_%s", user, dName))
 
 		// Attach & mount disk
-		if _, _, err := runAndLog(10*time.Second, nil, d.cfg.HdiutilPath, "attach", dmg_path, "-owners", "on", "-mountpoint", mount_point); err != nil {
-			return disk_paths, log.Error("Native: Unable to attach dmg disk:", dmg_path, mount_point, err)
+		if _, _, err := runAndLog(10*time.Second, nil, d.cfg.HdiutilPath, "attach", dmgPath, "-owners", "on", "-mountpoint", mountPoint); err != nil {
+			return diskPaths, log.Error("Native: Unable to attach dmg disk:", dmgPath, mountPoint, err)
 		}
 
 		// Change the owner of the volume to user
-		if _, _, err := runAndLog(5*time.Second, nil, d.cfg.SudoPath, "-n", d.cfg.ChownPath, "-R", user+":staff", mount_point+"/"); err != nil {
-			return disk_paths, fmt.Errorf("Native: Error user disk mount path chown: %v", err)
+		if _, _, err := runAndLog(5*time.Second, nil, d.cfg.SudoPath, "-n", d.cfg.ChownPath, "-R", user+":staff", mountPoint+"/"); err != nil {
+			return diskPaths, fmt.Errorf("Native: Error user disk mount path chown: %v", err)
 		}
 
 		// (Optional) Disable spotlight for the mounted volume
-		if _, _, err := runAndLog(5*time.Second, nil, d.cfg.SudoPath, d.cfg.MdutilPath, "-i", "off", mount_point+"/"); err != nil {
-			log.Warn("Native: Unable to disable spotlight for the volume:", mount_point, err)
+		if _, _, err := runAndLog(5*time.Second, nil, d.cfg.SudoPath, d.cfg.MdutilPath, "-i", "off", mountPoint+"/"); err != nil {
+			log.Warn("Native: Unable to disable spotlight for the volume:", mountPoint, err)
 		}
 
-		disk_paths[d_name] = mount_point
+		diskPaths[dName] = mountPoint
 	}
 
-	return disk_paths, nil
+	return diskPaths, nil
 }
 
 // Runs & logs the executable command
@@ -525,14 +525,14 @@ func runAndLog(timeout time.Duration, stdin io.Reader, path string, arg ...strin
 	}
 
 	// Replace these for Windows, we only want to deal with Unix style line endings.
-	returnStdout := strings.Replace(stdout.String(), "\r\n", "\n", -1)
-	returnStderr := strings.Replace(stderr.String(), "\r\n", "\n", -1)
+	returnStdout := strings.ReplaceAll(stdout.String(), "\r\n", "\n")
+	returnStderr := strings.ReplaceAll(stderr.String(), "\r\n", "\n")
 
 	return returnStdout, returnStderr, err
 }
 
 // Will retry on error and store the retry output and errors to return
-func runAndLogRetry(retry int, timeout time.Duration, stdin io.Reader, path string, arg ...string) (stdout string, stderr string, err error) {
+func runAndLogRetry(retry int, timeout time.Duration, stdin io.Reader, path string, arg ...string) (stdout string, stderr string, err error) { //nolint:unparam
 	counter := 0
 	for {
 		counter++

@@ -29,21 +29,22 @@ import (
 	"time"
 )
 
-func InitTlsPairCa(hosts []string, ca_path, key_path, crt_path string) error {
+// InitTLSPairCa creates a pair of asymmetric keys and CA if needed
+func InitTLSPairCa(hosts []string, caPath, keyPath, crtPath string) error {
 	// Generates simple CA and Node certificate signed by the CA
-	_, ca_err := os.Stat(ca_path)
-	if os.IsNotExist(ca_err) {
+	_, caErr := os.Stat(caPath)
+	if os.IsNotExist(caErr) {
 		// Generate new CA since it's not exist
-		if err := generateSimpleCa(getCaKeyFromCertPath(ca_path), ca_path); err != nil {
+		if err := generateSimpleCa(getCaKeyFromCertPath(caPath), caPath); err != nil {
 			return err
 		}
 	}
 
-	_, key_err := os.Stat(key_path)
-	_, crt_err := os.Stat(crt_path)
-	if os.IsNotExist(key_err) || os.IsNotExist(crt_err) {
+	_, keyErr := os.Stat(keyPath)
+	_, crtErr := os.Stat(crtPath)
+	if os.IsNotExist(keyErr) || os.IsNotExist(crtErr) {
 		// Generate fish key & cert
-		if err := generateSimpleKeyCert(hosts, key_path, crt_path, ca_path); err != nil {
+		if err := generateSimpleKeyCert(hosts, keyPath, crtPath, caPath); err != nil {
 			return err
 		}
 	}
@@ -51,40 +52,40 @@ func InitTlsPairCa(hosts []string, ca_path, key_path, crt_path string) error {
 	return nil
 }
 
-func getCaKeyFromCertPath(ca_path string) string {
+func getCaKeyFromCertPath(caPath string) string {
 	// Just trim the name extension and add ".key"
-	filename := filepath.Base(ca_path)
+	filename := filepath.Base(caPath)
 	n := strings.LastIndexByte(filename, '.')
 	if n == -1 {
-		return ca_path
+		return caPath
 	}
-	return filepath.Join(filepath.Dir(ca_path), filename[:n]+".key")
+	return filepath.Join(filepath.Dir(caPath), filename[:n]+".key")
 }
 
-func generateSimpleCa(key_path, crt_path string) error {
+func generateSimpleCa(keyPath, crtPath string) error {
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return err
 	}
 
-	not_before := time.Now()
+	notBefore := time.Now()
 
-	serial_number_limit := new(big.Int).Lsh(big.NewInt(1), 128)
-	serial_number, err := rand.Int(rand.Reader, serial_number_limit)
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
 		return err
 	}
 
 	template := x509.Certificate{
-		SerialNumber: serial_number,
+		SerialNumber: serialNumber,
 		Subject: pkix.Name{
 			// It's just an example CA - for prod generate CA & certs yourself with openssl
 			Organization: []string{"Example Co CA"},
 			CommonName:   "ClusterCA",
 		},
 
-		NotBefore: not_before,
-		NotAfter:  not_before.AddDate(10, 0, 0), // 10y
+		NotBefore: notBefore,
+		NotAfter:  notBefore.AddDate(10, 0, 0), // 10y
 
 		IsCA:     true,
 		KeyUsage: x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
@@ -93,27 +94,25 @@ func generateSimpleCa(key_path, crt_path string) error {
 	}
 
 	// Generate certificate
-	if err := createCert(crt_path, &priv.PublicKey, priv, &template, &template); err != nil {
+	if err := createCert(crtPath, &priv.PublicKey, priv, &template, &template); err != nil {
 		return err
 	}
 
 	// Create private key file
-	if err := createKey(key_path, priv); err != nil {
-		return err
-	}
+	err = createKey(keyPath, priv)
 
-	return nil
+	return err
 }
 
-func generateSimpleKeyCert(hosts []string, key_path, crt_path, ca_path string) error {
+func generateSimpleKeyCert(hosts []string, keyPath, crtPath, caPath string) error {
 	// Load the CA key and cert
-	ca_tls, err := tls.LoadX509KeyPair(ca_path, getCaKeyFromCertPath(ca_path))
+	caTLS, err := tls.LoadX509KeyPair(caPath, getCaKeyFromCertPath(caPath))
 	if err != nil {
 		return err
 	}
-	ca_key := ca_tls.PrivateKey
+	caKey := caTLS.PrivateKey
 
-	ca_crt, err := x509.ParseCertificate(ca_tls.Certificate[0])
+	caCrt, err := x509.ParseCertificate(caTLS.Certificate[0])
 	if err != nil {
 		return err
 	}
@@ -124,23 +123,23 @@ func generateSimpleKeyCert(hosts []string, key_path, crt_path, ca_path string) e
 		return err
 	}
 
-	not_before := time.Now()
+	notBefore := time.Now()
 
-	serial_number_limit := new(big.Int).Lsh(big.NewInt(1), 128)
-	serial_number, err := rand.Int(rand.Reader, serial_number_limit)
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
 		return err
 	}
 
 	template := x509.Certificate{
-		SerialNumber: serial_number,
+		SerialNumber: serialNumber,
 		Subject: pkix.Name{
 			Organization: []string{"Example Co Crt"},
 			CommonName:   hosts[0], // Node Name is first in hosts list
 		},
 
-		NotBefore: not_before,
-		NotAfter:  not_before.AddDate(1, 0, 0), // 1y
+		NotBefore: notBefore,
+		NotAfter:  notBefore.AddDate(1, 0, 0), // 1y
 
 		// Overall for server & client auth
 		KeyUsage:    x509.KeyUsageDigitalSignature,
@@ -160,38 +159,36 @@ func generateSimpleKeyCert(hosts []string, key_path, crt_path, ca_path string) e
 	}
 
 	// Generate certificate
-	if err := createCert(crt_path, &priv.PublicKey, ca_key, &template, ca_crt); err != nil {
+	if err := createCert(crtPath, &priv.PublicKey, caKey, &template, caCrt); err != nil {
 		return err
 	}
 
 	// Create private key file
-	if err := createKey(key_path, priv); err != nil {
-		return err
-	}
+	err = createKey(keyPath, priv)
 
-	return nil
+	return err
 }
 
-func createCert(crt_path string, pubkey crypto.PublicKey, ca_key crypto.PrivateKey, cert, ca_crt *x509.Certificate) error {
+func createCert(crtPath string, pubkey crypto.PublicKey, caKey crypto.PrivateKey, cert, caCrt *x509.Certificate) error {
 	// Generate certificate
-	der_bytes, err := x509.CreateCertificate(rand.Reader, cert, ca_crt, pubkey, ca_key)
+	derBytes, err := x509.CreateCertificate(rand.Reader, cert, caCrt, pubkey, caKey)
 	if err != nil {
 		return err
 	}
 
 	// Create certificate file
-	crt_out, err := os.Create(crt_path)
+	crtOut, err := os.Create(crtPath)
 	if err != nil {
 		return err
 	}
-	defer crt_out.Close()
-	if err := pem.Encode(crt_out, &pem.Block{Type: "CERTIFICATE", Bytes: der_bytes}); err != nil {
+	defer crtOut.Close()
+	if err := pem.Encode(crtOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}); err != nil {
 		return err
 	}
 
 	// Attach CA certificate to generate complete chain if it's different from the cert data
-	if cert != ca_crt {
-		if err := pem.Encode(crt_out, &pem.Block{Type: "CA CERTIFICATE", Bytes: ca_crt.Raw}); err != nil {
+	if cert != caCrt {
+		if err := pem.Encode(crtOut, &pem.Block{Type: "CA CERTIFICATE", Bytes: caCrt.Raw}); err != nil {
 			return err
 		}
 	}
@@ -199,20 +196,19 @@ func createCert(crt_path string, pubkey crypto.PublicKey, ca_key crypto.PrivateK
 	return nil
 }
 
-func createKey(key_path string, key crypto.PrivateKey) error {
+func createKey(keyPath string, key crypto.PrivateKey) error {
 	// Create private key file
-	key_out, err := os.OpenFile(key_path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	keyOut, err := os.OpenFile(keyPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
-	defer key_out.Close()
-	priv_bytes, err := x509.MarshalPKCS8PrivateKey(key)
+	defer keyOut.Close()
+	privBytes, err := x509.MarshalPKCS8PrivateKey(key)
 	if err != nil {
-		return err
-	}
-	if err := pem.Encode(key_out, &pem.Block{Type: "PRIVATE KEY", Bytes: priv_bytes}); err != nil {
 		return err
 	}
 
-	return nil
+	err = pem.Encode(keyOut, &pem.Block{Type: "PRIVATE KEY", Bytes: privBytes})
+
+	return err
 }

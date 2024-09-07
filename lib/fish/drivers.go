@@ -25,22 +25,24 @@ import (
 	_ "github.com/adobe/aquarium-fish/lib/drivers/native"
 	_ "github.com/adobe/aquarium-fish/lib/drivers/vmx"
 
+	// Importing test driver
 	_ "github.com/adobe/aquarium-fish/lib/drivers/test"
 )
 
-var drivers_instances map[string]drivers.ResourceDriver
+var driversInstances map[string]drivers.ResourceDriver
 
-func (f *Fish) DriverGet(name string) drivers.ResourceDriver {
-	if drivers_instances == nil {
+// driverGet returns specific driver by name
+func (*Fish) driverGet(name string) drivers.ResourceDriver {
+	if driversInstances == nil {
 		log.Error("Fish: Resource drivers are not initialized to request the driver instance:", name)
 		return nil
 	}
-	drv, _ := drivers_instances[name]
+	drv := driversInstances[name]
 	return drv
 }
 
-// Making the drivers instances map with specified names
-func (f *Fish) DriversSet() error {
+// driversSet making the drivers instances map with specified names
+func (f *Fish) driversSet() error {
 	instances := make(map[string]drivers.ResourceDriver)
 
 	if len(f.cfg.Drivers) == 0 {
@@ -66,33 +68,34 @@ func (f *Fish) DriversSet() error {
 		}
 	}
 
-	drivers_instances = instances
+	driversInstances = instances
 
 	return nil
 }
 
-func (f *Fish) DriversPrepare(configs []ConfigDriver) (errs []error) {
-	activated_drivers_instances := make(map[string]drivers.ResourceDriver)
-	for name, drv := range drivers_instances {
+// driversPrepare initializes the drivers with provided configs
+func (*Fish) driversPrepare(configs []ConfigDriver) (errs []error) {
+	activatedDriversInstances := make(map[string]drivers.ResourceDriver)
+	for name, drv := range driversInstances {
 		// Looking for the driver config
-		var json_cfg []byte
+		var jsonCfg []byte
 		for _, cfg := range configs {
 			if name == cfg.Name {
-				json_cfg = []byte(cfg.Cfg)
+				jsonCfg = []byte(cfg.Cfg)
 				break
 			}
 		}
 
-		if err := drv.Prepare(json_cfg); err != nil {
+		if err := drv.Prepare(jsonCfg); err != nil {
 			errs = append(errs, err)
 			log.Warn("Fish: Resource driver prepare failed:", drv.Name(), err)
 		} else {
-			activated_drivers_instances[name] = drv
+			activatedDriversInstances[name] = drv
 			log.Info("Fish: Resource driver activated:", drv.Name())
 		}
 	}
 
-	drivers_instances = activated_drivers_instances
+	driversInstances = activatedDriversInstances
 
 	return errs
 }
