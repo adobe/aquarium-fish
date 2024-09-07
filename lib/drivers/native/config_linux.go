@@ -24,5 +24,5 @@ type PlatformConfig struct {
 
 func (c *Config) validateForPlatform(err error) (error, error) {
 	//TODO: implement linux validation
-	return
+	return error, error
 }
