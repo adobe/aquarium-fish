@@ -1,5 +1,5 @@
 /**
- * Copyright 2023 Adobe. All rights reserved.
+ * Copyright 2024 Adobe. All rights reserved.
  * This file is licensed to you under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may obtain a copy
  * of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -117,6 +117,7 @@ func (cl *Cluster) importServiceMapping(message *msg.Message) {
 	}
 }
 
+// importVote is a special one - it doesn't import into DB, but instead to memory storage of Fish
 func (cl *Cluster) importVote(message *msg.Message) {
 	var items []types.Vote
 	dec := json.NewDecoder(bytes.NewReader([]byte(message.Data)))
@@ -125,12 +126,8 @@ func (cl *Cluster) importVote(message *msg.Message) {
 		return
 	}
 
-	for _, i := range items {
-		log.Debug("Cluster: Importing Vote:", i.UID)
-		if err := cl.fish.VoteImport(&i); err != nil {
-			log.Warnf("Cluster: Unable to import vote '%v': %v", i.UID, err)
-		}
-	}
+	log.Debug("Cluster: Importing Votes amount:", len(items))
+	cl.fish.StorageVotesAdd(items)
 }
 
 func (cl *Cluster) importLocation(message *msg.Message) {

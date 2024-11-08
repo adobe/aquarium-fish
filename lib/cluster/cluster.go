@@ -1,5 +1,5 @@
 /**
- * Copyright 2023 Adobe. All rights reserved.
+ * Copyright 2024 Adobe. All rights reserved.
  * This file is licensed to you under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may obtain a copy
  * of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -27,6 +27,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/cluster/msg"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
+	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
 const (
@@ -157,6 +158,9 @@ func New(fish *fish.Fish, join []string, data_dir, ca_path, cert_path, key_path 
 	// Cluster is ready, run the background watcher
 	go cl.watchConnectionsProcess()
 
+	// Connect to fish in order to receive sync requests
+	fish.ClusterSet(cl)
+
 	return cl, nil
 }
 
@@ -232,6 +236,12 @@ func (cl *Cluster) GetHub() *Hub {
 	return cl.hub
 }
 
+// SendVote distributes Vote across the cluster
+func (cl *Cluster) SendVote(vote *types.Vote) error {
+	return cl.Send(msg.NewMessage("Vote", "", []any{vote}))
+}
+
+// Send conducts the prepared message to the other nodes ins the cluster
 func (cl *Cluster) Send(message *msg.Message) error {
 	if ok := cl.processed_sums.Put(message.Sum); !ok {
 		// The message was already processed by the cluster so skipping

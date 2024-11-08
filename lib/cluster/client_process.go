@@ -1,5 +1,5 @@
 /**
- * Copyright 2023 Adobe. All rights reserved.
+ * Copyright 2024 Adobe. All rights reserved.
  * This file is licensed to you under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may obtain a copy
  * of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -265,15 +265,11 @@ func (c *Client) processSync(message *msg.Message) {
 		}
 	}
 
-	// Sending back the votes
+	// Sending back the current apps votes
 	{
 		//log.Debugf("Cluster: Client %s: Sending votes", c.Ident())
 		// Votes really need to be sent only for the active applications
-		votes, err := c.fish.VoteFind(filter)
-		if err != nil {
-			log.Errorf("Cluster: Client %s: Unable to get Votes to send: %v", c.Ident(), err)
-			return
-		}
+		votes := c.fish.VoteActiveList()
 		if len(votes) > 0 {
 			counter += 1
 			if err := c.Write(msg.NewMessage("Vote", message.Type, votes)); err != nil {

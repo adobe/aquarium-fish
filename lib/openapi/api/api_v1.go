@@ -774,11 +774,8 @@ func (e *Processor) VoteListGet(c echo.Context, params types.VoteListGetParams) 
 		return fmt.Errorf("Only 'admin' user can get votes")
 	}
 
-	out, err := e.fish.VoteFind(params.Filter)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the vote list: %v", err)})
-		return fmt.Errorf("Unable to get the vote list: %w", err)
-	}
+	// TODO: Right now no filter here - probably not even needed at all
+	out := e.fish.VoteActiveList()
 
 	return c.JSON(http.StatusOK, out)
 }

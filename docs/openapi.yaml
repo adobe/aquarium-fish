@@ -1735,14 +1735,13 @@ components:
     VoteUID:
       type: string
       format: uuid
-      x-oapi-codegen-extra-tags:
-        gorm: primaryKey
     Vote:
       type: object
       description: >
         When Application becomes available for the node it starts to vote to notify the cluster
         about its availability. Votes are basically "yes" or "no" and could take a number of rounds
         depends on the cluster voting and election rules.
+        Votes are not stored in DB and lives only in-memory, but synchronized within the cluster.
       required:
         - UID
         - created_at
@@ -1750,12 +1749,11 @@ components:
         - node_UID
         - round
         - available
+        - rule_result
         - rand
       properties:
         UID:
           $ref: '#/components/schemas/VoteUID'
-          x-oapi-codegen-extra-tags:
-            gorm: primaryKey
         created_at:
           x-go-type: time.Time
         application_UID:
@@ -1764,18 +1762,14 @@ components:
           format: uuid
           x-oapi-codegen-extra-tags:
             yaml: application_UID
-            gorm: uniqueIndex:idx_node_app_round_uniq
         node_UID:
           # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/NodeUID'
           type: string
           format: uuid
           x-oapi-codegen-extra-tags:
             yaml: node_UID
-            gorm: uniqueIndex:idx_node_app_round_uniq
         round:
           x-go-type: uint16
-          x-oapi-codegen-extra-tags:
-            gorm: uniqueIndex:idx_node_app_round_uniq
           description: >
             Round of the election, because it can take a number of rounds to figure out the Only
             One.
@@ -1785,6 +1779,9 @@ components:
             Node places answer to the Vote for the Application's definitions, the number represents
             the first available index of the definition which fits the node available resources. In
             case it's `-1` then node can't run any of the definitions.
+        rule_result:
+          x-go-type: uint32
+          description: The custom rule result is needed to store the custom rule decision
         rand:
           x-go-type: uint32
           description: The last resort to figure out for the winner.
