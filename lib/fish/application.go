@@ -16,7 +16,7 @@ package fish
 import (
 	"fmt"
 
-	"github.com/google/uuid"
+	"gorm.io/gorm"
 
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
@@ -41,11 +41,8 @@ func (f *Fish) ApplicationFind(filter *string) (as []types.Application, err erro
 
 // ApplicationCreate makes new Applciation
 func (f *Fish) ApplicationCreate(a *types.Application) error {
-	if a.LabelUID == uuid.Nil {
-		return fmt.Errorf("Fish: LabelUID can't be unset")
-	}
-	if a.Metadata == "" {
-		a.Metadata = "{}"
+	if err := a.Validate(); err != nil {
+		return fmt.Errorf("Fish: Unable to validate Application: %v", err)
 	}
 
 	a.UID = f.NewUID()
@@ -95,4 +92,20 @@ func (f *Fish) ApplicationIsAllocated(appUID types.ApplicationUID) (err error) {
 		return fmt.Errorf("Fish: The Application is not allocated")
 	}
 	return nil
+}
+
+// Insert / update the application directly from the data, without changing created_at and updated_at
+func (f *Fish) ApplicationImport(a *types.Application) error {
+	if err := a.Validate(); err != nil {
+		return fmt.Errorf("Fish: Unable to validate Application: %v", err)
+	}
+
+	// The updated_at and created_at should stay the same so skipping the hooks
+	tx := f.db.Session(&gorm.Session{SkipHooks: true})
+	err := tx.Create(a).Error
+	if err != nil {
+		err = tx.Save(a).Error
+	}
+
+	return err
 }

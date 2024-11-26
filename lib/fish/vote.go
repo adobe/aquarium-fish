@@ -1,5 +1,5 @@
 /**
- * Copyright 2021 Adobe. All rights reserved.
+ * Copyright 2024 Adobe. All rights reserved.
  * This file is licensed to you under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may obtain a copy
  * of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -13,83 +13,89 @@
 package fish
 
 import (
-	"fmt"
 	"math/rand"
+	"time"
 
-	"github.com/google/uuid"
-
-	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
-	"github.com/adobe/aquarium-fish/lib/util"
 )
 
-// VoteFind returns list of Votes that fits filter
-func (f *Fish) VoteFind(filter *string) (vs []types.Vote, err error) {
-	db := f.db
-	if filter != nil {
-		securedFilter, err := util.ExpressionSQLFilter(*filter)
-		if err != nil {
-			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
-			// We do not fail here because we should not give attacker more information
-			return vs, nil
-		}
-		db = db.Where(securedFilter)
+// VoteCreate makes new Vote for the current Node
+func (f *Fish) VoteCreate(app_uid types.ApplicationUID) types.Vote {
+	return types.Vote{
+		// UID is unset due to the Vote is modified in memory to follow the election procedures
+		CreatedAt:      time.Now(),
+		ApplicationUID: app_uid,
 	}
-	err = db.Find(&vs).Error
-	return vs, err
 }
 
-// VoteCreate makes new Vote
-func (f *Fish) VoteCreate(v *types.Vote) error {
-	if v.ApplicationUID == uuid.Nil {
-		return fmt.Errorf("Fish: ApplicationUID can't be unset")
-	}
-	if v.NodeUID == uuid.Nil {
-		return fmt.Errorf("Fish: NodeUID can't be unset")
-	}
-	// Update Vote Rand to be actual rand
-	v.Rand = rand.Uint32() // #nosec G404
+// clusterVoteSend sends signal to cluster to spread node vote
+func (f *Fish) clusterVoteSend(v *types.Vote) error {
+	// Generating new UID
 	v.UID = f.NewUID()
-	return f.db.Create(v).Error
+	// Update create time for the vote
+	v.CreatedAt = time.Now()
+	// Node should be the current one
+	v.NodeUID = f.node.UID
+	// Make sure the rand is reset every time
+	v.Rand = rand.Uint32() // #nosec G404
+
+	if f.cluster != nil {
+		return f.cluster.SendVote(v)
+	}
+
+	return nil
 }
 
-// Intentionally disabled, vote can't be updated
-/*func (f *Fish) VoteSave(v *types.Vote) error {
-	return f.db.Save(v).Error
-}*/
+// voteListGetApplicationRound returns storage and active Votes for the specified round
+func (f *Fish) voteListGetApplicationRound(appUID types.ApplicationUID, round uint16) (votes []types.Vote) {
+	// Filtering storageVotes list
+	f.storageVotesMutex.RLock()
+	defer f.storageVotesMutex.RUnlock()
 
-// VoteGet returns Vote by it's UID
-func (f *Fish) VoteGet(uid types.VoteUID) (v *types.Vote, err error) {
-	v = &types.Vote{}
-	err = f.db.First(v, uid).Error
-	return v, err
+	found_current := false
+	for _, vote := range f.storageVotes {
+		if vote.ApplicationUID == appUID && vote.Round == round {
+			votes = append(votes, vote)
+			if vote.NodeUID == f.node.UID {
+				found_current = true
+			}
+		}
+	}
+
+	if !found_current {
+		// Current node vote is not in the storage, so quickly looking into
+		if activeVote, err := f.activeVotesGet(appUID); activeVote != nil && err == nil {
+			votes = append(votes, *activeVote)
+		}
+	}
+
+	return votes
 }
 
-// VoteCurrentRoundGet returns the current round of voting based on the known Votes
-func (f *Fish) VoteCurrentRoundGet(appUID types.ApplicationUID) uint16 {
-	var result types.Vote
-	f.db.Select("max(round) as round").Where("application_uid = ?", appUID).First(&result)
-	return result.Round
-}
+// VoteAll returns active and related storage votes
+func (f *Fish) VoteActiveList() (votes []types.Vote) {
+	// Getting a list of active Votes ApplicationUID's to quickly filter the storage votes later
+	f.activeVotesMutex.RLock()
+	activeApps := make(map[types.ApplicationUID]uint16, len(f.activeVotes))
+	for _, v := range f.activeVotes {
+		activeApps[v.ApplicationUID] = v.Round
+		votes = append(votes, v)
+	}
+	f.activeVotesMutex.RUnlock()
 
-// VoteListGetApplicationRound returns Votes for the specified round
-func (f *Fish) VoteListGetApplicationRound(appUID types.ApplicationUID, round uint16) (vs []types.Vote, err error) {
-	err = f.db.Where("application_uid = ?", appUID).Where("round = ?", round).Find(&vs).Error
-	return vs, err
-}
+	// Filtering storageVotes list
+	f.storageVotesMutex.RLock()
+	defer f.storageVotesMutex.RUnlock()
 
-// VoteGetElectionWinner returns Vote that won the election
-func (f *Fish) VoteGetElectionWinner(appUID types.ApplicationUID, round uint16) (v *types.Vote, err error) {
-	// Current rule is simple - sort everyone answered the smallest available number and the first one wins
-	v = &types.Vote{}
-	err = f.db.Where("application_uid = ?", appUID).Where("round = ?", round).Where("available >= 0").
-		Order("available ASC").Order("created_at ASC").Order("rand ASC").First(&v).Error
-	return v, err
-}
+	// NOTE: The storageVotes can contain votes from activeVotes, but should not be a big deal
+	for _, vote := range f.storageVotes {
+		for appUID, round := range activeApps {
+			if vote.ApplicationUID == appUID && vote.Round == round {
+				votes = append(votes, vote)
+				break
+			}
+		}
+	}
 
-// VoteGetNodeApplication returns latest Vote by Node and Application
-func (f *Fish) VoteGetNodeApplication(nodeUID types.NodeUID, appUID types.ApplicationUID) (v *types.Vote, err error) {
-	v = &types.Vote{}
-	err = f.db.Where("application_uid = ?", appUID).Where("node_uid = ?", nodeUID).Order("round DESC").First(&v).Error
-	return v, err
+	return votes
 }

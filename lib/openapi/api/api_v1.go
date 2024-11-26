@@ -23,6 +23,7 @@ import (
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
 
+	"github.com/adobe/aquarium-fish/lib/cluster"
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
@@ -34,12 +35,16 @@ type H map[string]any
 
 // Processor doing processing of the API request
 type Processor struct {
-	fish *fish.Fish
+	fish    *fish.Fish
+	cluster *cluster.Cluster
 }
 
 // NewV1Router creates router for APIv1
-func NewV1Router(e *echo.Echo, f *fish.Fish) {
-	proc := &Processor{fish: f}
+func NewV1Router(e *echo.Echo, fish *fish.Fish, cl *cluster.Cluster) {
+	proc := &Processor{
+		fish:    fish,
+		cluster: cl,
+	}
 	router := e.Group("")
 	router.Use(
 		// Regular basic auth
@@ -624,6 +629,62 @@ func (e *Processor) NodeThisGet(c echo.Context) error {
 	return c.JSON(http.StatusOK, node)
 }
 
+// NodeThisConnectionsGet API call processor
+func (e *Processor) NodeThisConnectionsGet(c echo.Context) error {
+	user := c.Get("user")
+	if user.(*types.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' can get node connections")})
+		return fmt.Errorf("Only 'admin' user can set node connections")
+	}
+
+	var out []types.Connection
+
+	connections := e.cluster.GetHub().Clients()
+	for _, client := range connections {
+		curl := client.Url()
+		conn := types.Connection{
+			Name:   client.Name(),
+			Host:   client.Host(),
+			Url:    (&curl).String(),
+			Status: types.ConnectionStatusDISCONNECTED,
+		}
+		if client.IsConnected() {
+			conn.Status = types.ConnectionStatusCONNECTED
+		} else if client.ConnFail != nil {
+			conn.Status = types.ConnectionStatusERROR
+			conn.Error = fmt.Sprintf("%v", client.ConnFail)
+		}
+		out = append(out, conn)
+	}
+
+	return c.JSON(http.StatusOK, out)
+}
+
+// NodePubkeyPut API call processor
+func (e *Processor) NodePubkeyPut(c echo.Context, name string, params types.NodePubkeyPutParams) error {
+	user := c.Get("user")
+	if user.(*types.User).Name != "admin" {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Only 'admin' can set node pubkey")})
+		return fmt.Errorf("Only 'admin' user can set node pubkey")
+	}
+
+	node, err := e.fish.NodeGet(name)
+	if err != nil {
+		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Node get failed with error: %v", err)})
+		return fmt.Errorf("Node get failed with error: %w", err)
+	}
+
+	node.Pubkey = params.Value
+
+	err = e.fish.NodeSave(node)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to save the Node pubkey: %v", err)})
+		return fmt.Errorf("Unable to save the Node pubkey: %w", err)
+	}
+
+	return c.JSON(http.StatusOK, H{"message": "Node pubkey set"})
+}
+
 // NodeThisMaintenanceGet API call processor
 func (e *Processor) NodeThisMaintenanceGet(c echo.Context, params types.NodeThisMaintenanceGetParams) error {
 	user, ok := c.Get("user").(*types.User)
@@ -713,11 +774,8 @@ func (e *Processor) VoteListGet(c echo.Context, params types.VoteListGetParams) 
 		return fmt.Errorf("Only 'admin' user can get votes")
 	}
 
-	out, err := e.fish.VoteFind(params.Filter)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the vote list: %v", err)})
-		return fmt.Errorf("Unable to get the vote list: %w", err)
-	}
+	// TODO: Right now no filter here - probably not even needed at all
+	out := e.fish.VoteActiveList()
 
 	return c.JSON(http.StatusOK, out)
 }

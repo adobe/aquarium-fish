@@ -15,12 +15,28 @@ package fish
 import (
 	"fmt"
 
-	"github.com/google/uuid"
+	"gorm.io/gorm"
 
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
+
+// ApplicationTaskFind looks for ApplicationTask with filter
+func (f *Fish) ApplicationTaskFind(filter *string) (at []types.ApplicationTask, err error) {
+	db := f.db
+	if filter != nil {
+		secured_filter, err := util.ExpressionSQLFilter(*filter)
+		if err != nil {
+			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
+			// We do not fail here because we should not give attacker more information
+			return at, nil
+		}
+		db = db.Where(secured_filter)
+	}
+	err = db.Find(&at).Error
+	return at, err
+}
 
 // ApplicationTaskFindByApplication allows to find all the ApplicationTasks by ApplciationUID
 func (f *Fish) ApplicationTaskFindByApplication(uid types.ApplicationUID, filter *string) (at []types.ApplicationTask, err error) {
@@ -41,17 +57,8 @@ func (f *Fish) ApplicationTaskFindByApplication(uid types.ApplicationUID, filter
 
 // ApplicationTaskCreate makes a new ApplicationTask
 func (f *Fish) ApplicationTaskCreate(at *types.ApplicationTask) error {
-	if at.ApplicationUID == uuid.Nil {
-		return fmt.Errorf("Fish: ApplicationUID can't be unset")
-	}
-	if at.Task == "" {
-		return fmt.Errorf("Fish: Task can't be empty")
-	}
-	if at.Options == "" {
-		at.Options = util.UnparsedJSON("{}")
-	}
-	if at.Result == "" {
-		at.Result = util.UnparsedJSON("{}")
+	if err := at.Validate(); err != nil {
+		return fmt.Errorf("Fish: Unable to validate ApplicationTask: %v", err)
 	}
 
 	at.UID = f.NewUID()
@@ -74,4 +81,20 @@ func (f *Fish) ApplicationTaskGet(uid types.ApplicationTaskUID) (at *types.Appli
 func (f *Fish) ApplicationTaskListByApplicationAndWhen(appUID types.ApplicationUID, when types.ApplicationStatus) (at []types.ApplicationTask, err error) {
 	err = f.db.Where(`application_uid = ? AND "when" = ?`, appUID, when).Order("created_at desc").Find(&at).Error
 	return at, err
+}
+
+// Insert / update the application task directly from the data, without changing created_at and updated_at
+func (f *Fish) ApplicationTaskImport(at *types.ApplicationTask) error {
+	if err := at.Validate(); err != nil {
+		return fmt.Errorf("Fish: Unable to validate ApplicationTask: %v", err)
+	}
+
+	// The updated_at and created_at should stay the same so skipping the hooks
+	tx := f.db.Session(&gorm.Session{SkipHooks: true})
+	err := tx.Create(at).Error
+	if err != nil {
+		err = tx.Save(at).Error
+	}
+
+	return err
 }

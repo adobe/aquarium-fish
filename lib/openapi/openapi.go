@@ -34,9 +34,11 @@ import (
 	_ "github.com/oapi-codegen/oapi-codegen/v2/pkg/util" // We need util here otherwise it will not load the needed imports and fail go.mod vetting
 	"gopkg.in/yaml.v3"
 
+	"github.com/adobe/aquarium-fish/lib/cluster"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/api"
+	cluster_server "github.com/adobe/aquarium-fish/lib/openapi/cluster"
 	"github.com/adobe/aquarium-fish/lib/openapi/meta"
 )
 
@@ -68,7 +70,7 @@ func (*YamlBinder) Bind(i any, c echo.Context) (err error) {
 }
 
 // Init startups the API server to listen for incoming requests
-func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*http.Server, error) {
+func Init(f *fish.Fish, cl *cluster.Cluster, apiAddress, caPath, certPath, keyPath string) (*http.Server, error) {
 	swagger, err := GetSwagger()
 	if err != nil {
 		return nil, fmt.Errorf("Fish OpenAPI: Error loading swagger spec: %w", err)
@@ -87,10 +89,10 @@ func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*http.Ser
 	//router.Use(oapimw.OapiRequestValidator(swagger))
 	router.HideBanner = true
 
-	// TODO: Probably it will be a feature an ability to separate those
-	// routers to independence ports if needed
+	// TODO: Probably could be a feature to separate those routers to independent ports if needed
 	meta.NewV1Router(router, f)
-	api.NewV1Router(router, f)
+	cluster_server.NewV1Router(router, f, cl)
+	api.NewV1Router(router, f, cl)
 	// TODO: web UI router
 
 	caPool := x509.NewCertPool()
@@ -138,6 +140,11 @@ func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*http.Ser
 			addr := router.TLSListenerAddr()
 			if addr != nil && strings.Contains(addr.String(), ":") {
 				log.Info("API listening on:", addr)
+				if f.GetNode().Address == "" {
+					// Set the proper address of the node
+					f.GetNode().Address = addr.String()
+					f.NodeSave(f.GetNode())
+				}
 				return router.TLSServer, nil // Was started
 			}
 		case err := <-errChan:

@@ -15,6 +15,8 @@ package fish
 import (
 	"fmt"
 
+	"gorm.io/gorm"
+
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 	"github.com/adobe/aquarium-fish/lib/util"
@@ -38,8 +40,8 @@ func (f *Fish) LocationFind(filter *string) (ls []types.Location, err error) {
 
 // LocationCreate makes new Location
 func (f *Fish) LocationCreate(l *types.Location) error {
-	if l.Name == "" {
-		return fmt.Errorf("Fish: Name can't be empty")
+	if err := l.Validate(); err != nil {
+		return fmt.Errorf("Fish: Unable to validate Location: %v", err)
 	}
 
 	return f.db.Create(l).Error
@@ -60,4 +62,20 @@ func (f *Fish) LocationGet(name types.LocationName) (l *types.Location, err erro
 // LocationDelete removes location
 func (f *Fish) LocationDelete(name types.LocationName) error {
 	return f.db.Delete(&types.Location{}, name).Error
+}
+
+// Insert / update the location directly from the data, without changing created_at and updated_at
+func (f *Fish) LocationImport(l *types.Location) error {
+	if err := l.Validate(); err != nil {
+		return fmt.Errorf("Fish: Unable to validate Location: %v", err)
+	}
+
+	// The updated_at and created_at should stay the same so skipping the hooks
+	tx := f.db.Session(&gorm.Session{SkipHooks: true})
+	err := tx.Create(l).Error
+	if err != nil {
+		err = tx.Save(l).Error
+	}
+
+	return err
 }
