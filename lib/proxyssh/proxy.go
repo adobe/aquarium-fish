@@ -9,34 +9,11 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-/**
- * This file has been modified from: https://github.com/dutchcoders/sshproxy
- *
- * The MIT License (MIT)
- * Copyright (c) 2015 Remco Verhoef
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
 
-// Package proxyssh allows to access the remote resources through ssh proxy
 package proxyssh
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -45,7 +22,9 @@ import (
 	"io"
 	"net"
 	"os"
+	"strings"
 	"sync"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 
@@ -54,207 +33,268 @@ import (
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
-// NOTE: this init function and logging information exist to satisfy binary
-// redistribution of the code in this file.  Do not remove this.
-func init() {
-	log.Info("The Fish SSH proxy is a re-implementation of Remco Verhoef's MIT licensed example (https://github.com/dutchcoders/sshproxy)")
-}
+// NOTE: This proxy was highly influenced by Remco Verhoef's ideas in
+// https://github.com/dutchcoders/sshproxy, but have a little to no similarity with its ancestor.
 
 // ProxyAccess keeps state of the SSH server
 type ProxyAccess struct {
 	fish         *fish.Fish
 	serverConfig *ssh.ServerConfig
-	// Keys: remote address from ssh connection
-	// Values: tuple (username, password)
-	// [all strings]
+
+	// Listening address
+	Address net.Addr
+
+	// Keeps session info for auth, key is src address, value is Session
 	sessions sync.Map
 }
 
-// SessionRecord stored in ProxyAccess::sessions.
-type SessionRecord struct {
+// Session is stored in ProxyAccess::sessions.
+type Session struct {
 	ResourceAccessor *types.ResourceAccess
-	RemoteAddr       net.Addr
-	// Username   string
-	// Password   string
+	SrcAddr          net.Addr
+
+	// This work group used to track the routines of the session
+	// to make sure everything shutdown properly
+	wg sync.WaitGroup
 }
 
-func (p *ProxyAccess) serveConnection(conn net.Conn, serverConfig *ssh.ServerConfig) error {
-	// Establish the initial connection.
-	serverConn, serverChannels, serverReqs, err := ssh.NewServerConn(conn, serverConfig)
+func (p *ProxyAccess) serveConnection(clientConn net.Conn) error {
+	log.Infof("PROXYSSH: %s: Starting new session", clientConn.RemoteAddr())
+
+	// Establish SSH connection
+	srcConn, srcConnChannels, srcConnReqs, err := p.establishConnection(clientConn)
 	if err != nil {
-		return log.Errorf("Failed to establish new server connection with %s: %v", conn.RemoteAddr(), err)
+		return err
 	}
-	defer serverConn.Close()
-	go ssh.DiscardRequests(serverReqs)
+	defer srcConn.Close()
 
-	// Pop off the session information from our passwordCallback map immediately
-	// as any new connections will pass through that callback and add it.
-	remoteAddrString := conn.RemoteAddr().String()
-	value, loaded := p.sessions.LoadAndDelete(remoteAddrString)
-	if value == nil || !loaded {
-		return log.Errorf("Unable to load session record for %q", remoteAddrString)
-	}
-
-	// Go find the resource via its UID.
-	sessionRecord, ok := value.(SessionRecord)
-	if !ok {
-		return log.Errorf("Critical error retrieving session record (invalid type conversion).")
-	}
-	resource, err := p.fish.ResourceGet(sessionRecord.ResourceAccessor.ResourceUID)
+	// Get session info from map
+	session, err := p.getSession(srcConn.RemoteAddr().String())
 	if err != nil {
-		return log.Errorf("Unable to retrieve resource: %v", err)
+		return err
 	}
 
-	// If the resource was not created with the authentication username and
-	// password then they will both be the empty string, meaning we cannot
-	// actually login to anything.
+	// Getting the info about the destination resource
+	resource, err := p.fish.ResourceGet(session.ResourceAccessor.ResourceUID)
+	if err != nil {
+		return log.Errorf("PROXYSSH: %s: Unable to retrieve Resource %s: %v", session.SrcAddr, session.ResourceAccessor.ResourceUID, err)
+	}
 	if resource.Authentication.Username == "" && resource.Authentication.Password == "" {
-		// TODO: in the future, this may not be an appropriate error.
-		return log.Errorf("Resource Authentication not provided")
+		return log.Errorf("PROXYSSH: %s: Resource Authentication not provided", session.SrcAddr)
 	}
 
-	// Create the destination end of the proxy to the remote host.
-	remoteAddr := fmt.Sprintf("%s:22", resource.IpAddr)
-	remoteConfig := &ssh.ClientConfig{
-		User: resource.Authentication.Username,
+	// Establish destination connection
+	dstConn, err := session.connectToDestination(resource)
+	if err != nil {
+		return err
+	}
+	defer dstConn.Close()
+
+	// Start handling requests and channels concurrently
+	session.wg.Add(1)
+	go session.handleSourceRequests(srcConnReqs, dstConn)
+
+	for newChannel := range srcConnChannels {
+		session.wg.Add(1)
+		go session.handleChannel(newChannel, dstConn)
+	}
+
+	// Wait for goroutines to finish
+	session.wg.Wait()
+	log.Infof("PROXYSSH: %s: Session closed", session.SrcAddr)
+	return nil
+}
+
+func (p *ProxyAccess) establishConnection(clientConn net.Conn) (*ssh.ServerConn, <-chan ssh.NewChannel, <-chan *ssh.Request, error) {
+	srcConn, srcConnChannels, srcConnReqs, err := ssh.NewServerConn(clientConn, p.serverConfig)
+	if err != nil {
+		return nil, nil, nil, log.Errorf("PROXYSSH: %s: Failed to establish server connection: %v", clientConn.RemoteAddr(), err)
+	}
+	return srcConn, srcConnChannels, srcConnReqs, nil
+}
+
+func (p *ProxyAccess) getSession(srcAddrString string) (*Session, error) {
+	value, loaded := p.sessions.LoadAndDelete(srcAddrString)
+	if !loaded || value == nil {
+		return nil, fmt.Errorf("unable to load session record for %s", srcAddrString)
+	}
+
+	session, ok := value.(*Session)
+	if !ok {
+		return nil, fmt.Errorf("invalid type conversion while retrieving session for %s", srcAddrString)
+	}
+	return session, nil
+}
+
+func (s *Session) connectToDestination(res *types.Resource) (*ssh.Client, error) {
+	dstAddr := net.JoinHostPort(res.IpAddr, "22")
+	dstConfig := &ssh.ClientConfig{
+		User: res.Authentication.Username,
 		Auth: []ssh.AuthMethod{
-			ssh.Password(resource.Authentication.Password),
+			ssh.Password(res.Authentication.Password),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106 , remote always have new hostkey by design
 	}
-	remoteConn, err := ssh.Dial("tcp", remoteAddr, remoteConfig)
+	dstConn, err := ssh.Dial("tcp", dstAddr, dstConfig)
 	if err != nil {
-		return log.Errorf("Unable to dial proxy remote %q: %v", remoteAddr, err)
+		return nil, log.Errorf("PROXYSSH: %s: Unable to dial destination %q: %v", s.SrcAddr, dstAddr, err)
 	}
-	defer remoteConn.Close()
+	return dstConn, nil
+}
 
-	// Open and connect the channels between the incoming connection and the
-	// desired other end of the proxy (our 'remote').
-	for newChannel := range serverChannels {
-		remoteChannel, remoteRequests, remoteErr := remoteConn.OpenChannel(newChannel.ChannelType(), newChannel.ExtraData())
-		if remoteErr != nil {
-			return log.Errorf("Could not open channel to remote end of proxy: %v", remoteErr)
-		}
+func (s *Session) handleSourceRequests(srcConnReqs <-chan *ssh.Request, dstConn *ssh.Client) {
+	defer s.wg.Done()
+	log.Debugf("PROXYSSH: %s: Handling source requests", s.SrcAddr)
 
-		localChannel, localRequests, localErr := newChannel.Accept()
-		if localErr != nil {
-			return log.Errorf("Could not accept server channel: %v", localErr)
-		}
+	for r := range srcConnReqs {
+		s.handleRequest(r, dstConn)
+	}
+	log.Debugf("PROXYSSH: %s: Finished handling source requests", s.SrcAddr)
+}
 
-		// Connect the requests.
-		go func() {
-			for {
-				var request *ssh.Request
-				var targetChannel ssh.Channel
+func (s *Session) handleChannel(ch ssh.NewChannel, dstConn ssh.Conn) {
+	defer s.wg.Done()
+	log.Debugf("PROXYSSH: %s: Handling new channel: %s", s.SrcAddr, ch.ChannelType())
 
-				// This is the core "trick" about this infinite for loop: when
-				// data is going back and forth one or both of these get hit
-				// with an actual value.  However, when nothing is going between
-				// this `select` will block unti la request comes in.
-				select {
-				case request = <-localRequests:
-					targetChannel = remoteChannel
-				case request = <-remoteRequests:
-					targetChannel = localChannel
-				}
+	dstChn, dstChnRequests, dstChnErr := dstConn.OpenChannel(ch.ChannelType(), ch.ExtraData())
+	if dstChnErr != nil {
+		log.Errorf("PROXYSSH: %s: Could not open channel to destination: %v", s.SrcAddr, dstChnErr)
+		ch.Reject(ssh.ConnectionFailed, "Unable to connect to destination resource")
+		return
+	}
 
-				// In the event that an SSH request gets killed (not exited),
-				// the request will be nil.  Do not continue, exit the loop.
-				if request == nil {
-					log.Warnf("SSH connection terminated ungracefully...")
-					break
-				}
+	srcChn, srcChnRequests, srcChnErr := ch.Accept()
+	if srcChnErr != nil {
+		log.Errorf("PROXYSSH: %s: Could not accept source channel: %v", s.SrcAddr, srcChnErr)
+		dstChn.Close()
+		ch.Reject(ssh.ConnectionFailed, "Unable to accept connection")
+		return
+	}
 
-				requestValid, requestError := targetChannel.SendRequest(request.Type, request.WantReply, request.Payload)
-				if requestError != nil {
-					log.Errorf("SendRequest error: %v", requestError)
-					// TODO: we may need to identify a way to hit this error
-					// in order to decide how to handle it.  For now, we
-					// do nothing other than end the connection.
-					// TODO: probably this is a good time to delete it?
-					p.sessions.Delete(remoteAddrString)
-					break
-				}
+	// Need this local channel work group to wait until all the channel routines completed
+	var chWg sync.WaitGroup
 
-				if request.WantReply {
-					request.Reply(requestValid, nil)
-				}
+	// Proxying the requests
+	chWg.Add(1)
+	go func() {
+		defer chWg.Done()
+		log.Debugf("PROXYSSH: %s: Starting to listen for channel requests", s.SrcAddr)
+		for {
+			var request *ssh.Request
+			var targetChannel ssh.Channel
 
-				// NOTE: currently we only care about the exit-status
-				log.Debugf("Request: Type=%q, WantReply='%t'.", request.Type, request.WantReply)
-				if request.Type == "exit-status" {
-					// Connection is closed, end the proxy loop and remove this
-					// session from the list of known sessions.
-					p.sessions.Delete(remoteAddrString)
-					// End the proxy loop
+			select {
+			case request = <-srcChnRequests:
+				targetChannel = dstChn
+			case request = <-dstChnRequests:
+				targetChannel = srcChn
+			}
+
+			// In the event that an SSH request gets killed (not exited),
+			// the request will be nil.  Do not continue, exit the loop
+			if request == nil {
+				log.Warnf("PROXYSSH: %s: SSH connection terminated ungracefully...", s.SrcAddr)
+				break
+			}
+
+			requestValid, requestError := targetChannel.SendRequest(request.Type, request.WantReply, request.Payload)
+			if requestError != nil {
+				log.Errorf("PROXYSSH: %s: SendRequest error: %v", s.SrcAddr, requestError)
+				break
+			}
+
+			if request.WantReply {
+				if err := request.Reply(requestValid, nil); err != nil {
+					log.Errorf("PROXYSSH: %s: Unable to respond to request %s: %v", s.SrcAddr, request.Type, err)
 					break
 				}
 			}
 
-			// End the communication between the local and remote.
-			localChannel.Close()
-			remoteChannel.Close()
-		}()
-
-		// Connect the channels.
-		log.Debugf("Begin session connection between %q and %q.", conn.RemoteAddr(), remoteConn.RemoteAddr())
-		go io.Copy(remoteChannel, localChannel)
-		go io.Copy(localChannel, remoteChannel)
-		// These are kept for safety to ensure the channels are indeed closed,
-		// but in theory the ProxyLoop will close the channels and that will
-		// signal to io.Copy that we are complete.
-		defer localChannel.Close()  //nolint:revive
-		defer remoteChannel.Close() //nolint:revive
-	}
-
-	log.Debugf("Connection between %q and %q closed.", conn.RemoteAddr(), remoteConn.RemoteAddr())
-	return nil
-}
-
-func (p *ProxyAccess) listenAndServe(address string) error {
-	// Create the listener and let it wait for new connections in a separate
-	// goroutine.
-	listener, err := net.Listen("tcp", address)
-	if err != nil {
-		return log.Errorf("net.Listen failed: %v", err)
-	}
-	defer listener.Close()
-
-	// Indefinitely accept new connections, process them concurrently.
-	for {
-		conn, err := listener.Accept() // Blocks until new connection comes
-		if err != nil {
-			return log.Errorf("listen.Accept failed: %v", err)
+			log.Debugf("PROXYSSH: %s: Request: Type=%q, WantReply='%t'.", s.SrcAddr, request.Type, request.WantReply)
+			if request.Type == "exit-status" {
+				// Ending the channel requests processing
+				break
+			}
 		}
 
-		go p.serveConnection(conn, p.serverConfig)
+		// End the communication between the source and destination.
+		srcChn.Close()
+		dstChn.Close()
+
+		log.Debugf("PROXYSSH: %s: Stopped to listen for the channel requests", s.SrcAddr)
+	}()
+
+	log.Debugf("PROXYSSH: %s: Begin streaming to and from %q.", s.SrcAddr, dstConn.RemoteAddr())
+
+	chWg.Add(1)
+	go func() {
+		defer chWg.Done()
+		log.Debugf("PROXYSSH: %s: Starting dst->src stream copy", s.SrcAddr)
+		if _, err := io.Copy(dstChn, srcChn); err != nil && err != io.EOF {
+			log.Errorf("PROXYSSH: %s: The dst->src channel was closed unexpectidly: %v", s.SrcAddr, err)
+		}
+		// Properly closing the channel
+		dstChn.CloseWrite()
+		srcChn.CloseWrite()
+		log.Debugf("PROXYSSH: %s: The dst->src channel was closed", s.SrcAddr)
+	}()
+
+	log.Debugf("PROXYSSH: %s: Starting src->dst stream copy", s.SrcAddr)
+	if _, err := io.Copy(srcChn, dstChn); err != nil && err != io.EOF {
+		log.Errorf("PROXYSSH: %s: The src->dst channel was closed unexpectidly: %v", s.SrcAddr, err)
+	}
+	// Properly closing the channel
+	dstChn.CloseWrite()
+	srcChn.CloseWrite()
+	log.Debugf("PROXYSSH: %s: The src->dst channel was closed", s.SrcAddr)
+
+	chWg.Wait()
+	log.Debugf("PROXYSSH: %s: Completed processing channel: %s", s.SrcAddr, ch.ChannelType())
+}
+
+func (s *Session) handleRequest(r *ssh.Request, c *ssh.Client) {
+	log.Debugf("PROXYSSH: %s: Handling src request: %s", s.SrcAddr, r.Type)
+
+	// Proxy to destination
+	ok, data, err := c.SendRequest(r.Type, r.WantReply, r.Payload)
+	if nil != err {
+		log.Errorf("PROXYSSH: %s: Unable to proxy request %s: %v", s.SrcAddr, r.Type, err)
+		return
+	}
+
+	// Pass to src
+	if r.WantReply {
+		if err := r.Reply(ok, data); nil != err {
+			log.Errorf("PROXYSSH: %s: Unable to respond to request %s: %v", s.SrcAddr, r.Type, err)
+			return
+		}
 	}
 }
 
-func (p *ProxyAccess) passwordCallback(conn ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
-	user := conn.User()
-	log.Debugf("Login attempt from %q for user %q.", conn.RemoteAddr(), user)
+func (p *ProxyAccess) passwordCallback(incomingConn ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
+	user := incomingConn.User()
+	log.Debugf("PROXYSSH: %s: Login attempt for user %q.", incomingConn.RemoteAddr(), user)
 
 	fishUser, err := p.fish.UserGet(user)
 	if err != nil {
-		log.Errorf("unrecognized user %q", user)
-		return nil, fmt.Errorf("invalid access")
+		log.Errorf("PROXYSSH: Unrecognized user %q", user)
+		return nil, fmt.Errorf("Invalid access")
 	}
 
 	stringPass := string(pass)
+
 	ra, err := p.fish.ResourceAccessSingleUsePassword(fishUser.Name, stringPass)
 	if err != nil {
-		// NOTE: do *NOT* return the database error to the user.
-		log.Errorf("invalid access for user %q: %v", user, err)
-		return nil, fmt.Errorf("invalid access")
+		log.Errorf("PROXYSSH: Invalid access for user %q: %v", user, err)
+		return nil, fmt.Errorf("Invalid access")
 	}
 
-	// Only return non-error if the username and password match.
+	// Only return non-error if the username and password match
 	if ra.Username == user && ra.Password == stringPass {
-		remoteAddr := conn.RemoteAddr()
+		srcAddr := incomingConn.RemoteAddr()
 		// If the session is not already stored in our map, create it so that
 		// we have access to it when processing the incoming connections.
-		p.sessions.LoadOrStore(remoteAddr.String(), SessionRecord{ResourceAccessor: ra, RemoteAddr: remoteAddr})
+		p.sessions.LoadOrStore(srcAddr.String(), &Session{SrcAddr: srcAddr})
 		return nil, nil
 	}
 
@@ -264,16 +304,16 @@ func (p *ProxyAccess) passwordCallback(conn ssh.ConnMetadata, pass []byte) (*ssh
 
 // Init starts SSH proxy
 func Init(f *fish.Fish, idRsaPath string, address string) error {
-	// First, try and read the file if it exists already.  Otherwise, it is the
-	// first execution, generate the private / public keys.  The SSH server
+	// First, try and read the file if it exists already. Otherwise, it is the
+	// first execution, generate the private / public keys. The SSH server
 	// requires at least one identity loaded to run.
 	privateBytes, err := os.ReadFile(idRsaPath)
 	if err != nil {
 		// If it cannot be loaded, this is the first execution, generate it.
-		log.Infof("SSH Proxy: could not load %q, generating now.", idRsaPath)
+		log.Infof("PROXYSSH: Could not load %q, generating...", idRsaPath)
 		rsaKey, err := rsa.GenerateKey(rand.Reader, 4096)
 		if err != nil {
-			return fmt.Errorf("proxy_ssh: could not generate private key %q: %w", idRsaPath, err)
+			return fmt.Errorf("PROXYSSH: Could not generate private key %q: %w", idRsaPath, err)
 		}
 		pemKey := pem.EncodeToMemory(
 			&pem.Block{
@@ -283,30 +323,66 @@ func Init(f *fish.Fish, idRsaPath string, address string) error {
 		)
 		// Write out the new key file and load into `privateBytes` again.
 		if err := os.WriteFile(idRsaPath, pemKey, 0600); err != nil {
-			return fmt.Errorf("proxy_ssh: could not write %q: %w", idRsaPath, err)
+			return fmt.Errorf("PROXYSSH: Could not write %q: %w", idRsaPath, err)
 		}
 		privateBytes, err = os.ReadFile(idRsaPath)
 		if err != nil {
-			return fmt.Errorf(
-				"proxy_ssh: failed to load private key %q after generating: %w",
-				idRsaPath,
-				err,
-			)
+			return fmt.Errorf("PROXYSSH: Failed to load private key %q after generating: %w", idRsaPath, err)
 		}
 	}
 
 	private, err := ssh.ParsePrivateKey(privateBytes)
 	if err != nil {
-		return fmt.Errorf("proxy_ssh: failed to parse private key: %w", err)
+		return fmt.Errorf("PROXYSSH: Failed to parse private key: %w", err)
 	}
 
-	sshProxy := ProxyAccess{fish: f}
-	sshProxy.serverConfig = &ssh.ServerConfig{
-		PasswordCallback: sshProxy.passwordCallback,
+	server := ProxyAccess{fish: f}
+	server.serverConfig = &ssh.ServerConfig{
+		ServerVersion:    "SSH-2.0-AquriumFishProxy",
+		PasswordCallback: server.passwordCallback,
 	}
-	sshProxy.serverConfig.AddHostKey(private)
+	server.serverConfig.AddHostKey(private)
 
-	go sshProxy.listenAndServe(address)
+	errChan := make(chan error)
+	go func() {
+		// Create the listener and let it wait for new connections in a separated goroutine
+		listener, err := net.Listen("tcp", address)
+		if err != nil {
+			errChan <- err
+			return
+		}
+		defer listener.Close()
 
-	return nil
+		server.Address = listener.Addr()
+
+		// Indefinitely accept new connections, process them concurrently
+		for {
+			incomingConn, err := listener.Accept() // Blocks until new connection comes
+			if err != nil {
+				log.Errorf("PROXYSSH: Unable to accept the incoming connection: %v", err)
+				continue
+			}
+
+			go server.serveConnection(incomingConn)
+		}
+	}()
+
+	// Wait for server start
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			if server.Address != nil && strings.Contains(server.Address.String(), ":") {
+				log.Info("PROXYSSH listening on:", server.Address)
+				return nil // Was started
+			}
+		case err := <-errChan:
+			return log.Errorf("PROXYSSH: Unable to bind to address %s: %v", address, err)
+		}
+	}
 }
