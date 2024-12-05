@@ -199,8 +199,8 @@ func main() {
 
 	flags := cmd.Flags()
 	flags.StringVarP(&apiAddress, "api", "a", "", "address used to expose the fish API")
-	flags.StringVar(&proxySocksAddress, "socks_proxy", "", "address used to expose the SOCKS5 proxy")
-	flags.StringVar(&proxySSHAddress, "ssh_proxy", "", "address used to expose the SSH proxy")
+	flags.StringVar(&proxySocksAddress, "proxy_socks", "", "address used to expose the SOCKS5 proxy")
+	flags.StringVar(&proxySSHAddress, "proxy_ssh", "", "address used to expose the SSH proxy")
 	flags.StringVarP(&nodeAddress, "node", "n", "", "node external endpoint to connect to tell the other nodes")
 	flags.StringVarP(&cfgPath, "cfg", "c", "", "yaml configuration file")
 	flags.StringVarP(&dir, "dir", "D", "", "database and other fish files directory")

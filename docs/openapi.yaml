@@ -1651,6 +1651,7 @@ components:
         - resource_UID
         - username
         - password
+        - port
       properties:
         UID:
           $ref: '#/components/schemas/ResourceAccessUID'
@@ -1672,14 +1673,19 @@ components:
           type: string
           description: >
             The password to use when logging into the fish node.
+        port:
+          type: integer
+          description: >
+            TCP port to connect with SSH client.
 
     Authentication:
       type: object
       description: >
-        Authentication information to enable connecting to the machine.
+        Authentication information to enable connecting to the machine
       required:
         - username
         - password
+        - port
       properties:
         username:
           type: string
@@ -1689,6 +1695,10 @@ components:
           type: string
           description: >
             The password to use when loggin into the Resource.
+        port:
+          type: integer
+          description: >
+            TCP port to connect with SSH client.
 
     VoteUID:
       type: string

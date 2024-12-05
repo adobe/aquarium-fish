@@ -10,15 +10,18 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/kms v1.32.3
 	github.com/aws/aws-sdk-go-v2/service/servicequotas v1.21.10
 	github.com/aws/aws-sdk-go-v2/service/sts v1.28.12
+	github.com/creack/pty v1.1.24
 	github.com/getkin/kin-openapi v0.124.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/glebarez/sqlite v1.7.0
+	github.com/gliderlabs/ssh v0.3.7
 	github.com/google/uuid v1.5.0
 	github.com/hpcloud/tail v1.0.0
 	github.com/labstack/echo/v4 v4.11.4
 	github.com/mostlygeek/arp v0.0.0-20170424181311-541a2129847a
 	github.com/oapi-codegen/oapi-codegen/v2 v2.3.0
 	github.com/oapi-codegen/runtime v1.1.1
+	github.com/pkg/sftp v1.13.7
 	github.com/rqlite/sql v0.0.0-20221103124402-8f9ff0ceb8f0
 	github.com/shirou/gopsutil/v3 v3.23.1
 	github.com/spf13/cobra v1.7.0
@@ -31,6 +34,7 @@ require (
 )
 
 require (
+	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.9 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.9 // indirect
@@ -51,6 +55,7 @@ require (
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
+	github.com/kr/fs v0.1.0 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect

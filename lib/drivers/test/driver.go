@@ -156,7 +156,10 @@ func (d *Driver) Allocate(def types.LabelDefinition, _ /*metadata*/ map[string]a
 	}
 
 	// Generate random resource id and if exists - regenerate
-	res := &types.Resource{}
+	res := &types.Resource{
+		IpAddr:         "127.0.0.1",
+		Authentication: def.Authentication,
+	}
 	var resFile string
 	for {
 		res.Identifier = "test-" + crypt.RandString(6)

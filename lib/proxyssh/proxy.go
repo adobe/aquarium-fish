@@ -13,7 +13,6 @@
 package proxyssh
 
 import (
-	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -22,9 +21,8 @@ import (
 	"io"
 	"net"
 	"os"
-	"strings"
+	"strconv"
 	"sync"
-	"time"
 
 	"golang.org/x/crypto/ssh"
 
@@ -36,20 +34,20 @@ import (
 // NOTE: This proxy was highly influenced by Remco Verhoef's ideas in
 // https://github.com/dutchcoders/sshproxy, but have a little to no similarity with its ancestor.
 
-// ProxyAccess keeps state of the SSH server
-type ProxyAccess struct {
+// proxySSH keeps state of the SSH server
+type proxySSH struct {
 	fish         *fish.Fish
 	serverConfig *ssh.ServerConfig
 
-	// Listening address
+	// Actual listening address of the service
 	Address net.Addr
 
-	// Keeps session info for auth, key is src address, value is Session
+	// Keeps session info for auth, key is src address, value is session
 	sessions sync.Map
 }
 
-// Session is stored in ProxyAccess::sessions.
-type Session struct {
+// session is stored in proxySSH::sessions.
+type session struct {
 	ResourceAccessor *types.ResourceAccess
 	SrcAddr          net.Addr
 
@@ -58,7 +56,7 @@ type Session struct {
 	wg sync.WaitGroup
 }
 
-func (p *ProxyAccess) serveConnection(clientConn net.Conn) error {
+func (p *proxySSH) serveConnection(clientConn net.Conn) error {
 	log.Infof("PROXYSSH: %s: Starting new session", clientConn.RemoteAddr())
 
 	// Establish SSH connection
@@ -74,12 +72,16 @@ func (p *ProxyAccess) serveConnection(clientConn net.Conn) error {
 		return err
 	}
 
+	if session.ResourceAccessor == nil {
+		return log.Errorf("PROXYSSH: %s: No ResourceAccessor is set for the session", session.SrcAddr)
+	}
+
 	// Getting the info about the destination resource
 	resource, err := p.fish.ResourceGet(session.ResourceAccessor.ResourceUID)
 	if err != nil {
 		return log.Errorf("PROXYSSH: %s: Unable to retrieve Resource %s: %v", session.SrcAddr, session.ResourceAccessor.ResourceUID, err)
 	}
-	if resource.Authentication.Username == "" && resource.Authentication.Password == "" {
+	if resource.Authentication == nil || resource.Authentication.Username == "" && resource.Authentication.Password == "" {
 		return log.Errorf("PROXYSSH: %s: Resource Authentication not provided", session.SrcAddr)
 	}
 
@@ -105,7 +107,7 @@ func (p *ProxyAccess) serveConnection(clientConn net.Conn) error {
 	return nil
 }
 
-func (p *ProxyAccess) establishConnection(clientConn net.Conn) (*ssh.ServerConn, <-chan ssh.NewChannel, <-chan *ssh.Request, error) {
+func (p *proxySSH) establishConnection(clientConn net.Conn) (*ssh.ServerConn, <-chan ssh.NewChannel, <-chan *ssh.Request, error) {
 	srcConn, srcConnChannels, srcConnReqs, err := ssh.NewServerConn(clientConn, p.serverConfig)
 	if err != nil {
 		return nil, nil, nil, log.Errorf("PROXYSSH: %s: Failed to establish server connection: %v", clientConn.RemoteAddr(), err)
@@ -113,21 +115,21 @@ func (p *ProxyAccess) establishConnection(clientConn net.Conn) (*ssh.ServerConn,
 	return srcConn, srcConnChannels, srcConnReqs, nil
 }
 
-func (p *ProxyAccess) getSession(srcAddrString string) (*Session, error) {
+func (p *proxySSH) getSession(srcAddrString string) (*session, error) {
 	value, loaded := p.sessions.LoadAndDelete(srcAddrString)
 	if !loaded || value == nil {
 		return nil, fmt.Errorf("unable to load session record for %s", srcAddrString)
 	}
 
-	session, ok := value.(*Session)
+	session, ok := value.(*session)
 	if !ok {
 		return nil, fmt.Errorf("invalid type conversion while retrieving session for %s", srcAddrString)
 	}
 	return session, nil
 }
 
-func (s *Session) connectToDestination(res *types.Resource) (*ssh.Client, error) {
-	dstAddr := net.JoinHostPort(res.IpAddr, "22")
+func (s *session) connectToDestination(res *types.Resource) (*ssh.Client, error) {
+	dstAddr := net.JoinHostPort(res.IpAddr, strconv.Itoa(res.Authentication.Port))
 	dstConfig := &ssh.ClientConfig{
 		User: res.Authentication.Username,
 		Auth: []ssh.AuthMethod{
@@ -142,7 +144,7 @@ func (s *Session) connectToDestination(res *types.Resource) (*ssh.Client, error)
 	return dstConn, nil
 }
 
-func (s *Session) handleSourceRequests(srcConnReqs <-chan *ssh.Request, dstConn *ssh.Client) {
+func (s *session) handleSourceRequests(srcConnReqs <-chan *ssh.Request, dstConn *ssh.Client) {
 	defer s.wg.Done()
 	log.Debugf("PROXYSSH: %s: Handling source requests", s.SrcAddr)
 
@@ -152,7 +154,7 @@ func (s *Session) handleSourceRequests(srcConnReqs <-chan *ssh.Request, dstConn 
 	log.Debugf("PROXYSSH: %s: Finished handling source requests", s.SrcAddr)
 }
 
-func (s *Session) handleChannel(ch ssh.NewChannel, dstConn ssh.Conn) {
+func (s *session) handleChannel(ch ssh.NewChannel, dstConn ssh.Conn) {
 	defer s.wg.Done()
 	log.Debugf("PROXYSSH: %s: Handling new channel: %s", s.SrcAddr, ch.ChannelType())
 
@@ -252,7 +254,7 @@ func (s *Session) handleChannel(ch ssh.NewChannel, dstConn ssh.Conn) {
 	log.Debugf("PROXYSSH: %s: Completed processing channel: %s", s.SrcAddr, ch.ChannelType())
 }
 
-func (s *Session) handleRequest(r *ssh.Request, c *ssh.Client) {
+func (s *session) handleRequest(r *ssh.Request, c *ssh.Client) {
 	log.Debugf("PROXYSSH: %s: Handling src request: %s", s.SrcAddr, r.Type)
 
 	// Proxy to destination
@@ -271,7 +273,7 @@ func (s *Session) handleRequest(r *ssh.Request, c *ssh.Client) {
 	}
 }
 
-func (p *ProxyAccess) passwordCallback(incomingConn ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
+func (p *proxySSH) passwordCallback(incomingConn ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
 	user := incomingConn.User()
 	log.Debugf("PROXYSSH: %s: Login attempt for user %q.", incomingConn.RemoteAddr(), user)
 
@@ -294,7 +296,7 @@ func (p *ProxyAccess) passwordCallback(incomingConn ssh.ConnMetadata, pass []byt
 		srcAddr := incomingConn.RemoteAddr()
 		// If the session is not already stored in our map, create it so that
 		// we have access to it when processing the incoming connections.
-		p.sessions.LoadOrStore(srcAddr.String(), &Session{SrcAddr: srcAddr})
+		p.sessions.LoadOrStore(srcAddr.String(), &session{SrcAddr: srcAddr, ResourceAccessor: ra})
 		return nil, nil
 	}
 
@@ -336,24 +338,21 @@ func Init(f *fish.Fish, idRsaPath string, address string) error {
 		return fmt.Errorf("PROXYSSH: Failed to parse private key: %w", err)
 	}
 
-	server := ProxyAccess{fish: f}
+	server := proxySSH{fish: f}
 	server.serverConfig = &ssh.ServerConfig{
 		ServerVersion:    "SSH-2.0-AquriumFishProxy",
 		PasswordCallback: server.passwordCallback,
 	}
 	server.serverConfig.AddHostKey(private)
 
-	errChan := make(chan error)
-	go func() {
-		// Create the listener and let it wait for new connections in a separated goroutine
-		listener, err := net.Listen("tcp", address)
-		if err != nil {
-			errChan <- err
-			return
-		}
-		defer listener.Close()
+	// Create the listener and let it wait for new connections in a separated goroutine
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		return log.Errorf("PROXYSSH: Unable to bind to address %q: %v", address, err)
+	}
 
-		server.Address = listener.Addr()
+	go func() {
+		defer listener.Close()
 
 		// Indefinitely accept new connections, process them concurrently
 		for {
@@ -367,22 +366,7 @@ func Init(f *fish.Fish, idRsaPath string, address string) error {
 		}
 	}()
 
-	// Wait for server start
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-	ticker := time.NewTicker(10 * time.Millisecond)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
-			if server.Address != nil && strings.Contains(server.Address.String(), ":") {
-				log.Info("PROXYSSH listening on:", server.Address)
-				return nil // Was started
-			}
-		case err := <-errChan:
-			return log.Errorf("PROXYSSH: Unable to bind to address %s: %v", address, err)
-		}
-	}
+	log.Info("PROXYSSH listening on:", listener.Addr())
+
+	return nil
 }
