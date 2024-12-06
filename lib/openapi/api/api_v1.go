@@ -259,12 +259,35 @@ func (e *Processor) ResourceAccessPut(c echo.Context, uid types.ResourceUID) err
 		return fmt.Errorf("Only the owner & admin can assign service mapping to the Application")
 	}
 
+	pwd := crypt.RandString(64)
+	pwdHash, err := crypt.NewHash(pwd, nil).Serialize()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, H{"message": "Unable to prepare password hash"})
+		return fmt.Errorf("Unable to prepare password hash: %w", err)
+	}
+	key, err := crypt.GenerateSSHKey()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, H{"message": "Unable to generate SSH key"})
+		return fmt.Errorf("Unable to generate SSH key: %w", err)
+	}
+	pubkey, err := crypt.GetSSHPubKeyFromPem(key)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, H{"message": "Unable to generate SSH public key"})
+		return fmt.Errorf("Unable to generate SSH public key: %w", err)
+	}
 	rAccess := types.ResourceAccess{
 		ResourceUID: res.UID,
 		Username:    user.Name,
-		Password:    crypt.RandString(64),
+		// We should not store clear password, so convert it to salted hash
+		Password: string(pwdHash),
+		// Key need to be stored as public key
+		Key: string(pubkey),
 	}
 	e.fish.ResourceAccessCreate(&rAccess)
+
+	// Overriding the password and key to return user the actual values one time and forget about
+	rAccess.Password = pwd
+	rAccess.Key = string(key)
 
 	return c.JSON(http.StatusOK, rAccess)
 }

@@ -16,6 +16,7 @@ package crypt
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/json"
 	"math/big"
 
 	"golang.org/x/crypto/argon2"
@@ -121,4 +122,19 @@ func (h *Hash) IsEqual(input string) bool {
 // IsEmpty shows is the hash is actually not filled with data
 func (h *Hash) IsEmpty() bool {
 	return h.Algo == ""
+}
+
+func (h Hash) Serialize() ([]byte, error) {
+	jsonHash, err := json.Marshal(h)
+	if err != nil {
+		return nil, log.Errorf("Unable to serialize Hash: %v", err)
+	}
+	return jsonHash, nil
+}
+func (h *Hash) Deserialize(jsonHash string) error {
+	err := json.Unmarshal([]byte(jsonHash), h)
+	if err != nil {
+		return log.Errorf("Unable to deserialize Hash: %v", err)
+	}
+	return nil
 }

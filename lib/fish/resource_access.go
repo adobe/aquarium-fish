@@ -48,11 +48,26 @@ func (f *Fish) ResourceAccessDelete(uid types.ResourceAccessUID) error {
 	return f.db.Delete(&types.ResourceAccess{}, uid).Error
 }
 
-// ResourceAccessSingleUsePassword retrieves the password from the database *AND* deletes it.  Users must
-// issue another curl call to request a new access password.
-func (f *Fish) ResourceAccessSingleUsePassword(username string, password string) (ra *types.ResourceAccess, err error) {
+// ResourceAccessSingleUsePasswordHash retrieves the password hash from the database *AND* deletes
+// it. Users must request a new Resource Access to connect again.
+func (f *Fish) ResourceAccessSingleUsePasswordHash(username string, hash string) (ra *types.ResourceAccess, err error) {
 	ra = &types.ResourceAccess{}
-	err = f.db.Where("username = ? AND password = ?", username, password).First(ra).Error
+	err = f.db.Where("username = ? AND password = ?", username, hash).First(ra).Error
+	if err == nil {
+		err = f.ResourceAccessDelete(ra.UID)
+		// NOTE: in rare occasions, `err` here could end up propagating to the
+		// caller with a valid `ra`.  However, see ssh_proxy/proxy.go usage,
+		// in the event that our deletion failed (but nothing else), the single
+		// use connection ultimately gets rejected.
+	}
+	return ra, err
+}
+
+// ResourceAccessSingleUseKey retrieves the key from the database *AND* deletes it.
+// Users must request a new resource access to connect again.
+func (f *Fish) ResourceAccessSingleUseKey(username string, key string) (ra *types.ResourceAccess, err error) {
+	ra = &types.ResourceAccess{}
+	err = f.db.Where("username = ? AND key = ?", username, key).First(ra).Error
 	if err == nil {
 		err = f.ResourceAccessDelete(ra.UID)
 		// NOTE: in rare occasions, `err` here could end up propagating to the

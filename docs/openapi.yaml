@@ -1651,6 +1651,7 @@ components:
         - resource_UID
         - username
         - password
+        - key
         - port
       properties:
         UID:
@@ -1673,6 +1674,10 @@ components:
           type: string
           description: >
             The password to use when logging into the fish node.
+        key:
+          type: string
+          description: >
+            SSH key could be used instead of password to access the system.
         port:
           type: integer
           description: >
@@ -1685,16 +1690,21 @@ components:
       required:
         - username
         - password
+        - key
         - port
       properties:
         username:
           type: string
           description: |
-            The username to use when logging into Resource.
+            The username to login into the Resource.
         password:
           type: string
           description: >
-            The password to use when loggin into the Resource.
+            The password to login into the Resource.
+        key:
+          type: string
+          description: >
+            SSH private key to use instead of password to login into the Resource.
         port:
           type: integer
           description: >

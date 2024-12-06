@@ -13,10 +13,6 @@
 package proxyssh
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 	"io"
 	"net"
@@ -26,6 +22,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
+	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
@@ -65,9 +62,10 @@ func (p *proxySSH) serveConnection(clientConn net.Conn) error {
 		return err
 	}
 	defer srcConn.Close()
+	log.Debugf("PROXYSSH: %s: Established new connection: %s", clientConn.RemoteAddr(), srcConn.SessionID())
 
 	// Get session info from map
-	session, err := p.getSession(srcConn.RemoteAddr().String())
+	session, err := p.getSession(srcConn.SessionID())
 	if err != nil {
 		return err
 	}
@@ -115,15 +113,15 @@ func (p *proxySSH) establishConnection(clientConn net.Conn) (*ssh.ServerConn, <-
 	return srcConn, srcConnChannels, srcConnReqs, nil
 }
 
-func (p *proxySSH) getSession(srcAddrString string) (*session, error) {
-	value, loaded := p.sessions.LoadAndDelete(srcAddrString)
+func (p *proxySSH) getSession(sessionID []byte) (*session, error) {
+	value, loaded := p.sessions.LoadAndDelete(string(sessionID))
 	if !loaded || value == nil {
-		return nil, fmt.Errorf("unable to load session record for %s", srcAddrString)
+		return nil, fmt.Errorf("Unable to load session record for %s", sessionID)
 	}
 
 	session, ok := value.(*session)
 	if !ok {
-		return nil, fmt.Errorf("invalid type conversion while retrieving session for %s", srcAddrString)
+		return nil, fmt.Errorf("Invalid type conversion while retrieving session: %s", sessionID)
 	}
 	return session, nil
 }
@@ -131,12 +129,25 @@ func (p *proxySSH) getSession(srcAddrString string) (*session, error) {
 func (s *session) connectToDestination(res *types.Resource) (*ssh.Client, error) {
 	dstAddr := net.JoinHostPort(res.IpAddr, strconv.Itoa(res.Authentication.Port))
 	dstConfig := &ssh.ClientConfig{
-		User: res.Authentication.Username,
-		Auth: []ssh.AuthMethod{
-			ssh.Password(res.Authentication.Password),
-		},
+		User:            res.Authentication.Username,
+		Auth:            []ssh.AuthMethod{},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106 , remote always have new hostkey by design
 	}
+
+	// Use password auth if password is set for the Resource
+	if res.Authentication.Password != "" {
+		dstConfig.Auth = append(dstConfig.Auth, ssh.Password(res.Authentication.Password))
+	}
+
+	// Use use private key if it's set for the Resource
+	if res.Authentication.Key != "" {
+		signer, err := ssh.ParsePrivateKey([]byte(res.Authentication.Key))
+		if err != nil {
+			return nil, log.Errorf("PROXYSSH: %s: Unable to parse private key %q: %v", s.SrcAddr, dstAddr, err)
+		}
+		dstConfig.Auth = append(dstConfig.Auth, ssh.PublicKeys(signer))
+	}
+
 	dstConn, err := ssh.Dial("tcp", dstAddr, dstConfig)
 	if err != nil {
 		return nil, log.Errorf("PROXYSSH: %s: Unable to dial destination %q: %v", s.SrcAddr, dstAddr, err)
@@ -283,25 +294,60 @@ func (p *proxySSH) passwordCallback(incomingConn ssh.ConnMetadata, pass []byte) 
 		return nil, fmt.Errorf("Invalid access")
 	}
 
-	stringPass := string(pass)
+	pwdHash, err := crypt.NewHash(string(pass), nil).Serialize()
+	if err != nil {
+		return nil, fmt.Errorf("PROXYSSH: Unable to prepare password hash: %w", err)
+	}
+	pwdHashStr := string(pwdHash)
 
-	ra, err := p.fish.ResourceAccessSingleUsePassword(fishUser.Name, stringPass)
+	ra, err := p.fish.ResourceAccessSingleUsePasswordHash(fishUser.Name, pwdHashStr)
 	if err != nil {
 		log.Errorf("PROXYSSH: Invalid access for user %q: %v", user, err)
 		return nil, fmt.Errorf("Invalid access")
 	}
 
-	// Only return non-error if the username and password match
-	if ra.Username == user && ra.Password == stringPass {
+	// Only return non-error if the username and password match (double check just in case)
+	if ra.Username == user && ra.Password == pwdHashStr {
 		srcAddr := incomingConn.RemoteAddr()
 		// If the session is not already stored in our map, create it so that
 		// we have access to it when processing the incoming connections.
-		p.sessions.LoadOrStore(srcAddr.String(), &session{SrcAddr: srcAddr, ResourceAccessor: ra})
+		p.sessions.LoadOrStore(string(incomingConn.SessionID()), &session{SrcAddr: srcAddr, ResourceAccessor: ra})
 		return nil, nil
 	}
 
 	// Otherwise, we have failed, return error to indicate as such.
-	return nil, fmt.Errorf("invalid access")
+	return nil, fmt.Errorf("Invalid access")
+}
+
+func (p *proxySSH) publicKeyCallback(incomingConn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+	user := incomingConn.User()
+	log.Debugf("PROXYSSH: %s: Login attempt for user %q.", incomingConn.RemoteAddr(), user)
+
+	fishUser, err := p.fish.UserGet(user)
+	if err != nil {
+		log.Errorf("PROXYSSH: Unrecognized user %q", user)
+		return nil, fmt.Errorf("Invalid access")
+	}
+
+	stringKey := string(ssh.MarshalAuthorizedKey(key))
+
+	ra, err := p.fish.ResourceAccessSingleUseKey(fishUser.Name, stringKey)
+	if err != nil {
+		log.Errorf("PROXYSSH: Invalid access for user %q: %v", user, err)
+		return nil, fmt.Errorf("Invalid access")
+	}
+
+	// Only return non-error if the username and key match (double check just in case)
+	if ra.Username == user && ra.Key == stringKey {
+		srcAddr := incomingConn.RemoteAddr()
+		// If the session is not already stored in our map, create it so that
+		// we have access to it when processing the incoming connections.
+		p.sessions.LoadOrStore(string(incomingConn.SessionID()), &session{SrcAddr: srcAddr, ResourceAccessor: ra})
+		return nil, nil
+	}
+
+	// Otherwise, we have failed, return error to indicate as such.
+	return nil, fmt.Errorf("Invalid access")
 }
 
 // Init starts SSH proxy
@@ -313,16 +359,10 @@ func Init(f *fish.Fish, idRsaPath string, address string) error {
 	if err != nil {
 		// If it cannot be loaded, this is the first execution, generate it.
 		log.Infof("PROXYSSH: Could not load %q, generating...", idRsaPath)
-		rsaKey, err := rsa.GenerateKey(rand.Reader, 4096)
+		pemKey, err := crypt.GenerateSSHKey()
 		if err != nil {
-			return fmt.Errorf("PROXYSSH: Could not generate private key %q: %w", idRsaPath, err)
+			return fmt.Errorf("PROXYSSH: Could not generate private key: %w", err)
 		}
-		pemKey := pem.EncodeToMemory(
-			&pem.Block{
-				Type:  "RSA PRIVATE KEY",
-				Bytes: x509.MarshalPKCS1PrivateKey(rsaKey),
-			},
-		)
 		// Write out the new key file and load into `privateBytes` again.
 		if err := os.WriteFile(idRsaPath, pemKey, 0600); err != nil {
 			return fmt.Errorf("PROXYSSH: Could not write %q: %w", idRsaPath, err)
@@ -340,8 +380,9 @@ func Init(f *fish.Fish, idRsaPath string, address string) error {
 
 	server := proxySSH{fish: f}
 	server.serverConfig = &ssh.ServerConfig{
-		ServerVersion:    "SSH-2.0-AquriumFishProxy",
-		PasswordCallback: server.passwordCallback,
+		ServerVersion:     "SSH-2.0-AquriumFishProxy",
+		PasswordCallback:  server.passwordCallback,
+		PublicKeyCallback: server.publicKeyCallback,
 	}
 	server.serverConfig.AddHostKey(private)
 

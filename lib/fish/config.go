@@ -81,7 +81,7 @@ func (c *Config) ReadConfigFile(cfgPath string) error {
 	}
 
 	if c.NodeSSHKey == "" {
-		c.NodeSSHKey = c.NodeName + "_id_rsa"
+		c.NodeSSHKey = c.NodeName + "_id_ecdsa"
 	}
 
 	_, err := time.ParseDuration(c.DefaultResourceLifetime)
