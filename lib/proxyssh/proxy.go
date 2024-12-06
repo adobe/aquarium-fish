@@ -62,7 +62,7 @@ func (p *proxySSH) serveConnection(clientConn net.Conn) error {
 		return err
 	}
 	defer srcConn.Close()
-	log.Debugf("PROXYSSH: %s: Established new connection: %s", clientConn.RemoteAddr(), srcConn.SessionID())
+	log.Debugf("PROXYSSH: %s: Established new connection: %x", clientConn.RemoteAddr(), srcConn.SessionID())
 
 	// Get session info from map
 	session, err := p.getSession(srcConn.SessionID())
