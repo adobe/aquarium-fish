@@ -28,6 +28,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 // Factory implements drivers.ResourceDriverFactory interface
@@ -80,7 +81,7 @@ func (d *Driver) Prepare(config []byte) error {
 	}
 
 	// Getting info about the docker system - will return "<ncpu>,<mem_bytes>"
-	stdout, _, err := runAndLog(5*time.Second, d.cfg.DockerPath,
+	stdout, _, err := util.RunAndLog("DOCKER", 5*time.Second, nil, d.cfg.DockerPath,
 		"system", "info", "--format", "{{ .NCPU }},{{ .MemTotal }}",
 	)
 	if err != nil {
@@ -213,7 +214,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 			netArgs = append(netArgs, "--internal")
 		}
 		netArgs = append(netArgs, "aquarium-"+cNetwork)
-		if _, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, netArgs...); err != nil {
+		if _, _, err := util.RunAndLog("DOCKER", 5*time.Second, nil, d.cfg.DockerPath, netArgs...); err != nil {
 			return nil, err
 		}
 	}
@@ -251,7 +252,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 
 	// Run the container
 	runArgs = append(runArgs, imgNameVersion)
-	if _, _, err := runAndLog(30*time.Second, d.cfg.DockerPath, runArgs...); err != nil {
+	if _, _, err := util.RunAndLog("DOCKER", 30*time.Second, nil, d.cfg.DockerPath, runArgs...); err != nil {
 		return nil, log.Error("Docker: Unable to run container", cName, err)
 	}
 
@@ -314,7 +315,7 @@ func (d *Driver) Deallocate(res *types.Resource) error {
 	}
 
 	// Getting the mounted volumes
-	stdout, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, "inspect",
+	stdout, _, err := util.RunAndLog("DOCKER", 5*time.Second, nil, d.cfg.DockerPath, "inspect",
 		"--format", "{{ range .Mounts }}{{ println .Source }}{{ end }}", cID,
 	)
 	if err != nil {
@@ -333,22 +334,22 @@ func (d *Driver) Deallocate(res *types.Resource) error {
 	}
 
 	// Stop the container
-	if _, _, err := runAndLogRetry(3, 10*time.Second, d.cfg.DockerPath, "stop", cID); err != nil {
+	if _, _, err := util.RunAndLogRetry("DOCKER", 3, 10*time.Second, nil, d.cfg.DockerPath, "stop", cID); err != nil {
 		return log.Error("Docker: Unable to stop the container:", cName, err)
 	}
 	// Remove the container
-	if _, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, "rm", cID); err != nil {
+	if _, _, err := util.RunAndLog("DOCKER", 5*time.Second, nil, d.cfg.DockerPath, "rm", cID); err != nil {
 		return log.Error("Docker: Unable to remove the container:", cName, err)
 	}
 
 	// Umount the disk volumes if needed
-	mounts, _, err := runAndLog(3*time.Second, "/sbin/mount")
+	mounts, _, err := util.RunAndLog("DOCKER", 3*time.Second, nil, "/sbin/mount")
 	if err != nil {
 		return log.Error("Docker: Unable to list the mount points:", cName, err)
 	}
 	for _, volPath := range cVolumes {
 		if strings.Contains(mounts, volPath) {
-			if _, _, err := runAndLog(5*time.Second, "/usr/bin/hdiutil", "detach", volPath); err != nil {
+			if _, _, err := util.RunAndLog("DOCKER", 5*time.Second, nil, "/usr/bin/hdiutil", "detach", volPath); err != nil {
 				return log.Error("Docker: Unable to detach the volume disk:", cName, volPath, err)
 			}
 		}

@@ -189,7 +189,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, _ /*metadata*/ map[string]a
 		"linked", "-snapshot", "original",
 		"-cloneName", vmID,
 	}
-	if _, _, err := runAndLog(120*time.Second, d.cfg.VmrunPath, args...); err != nil {
+	if _, _, err := util.RunAndLog("VMX", 120*time.Second, nil, d.cfg.VmrunPath, args...); err != nil {
 		d.cleanupVM(vmDir)
 		return nil, log.Error("VMX: Unable to clone the target image:", imgPath, err)
 	}
@@ -220,7 +220,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, _ /*metadata*/ map[string]a
 	}
 
 	// Run the VM
-	if _, _, err := runAndLog(120*time.Second, d.cfg.VmrunPath, "start", vmxPath, "nogui"); err != nil {
+	if _, _, err := util.RunAndLog("VMX", 120*time.Second, nil, d.cfg.VmrunPath, "start", vmxPath, "nogui"); err != nil {
 		log.Error("VMX: Check logs in ~/Library/Logs/VMware/ or enable debug to see vmware.log")
 		d.cleanupVM(vmDir)
 		return nil, log.Error("VMX: Unable to run VM:", vmxPath, err)
@@ -277,16 +277,16 @@ func (d *Driver) Deallocate(res *types.Resource) error {
 	}
 
 	// Sometimes it's stuck, so try to stop a bit more than usual
-	if _, _, err := runAndLogRetry(3, 60*time.Second, d.cfg.VmrunPath, "stop", vmxPath); err != nil {
+	if _, _, err := util.RunAndLogRetry("VMX", 3, 60*time.Second, nil, d.cfg.VmrunPath, "stop", vmxPath); err != nil {
 		log.Warn("VMX: Unable to soft stop the VM:", vmxPath, err)
 		// Ok, it doesn't want to stop, so stopping it hard
-		if _, _, err := runAndLogRetry(3, 60*time.Second, d.cfg.VmrunPath, "stop", vmxPath, "hard"); err != nil {
+		if _, _, err := util.RunAndLogRetry("VMX", 3, 60*time.Second, nil, d.cfg.VmrunPath, "stop", vmxPath, "hard"); err != nil {
 			return log.Error("VMX: Unable to deallocate VM:", vmxPath, err)
 		}
 	}
 
 	// Delete VM
-	if _, _, err := runAndLogRetry(3, 30*time.Second, d.cfg.VmrunPath, "deleteVM", vmxPath); err != nil {
+	if _, _, err := util.RunAndLogRetry("VMX", 3, 30*time.Second, nil, d.cfg.VmrunPath, "deleteVM", vmxPath); err != nil {
 		return log.Error("VMX: Unable to delete VM:", vmxPath, err)
 	}
 
