@@ -143,7 +143,7 @@ func (s *session) connectToDestination(res *types.Resource) (*ssh.Client, error)
 	if res.Authentication.Key != "" {
 		signer, err := ssh.ParsePrivateKey([]byte(res.Authentication.Key))
 		if err != nil {
-			return nil, log.Errorf("PROXYSSH: %s: Unable to parse private key %q: %v", s.SrcAddr, dstAddr, err)
+			return nil, log.Errorf("PROXYSSH: %s: Unable to parse private key len %d: %v", s.SrcAddr, len(res.Authentication.Key), err)
 		}
 		dstConfig.Auth = append(dstConfig.Auth, ssh.PublicKeys(signer))
 	}

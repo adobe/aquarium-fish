@@ -31,11 +31,16 @@ import (
 )
 
 // Base ssh server with no handler
-func TestSSHServer(t *testing.T, sshSrv *sshd.Server, options ...sshd.Option) string {
-	for _, option := range options {
-		if err := sshSrv.SetOption(option); err != nil {
-			t.Fatalf("Unable to set SSH server options: %v", err)
-		}
+func TestSSHServer(t *testing.T, sshSrv *sshd.Server, user, pass, key string) string {
+	if pass != "" {
+		sshSrv.SetOption(sshd.PasswordAuth(func(ctx sshd.Context, password string) bool {
+			return ctx.User() == user && password == pass
+		}))
+	}
+	if key != "" {
+		sshSrv.SetOption(sshd.PublicKeyAuth(func(ctx sshd.Context, inkey sshd.PublicKey) bool {
+			return ctx.User() == user && key == string(ssh.MarshalAuthorizedKey(inkey))
+		}))
 	}
 
 	sshListener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -59,7 +64,7 @@ func TestSSHServer(t *testing.T, sshSrv *sshd.Server, options ...sshd.Option) st
 	return port
 }
 
-func TestSSHPtyServer(t *testing.T) string {
+func TestSSHPtyServer(t *testing.T, user, pass, key string) string {
 	sshSrv := &sshd.Server{Handler: func(s sshd.Session) {
 		t.Log("Test SSH server: handling session")
 		cmd := exec.Command("sh")
@@ -88,9 +93,7 @@ func TestSSHPtyServer(t *testing.T) string {
 		}
 		t.Log("Test SSH server completed handling session")
 	}}
-	return TestSSHServer(t, sshSrv, sshd.PasswordAuth(func(ctx sshd.Context, pass string) bool {
-		return ctx.User() == "testuser" && pass == "testpass"
-	}))
+	return TestSSHServer(t, sshSrv, user, pass, key)
 }
 
 func setWinsize(f *os.File, w, h int) {
@@ -98,11 +101,8 @@ func setWinsize(f *os.File, w, h int) {
 		uintptr(unsafe.Pointer(&struct{ h, w, x, y uint16 }{uint16(h), uint16(w), 0, 0})))
 }
 
-func TestSSHSftpServer(t *testing.T) string {
+func TestSSHSftpServer(t *testing.T, user, pass, key string) string {
 	sshSrv := &sshd.Server{
-		/*Handler: func(s sshd.Session) {
-			t.Log("Test SSH server: handling session")
-		},*/
 		SubsystemHandlers: map[string]sshd.SubsystemHandler{
 			"sftp": func(s sshd.Session) {
 				t.Log("Test SFTP server: handling session")
@@ -125,9 +125,7 @@ func TestSSHSftpServer(t *testing.T) string {
 			},
 		},
 	}
-	return TestSSHServer(t, sshSrv, sshd.PasswordAuth(func(ctx sshd.Context, pass string) bool {
-		return ctx.User() == "testuser" && pass == "testpass"
-	}))
+	return TestSSHServer(t, sshSrv, user, pass, key)
 }
 
 func RunCmdPtySSH(addr, username, password, cmd string) ([]byte, error) {
