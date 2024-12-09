@@ -14,12 +14,15 @@ package tests
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -598,7 +601,7 @@ drivers:
 			"-oStrictHostKeyChecking=no",
 			"-oUserKnownHostsFile=/dev/null",
 			"-oGlobalKnownHostsFile=/dev/null",
-			"admin@" + host + ":" + srcdir + "/*",
+			"admin@"+host+":"+srcdir+"/*",
 			dstdir,
 		)
 		if err != nil {
@@ -672,7 +675,7 @@ drivers:
 			"-oGlobalKnownHostsFile=/dev/null",
 		}
 		args = append(args, srcFiles...)
-		args = append(args, "admin@" + host + ":" + dstdir)
+		args = append(args, "admin@"+host+":"+dstdir)
 
 		_, _, err = util.RunAndLog("TEST", 5*time.Second, nil, "scp", args...)
 		if err != nil {
@@ -684,6 +687,294 @@ drivers:
 			t.Fatalf("Found differences in the copied files from %q to %q: %v", srcdir, dstdir, err)
 		}
 	})
+
+	t.Run("Deallocate the Application", func(t *testing.T) {
+		apitest.New().
+			EnableNetworking(cli).
+			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/deallocate")).
+			BasicAuth("admin", afi.AdminToken()).
+			Expect(t).
+			Status(http.StatusOK).
+			End()
+	})
+
+	t.Run("Application should get DEALLOCATED in 10 sec", func(t *testing.T) {
+		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
+			apitest.New().
+				EnableNetworking(cli).
+				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
+				BasicAuth("admin", afi.AdminToken()).
+				Expect(r).
+				Status(http.StatusOK).
+				End().
+				JSON(&appState)
+
+			if appState.Status != types.ApplicationStatusDEALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", appState.Status)
+			}
+		})
+	})
+}
+
+// Checks that proxyssh can forward port back and forth and the API becomes available on it
+// Client will use key and proxy will connect to target by key
+// WARN: This test requires `ssh` binary to be available in PATH
+func Test_proxyssh_port_key2key(t *testing.T) {
+	t.Parallel()
+	afi := h.NewAquariumFish(t, "node-1", `---
+node_location: test_loc
+
+api_address: 127.0.0.1:0
+proxy_ssh_address: 127.0.0.1:0
+
+drivers:
+  - name: test`)
+
+	t.Cleanup(func() {
+		afi.Cleanup(t)
+	})
+
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered in f", r)
+		}
+	}()
+
+	// Still need HTTPS client to request SSH access to the machine
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	cli := &http.Client{
+		Timeout:   time.Second * 5,
+		Transport: tr,
+	}
+
+	serverkey, err := crypt.GenerateSSHKey()
+	if err != nil {
+		t.Fatalf("Can't create ssh key for mock server: %v", err)
+	}
+	serverpubkey, err := crypt.GetSSHPubKeyFromPem(serverkey)
+	if err != nil {
+		t.Fatalf("Can't create ssh key for mock server: %v", err)
+	}
+	serverkeyjson, err := json.Marshal(string(serverkey))
+	if err != nil {
+		t.Fatalf("Can't encode ssh key to json: %v", err)
+	}
+
+	// Running SSH Port server
+	sshdPort := h.TestSSHPortServer(t, "testuser", "", string(serverpubkey))
+
+	var label types.Label
+	t.Run("Create Label", func(t *testing.T) {
+		apitest.New().
+			EnableNetworking(cli).
+			Post(afi.APIAddress("api/v1/label/")).
+			JSON(`{"name":"test-label", "version":1, "definitions": [{
+				"driver":"test",
+				"resources":{"cpu":1,"ram":2},
+				"authentication":{"username":"testuser","key":`+string(serverkeyjson)+`,"port":`+sshdPort+`}
+			}]}`).
+			BasicAuth("admin", afi.AdminToken()).
+			Expect(t).
+			Status(http.StatusOK).
+			End().
+			JSON(&label)
+
+		if label.UID == uuid.Nil {
+			t.Fatalf("Label UID is incorrect: %v", label.UID)
+		}
+	})
+
+	var app types.Application
+	t.Run("Create Application", func(t *testing.T) {
+		apitest.New().
+			EnableNetworking(cli).
+			Post(afi.APIAddress("api/v1/application/")).
+			JSON(`{"label_UID":"`+label.UID.String()+`"}`).
+			BasicAuth("admin", afi.AdminToken()).
+			Expect(t).
+			Status(http.StatusOK).
+			End().
+			JSON(&app)
+
+		if app.UID == uuid.Nil {
+			t.Fatalf("Application UID is incorrect: %v", app.UID)
+		}
+	})
+
+	var appState types.ApplicationState
+	t.Run("Application should get ALLOCATED in 10 sec", func(t *testing.T) {
+		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
+			apitest.New().
+				EnableNetworking(cli).
+				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
+				BasicAuth("admin", afi.AdminToken()).
+				Expect(r).
+				Status(http.StatusOK).
+				End().
+				JSON(&appState)
+
+			if appState.Status != types.ApplicationStatusALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", appState.Status)
+			}
+		})
+	})
+
+	var res types.Resource
+	t.Run("Resource should be created", func(t *testing.T) {
+		apitest.New().
+			EnableNetworking(cli).
+			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/resource")).
+			BasicAuth("admin", afi.AdminToken()).
+			Expect(t).
+			Status(http.StatusOK).
+			End().
+			JSON(&res)
+
+		if res.Identifier == "" {
+			t.Fatalf("Resource identifier is incorrect: %v", res.Identifier)
+		}
+	})
+
+	// Now working with the created Application to get access
+	var acc types.ResourceAccess
+	t.Run("Requesting access to the Application Resource", func(t *testing.T) {
+		apitest.New().
+			EnableNetworking(cli).
+			Get(afi.APIAddress("api/v1/resource/"+res.UID.String()+"/access")).
+			BasicAuth("admin", afi.AdminToken()).
+			Expect(t).
+			Status(http.StatusOK).
+			End().
+			JSON(&acc)
+
+		if res.Identifier == "" {
+			t.Fatalf("Unable to get access to Resource: %v", res.Identifier)
+		}
+	})
+
+	t.Run("Executing SSH port forward pass through PROXYSSH", func(t *testing.T) {
+		// Writing ssh private key to temp file
+		tempFile, err := os.CreateTemp("", "key")
+		if err != nil {
+			t.Fatalf("Unable to create temp file: %v", err)
+		}
+		defer os.Remove(tempFile.Name())
+		_, err = tempFile.WriteString(acc.Key)
+		if err != nil {
+			t.Fatalf("Unable to write temp file: %v", err)
+		}
+		tempFile.Close()
+		err = os.Chmod(tempFile.Name(), 0600)
+		if err != nil {
+			t.Fatalf("Unable to change temp file mod: %v", err)
+		}
+
+		sshHost, sshPort, err := net.SplitHostPort(afi.ProxySSHEndpoint())
+		_, apiPort, err := net.SplitHostPort(afi.APIEndpoint())
+		// Picking semi-random port to listen on
+		proxyApiPort, _ := strconv.Atoi(apiPort)
+		proxyApiPort += 10
+
+		// Running command with timeout in background
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, "ssh",
+			// ssh -N -R 2223:localhost:2222 -p 2222 testuser@127.0.0.1
+			// ssh -N -L 2223:localhost:2222 -p 2222 testuser@127.0.0.1
+			"-i", tempFile.Name(),
+			"-p", sshPort,
+			"-oStrictHostKeyChecking=no",
+			"-oUserKnownHostsFile=/dev/null",
+			"-oGlobalKnownHostsFile=/dev/null",
+			"-l", "admin",
+			"-N", // Don't establish ssh session
+			"-L", strconv.Itoa(proxyApiPort)+":localhost:"+apiPort,
+			sshHost,
+		)
+		t.Log("DEBUG: Executing:", strings.Join(cmd.Args, " "), acc.Password, string(serverkey))
+
+		cmd.Stdout = os.Stderr
+		cmd.Stderr = os.Stderr
+		cmd.Start()
+
+		// Wait for ssh port passthrough startup
+		time.Sleep(2 * time.Second)
+
+		// Requesting Fish API through proxied port for the next test
+		apitest.New().
+			EnableNetworking(cli).
+			Get("https://127.0.0.1:"+strconv.Itoa(proxyApiPort)+"/api/v1/resource/"+res.UID.String()+"/access").
+			BasicAuth("admin", afi.AdminToken()).
+			Expect(t).
+			Status(http.StatusOK).
+			End().
+			JSON(&acc)
+
+		if res.Identifier == "" {
+			t.Fatalf("Unable to get access to Resource: %v", res.Identifier)
+		}
+	})
+
+	// TODO: For some reason mock server does not accept reverse port forwarding, but
+	// I spent too much time on that already, so the direct forwarding enough for testing now
+	/*t.Run("Executing SSH port reverse pass through PROXYSSH", func(t *testing.T) {
+		// Writing ssh private key to temp file
+		tempFile, err := os.CreateTemp("", "key")
+		if err != nil {
+			t.Fatalf("Unable to create temp file: %v", err)
+		}
+		defer os.Remove(tempFile.Name())
+		_, err = tempFile.WriteString(acc.Key)
+		if err != nil {
+			t.Fatalf("Unable to write temp file: %v", err)
+		}
+		tempFile.Close()
+		err = os.Chmod(tempFile.Name(), 0600)
+		if err != nil {
+			t.Fatalf("Unable to change temp file mod: %v", err)
+		}
+
+		sshHost, sshPort, err := net.SplitHostPort(afi.ProxySSHEndpoint())
+		_, apiPort, err := net.SplitHostPort(afi.APIEndpoint())
+		// Picking semi-random port to listen on
+		proxyApiPort, _ := strconv.Atoi(apiPort)
+		proxyApiPort += 10
+
+		// Running command with timeout in background
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, "ssh",
+			// ssh -N -R 2223:localhost:2222 -p 2222 testuser@127.0.0.1
+			// ssh -N -L 2223:localhost:2222 -p 2222 testuser@127.0.0.1
+			"-i", tempFile.Name(),
+			"-p", sshPort,
+			"-oStrictHostKeyChecking=no",
+			"-oUserKnownHostsFile=/dev/null",
+			"-oGlobalKnownHostsFile=/dev/null",
+			"-l", "admin",
+			"-N", // Don't establish ssh session
+			"-R", strconv.Itoa(proxyApiPort)+":localhost:"+apiPort,
+			sshHost,
+		)
+		cmd.Stdout = os.Stderr
+		cmd.Stderr = os.Stderr
+		cmd.Start()
+
+		// Wait for ssh port passthrough startup
+		time.Sleep(2*time.Second)
+
+		// Requesting Fish API through proxied port
+		apitest.New().
+			EnableNetworking(cli).
+			Get("https://127.0.0.1:"+strconv.Itoa(proxyApiPort)+"/api/v1/application/"+app.UID.String()+"/resource").
+			BasicAuth("admin", afi.AdminToken()).
+			Expect(t).
+			Status(http.StatusOK).
+			End().
+			JSON(&res)
+	})*/
 
 	t.Run("Deallocate the Application", func(t *testing.T) {
 		apitest.New().

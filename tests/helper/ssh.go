@@ -258,3 +258,30 @@ func sftpFromRemote(client *sftp.Client, srcPath, dstPath string) error {
 
 	return nil
 }
+
+func TestSSHPortServer(t *testing.T, user, pass, key string) string {
+	forwardHandler := &sshd.ForwardedTCPHandler{}
+
+	sshSrv := &sshd.Server{
+		Handler: sshd.Handler(func(s sshd.Session) {
+			io.WriteString(s, "Remote forwarding available...\n")
+			select {}
+		}),
+		LocalPortForwardingCallback: sshd.LocalPortForwardingCallback(func(ctx sshd.Context, dhost string, dport uint32) bool {
+			t.Log("Accepted forward", dhost, dport)
+			return true
+		}),
+		ReversePortForwardingCallback: sshd.ReversePortForwardingCallback(func(ctx sshd.Context, host string, port uint32) bool {
+			t.Log("Attempt to bind", host, port, "granted")
+			return true
+		}),
+		RequestHandlers: map[string]sshd.RequestHandler{
+			"tcpip-forward":        forwardHandler.HandleSSHRequest,
+			"cancel-tcpip-forward": forwardHandler.HandleSSHRequest,
+		},
+		ChannelHandlers: map[string]sshd.ChannelHandler{
+			"direct-tcpip": sshd.DirectTCPIPHandler,
+		},
+	}
+	return TestSSHServer(t, sshSrv, user, pass, key)
+}
