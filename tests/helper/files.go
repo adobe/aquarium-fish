@@ -15,7 +15,7 @@ package helper
 
 import (
 	"bytes"
-	"crypto/md5"
+	"crypto/md5" // #nosec G501
 	"crypto/rand"
 	"fmt"
 	"io"
@@ -112,7 +112,7 @@ func compareFiles(file1, file2 string) (bool, error) {
 }
 
 func fileHash(file string) ([]byte, error) {
-	hash := md5.New()
+	hash := md5.New() // #nosec G401
 	f, err := os.Open(file)
 	if err != nil {
 		return nil, err

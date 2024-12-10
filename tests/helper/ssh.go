@@ -134,7 +134,7 @@ func RunCmdPtySSH(addr, username, password, cmd string) ([]byte, error) {
 		Auth: []ssh.AuthMethod{
 			ssh.Password(password),
 		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106 , tests need to be simple
 	}
 
 	conn, err := ssh.Dial("tcp", addr, cfg)
@@ -187,14 +187,14 @@ func RunCmdPtySSH(addr, username, password, cmd string) ([]byte, error) {
 	return io.ReadAll(stdout)
 }
 
-// SCP nowdays uses sftp subsystem with no need for scp binary on the target, so use it directly
-func RunSftp(addr, username, password string, files []string, to_path string, to_remote bool) error {
+// SCP nowadays uses sftp subsystem with no need for scp binary on the target, so use it directly
+func RunSftp(addr, username, password string, files []string, toPath string, toRemote bool) error {
 	cfg := &ssh.ClientConfig{
 		User: username,
 		Auth: []ssh.AuthMethod{
 			ssh.Password(password),
 		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106 , tests need to be simple
 	}
 
 	conn, err := ssh.Dial("tcp", addr, cfg)
@@ -203,13 +203,16 @@ func RunSftp(addr, username, password string, files []string, to_path string, to
 	}
 
 	client, err := sftp.NewClient(conn)
+	if err != nil {
+		return fmt.Errorf("RunSftp: Unable to create sftp client: %v", err)
+	}
 	defer client.Close()
 
 	for _, path := range files {
-		if to_remote {
-			err = sftpToRemote(client, path, filepath.Join(to_path, filepath.Base(path)))
+		if toRemote {
+			err = sftpToRemote(client, path, filepath.Join(toPath, filepath.Base(path)))
 		} else {
-			err = sftpFromRemote(client, path, filepath.Join(to_path, filepath.Base(path)))
+			err = sftpFromRemote(client, path, filepath.Join(toPath, filepath.Base(path)))
 		}
 		if err != nil {
 			return fmt.Errorf("RunSftp: %v", err)
@@ -267,11 +270,11 @@ func TestSSHPortServer(t *testing.T, user, pass, key string) string {
 			io.WriteString(s, "Remote forwarding available...\n")
 			select {}
 		}),
-		LocalPortForwardingCallback: sshd.LocalPortForwardingCallback(func(ctx sshd.Context, dhost string, dport uint32) bool {
+		LocalPortForwardingCallback: sshd.LocalPortForwardingCallback(func(_ sshd.Context, dhost string, dport uint32) bool {
 			t.Log("Accepted forward", dhost, dport)
 			return true
 		}),
-		ReversePortForwardingCallback: sshd.ReversePortForwardingCallback(func(ctx sshd.Context, host string, port uint32) bool {
+		ReversePortForwardingCallback: sshd.ReversePortForwardingCallback(func(_ sshd.Context, host string, port uint32) bool {
 			t.Log("Attempt to bind", host, port, "granted")
 			return true
 		}),

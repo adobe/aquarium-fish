@@ -48,17 +48,17 @@ const (
 
 // Hash contains everything needed for storing and reproducing password hash
 type Hash struct {
-	Algo string
-	Prop properties `gorm:"embedded;embeddedPrefix:prop_"`
-	Salt []byte
-	Hash []byte
+	Algo string     `json:"algo"`
+	Prop properties `gorm:"embedded;embeddedPrefix:prop_" json:"prop"`
+	Salt []byte     `json:"salt"`
+	Hash []byte     `json:"hash"`
 }
 
 // Properties of Argon2id algo
 type properties struct {
-	Memory     uint32
-	Iterations uint32
-	Threads    uint8
+	Memory     uint32 `json:"memory"`
+	Iterations uint32 `json:"iterations"`
+	Threads    uint8  `json:"threads"`
 }
 
 // RandBytes create random bytes of specified size

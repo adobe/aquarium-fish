@@ -72,7 +72,7 @@ func RunAndLog(sec string, timeout time.Duration, stdin io.Reader, path string, 
 }
 
 // Will retry on error and store the retry output and errors to return
-func RunAndLogRetry(sec string, retry int, timeout time.Duration, stdin io.Reader, path string, arg ...string) (stdout string, stderr string, err error) { //nolint:unparam
+func RunAndLogRetry(sec string, retry int, timeout time.Duration, stdin io.Reader, path string, arg ...string) (stdout string, stderr string, err error) {
 	counter := 0
 	for {
 		counter++

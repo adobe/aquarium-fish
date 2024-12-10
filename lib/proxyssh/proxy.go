@@ -105,7 +105,7 @@ func (p *proxySSH) serveConnection(clientConn net.Conn) error {
 	return nil
 }
 
-func (p *proxySSH) establishConnection(clientConn net.Conn) (*ssh.ServerConn, <-chan ssh.NewChannel, <-chan *ssh.Request, error) {
+func (p *proxySSH) establishConnection(clientConn net.Conn) (*ssh.ServerConn, <-chan ssh.NewChannel, <-chan *ssh.Request, error) { //nolint:revive
 	srcConn, srcConnChannels, srcConnReqs, err := ssh.NewServerConn(clientConn, p.serverConfig)
 	if err != nil {
 		return nil, nil, nil, log.Errorf("PROXYSSH: %s: Failed to establish server connection: %v", clientConn.RemoteAddr(), err)
@@ -244,7 +244,7 @@ func (s *session) handleChannel(ch ssh.NewChannel, dstConn ssh.Conn) {
 		defer chWg.Done()
 		log.Debugf("PROXYSSH: %s: Starting dst->src stream copy", s.SrcAddr)
 		if _, err := io.Copy(dstChn, srcChn); err != nil && err != io.EOF {
-			log.Errorf("PROXYSSH: %s: The dst->src channel was closed unexpectidly: %v", s.SrcAddr, err)
+			log.Errorf("PROXYSSH: %s: The dst->src channel was closed unexpectedly: %v", s.SrcAddr, err)
 		}
 		// Properly closing the channel
 		dstChn.CloseWrite()
@@ -254,7 +254,7 @@ func (s *session) handleChannel(ch ssh.NewChannel, dstConn ssh.Conn) {
 
 	log.Debugf("PROXYSSH: %s: Starting src->dst stream copy", s.SrcAddr)
 	if _, err := io.Copy(srcChn, dstChn); err != nil && err != io.EOF {
-		log.Errorf("PROXYSSH: %s: The src->dst channel was closed unexpectidly: %v", s.SrcAddr, err)
+		log.Errorf("PROXYSSH: %s: The src->dst channel was closed unexpectedly: %v", s.SrcAddr, err)
 	}
 	// Properly closing the channel
 	dstChn.CloseWrite()
