@@ -34,6 +34,7 @@ node_location: test_loc
 default_resource_lifetime: 5s
 
 api_address: 127.0.0.1:0
+proxy_ssh_address: 127.0.0.1:0
 
 drivers:
   - name: test`)

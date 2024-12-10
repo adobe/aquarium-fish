@@ -33,6 +33,7 @@ func Test_application_task_snapshot_by_user(t *testing.T) {
 node_location: test_loc
 
 api_address: 127.0.0.1:0
+proxy_ssh_address: 127.0.0.1:0
 
 drivers:
   - name: test`)

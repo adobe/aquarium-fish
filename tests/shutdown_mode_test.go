@@ -38,6 +38,7 @@ func Test_shutdown_after_maintenace(t *testing.T) {
 node_location: test_loc
 
 api_address: 127.0.0.1:0
+proxy_ssh_address: 127.0.0.1:0
 
 drivers:
   - name: test`)
@@ -159,6 +160,7 @@ func Test_immediate_shutdown(t *testing.T) {
 node_location: test_loc
 
 api_address: 127.0.0.1:0
+proxy_ssh_address: 127.0.0.1:0
 
 drivers:
   - name: test`)
@@ -265,6 +267,7 @@ func Test_shutdown_after_delay(t *testing.T) {
 node_location: test_loc
 
 api_address: 127.0.0.1:0
+proxy_ssh_address: 127.0.0.1:0
 
 drivers:
   - name: test`)
@@ -380,6 +383,7 @@ func Test_shutdown_cancel_during_maintenance(t *testing.T) {
 node_location: test_loc
 
 api_address: 127.0.0.1:0
+proxy_ssh_address: 127.0.0.1:0
 
 drivers:
   - name: test`)
@@ -531,6 +535,7 @@ func Test_shutdown_cancel_during_delay(t *testing.T) {
 node_location: test_loc
 
 api_address: 127.0.0.1:0
+proxy_ssh_address: 127.0.0.1:0
 
 drivers:
   - name: test`)
