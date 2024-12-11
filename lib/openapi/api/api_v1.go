@@ -260,11 +260,9 @@ func (e *Processor) ResourceAccessPut(c echo.Context, uid types.ResourceUID) err
 	}
 
 	pwd := crypt.RandString(64)
-	pwdHash, err := crypt.NewHash(pwd, nil).Serialize()
-	if err != nil {
-		c.JSON(http.StatusBadRequest, H{"message": "Unable to prepare password hash"})
-		return fmt.Errorf("Unable to prepare password hash: %w", err)
-	}
+	// The proxy password is temporary (for the lifetime of the Resource) and one-time
+	// so lack of salt will not be a big deal - the params will contribute to salt majorily.
+	pwdHash := crypt.NewHash(pwd, []byte{}).Hash
 	key, err := crypt.GenerateSSHKey()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": "Unable to generate SSH key"})

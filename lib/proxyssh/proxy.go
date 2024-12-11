@@ -307,24 +307,23 @@ func (p *proxySSH) passwordCallback(incomingConn ssh.ConnMetadata, pass []byte) 
 
 	fishUser, err := p.fish.UserGet(user)
 	if err != nil {
-		log.Errorf("PROXYSSH: Unrecognized user %q", user)
+		log.Errorf("PROXYSSH: %s: Unrecognized user %q", incomingConn.RemoteAddr(), user)
 		return nil, fmt.Errorf("Invalid access")
 	}
 
-	pwdHash, err := crypt.NewHash(string(pass), nil).Serialize()
-	if err != nil {
-		return nil, fmt.Errorf("PROXYSSH: Unable to prepare password hash: %w", err)
-	}
-	pwdHashStr := string(pwdHash)
+	// The proxy password is temporary (for the lifetime of the Resource) and one-time
+	// so lack of salt will not be a big deal - the params will contribute to salt majorily.
+	passHash := crypt.NewHash(string(pass), []byte{}).Hash
+	passHashStr := string(passHash)
 
-	ra, err := p.fish.ResourceAccessSingleUsePasswordHash(fishUser.Name, pwdHashStr)
+	ra, err := p.fish.ResourceAccessSingleUsePasswordHash(fishUser.Name, passHashStr)
 	if err != nil {
-		log.Errorf("PROXYSSH: Invalid access for user %q: %v", user, err)
+		log.Errorf("PROXYSSH: %s: Invalid access for user %q: %v", incomingConn.RemoteAddr(), fishUser.Name, err)
 		return nil, fmt.Errorf("Invalid access")
 	}
 
 	// Only return non-error if the username and password match (double check just in case)
-	if ra.Username == user && ra.Password == pwdHashStr {
+	if ra.Username == user && ra.Password == passHashStr {
 		srcAddr := incomingConn.RemoteAddr()
 		// If the session is not already stored in our map, create it so that
 		// we have access to it when processing the incoming connections.
@@ -342,7 +341,7 @@ func (p *proxySSH) publicKeyCallback(incomingConn ssh.ConnMetadata, key ssh.Publ
 
 	fishUser, err := p.fish.UserGet(user)
 	if err != nil {
-		log.Errorf("PROXYSSH: Unrecognized user %q", user)
+		log.Errorf("PROXYSSH: %s: Unrecognized user %q", incomingConn.RemoteAddr(), user)
 		return nil, fmt.Errorf("Invalid access")
 	}
 
@@ -350,7 +349,7 @@ func (p *proxySSH) publicKeyCallback(incomingConn ssh.ConnMetadata, key ssh.Publ
 
 	ra, err := p.fish.ResourceAccessSingleUseKey(fishUser.Name, stringKey)
 	if err != nil {
-		log.Errorf("PROXYSSH: Invalid access for user %q: %v", user, err)
+		log.Errorf("PROXYSSH: %s: Invalid access for user %q: %v", incomingConn.RemoteAddr(), user, err)
 		return nil, fmt.Errorf("Invalid access")
 	}
 

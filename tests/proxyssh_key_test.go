@@ -70,7 +70,7 @@ drivers:
 	}
 
 	// Running SSH Pty server with shell
-	sshPort := h.TestSSHPtyServer(t, "testuser", "testpass", "")
+	sshdPort := h.TestSSHPtyServer(t, "testuser", "testpass", "")
 
 	var label types.Label
 	t.Run("Create Label", func(t *testing.T) {
@@ -80,7 +80,7 @@ drivers:
 			JSON(`{"name":"test-label", "version":1, "definitions": [{
 				"driver":"test",
 				"resources":{"cpu":1,"ram":2},
-				"authentication":{"username":"testuser","password":"testpass","port":`+sshPort+`}
+				"authentication":{"username":"testuser","password":"testpass","port":`+sshdPort+`}
 			}]}`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
@@ -276,7 +276,7 @@ drivers:
 	}
 
 	// Running SSH Pty server with shell
-	sshPort := h.TestSSHPtyServer(t, "testuser", "", string(serverpubkey))
+	sshdPort := h.TestSSHPtyServer(t, "testuser", "", string(serverpubkey))
 
 	var label types.Label
 	t.Run("Create Label", func(t *testing.T) {
@@ -286,7 +286,7 @@ drivers:
 			JSON(`{"name":"test-label", "version":1, "definitions": [{
 				"driver":"test",
 				"resources":{"cpu":1,"ram":2},
-				"authentication":{"username":"testuser","key":`+string(serverkeyjson)+`,"port":`+sshPort+`}
+				"authentication":{"username":"testuser","key":`+string(serverkeyjson)+`,"port":`+sshdPort+`}
 			}]}`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
@@ -468,7 +468,7 @@ drivers:
 	}
 
 	// Running SSH Sftp server with shell
-	sshPort := h.TestSSHSftpServer(t, "testuser", "testpass", "")
+	sshdPort := h.TestSSHSftpServer(t, "testuser", "testpass", "")
 
 	var label types.Label
 	t.Run("Create Label", func(t *testing.T) {
@@ -478,7 +478,7 @@ drivers:
 			JSON(`{"name":"test-label", "version":1, "definitions": [{
 				"driver":"test",
 				"resources":{"cpu":1,"ram":2},
-				"authentication":{"username":"testuser","password":"testpass","port":`+sshPort+`}
+				"authentication":{"username":"testuser","password":"testpass","port":`+sshdPort+`}
 			}]}`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
