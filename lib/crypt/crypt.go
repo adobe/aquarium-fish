@@ -131,6 +131,7 @@ func (h Hash) Serialize() ([]byte, error) {
 	}
 	return jsonHash, nil
 }
+
 func (h *Hash) Deserialize(jsonHash string) error {
 	err := json.Unmarshal([]byte(jsonHash), h)
 	if err != nil {

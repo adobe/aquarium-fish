@@ -25,7 +25,7 @@ import (
 )
 
 // Runs & logs the executable command
-func RunAndLog(sec string, timeout time.Duration, stdin io.Reader, path string, arg ...string) (string, string, error) {
+func RunAndLog(section string, timeout time.Duration, stdin io.Reader, path string, arg ...string) (string, string, error) {
 	var stdout, stderr bytes.Buffer
 
 	// Running command with timeout
@@ -34,7 +34,7 @@ func RunAndLog(sec string, timeout time.Duration, stdin io.Reader, path string, 
 
 	cmd := exec.CommandContext(ctx, path, arg...)
 
-	log.Debugf("%s: Executing: %s %s", sec, cmd.Path, strings.Join(cmd.Args[1:], " "))
+	log.Debugf("%s: Executing: %s %s", section, cmd.Path, strings.Join(cmd.Args[1:], " "))
 	if stdin != nil {
 		cmd.Stdin = stdin
 	}
@@ -47,21 +47,21 @@ func RunAndLog(sec string, timeout time.Duration, stdin io.Reader, path string, 
 
 	// Check the context error to see if the timeout was executed
 	if ctx.Err() == context.DeadlineExceeded {
-		err = fmt.Errorf("%s: Command timed out", sec)
+		err = fmt.Errorf("%s: Command timed out", section)
 	} else if _, ok := err.(*exec.ExitError); ok {
 		message := stderrString
 		if message == "" {
 			message = stdoutString
 		}
 
-		err = fmt.Errorf("%s: Command exited with error: %v: %s", sec, err, message)
+		err = fmt.Errorf("%s: Command exited with error: %v: %s", section, err, message)
 	}
 
 	if len(stdoutString) > 0 {
-		log.Debugf("%s: stdout: %s", sec, stdoutString)
+		log.Debugf("%s: stdout: %s", section, stdoutString)
 	}
 	if len(stderrString) > 0 {
-		log.Debugf("%s: stderr: %s", sec, stderrString)
+		log.Debugf("%s: stderr: %s", section, stderrString)
 	}
 
 	// Replace these for Windows, we only want to deal with Unix style line endings.
@@ -72,15 +72,15 @@ func RunAndLog(sec string, timeout time.Duration, stdin io.Reader, path string, 
 }
 
 // Will retry on error and store the retry output and errors to return
-func RunAndLogRetry(sec string, retry int, timeout time.Duration, stdin io.Reader, path string, arg ...string) (stdout string, stderr string, err error) {
+func RunAndLogRetry(section string, retry int, timeout time.Duration, stdin io.Reader, path string, arg ...string) (stdout string, stderr string, err error) {
 	counter := 0
 	for {
 		counter++
-		rout, rerr, err := RunAndLog(sec, timeout, stdin, path, arg...)
+		rout, rerr, err := RunAndLog(section, timeout, stdin, path, arg...)
 		if err != nil {
-			stdout += fmt.Sprintf("\n--- %s: Command execution attempt %d ---\n", sec, counter)
+			stdout += fmt.Sprintf("\n--- %s: Command execution attempt %d ---\n", section, counter)
 			stdout += rout
-			stderr += fmt.Sprintf("\n--- %s: Command execution attempt %d ---\n", sec, counter)
+			stderr += fmt.Sprintf("\n--- %s: Command execution attempt %d ---\n", section, counter)
 			stderr += rerr
 			if counter <= retry {
 				// Give command time to rest

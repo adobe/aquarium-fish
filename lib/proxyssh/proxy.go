@@ -139,7 +139,7 @@ func (s *session) connectToDestination(res *types.Resource) (*ssh.Client, error)
 		dstConfig.Auth = append(dstConfig.Auth, ssh.Password(res.Authentication.Password))
 	}
 
-	// Use use private key if it's set for the Resource
+	// Use private key if it's set for the Resource
 	if res.Authentication.Key != "" {
 		signer, err := ssh.ParsePrivateKey([]byte(res.Authentication.Key))
 		if err != nil {
@@ -191,6 +191,11 @@ func (s *session) handleChannel(ch ssh.NewChannel, dstConn ssh.Conn) {
 	chWg.Add(1)
 	go func() {
 		defer chWg.Done()
+
+		// End the communication between the source and destination when this function is complete.
+		defer srcChn.Close()
+		defer dstChn.Close()
+
 		log.Debugf("PROXYSSH: %s: Starting to listen for channel requests", s.SrcAddr)
 		for {
 			var request *ssh.Request
@@ -230,10 +235,6 @@ func (s *session) handleChannel(ch ssh.NewChannel, dstConn ssh.Conn) {
 			}
 		}
 
-		// End the communication between the source and destination.
-		srcChn.Close()
-		dstChn.Close()
-
 		log.Debugf("PROXYSSH: %s: Stopped to listen for the channel requests", s.SrcAddr)
 	}()
 
@@ -245,21 +246,37 @@ func (s *session) handleChannel(ch ssh.NewChannel, dstConn ssh.Conn) {
 		log.Debugf("PROXYSSH: %s: Starting dst->src stream copy", s.SrcAddr)
 		if _, err := io.Copy(dstChn, srcChn); err != nil && err != io.EOF {
 			log.Errorf("PROXYSSH: %s: The dst->src channel was closed unexpectedly: %v", s.SrcAddr, err)
+		} else {
+			log.Debugf("PROXYSSH: %s: The dst->src channel was closed 1: %v", s.SrcAddr, err)
+			if _, err := io.Copy(dstChn, srcChn); err != nil && err != io.EOF {
+				log.Debugf("PROXYSSH: %s: The dst->src channel was closed again: %v", s.SrcAddr, err)
+			}
 		}
 		// Properly closing the channel
-		dstChn.CloseWrite()
-		srcChn.CloseWrite()
-		log.Debugf("PROXYSSH: %s: The dst->src channel was closed", s.SrcAddr)
+		if err := dstChn.CloseWrite(); err != nil {
+			log.Warnf("PROXYSSH: %s: The dst->src closing write for dst channel did not go well: %v", s.SrcAddr, err)
+		}
+		if err := srcChn.CloseWrite(); err != nil {
+			log.Warnf("PROXYSSH: %s: The dst->src closing write for src channel did not go well: %v", s.SrcAddr, err)
+		}
 	}()
 
 	log.Debugf("PROXYSSH: %s: Starting src->dst stream copy", s.SrcAddr)
 	if _, err := io.Copy(srcChn, dstChn); err != nil && err != io.EOF {
 		log.Errorf("PROXYSSH: %s: The src->dst channel was closed unexpectedly: %v", s.SrcAddr, err)
+	} else {
+		log.Debugf("PROXYSSH: %s: The src->dst channel was closed 1", s.SrcAddr)
+		if _, err := io.Copy(srcChn, dstChn); err != nil && err != io.EOF {
+			log.Debugf("PROXYSSH: %s: The src->dst channel was closed again", s.SrcAddr)
+		}
 	}
 	// Properly closing the channel
-	dstChn.CloseWrite()
-	srcChn.CloseWrite()
-	log.Debugf("PROXYSSH: %s: The src->dst channel was closed", s.SrcAddr)
+	if err := dstChn.CloseWrite(); err != nil {
+		log.Warnf("PROXYSSH: %s: The src->dst closing write for dst channel did not go well: %v", s.SrcAddr, err)
+	}
+	if err := srcChn.CloseWrite(); err != nil {
+		log.Warnf("PROXYSSH: %s: The src->dst closing write for src channel did not go well: %v", s.SrcAddr, err)
+	}
 
 	chWg.Wait()
 	log.Debugf("PROXYSSH: %s: Completed processing channel: %s", s.SrcAddr, ch.ChannelType())
@@ -380,7 +397,7 @@ func Init(f *fish.Fish, idRsaPath string, address string) error {
 
 	server := proxySSH{fish: f}
 	server.serverConfig = &ssh.ServerConfig{
-		ServerVersion:     "SSH-2.0-AquriumFishProxy",
+		ServerVersion:     "SSH-2.0-AquariumFishProxy",
 		PasswordCallback:  server.passwordCallback,
 		PublicKeyCallback: server.publicKeyCallback,
 	}
