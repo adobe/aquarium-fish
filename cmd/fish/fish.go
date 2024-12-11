@@ -165,7 +165,7 @@ func main() {
 			if !filepath.IsAbs(idRsaPath) {
 				idRsaPath = filepath.Join(cfg.Directory, idRsaPath)
 			}
-			err = proxyssh.Init(fish, idRsaPath, cfg.ProxySSHAddress)
+			cfg.ProxySSHAddress, err = proxyssh.Init(fish, idRsaPath, cfg.ProxySSHAddress)
 			if err != nil {
 				return err
 			}

@@ -277,7 +277,11 @@ func (e *Processor) ResourceAccessPut(c echo.Context, uid types.ResourceUID) err
 	}
 	rAccess := types.ResourceAccess{
 		ResourceUID: res.UID,
-		Username:    user.Name,
+		// Storing address of the proxy to give the user idea of where to connect to.
+		// Later when cluster will be here - it could contain a different node IP instead, because
+		// this particular one could not be able to serve the connection.
+		Address:  e.fish.GetProxySSHEndpoint(),
+		Username: user.Name,
 		// We should not store clear password, so convert it to salted hash
 		Password: string(pwdHash),
 		// Key need to be stored as public key
@@ -285,7 +289,8 @@ func (e *Processor) ResourceAccessPut(c echo.Context, uid types.ResourceUID) err
 	}
 	e.fish.ResourceAccessCreate(&rAccess)
 
-	// Overriding the password and key to return user the actual values one time and forget about
+	// Now database has had the hashed credentials stored, we store the original
+	// values to return so user have access to the actual credentials.
 	rAccess.Password = pwd
 	rAccess.Key = string(key)
 

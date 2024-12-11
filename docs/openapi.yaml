@@ -1649,6 +1649,7 @@ components:
         - UID
         - created_at
         - resource_UID
+        - address
         - username
         - password
         - key
@@ -1665,6 +1666,10 @@ components:
           format: uuid
           x-oapi-codegen-extra-tags:
             yaml: resource_UID
+        address:
+          type: string
+          description: |
+            Address (host:port) to help user to connect to right proxyssh.
         username:
           type: string
           description: |

@@ -367,8 +367,8 @@ func (p *proxySSH) publicKeyCallback(incomingConn ssh.ConnMetadata, key ssh.Publ
 	return nil, fmt.Errorf("Invalid access")
 }
 
-// Init starts SSH proxy
-func Init(f *fish.Fish, idRsaPath string, address string) error {
+// Init starts SSH proxy and returns the actual listening address and error if happened
+func Init(f *fish.Fish, idRsaPath string, address string) (string, error) {
 	// First, try and read the file if it exists already. Otherwise, it is the
 	// first execution, generate the private / public keys. The SSH server
 	// requires at least one identity loaded to run.
@@ -378,21 +378,21 @@ func Init(f *fish.Fish, idRsaPath string, address string) error {
 		log.Infof("PROXYSSH: Could not load %q, generating...", idRsaPath)
 		pemKey, err := crypt.GenerateSSHKey()
 		if err != nil {
-			return fmt.Errorf("PROXYSSH: Could not generate private key: %w", err)
+			return "", fmt.Errorf("PROXYSSH: Could not generate private key: %w", err)
 		}
 		// Write out the new key file and load into `privateBytes` again.
 		if err := os.WriteFile(idRsaPath, pemKey, 0600); err != nil {
-			return fmt.Errorf("PROXYSSH: Could not write %q: %w", idRsaPath, err)
+			return "", fmt.Errorf("PROXYSSH: Could not write %q: %w", idRsaPath, err)
 		}
 		privateBytes, err = os.ReadFile(idRsaPath)
 		if err != nil {
-			return fmt.Errorf("PROXYSSH: Failed to load private key %q after generating: %w", idRsaPath, err)
+			return "", fmt.Errorf("PROXYSSH: Failed to load private key %q after generating: %w", idRsaPath, err)
 		}
 	}
 
 	private, err := ssh.ParsePrivateKey(privateBytes)
 	if err != nil {
-		return fmt.Errorf("PROXYSSH: Failed to parse private key: %w", err)
+		return "", fmt.Errorf("PROXYSSH: Failed to parse private key: %w", err)
 	}
 
 	server := proxySSH{fish: f}
@@ -406,7 +406,7 @@ func Init(f *fish.Fish, idRsaPath string, address string) error {
 	// Create the listener and let it wait for new connections in a separated goroutine
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
-		return log.Errorf("PROXYSSH: Unable to bind to address %q: %v", address, err)
+		return "", log.Errorf("PROXYSSH: Unable to bind to address %q: %v", address, err)
 	}
 
 	go func() {
@@ -426,5 +426,5 @@ func Init(f *fish.Fish, idRsaPath string, address string) error {
 
 	log.Info("PROXYSSH listening on:", listener.Addr())
 
-	return nil
+	return listener.Addr().String(), nil
 }
