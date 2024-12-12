@@ -116,14 +116,15 @@ func setWinsize(f *os.File, w, h int) {
 func MockSSHSftpServer(t *testing.T, user, pass, key string) (string, string) {
 	t.Helper()
 	sshSrv := &sshd.Server{
+		Handler: func(s sshd.Session) {
+			t.Log("MockSSHSftpServer: exec or shell called but not supported")
+			io.WriteString(s, "Exec/Shell not supported.\n")
+			s.Exit(1)
+		},
 		SubsystemHandlers: map[string]sshd.SubsystemHandler{
 			"sftp": func(s sshd.Session) {
 				t.Log("MockSSHSftpServer: Start handling session")
-				debugStream := os.Stderr
-				serverOptions := []sftp.ServerOption{
-					sftp.WithDebug(debugStream),
-				}
-				server, err := sftp.NewServer(s, serverOptions...)
+				server, err := sftp.NewServer(s, sftp.WithDebug(os.Stderr))
 				if err != nil {
 					t.Log("MockSSHSftpServer: Init error:", err)
 					return
