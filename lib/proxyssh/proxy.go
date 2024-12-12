@@ -59,7 +59,7 @@ func (p *proxySSH) serveConnection(clientConn net.Conn) error {
 	// Establish SSH connection
 	srcConn, srcConnChannels, srcConnReqs, err := p.establishConnection(clientConn)
 	if err != nil {
-		return err
+		return log.Errorf("PROXYSSH: %s: Failed to establish connection: %v", clientConn.RemoteAddr(), err)
 	}
 	defer srcConn.Close()
 	log.Debugf("PROXYSSH: %s: Established new connection: %x", clientConn.RemoteAddr(), srcConn.SessionID())
@@ -67,7 +67,7 @@ func (p *proxySSH) serveConnection(clientConn net.Conn) error {
 	// Get session info from map
 	session, err := p.getSession(srcConn.SessionID())
 	if err != nil {
-		return err
+		return log.Errorf("PROXYSSH: %s: Failed to get session: %v", clientConn.RemoteAddr(), err)
 	}
 
 	if session.ResourceAccessor == nil {
@@ -86,7 +86,7 @@ func (p *proxySSH) serveConnection(clientConn net.Conn) error {
 	// Establish destination connection
 	dstConn, err := session.connectToDestination(resource)
 	if err != nil {
-		return err
+		return log.Errorf("PROXYSSH: %s: Unable to connect to destination: %v", session.SrcAddr, err)
 	}
 	defer dstConn.Close()
 
@@ -203,13 +203,15 @@ func (s *session) handleChannel(ch ssh.NewChannel, dstConn ssh.Conn) {
 
 			select {
 			case request = <-srcChnRequests:
+				//log.Debugf("PROXYSSH: %s: Received src channel request: %v", s.SrcAddr, request)
 				targetChannel = dstChn
 			case request = <-dstChnRequests:
+				//log.Debugf("PROXYSSH: %s: Received dst channel request: %v", s.SrcAddr, request)
 				targetChannel = srcChn
 			}
 
 			// In the event that an SSH request gets killed (not exited),
-			// the request will be nil.  Do not continue, exit the loop
+			// the request will be nil. Do not continue, exit the loop.
 			if request == nil {
 				log.Warnf("PROXYSSH: %s: SSH connection terminated ungracefully...", s.SrcAddr)
 				break
@@ -244,13 +246,10 @@ func (s *session) handleChannel(ch ssh.NewChannel, dstConn ssh.Conn) {
 	go func() {
 		defer chWg.Done()
 		log.Debugf("PROXYSSH: %s: Starting dst->src stream copy", s.SrcAddr)
-		if _, err := io.Copy(dstChn, srcChn); err != nil && err != io.EOF {
+		if _, err := io.Copy(srcChn, dstChn); err != nil && err != io.EOF {
 			log.Errorf("PROXYSSH: %s: The dst->src channel was closed unexpectedly: %v", s.SrcAddr, err)
 		} else {
-			log.Debugf("PROXYSSH: %s: The dst->src channel was closed 1: %v", s.SrcAddr, err)
-			if _, err := io.Copy(dstChn, srcChn); err != nil && err != io.EOF {
-				log.Debugf("PROXYSSH: %s: The dst->src channel was closed again: %v", s.SrcAddr, err)
-			}
+			log.Debugf("PROXYSSH: %s: The dst->src channel was closed: %v", s.SrcAddr, err)
 		}
 		// Properly closing the channel
 		if err := dstChn.CloseWrite(); err != nil {
@@ -261,14 +260,10 @@ func (s *session) handleChannel(ch ssh.NewChannel, dstConn ssh.Conn) {
 		}
 	}()
 
-	log.Debugf("PROXYSSH: %s: Starting src->dst stream copy", s.SrcAddr)
-	if _, err := io.Copy(srcChn, dstChn); err != nil && err != io.EOF {
+	if _, err := io.Copy(dstChn, srcChn); err != nil && err != io.EOF {
 		log.Errorf("PROXYSSH: %s: The src->dst channel was closed unexpectedly: %v", s.SrcAddr, err)
 	} else {
-		log.Debugf("PROXYSSH: %s: The src->dst channel was closed 1", s.SrcAddr)
-		if _, err := io.Copy(srcChn, dstChn); err != nil && err != io.EOF {
-			log.Debugf("PROXYSSH: %s: The src->dst channel was closed again", s.SrcAddr)
-		}
+		log.Debugf("PROXYSSH: %s: The src->dst channel was closed", s.SrcAddr)
 	}
 	// Properly closing the channel
 	if err := dstChn.CloseWrite(); err != nil {
@@ -409,6 +404,7 @@ func Init(f *fish.Fish, idRsaPath string, address string) (string, error) {
 	}
 
 	go func() {
+		log.Debug("PROXYSSH: Start listening for the incoming connections")
 		defer listener.Close()
 
 		// Indefinitely accept new connections, process them concurrently

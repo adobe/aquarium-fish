@@ -31,21 +31,26 @@ import (
 )
 
 // Base ssh server with no handler
-func TestSSHServer(t *testing.T, sshSrv *sshd.Server, user, pass, key string) string {
+func MockSSHServer(t *testing.T, sshSrv *sshd.Server, user, pass, key string) (string, string) {
 	if pass != "" {
 		sshSrv.SetOption(sshd.PasswordAuth(func(ctx sshd.Context, password string) bool {
-			return ctx.User() == user && password == pass
+			res := ctx.User() == user && password == pass
+			t.Log("MockSSHServer: Checked password:", res)
+			return res
 		}))
 	}
 	if key != "" {
 		sshSrv.SetOption(sshd.PublicKeyAuth(func(ctx sshd.Context, inkey sshd.PublicKey) bool {
-			return ctx.User() == user && key == string(ssh.MarshalAuthorizedKey(inkey))
+			res := ctx.User() == user && key == string(ssh.MarshalAuthorizedKey(inkey))
+			t.Log("MockSSHServer: Checked pubkey:", res)
+			return res
 		}))
 	}
 
 	sshListener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		t.Fatalf("Unable to start SSH server to listen: %v", err)
+		t.Fatalf("MockSSHServer: Unable to start SSH server to listen: %v", err)
+		return "", ""
 	}
 	t.Cleanup(func() {
 		sshListener.Close()
@@ -54,23 +59,24 @@ func TestSSHServer(t *testing.T, sshSrv *sshd.Server, user, pass, key string) st
 
 	_, port, err := net.SplitHostPort(sshListener.Addr().String())
 	if err != nil {
-		t.Fatalf("Unable to get SSH listening port: %v", err)
+		t.Fatalf("MockSSHServer: Unable to get SSH listening port: %v", err)
+		return "", ""
 	}
 
 	go sshSrv.Serve(sshListener)
 
-	t.Log("Started Test SSH server on", sshSrv.Addr)
+	t.Log("MockSSHServer: Started Test SSH server on", sshSrv.Addr)
 
-	return port
+	return "127.0.0.1", port
 }
 
-func TestSSHPtyServer(t *testing.T, user, pass, key string) string {
+func MockSSHPtyServer(t *testing.T, user, pass, key string) (string, string) {
 	sshSrv := &sshd.Server{Handler: func(s sshd.Session) {
-		t.Log("Test SSH server: handling session")
+		t.Log("MockSSHPtyServer: Start handling session")
 		cmd := exec.Command("sh")
 		ptyReq, winCh, isPty := s.Pty()
 		if isPty {
-			t.Log("Test SSH server: pty is requested")
+			t.Log("MockSSHPtyServer: PTY is requested")
 			cmd.Env = append(cmd.Env, fmt.Sprintf("TERM=%s", ptyReq.Term))
 			f, err := pty.Start(cmd)
 			if err != nil {
@@ -82,18 +88,22 @@ func TestSSHPtyServer(t *testing.T, user, pass, key string) string {
 				}
 			}()
 			go func() {
+				t.Log("MockSSHPtyServer: starting session->cmd copy")
 				io.Copy(f, s) // stdin
+				t.Log("MockSSHPtyServer: ended session->cmd copy")
 			}()
+			t.Log("MockSSHPtyServer: starting cmd->session copy")
 			io.Copy(s, f) // stdout
+			t.Log("MockSSHPtyServer: ended cmd->session copy")
 			cmd.Wait()
 		} else {
-			t.Log("Test SSH server: no pty is requested")
+			t.Log("MockSSHPtyServer: No PTY is requested")
 			io.WriteString(s, "No PTY requested.\n")
 			s.Exit(1)
 		}
-		t.Log("Test SSH server completed handling session")
+		t.Log("MockSSHPtyServer: End handling session")
 	}}
-	return TestSSHServer(t, sshSrv, user, pass, key)
+	return MockSSHServer(t, sshSrv, user, pass, key)
 }
 
 func setWinsize(f *os.File, w, h int) {
@@ -101,31 +111,58 @@ func setWinsize(f *os.File, w, h int) {
 		uintptr(unsafe.Pointer(&struct{ h, w, x, y uint16 }{uint16(h), uint16(w), 0, 0})))
 }
 
-func TestSSHSftpServer(t *testing.T, user, pass, key string) string {
+func MockSSHSftpServer(t *testing.T, user, pass, key string) (string, string) {
 	sshSrv := &sshd.Server{
 		SubsystemHandlers: map[string]sshd.SubsystemHandler{
 			"sftp": func(s sshd.Session) {
-				t.Log("Test SFTP server: handling session")
+				t.Log("MockSSHSftpServer: Start handling session")
 				debugStream := os.Stderr
 				serverOptions := []sftp.ServerOption{
 					sftp.WithDebug(debugStream),
 				}
 				server, err := sftp.NewServer(s, serverOptions...)
 				if err != nil {
-					t.Log("sftp server init error:", err)
+					t.Log("MockSSHSftpServer: Init error:", err)
 					return
 				}
 				if err := server.Serve(); err == io.EOF {
 					server.Close()
-					fmt.Println("sftp client exited session.")
+					t.Log("MockSSHSftpServer: Slient exited session.")
 				} else if err != nil {
-					fmt.Println("sftp server completed with error:", err)
+					t.Log("MockSSHSftpServer: Server completed with error:", err)
 				}
-				t.Log("Test SFTP server completed handling session")
+				t.Log("MockSSHSftpServer: End handling session")
 			},
 		},
 	}
-	return TestSSHServer(t, sshSrv, user, pass, key)
+	return MockSSHServer(t, sshSrv, user, pass, key)
+}
+
+func MockSSHPortServer(t *testing.T, user, pass, key string) (string, string) {
+	forwardHandler := &sshd.ForwardedTCPHandler{}
+
+	sshSrv := &sshd.Server{
+		Handler: sshd.Handler(func(s sshd.Session) {
+			io.WriteString(s, "Remote forwarding available...\n")
+			select {}
+		}),
+		LocalPortForwardingCallback: sshd.LocalPortForwardingCallback(func(_ sshd.Context, dhost string, dport uint32) bool {
+			t.Log("Accepted forward", dhost, dport)
+			return true
+		}),
+		ReversePortForwardingCallback: sshd.ReversePortForwardingCallback(func(_ sshd.Context, host string, port uint32) bool {
+			t.Log("Attempt to bind", host, port, "granted")
+			return true
+		}),
+		RequestHandlers: map[string]sshd.RequestHandler{
+			"tcpip-forward":        forwardHandler.HandleSSHRequest,
+			"cancel-tcpip-forward": forwardHandler.HandleSSHRequest,
+		},
+		ChannelHandlers: map[string]sshd.ChannelHandler{
+			"direct-tcpip": sshd.DirectTCPIPHandler,
+		},
+	}
+	return MockSSHServer(t, sshSrv, user, pass, key)
 }
 
 func RunCmdPtySSH(addr, username, password, cmd string) ([]byte, error) {
@@ -260,31 +297,4 @@ func sftpFromRemote(client *sftp.Client, srcPath, dstPath string) error {
 	}
 
 	return nil
-}
-
-func TestSSHPortServer(t *testing.T, user, pass, key string) string {
-	forwardHandler := &sshd.ForwardedTCPHandler{}
-
-	sshSrv := &sshd.Server{
-		Handler: sshd.Handler(func(s sshd.Session) {
-			io.WriteString(s, "Remote forwarding available...\n")
-			select {}
-		}),
-		LocalPortForwardingCallback: sshd.LocalPortForwardingCallback(func(_ sshd.Context, dhost string, dport uint32) bool {
-			t.Log("Accepted forward", dhost, dport)
-			return true
-		}),
-		ReversePortForwardingCallback: sshd.ReversePortForwardingCallback(func(_ sshd.Context, host string, port uint32) bool {
-			t.Log("Attempt to bind", host, port, "granted")
-			return true
-		}),
-		RequestHandlers: map[string]sshd.RequestHandler{
-			"tcpip-forward":        forwardHandler.HandleSSHRequest,
-			"cancel-tcpip-forward": forwardHandler.HandleSSHRequest,
-		},
-		ChannelHandlers: map[string]sshd.ChannelHandler{
-			"direct-tcpip": sshd.DirectTCPIPHandler,
-		},
-	}
-	return TestSSHServer(t, sshSrv, user, pass, key)
 }

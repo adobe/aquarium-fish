@@ -13,11 +13,11 @@
 package tests
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -70,7 +70,7 @@ drivers:
 	}
 
 	// Running SSH Pty server with shell
-	sshdPort := h.TestSSHPtyServer(t, "testuser", "testpass", "")
+	_, sshdPort := h.MockSSHPtyServer(t, "testuser", "testpass", "")
 
 	var label types.Label
 	t.Run("Create Label", func(t *testing.T) {
@@ -163,41 +163,65 @@ drivers:
 
 	t.Run("Executing SSH shell through PROXYSSH", func(t *testing.T) {
 		// Writing ssh private key to temp file
-		tempFile, err := os.CreateTemp("", "key")
+		proxyKeyFile, err := os.CreateTemp("", "proxykey")
 		if err != nil {
-			t.Fatalf("Unable to create temp file: %v", err)
+			t.Fatalf("Unable to create temp proxykey file: %v", err)
 		}
-		defer os.Remove(tempFile.Name())
-		_, err = tempFile.WriteString(acc.Key)
+		defer os.Remove(proxyKeyFile.Name())
+		_, err = proxyKeyFile.WriteString(acc.Key)
 		if err != nil {
-			t.Fatalf("Unable to write temp file: %v", err)
+			t.Fatalf("Unable to write temp proxykey file: %v", err)
 		}
-		tempFile.Close()
-		err = os.Chmod(tempFile.Name(), 0600)
+		proxyKeyFile.Close()
+		err = os.Chmod(proxyKeyFile.Name(), 0600)
 		if err != nil {
-			t.Fatalf("Unable to change temp file mod: %v", err)
+			t.Fatalf("Unable to change temp proxykey file mod: %v", err)
 		}
 
-		host, port, err := net.SplitHostPort(afi.ProxySSHEndpoint())
+		proxyHost, proxyPort, err := net.SplitHostPort(afi.ProxySSHEndpoint())
 
-		input := bytes.NewBufferString("echo 'Its ALIVE!'\nexit\n")
-		stdout, _, err := util.RunAndLog("TEST", 5*time.Second, input, "ssh",
-			"-i", tempFile.Name(),
-			"-p", port,
+		// In order to emulate terminal input we using pipe to write. This allows us to keep the
+		// stdin opened while we woking with ssh app, otherwise something like
+		// input := bytes.NewBufferString("echo 'Its ALIVE!'\nexit\n") will just close the stream
+		// and test will be ok on MacOS (Sonoma 14.5, OpenSSH_9.6p1), but will close the src->dst
+		// channel on Linux (Debian 12.8, OpenSSH 9.2p1).
+		pipeReader, pipeWriter := io.Pipe()
+
+		go func() {
+			// Function to write to the pipe and not to close the channel until we need to. It uses
+			// sleep, which is not that great and could be switched to getting response, but meh
+			defer pipeWriter.Close()
+
+			// While connection establishing we preparing for the write just like humans do
+			time.Sleep(time.Second)
+			pipeWriter.Write([]byte("echo 'Its ALIVE!'\n"))
+			// After we hit enter - expecting some output from there
+			time.Sleep(500 * time.Millisecond)
+			pipeWriter.Write([]byte("exit\n"))
+			// Not closing pipeWriter, because the other side should close reader
+			time.Sleep(100 * time.Millisecond)
+		}()
+
+		// Running SSH client and receiving the output
+		stdout, stderr, err := util.RunAndLog("TEST", 5*time.Second, pipeReader, "ssh", "-v",
+			"-i", proxyKeyFile.Name(),
+			"-p", proxyPort,
 			"-tt", // We need to request PTY for server
 			"-oStrictHostKeyChecking=no",
 			"-oUserKnownHostsFile=/dev/null",
 			"-oGlobalKnownHostsFile=/dev/null",
 			"-l", "admin",
-			host,
+			proxyHost,
 		)
 		if err != nil {
-			t.Fatalf("Failed to execute command via PROXYSSH: %v", err)
+			t.Fatalf("Failed to execute command via PROXYSSH: %v (stderr: %s)", err, stderr)
 		}
 
 		// SSH output is full of special symbols, so looking just for the desired output
-		if !strings.Contains(stdout, "\nIts ALIVE!\n") {
-			t.Fatalf("Incorrect response from command through PROXYSSH: %q not in %q", "\nIts ALIVE!\n", stdout)
+		if !strings.Contains(stdout, "Its ALIVE!\n") {
+			t.Fatalf("Incorrect response from command through PROXYSSH: %q not in %q (stderr: %s)", "Its ALIVE!\n", stdout, stderr)
+			//} else {
+			//	t.Log(fmt.Sprintf("Correct response from command through PROXYSSH: %q in %q (stderr: %s)", "Its ALIVE!\n", stdout, stderr))
 		}
 	})
 
@@ -262,21 +286,86 @@ drivers:
 		Transport: tr,
 	}
 
-	serverkey, err := crypt.GenerateSSHKey()
+	sshdKey, err := crypt.GenerateSSHKey()
 	if err != nil {
-		t.Fatalf("Can't create ssh key for mock server: %v", err)
+		t.Fatalf("Can't create ssh key for mock sshd: %v", err)
 	}
-	serverpubkey, err := crypt.GetSSHPubKeyFromPem(serverkey)
+	sshdPubKey, err := crypt.GetSSHPubKeyFromPem(sshdKey)
 	if err != nil {
-		t.Fatalf("Can't create ssh key for mock server: %v", err)
+		t.Fatalf("Can't create ssh key for mock sshd: %v", err)
 	}
-	serverkeyjson, err := json.Marshal(string(serverkey))
+	sshdKeyJsonStr, err := json.Marshal(string(sshdKey))
 	if err != nil {
 		t.Fatalf("Can't encode ssh key to json: %v", err)
 	}
 
-	// Running SSH Pty server with shell
-	sshdPort := h.TestSSHPtyServer(t, "testuser", "", string(serverpubkey))
+	// Running mock SSH Pty server with shell
+	sshdHost, sshdPort := h.MockSSHPtyServer(t, "testuser", "", string(sshdPubKey))
+
+	// First executing a simple one directly over the mock server with a little validation
+	var sshdTestOutput string
+	t.Run("Executing SSH shell directly on mock SSHD", func(t *testing.T) {
+		// Writing ssh private key to temp file
+		sshdKeyFile, err := os.CreateTemp("", "sshdkey")
+		if err != nil {
+			t.Fatalf("Unable to create temp sshdkey file: %v", err)
+		}
+		defer os.Remove(sshdKeyFile.Name())
+		_, err = sshdKeyFile.Write(sshdKey)
+		if err != nil {
+			t.Fatalf("Unable to write temp sshdkey file: %v", err)
+		}
+		sshdKeyFile.Close()
+		err = os.Chmod(sshdKeyFile.Name(), 0600)
+		if err != nil {
+			t.Fatalf("Unable to change temp sshdkey file mod: %v", err)
+		}
+
+		// In order to emulate terminal input we using pipe to write. This allows us to keep the
+		// stdin opened while we woking with ssh app, otherwise something like
+		// input := bytes.NewBufferString("echo 'Its ALIVE!'\nexit\n") will just close the stream
+		// and test will be ok on MacOS (Sonoma 14.5, OpenSSH_9.6p1), but will close the src->dst
+		// channel on Linux (Debian 12.8, OpenSSH 9.2p1).
+		pipeReader, pipeWriter := io.Pipe()
+
+		go func() {
+			// Function to write to the pipe and not to close the channel until we need to. It uses
+			// sleep, which is not that great and could be switched to getting response, but meh
+			defer pipeWriter.Close()
+
+			// While connection establishing we preparing for the write just like humans do
+			time.Sleep(time.Second)
+			pipeWriter.Write([]byte("echo 'Its ALIVE!'\n"))
+			// After we hit enter - expecting some output from there
+			time.Sleep(500 * time.Millisecond)
+			pipeWriter.Write([]byte("exit\n"))
+			// Not closing pipeWriter, because the other side should close reader
+			time.Sleep(100 * time.Millisecond)
+		}()
+
+		// Running SSH client and receiving the input
+		stdout, stderr, err := util.RunAndLog("TEST", 5*time.Second, pipeReader, "ssh", "-vvv",
+			"-i", sshdKeyFile.Name(),
+			"-p", sshdPort,
+			"-tt", // We need to request PTY for server
+			"-oStrictHostKeyChecking=no",
+			"-oUserKnownHostsFile=/dev/null",
+			"-oGlobalKnownHostsFile=/dev/null",
+			"-l", "testuser",
+			sshdHost,
+		)
+		if err != nil {
+			t.Fatalf("Failed to execute command directly on mock sshd: %v (stderr: %s)", err, stderr)
+		}
+
+		// SSH output is full of special symbols, so looking just for the desired output
+		if !strings.Contains(stdout, "Its ALIVE!\n") {
+			t.Fatalf("Incorrect response from command on mock sshd: %q not in %q (stderr: %s)", "Its ALIVE!\n", stdout, stderr)
+			//} else {
+			//	t.Log(fmt.Sprintf("Correct response from command on mock sshd: %q in %q (stderr: %s)", "Its ALIVE!\n", stdout, stderr))
+		}
+		sshdTestOutput = stdout
+	})
 
 	var label types.Label
 	t.Run("Create Label", func(t *testing.T) {
@@ -286,7 +375,7 @@ drivers:
 			JSON(`{"name":"test-label", "version":1, "definitions": [{
 				"driver":"test",
 				"resources":{"cpu":1,"ram":2},
-				"authentication":{"username":"testuser","key":`+string(serverkeyjson)+`,"port":`+sshdPort+`}
+				"authentication":{"username":"testuser","key":`+string(sshdKeyJsonStr)+`,"port":`+sshdPort+`}
 			}]}`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
@@ -367,43 +456,68 @@ drivers:
 		}
 	})
 
+	// Now running the same but through proxy - and we should get the identical answer
 	t.Run("Executing SSH shell through PROXYSSH", func(t *testing.T) {
 		// Writing ssh private key to temp file
-		tempFile, err := os.CreateTemp("", "key")
+		proxyKeyFile, err := os.CreateTemp("", "proxykey")
 		if err != nil {
-			t.Fatalf("Unable to create temp file: %v", err)
+			t.Fatalf("Unable to create temp proxykey file: %v", err)
 		}
-		defer os.Remove(tempFile.Name())
-		_, err = tempFile.WriteString(acc.Key)
+		defer os.Remove(proxyKeyFile.Name())
+		_, err = proxyKeyFile.WriteString(acc.Key)
 		if err != nil {
-			t.Fatalf("Unable to write temp file: %v", err)
+			t.Fatalf("Unable to write temp proxykey file: %v", err)
 		}
-		tempFile.Close()
-		err = os.Chmod(tempFile.Name(), 0600)
+		proxyKeyFile.Close()
+		err = os.Chmod(proxyKeyFile.Name(), 0600)
 		if err != nil {
-			t.Fatalf("Unable to change temp file mod: %v", err)
+			t.Fatalf("Unable to change temp proxykey file mod: %v", err)
 		}
 
-		host, port, err := net.SplitHostPort(afi.ProxySSHEndpoint())
+		proxyHost, proxyPort, err := net.SplitHostPort(afi.ProxySSHEndpoint())
 
-		input := bytes.NewBufferString("echo 'Its ALIVE!'\nexit\n")
-		stdout, _, err := util.RunAndLog("TEST", 5*time.Second, input, "ssh",
-			"-i", tempFile.Name(),
-			"-p", port,
+		// In order to emulate terminal input we using pipe to write. This allows us to keep the
+		// stdin opened while we woking with ssh app, otherwise something like
+		// input := bytes.NewBufferString("echo 'Its ALIVE!'\nexit\n") will just close the stream
+		// and test will be ok on MacOS (Sonoma 14.5, OpenSSH_9.6p1), but will close the src->dst
+		// channel on Linux (Debian 12.8, OpenSSH 9.2p1).
+		pipeReader, pipeWriter := io.Pipe()
+
+		go func() {
+			// Function to write to the pipe and not to close the channel until we need to. It uses
+			// sleep, which is not that great and could be switched to getting response, but meh
+			defer pipeWriter.Close()
+
+			// While connection establishing we preparing for the write just like humans do
+			time.Sleep(time.Second)
+			pipeWriter.Write([]byte("echo 'Its ALIVE!'\n"))
+			// After we hit enter - expecting some output from there
+			time.Sleep(500 * time.Millisecond)
+			pipeWriter.Write([]byte("exit\n"))
+			// Not closing pipeWriter, because the other side should close reader
+			time.Sleep(100 * time.Millisecond)
+		}()
+
+		// Running SSH client and receiving the input
+		stdout, stderr, err := util.RunAndLog("TEST", 5*time.Second, pipeReader, "ssh", "-v",
+			"-i", proxyKeyFile.Name(),
+			"-p", proxyPort,
 			"-tt", // We need to request PTY for server
 			"-oStrictHostKeyChecking=no",
 			"-oUserKnownHostsFile=/dev/null",
 			"-oGlobalKnownHostsFile=/dev/null",
 			"-l", "admin",
-			host,
+			proxyHost,
 		)
 		if err != nil {
-			t.Fatalf("Failed to execute command via PROXYSSH: %v", err)
+			t.Fatalf("Failed to execute command via PROXYSSH: %v (stderr: %s)", err, stderr)
 		}
 
 		// SSH output is full of special symbols, so looking just for the desired output
-		if !strings.Contains(stdout, "\nIts ALIVE!\n") {
-			t.Fatalf("Incorrect response from command through PROXYSSH: %q not in %q", "\nIts ALIVE!\n", stdout)
+		if stdout != sshdTestOutput {
+			t.Fatalf("Incorrect response from command through PROXYSSH: %q != %q (stderr: %s)", sshdTestOutput, stdout, stderr)
+			//} else {
+			//	t.Log(fmt.Printf("Correct response from command through PROXYSSH: %q == %q (stderr: %s)", sshdTestOutput, stdout, stderr))
 		}
 	})
 
@@ -468,7 +582,7 @@ drivers:
 	}
 
 	// Running SSH Sftp server with shell
-	sshdPort := h.TestSSHSftpServer(t, "testuser", "testpass", "")
+	_, sshdPort := h.MockSSHSftpServer(t, "testuser", "testpass", "")
 
 	var label types.Label
 	t.Run("Create Label", func(t *testing.T) {
@@ -578,30 +692,30 @@ drivers:
 		}
 
 		// Writing ssh private key to temp file
-		tempFile, err := os.CreateTemp("", "key")
+		proxyKeyFile, err := os.CreateTemp("", "proxykey")
 		if err != nil {
-			t.Fatalf("Unable to create temp file: %v", err)
+			t.Fatalf("Unable to create temp proxykey file: %v", err)
 		}
-		defer os.Remove(tempFile.Name())
-		_, err = tempFile.WriteString(acc.Key)
+		defer os.Remove(proxyKeyFile.Name())
+		_, err = proxyKeyFile.WriteString(acc.Key)
 		if err != nil {
-			t.Fatalf("Unable to write temp file: %v", err)
+			t.Fatalf("Unable to write temp proxykey file: %v", err)
 		}
-		tempFile.Close()
-		err = os.Chmod(tempFile.Name(), 0600)
+		proxyKeyFile.Close()
+		err = os.Chmod(proxyKeyFile.Name(), 0600)
 		if err != nil {
-			t.Fatalf("Unable to change temp file mod: %v", err)
+			t.Fatalf("Unable to change temp proxykey file mod: %v", err)
 		}
 
-		host, port, err := net.SplitHostPort(afi.ProxySSHEndpoint())
+		proxyHost, proxyPort, err := net.SplitHostPort(afi.ProxySSHEndpoint())
 
 		_, _, err = util.RunAndLog("TEST", 5*time.Second, nil, "scp",
-			"-i", tempFile.Name(),
-			"-P", port,
+			"-i", proxyKeyFile.Name(),
+			"-P", proxyPort,
 			"-oStrictHostKeyChecking=no",
 			"-oUserKnownHostsFile=/dev/null",
 			"-oGlobalKnownHostsFile=/dev/null",
-			"admin@"+host+":"+srcdir+"/*",
+			"admin@"+proxyHost+":"+srcdir+"/*",
 			dstdir,
 		)
 		if err != nil {
@@ -650,32 +764,32 @@ drivers:
 		}
 
 		// Writing ssh private key to temp file
-		tempFile, err := os.CreateTemp("", "key")
+		proxyKeyFile, err := os.CreateTemp("", "proxykey")
 		if err != nil {
-			t.Fatalf("Unable to create temp file: %v", err)
+			t.Fatalf("Unable to create temp proxykey file: %v", err)
 		}
-		defer os.Remove(tempFile.Name())
-		_, err = tempFile.WriteString(acc.Key)
+		defer os.Remove(proxyKeyFile.Name())
+		_, err = proxyKeyFile.WriteString(acc.Key)
 		if err != nil {
-			t.Fatalf("Unable to write temp file: %v", err)
+			t.Fatalf("Unable to write temp proxykey file: %v", err)
 		}
-		tempFile.Close()
-		err = os.Chmod(tempFile.Name(), 0600)
+		proxyKeyFile.Close()
+		err = os.Chmod(proxyKeyFile.Name(), 0600)
 		if err != nil {
-			t.Fatalf("Unable to change temp file mod: %v", err)
+			t.Fatalf("Unable to change temp proxykey file mod: %v", err)
 		}
 
-		host, port, err := net.SplitHostPort(afi.ProxySSHEndpoint())
+		proxyHost, proxyPort, err := net.SplitHostPort(afi.ProxySSHEndpoint())
 
 		args := []string{
-			"-i", tempFile.Name(),
-			"-P", port,
+			"-i", proxyKeyFile.Name(),
+			"-P", proxyPort,
 			"-oStrictHostKeyChecking=no",
 			"-oUserKnownHostsFile=/dev/null",
 			"-oGlobalKnownHostsFile=/dev/null",
 		}
 		args = append(args, srcFiles...)
-		args = append(args, "admin@"+host+":"+dstdir)
+		args = append(args, "admin@"+proxyHost+":"+dstdir)
 
 		_, _, err = util.RunAndLog("TEST", 5*time.Second, nil, "scp", args...)
 		if err != nil {
@@ -763,7 +877,7 @@ drivers:
 	}
 
 	// Running SSH Port server
-	sshdPort := h.TestSSHPortServer(t, "testuser", "", string(serverpubkey))
+	_, sshdPort := h.MockSSHPortServer(t, "testuser", "", string(serverpubkey))
 
 	var label types.Label
 	t.Run("Create Label", func(t *testing.T) {
@@ -856,22 +970,22 @@ drivers:
 
 	t.Run("Executing SSH port forward pass through PROXYSSH", func(t *testing.T) {
 		// Writing ssh private key to temp file
-		tempFile, err := os.CreateTemp("", "key")
+		proxyKeyFile, err := os.CreateTemp("", "proxykey")
 		if err != nil {
-			t.Fatalf("Unable to create temp file: %v", err)
+			t.Fatalf("Unable to create temp proxykey file: %v", err)
 		}
-		defer os.Remove(tempFile.Name())
-		_, err = tempFile.WriteString(acc.Key)
+		defer os.Remove(proxyKeyFile.Name())
+		_, err = proxyKeyFile.WriteString(acc.Key)
 		if err != nil {
-			t.Fatalf("Unable to write temp file: %v", err)
+			t.Fatalf("Unable to write temp proxykey file: %v", err)
 		}
-		tempFile.Close()
-		err = os.Chmod(tempFile.Name(), 0600)
+		proxyKeyFile.Close()
+		err = os.Chmod(proxyKeyFile.Name(), 0600)
 		if err != nil {
-			t.Fatalf("Unable to change temp file mod: %v", err)
+			t.Fatalf("Unable to change temp proxykey file mod: %v", err)
 		}
 
-		sshHost, sshPort, err := net.SplitHostPort(afi.ProxySSHEndpoint())
+		proxyHost, proxyPort, err := net.SplitHostPort(afi.ProxySSHEndpoint())
 		_, apiPort, err := net.SplitHostPort(afi.APIEndpoint())
 		// Picking semi-random port to listen on
 		proxyApiPort, _ := strconv.Atoi(apiPort)
@@ -880,18 +994,18 @@ drivers:
 		// Running command with timeout in background
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		cmd := exec.CommandContext(ctx, "ssh",
+		cmd := exec.CommandContext(ctx, "ssh", "-v",
 			// ssh -N -R 2223:localhost:2222 -p 2222 testuser@127.0.0.1
 			// ssh -N -L 2223:localhost:2222 -p 2222 testuser@127.0.0.1
-			"-i", tempFile.Name(),
-			"-p", sshPort,
+			"-i", proxyKeyFile.Name(),
+			"-p", proxyPort,
 			"-oStrictHostKeyChecking=no",
 			"-oUserKnownHostsFile=/dev/null",
 			"-oGlobalKnownHostsFile=/dev/null",
 			"-l", "admin",
 			"-N", // Don't establish ssh session
 			"-L", strconv.Itoa(proxyApiPort)+":localhost:"+apiPort,
-			sshHost,
+			proxyHost,
 		)
 		t.Log("DEBUG: Executing:", strings.Join(cmd.Args, " "), acc.Password, string(serverkey))
 
@@ -921,22 +1035,22 @@ drivers:
 	// I spent too much time on that already, so the direct forwarding enough for testing now
 	/*t.Run("Executing SSH port reverse pass through PROXYSSH", func(t *testing.T) {
 		// Writing ssh private key to temp file
-		tempFile, err := os.CreateTemp("", "key")
+		proxyKeyFile, err := os.CreateTemp("", "proxykey")
 		if err != nil {
-			t.Fatalf("Unable to create temp file: %v", err)
+			t.Fatalf("Unable to create temp proxykey file: %v", err)
 		}
-		defer os.Remove(tempFile.Name())
-		_, err = tempFile.WriteString(acc.Key)
+		defer os.Remove(proxyKeyFile.Name())
+		_, err = proxyKeyFile.WriteString(acc.Key)
 		if err != nil {
-			t.Fatalf("Unable to write temp file: %v", err)
+			t.Fatalf("Unable to write temp proxykey file: %v", err)
 		}
-		tempFile.Close()
-		err = os.Chmod(tempFile.Name(), 0600)
+		proxyKeyFile.Close()
+		err = os.Chmod(proxyKeyFile.Name(), 0600)
 		if err != nil {
-			t.Fatalf("Unable to change temp file mod: %v", err)
+			t.Fatalf("Unable to change temp proxykey file mod: %v", err)
 		}
 
-		sshHost, sshPort, err := net.SplitHostPort(afi.ProxySSHEndpoint())
+		proxyHost, proxyPort, err := net.SplitHostPort(afi.ProxySSHEndpoint())
 		_, apiPort, err := net.SplitHostPort(afi.APIEndpoint())
 		// Picking semi-random port to listen on
 		proxyApiPort, _ := strconv.Atoi(apiPort)
@@ -945,18 +1059,18 @@ drivers:
 		// Running command with timeout in background
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		cmd := exec.CommandContext(ctx, "ssh",
+		cmd := exec.CommandContext(ctx, "ssh", "-v",
 			// ssh -N -R 2223:localhost:2222 -p 2222 testuser@127.0.0.1
 			// ssh -N -L 2223:localhost:2222 -p 2222 testuser@127.0.0.1
-			"-i", tempFile.Name(),
-			"-p", sshPort,
+			"-i", proxyKeyFile.Name(),
+			"-p", proxyPort,
 			"-oStrictHostKeyChecking=no",
 			"-oUserKnownHostsFile=/dev/null",
 			"-oGlobalKnownHostsFile=/dev/null",
 			"-l", "admin",
 			"-N", // Don't establish ssh session
 			"-R", strconv.Itoa(proxyApiPort)+":localhost:"+apiPort,
-			sshHost,
+			proxyHost,
 		)
 		cmd.Stdout = os.Stderr
 		cmd.Stderr = os.Stderr

@@ -62,7 +62,21 @@ drivers:
 	}
 
 	// Running SSH Pty server with shell
-	sshdPort := h.TestSSHPtyServer(t, "testuser", "testpass", "")
+	sshdHost, sshdPort := h.MockSSHPtyServer(t, "testuser", "testpass", "")
+
+	// First executing a simple one directly over the mock server with a little validation
+	var sshdTestOutput string
+	t.Run("Executing SSH shell directly on mock SSHD", func(t *testing.T) {
+		response, err := h.RunCmdPtySSH(sshdHost+":"+sshdPort, "testuser", "testpass", "echo 'Its ALIVE!'")
+		if err != nil {
+			t.Fatalf("Failed to execute command via PROXYSSH: %v", err)
+		}
+		// SSH output is full of special symbols, so looking just for the desired output
+		if !strings.Contains(string(response), "Its ALIVE!\r\n") {
+			t.Fatalf("Incorrect response from command through PROXYSSH: %q not in %q", "\r\nIts ALIVE!\r\n", string(response))
+		}
+		sshdTestOutput = string(response)
+	})
 
 	var label types.Label
 	t.Run("Create Label", func(t *testing.T) {
@@ -153,14 +167,15 @@ drivers:
 		}
 	})
 
+	// Now running the same but through proxy - and we should get the identical answer
 	t.Run("Executing SSH shell through PROXYSSH", func(t *testing.T) {
 		response, err := h.RunCmdPtySSH(afi.ProxySSHEndpoint(), acc.Username, acc.Password, "echo 'Its ALIVE!'")
 		if err != nil {
 			t.Fatalf("Failed to execute command via PROXYSSH: %v", err)
 		}
 		// SSH output is full of special symbols, so looking just for the desired output
-		if !strings.Contains(string(response), "\r\nIts ALIVE!\r\n") {
-			t.Fatalf("Incorrect response from command through PROXYSSH: %q not in %q", "\r\nIts ALIVE!\r\n", string(response))
+		if string(response) != sshdTestOutput {
+			t.Fatalf("Incorrect response from command through PROXYSSH: %q != %q", sshdTestOutput, string(response))
 		}
 	})
 
@@ -232,7 +247,7 @@ drivers:
 	}
 
 	// Running SSH Sftp server with shell
-	sshdPort := h.TestSSHSftpServer(t, "testuser", "testpass", "")
+	_, sshdPort := h.MockSSHSftpServer(t, "testuser", "testpass", "")
 
 	var label types.Label
 	t.Run("Create Label", func(t *testing.T) {
