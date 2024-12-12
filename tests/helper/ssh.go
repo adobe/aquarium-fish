@@ -32,6 +32,7 @@ import (
 
 // Base ssh server with no handler
 func MockSSHServer(t *testing.T, sshSrv *sshd.Server, user, pass, key string) (string, string) {
+	t.Helper()
 	if pass != "" {
 		sshSrv.SetOption(sshd.PasswordAuth(func(ctx sshd.Context, password string) bool {
 			res := ctx.User() == user && password == pass
@@ -71,6 +72,7 @@ func MockSSHServer(t *testing.T, sshSrv *sshd.Server, user, pass, key string) (s
 }
 
 func MockSSHPtyServer(t *testing.T, user, pass, key string) (string, string) {
+	t.Helper()
 	sshSrv := &sshd.Server{Handler: func(s sshd.Session) {
 		t.Log("MockSSHPtyServer: Start handling session")
 		cmd := exec.Command("sh")
@@ -112,6 +114,7 @@ func setWinsize(f *os.File, w, h int) {
 }
 
 func MockSSHSftpServer(t *testing.T, user, pass, key string) (string, string) {
+	t.Helper()
 	sshSrv := &sshd.Server{
 		SubsystemHandlers: map[string]sshd.SubsystemHandler{
 			"sftp": func(s sshd.Session) {
@@ -139,6 +142,7 @@ func MockSSHSftpServer(t *testing.T, user, pass, key string) (string, string) {
 }
 
 func MockSSHPortServer(t *testing.T, user, pass, key string) (string, string) {
+	t.Helper()
 	forwardHandler := &sshd.ForwardedTCPHandler{}
 
 	sshSrv := &sshd.Server{
