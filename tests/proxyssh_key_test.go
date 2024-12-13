@@ -709,7 +709,8 @@ drivers:
 
 		proxyHost, proxyPort, err := net.SplitHostPort(afi.ProxySSHEndpoint())
 
-		_, _, err = util.RunAndLog("TEST", 5*time.Second, nil, "scp",
+		stdout, stderr, err = util.RunAndLog("TEST", 5*time.Second, nil, "scp", "-v",
+			"-s", // Forcing SFTP for the scp < v9.0
 			"-i", proxyKeyFile.Name(),
 			"-P", proxyPort,
 			"-oStrictHostKeyChecking=no",
@@ -719,12 +720,12 @@ drivers:
 			dstdir,
 		)
 		if err != nil {
-			t.Fatalf("Failed to copy files via PROXYSSH: %v", err)
+			t.Fatalf("Failed to copy files via PROXYSSH: %v, (stdout: %q, stderr: %q)", err)
 		}
 
 		// Compare 2 directories - they should contain identical files
 		if err = h.CompareDirFiles(srcdir, dstdir); err != nil {
-			t.Fatalf("Found differences in the copied files from %q to %q: %v", srcdir, dstdir, err)
+			t.Fatalf("Found differences in the copied files from %q to %q: %v, (stdout: %q, stderr: %q)", srcdir, dstdir, err, stdout, stderr)
 		}
 	})
 
@@ -782,6 +783,8 @@ drivers:
 		proxyHost, proxyPort, err := net.SplitHostPort(afi.ProxySSHEndpoint())
 
 		args := []string{
+			"-v",
+			"-s", // Forcing SFTP for the scp < v9.0
 			"-i", proxyKeyFile.Name(),
 			"-P", proxyPort,
 			"-oStrictHostKeyChecking=no",
