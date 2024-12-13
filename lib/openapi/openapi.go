@@ -19,7 +19,6 @@
 package openapi
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -27,7 +26,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
+	"syscall"
 
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
@@ -97,6 +96,7 @@ func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*http.Ser
 	if caBytes, err := os.ReadFile(caPath); err == nil {
 		caPool.AppendCertsFromPEM(caBytes)
 	}
+
 	s := router.TLSServer
 	s.Addr = apiAddress
 	s.TLSConfig = &tls.Config{ // #nosec G402 , keep the compatibility high since not public access
@@ -104,47 +104,24 @@ func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*http.Ser
 		ClientCAs:  caPool,                // Verify client certificate with the cluster CA
 	}
 	errChan := make(chan error)
+
+	if router.TLSListener, err = net.Listen("tcp", s.Addr); err != nil {
+		return router.TLSServer, log.Error("API: Unable to start listener:", err)
+	}
+
+	// There is a bit of chance that API server will not startup properly,
+	// but just sending quit to fish with error before that should be enough
 	go func() {
-		addr := s.Addr
-		if addr == "" {
-			addr = ":https"
-		}
-
-		var err error
-		router.TLSListener, err = net.Listen("tcp", addr)
-		if err != nil {
-			errChan <- err
-			return
-		}
-
 		defer router.TLSListener.Close()
 
 		if err := s.ServeTLS(router.TLSListener, certPath, keyPath); err != http.ErrServerClosed {
 			errChan <- err
-			log.Error("API: Unable to start listener:", err)
+			log.Error("API: Unable to start API server:", err)
+			f.Quit <- syscall.SIGQUIT
 		}
 	}()
 
-	// Wait for server start
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-	ticker := time.NewTicker(10 * time.Millisecond)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return router.TLSServer, ctx.Err()
-		case <-ticker.C:
-			addr := router.TLSListenerAddr()
-			if addr != nil && strings.Contains(addr.String(), ":") {
-				log.Info("API listening on:", addr)
-				return router.TLSServer, nil // Was started
-			}
-		case err := <-errChan:
-			if err == http.ErrServerClosed {
-				return router.TLSServer, nil
-			}
-			return router.TLSServer, err
-		}
-	}
+	log.Info("API listening on:", router.TLSListener.Addr())
+
+	return router.TLSServer, nil
 }

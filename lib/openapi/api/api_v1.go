@@ -259,12 +259,38 @@ func (e *Processor) ResourceAccessPut(c echo.Context, uid types.ResourceUID) err
 		return fmt.Errorf("Only the owner & admin can assign service mapping to the Application")
 	}
 
+	pwd := crypt.RandString(64)
+	// The proxy password is temporary (for the lifetime of the Resource) and one-time
+	// so lack of salt will not be a big deal - the params will contribute to salt majorily.
+	pwdHash := crypt.NewHash(pwd, []byte{}).Hash
+	key, err := crypt.GenerateSSHKey()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, H{"message": "Unable to generate SSH key"})
+		return fmt.Errorf("Unable to generate SSH key: %w", err)
+	}
+	pubkey, err := crypt.GetSSHPubKeyFromPem(key)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, H{"message": "Unable to generate SSH public key"})
+		return fmt.Errorf("Unable to generate SSH public key: %w", err)
+	}
 	rAccess := types.ResourceAccess{
 		ResourceUID: res.UID,
-		Username:    user.Name,
-		Password:    crypt.RandString(64),
+		// Storing address of the proxy to give the user idea of where to connect to.
+		// Later when cluster will be here - it could contain a different node IP instead, because
+		// this particular one could not be able to serve the connection.
+		Address:  e.fish.GetProxySSHEndpoint(),
+		Username: user.Name,
+		// We should not store clear password, so convert it to salted hash
+		Password: string(pwdHash),
+		// Key need to be stored as public key
+		Key: string(pubkey),
 	}
 	e.fish.ResourceAccessCreate(&rAccess)
+
+	// Now database has had the hashed credentials stored, we store the original
+	// values to return so user have access to the actual credentials.
+	rAccess.Password = pwd
+	rAccess.Key = string(key)
 
 	return c.JSON(http.StatusOK, rAccess)
 }

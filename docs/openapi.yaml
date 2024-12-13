@@ -1649,8 +1649,10 @@ components:
         - UID
         - created_at
         - resource_UID
+        - address
         - username
         - password
+        - key
       properties:
         UID:
           $ref: '#/components/schemas/ResourceAccessUID'
@@ -1664,6 +1666,10 @@ components:
           format: uuid
           x-oapi-codegen-extra-tags:
             yaml: resource_UID
+        address:
+          type: string
+          description: |
+            Address (host:port) to help user to connect to right proxyssh.
         username:
           type: string
           description: |
@@ -1672,6 +1678,10 @@ components:
           type: string
           description: >
             The password to use when logging into the fish node.
+        key:
+          type: string
+          description: >
+            SSH key could be used instead of password to access the system.
 
     Authentication:
       type: object
@@ -1680,15 +1690,25 @@ components:
       required:
         - username
         - password
+        - key
+        - port
       properties:
         username:
           type: string
           description: |
-            The username to use when logging into Resource.
+            The username to login into the Resource.
         password:
           type: string
           description: >
-            The password to use when loggin into the Resource.
+            The password to login into the Resource.
+        key:
+          type: string
+          description: >
+            SSH private key to use instead of password to login into the Resource.
+        port:
+          type: integer
+          description: >
+            TCP port to connect with SSH client.
 
     VoteUID:
       type: string

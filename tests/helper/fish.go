@@ -34,8 +34,10 @@ type AFInstance struct {
 	cmd       *exec.Cmd
 
 	nodeName   string
-	endpoint   string
 	adminToken string
+
+	apiEndpoint      string
+	proxysshEndpoint string
 }
 
 // NewAquariumFish simple creates and run the fish node
@@ -79,7 +81,7 @@ func (afi *AFInstance) NewClusterNode(tb testing.TB, name, cfg string, args ...s
 func (afi *AFInstance) NewAfInstanceCluster(tb testing.TB, name, cfg string) *AFInstance {
 	tb.Helper()
 	tb.Log("INFO: Creating new cluster node with seed node:", afi.nodeName)
-	cfg += fmt.Sprintf("\ncluster_join: [%q]", afi.endpoint)
+	cfg += fmt.Sprintf("\ncluster_join: [%q]", afi.apiEndpoint)
 	afi2 := NewAfInstance(tb, name, cfg)
 
 	// Copy seed node CA to generate valid cluster node cert
@@ -93,14 +95,19 @@ func (afi *AFInstance) NewAfInstanceCluster(tb testing.TB, name, cfg string) *AF
 	return afi2
 }
 
-// Endpoint will return IP:PORT
-func (afi *AFInstance) Endpoint() string {
-	return afi.endpoint
+// APIEndpoint will return IP:PORT
+func (afi *AFInstance) APIEndpoint() string {
+	return afi.apiEndpoint
+}
+
+// ProxySSHEndpoint will return IP:PORT
+func (afi *AFInstance) ProxySSHEndpoint() string {
+	return afi.proxysshEndpoint
 }
 
 // APIAddress will return url to access API of AquariumFish
 func (afi *AFInstance) APIAddress(path string) string {
-	return fmt.Sprintf("https://%s/%s", afi.endpoint, path)
+	return fmt.Sprintf("https://%s/%s", afi.apiEndpoint, path)
 }
 
 // Workspace will return workspace of the AquariumFish
@@ -195,7 +202,15 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 					initDone <- "ERROR: No address after 'API listening on: '"
 					break
 				}
-				afi.endpoint = val[1]
+				afi.apiEndpoint = val[1]
+			}
+			if strings.Contains(line, "PROXYSSH listening on: ") {
+				val := strings.SplitN(strings.TrimSpace(line), "PROXYSSH listening on: ", 2)
+				if len(val) < 2 {
+					initDone <- "ERROR: No address after 'API listening on: '"
+					break
+				}
+				afi.proxysshEndpoint = val[1]
 			}
 			if strings.HasSuffix(line, "Fish initialized") {
 				// Found the needed values and continue to process to print the fish output for

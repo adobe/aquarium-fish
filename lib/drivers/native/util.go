@@ -14,9 +14,7 @@ package native
 
 import (
 	"bytes"
-	"context"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -119,7 +117,7 @@ func (d *Driver) loadImages(user string, images []drivers.Image, diskPaths map[s
 			return log.Error("Native: Unable to read the image:", imageArchive, err)
 		}
 		log.Info("Native: Unpacking image:", user, imageArchive, unpackPath)
-		_, _, err = runAndLog(5*time.Minute, f, d.cfg.SudoPath, "-n", d.cfg.TarPath, "-xf", "-", "--uname", user, "-C", unpackPath+"/")
+		_, _, err = util.RunAndLog("NATIVE", 5*time.Minute, f, d.cfg.SudoPath, "-n", d.cfg.TarPath, "-xf", "-", "--uname", user, "-C", unpackPath+"/")
 		f.Close()
 		if err != nil {
 			return log.Error("Native: Unable to unpack the image:", imageArchive, err)
@@ -146,13 +144,13 @@ func userCreate(c *Config, groups []string) (user, homedir string, err error) {
 	// In theory we can use `sysadminctl -addUser` command instead, but it asks for elevated previleges
 	// so not sure how useful it will be in automation...
 
-	if _, _, err = runAndLog(5*time.Second, nil, c.SudoPath, "-n", c.DsclPath, ".", "create", "/Users/"+user, "RealName", "Aquarium Fish env user"); err != nil {
+	if _, _, err = util.RunAndLog("NATIVE", 5*time.Second, nil, c.SudoPath, "-n", c.DsclPath, ".", "create", "/Users/"+user, "RealName", "Aquarium Fish env user"); err != nil {
 		err = log.Error("Native: Error user set RealName:", err)
 		return
 	}
 
 	// Configure default shell
-	if _, _, err = runAndLog(5*time.Second, nil, c.SudoPath, "-n", c.DsclPath, ".", "create", "/Users/"+user, "UserShell", c.ShPath); err != nil {
+	if _, _, err = util.RunAndLog("NATIVE", 5*time.Second, nil, c.SudoPath, "-n", c.DsclPath, ".", "create", "/Users/"+user, "UserShell", c.ShPath); err != nil {
 		err = log.Error("Native: Error user set UserShell:", err)
 		return
 	}
@@ -162,7 +160,7 @@ func userCreate(c *Config, groups []string) (user, homedir string, err error) {
 	{
 		// Locate the unassigned user id
 		var stdout string
-		if stdout, _, err = runAndLog(5*time.Second, nil, c.DsclPath, ".", "list", "/Users", "UniqueID"); err != nil {
+		if stdout, _, err = util.RunAndLog("NATIVE", 5*time.Second, nil, c.DsclPath, ".", "list", "/Users", "UniqueID"); err != nil {
 			userCreateLock.Unlock()
 			err = log.Error("Native: Unable to list directory users:", err)
 			return
@@ -184,7 +182,7 @@ func userCreate(c *Config, groups []string) (user, homedir string, err error) {
 		}
 
 		// Increment max user id and use it as unique id for new user
-		if _, _, err = runAndLog(5*time.Second, nil, c.SudoPath, "-n", c.DsclPath, ".", "create", "/Users/"+user, "UniqueID", fmt.Sprint(userID+1)); err != nil {
+		if _, _, err = util.RunAndLog("NATIVE", 5*time.Second, nil, c.SudoPath, "-n", c.DsclPath, ".", "create", "/Users/"+user, "UniqueID", fmt.Sprint(userID+1)); err != nil {
 			userCreateLock.Unlock()
 			err = log.Error("Native: Unable to set user UniqueID:", err)
 			return
@@ -200,7 +198,7 @@ func userCreate(c *Config, groups []string) (user, homedir string, err error) {
 	}
 
 	// Set user primary group
-	if _, _, err = runAndLog(5*time.Second, nil, c.SudoPath, "-n", c.DsclPath, ".", "create", "/Users/"+user, "PrimaryGroupID", primaryGroup.Gid); err != nil {
+	if _, _, err = util.RunAndLog("NATIVE", 5*time.Second, nil, c.SudoPath, "-n", c.DsclPath, ".", "create", "/Users/"+user, "PrimaryGroupID", primaryGroup.Gid); err != nil {
 		err = log.Error("Native: Unable to set user PrimaryGroupID:", err)
 		return
 	}
@@ -208,7 +206,7 @@ func userCreate(c *Config, groups []string) (user, homedir string, err error) {
 	// If there are other groups required - add user to them too
 	if len(groups) > 1 {
 		for _, group := range groups[1:] {
-			if _, _, err = runAndLog(5*time.Second, nil, c.SudoPath, "-n", c.DsclPath, ".", "append", "/Groups/"+group, "GroupMembership", user); err != nil {
+			if _, _, err = util.RunAndLog("NATIVE", 5*time.Second, nil, c.SudoPath, "-n", c.DsclPath, ".", "append", "/Groups/"+group, "GroupMembership", user); err != nil {
 				err = log.Error("Native: Unable to add user to group:", group, err)
 				return
 			}
@@ -217,13 +215,13 @@ func userCreate(c *Config, groups []string) (user, homedir string, err error) {
 
 	// Set the default home directory
 	homedir = filepath.Join("/Users", user)
-	if _, _, err = runAndLog(5*time.Second, nil, c.SudoPath, "-n", c.DsclPath, ".", "create", "/Users/"+user, "NFSHomeDirectory", homedir); err != nil {
+	if _, _, err = util.RunAndLog("NATIVE", 5*time.Second, nil, c.SudoPath, "-n", c.DsclPath, ".", "create", "/Users/"+user, "NFSHomeDirectory", homedir); err != nil {
 		err = log.Error("Native: Unable to set user NFSHomeDirectory:", err)
 		return
 	}
 
 	// Populate the default user home directory
-	if _, _, err = runAndLog(30*time.Second, nil, c.SudoPath, "-n", c.CreatehomedirPath, "-c", "-u", user); err != nil {
+	if _, _, err = util.RunAndLog("NATIVE", 30*time.Second, nil, c.SudoPath, "-n", c.CreatehomedirPath, "-c", "-u", user); err != nil {
 		err = log.Error("Native: Unable to populate the default user directory:", err)
 		return
 	}
@@ -288,7 +286,7 @@ func userRun(c *Config, envData *EnvData, user, entry string, metadata map[strin
 	}
 
 	// Add ACL permission to the env file to allow to read it by unprevileged user
-	if _, _, err := runAndLogRetry(5, 5*time.Second, nil, c.ChmodPath, "+a", fmt.Sprintf("user:%s:allow read,readattr,readextattr,readsecurity", user), envFile.Name()); err != nil {
+	if _, _, err := util.RunAndLogRetry("NATIVE", 5, 5*time.Second, nil, c.ChmodPath, "+a", fmt.Sprintf("user:%s:allow read,readattr,readextattr,readsecurity", user), envFile.Name()); err != nil {
 		return log.Error("Native: Unable to set ACL for temp env file:", err)
 	}
 
@@ -340,14 +338,14 @@ func userStop(c *Config, user string) (outErr error) { //nolint:unparam
 	// Note: some operations may fail, but they should not interrupt the whole cleanup process
 
 	// Interrupt all the user processes
-	if _, _, err := runAndLog(5*time.Second, nil, c.SudoPath, "-n", c.KillallPath, "-INT", "-u", user); err != nil {
+	if _, _, err := util.RunAndLog("NATIVE", 5*time.Second, nil, c.SudoPath, "-n", c.KillallPath, "-INT", "-u", user); err != nil {
 		log.Debug("Native: Unable to interrupt the user apps:", user, err)
 	}
 	// Check if no apps are running after interrupt - ps will end up with error if there is none apps left
-	if _, _, err := runAndLog(5*time.Second, nil, "ps", "-U", user); err == nil {
+	if _, _, err := util.RunAndLog("NATIVE", 5*time.Second, nil, "ps", "-U", user); err == nil {
 		// Some apps are still running - give them 5 seconds to complete their processes
 		time.Sleep(5 * time.Second)
-		if _, _, err := runAndLog(5*time.Second, nil, c.SudoPath, "-n", c.KillallPath, "-KILL", "-u", user); err != nil {
+		if _, _, err := util.RunAndLog("NATIVE", 5*time.Second, nil, c.SudoPath, "-n", c.KillallPath, "-KILL", "-u", user); err != nil {
 			log.Warn("Native: Unable to kill the user apps:", user, err)
 		}
 	}
@@ -362,11 +360,11 @@ func userDelete(c *Config, user string) (outErr error) {
 
 	// Sometimes delete of the user could not be done due to MacOS blocking it, so retrying 5 times
 	// Native: Command exited with error: exit status 40: <main> delete status: eDSPermissionError <dscl_cmd> DS Error: -14120 (eDSPermissionError)
-	if _, _, err := runAndLogRetry(5, 5*time.Second, nil, c.SudoPath, "-n", c.DsclPath, ".", "delete", "/Users/"+user); err != nil {
+	if _, _, err := util.RunAndLogRetry("NATIVE", 5, 5*time.Second, nil, c.SudoPath, "-n", c.DsclPath, ".", "delete", "/Users/"+user); err != nil {
 		outErr = log.Error("Native: Unable to delete user:", err)
 	}
 
-	if _, _, err := runAndLog(5*time.Second, nil, c.SudoPath, "-n", c.RmPath, "-rf", "/Users/"+user); err != nil {
+	if _, _, err := util.RunAndLog("NATIVE", 5*time.Second, nil, c.SudoPath, "-n", c.RmPath, "-rf", "/Users/"+user); err != nil {
 		outErr = log.Error("Native: Unable to remove the user home directory:", err)
 	}
 
@@ -391,13 +389,13 @@ func disksDelete(c *Config, user string) (outErr error) {
 	}
 
 	// Umount the disk volumes if needed
-	mounts, _, err := runAndLog(3*time.Second, nil, c.MountPath)
+	mounts, _, err := util.RunAndLog("NATIVE", 3*time.Second, nil, c.MountPath)
 	if err != nil {
 		outErr = log.Error("Native: Unable to list the mount points:", user, err)
 	}
 	for _, volPath := range envVolumes {
 		if strings.Contains(mounts, volPath) {
-			if _, _, err := runAndLog(5*time.Second, nil, c.HdiutilPath, "detach", volPath); err != nil {
+			if _, _, err := util.RunAndLog("NATIVE", 5*time.Second, nil, c.HdiutilPath, "detach", volPath); err != nil {
 				outErr = log.Error("Native: Unable to detach the volume disk:", user, volPath, err)
 			}
 		}
@@ -456,7 +454,7 @@ func (d *Driver) disksCreate(user string, disks map[string]types.ResourcesDisk) 
 				"-volname", label,
 				"-size", fmt.Sprintf("%dm", disk.Size*1024),
 			}
-			if _, _, err := runAndLog(10*time.Minute, nil, d.cfg.HdiutilPath, args...); err != nil {
+			if _, _, err := util.RunAndLog("NATIVE", 10*time.Minute, nil, d.cfg.HdiutilPath, args...); err != nil {
 				return diskPaths, log.Error("Native: Unable to create dmg disk:", dmgPath, err)
 			}
 		}
@@ -464,17 +462,17 @@ func (d *Driver) disksCreate(user string, disks map[string]types.ResourcesDisk) 
 		mountPoint := filepath.Join("/Volumes", fmt.Sprintf("%s_%s", user, dName))
 
 		// Attach & mount disk
-		if _, _, err := runAndLog(10*time.Second, nil, d.cfg.HdiutilPath, "attach", dmgPath, "-owners", "on", "-mountpoint", mountPoint); err != nil {
+		if _, _, err := util.RunAndLog("NATIVE", 10*time.Second, nil, d.cfg.HdiutilPath, "attach", dmgPath, "-owners", "on", "-mountpoint", mountPoint); err != nil {
 			return diskPaths, log.Error("Native: Unable to attach dmg disk:", dmgPath, mountPoint, err)
 		}
 
 		// Change the owner of the volume to user
-		if _, _, err := runAndLog(5*time.Second, nil, d.cfg.SudoPath, "-n", d.cfg.ChownPath, "-R", user+":staff", mountPoint+"/"); err != nil {
+		if _, _, err := util.RunAndLog("NATIVE", 5*time.Second, nil, d.cfg.SudoPath, "-n", d.cfg.ChownPath, "-R", user+":staff", mountPoint+"/"); err != nil {
 			return diskPaths, fmt.Errorf("Native: Error user disk mount path chown: %v", err)
 		}
 
 		// (Optional) Disable spotlight for the mounted volume
-		if _, _, err := runAndLog(5*time.Second, nil, d.cfg.SudoPath, d.cfg.MdutilPath, "-i", "off", mountPoint+"/"); err != nil {
+		if _, _, err := util.RunAndLog("NATIVE", 5*time.Second, nil, d.cfg.SudoPath, d.cfg.MdutilPath, "-i", "off", mountPoint+"/"); err != nil {
 			log.Warn("Native: Unable to disable spotlight for the volume:", mountPoint, err)
 		}
 
@@ -482,72 +480,4 @@ func (d *Driver) disksCreate(user string, disks map[string]types.ResourcesDisk) 
 	}
 
 	return diskPaths, nil
-}
-
-// Runs & logs the executable command
-func runAndLog(timeout time.Duration, stdin io.Reader, path string, arg ...string) (string, string, error) {
-	var stdout, stderr bytes.Buffer
-
-	// Running command with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, path, arg...)
-
-	log.Debug("Native: Executing:", cmd.Path, strings.Join(cmd.Args[1:], " "))
-	if stdin != nil {
-		cmd.Stdin = stdin
-	}
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-
-	stdoutString := strings.TrimSpace(stdout.String())
-	stderrString := strings.TrimSpace(stderr.String())
-
-	// Check the context error to see if the timeout was executed
-	if ctx.Err() == context.DeadlineExceeded {
-		err = fmt.Errorf("Native: Command timed out")
-	} else if _, ok := err.(*exec.ExitError); ok {
-		message := stderrString
-		if message == "" {
-			message = stdoutString
-		}
-
-		err = fmt.Errorf("Native: Command exited with error: %v: %s", err, message)
-	}
-
-	if len(stdoutString) > 0 {
-		log.Debug("Native: stdout:", stdoutString)
-	}
-	if len(stderrString) > 0 {
-		log.Debug("Native: stderr:", stderrString)
-	}
-
-	// Replace these for Windows, we only want to deal with Unix style line endings.
-	returnStdout := strings.ReplaceAll(stdout.String(), "\r\n", "\n")
-	returnStderr := strings.ReplaceAll(stderr.String(), "\r\n", "\n")
-
-	return returnStdout, returnStderr, err
-}
-
-// Will retry on error and store the retry output and errors to return
-func runAndLogRetry(retry int, timeout time.Duration, stdin io.Reader, path string, arg ...string) (stdout string, stderr string, err error) { //nolint:unparam
-	counter := 0
-	for {
-		counter++
-		rout, rerr, err := runAndLog(timeout, stdin, path, arg...)
-		if err != nil {
-			stdout += fmt.Sprintf("\n--- Fish: Command execution attempt %d ---\n", counter)
-			stdout += rout
-			stderr += fmt.Sprintf("\n--- Fish: Command execution attempt %d ---\n", counter)
-			stderr += rerr
-			if counter <= retry {
-				// Give command time to rest
-				time.Sleep(time.Duration(counter) * time.Second)
-				continue
-			}
-		}
-		return stdout, stderr, err
-	}
 }

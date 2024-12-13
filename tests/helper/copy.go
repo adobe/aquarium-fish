@@ -10,7 +10,7 @@
  * governing permissions and limitations under the License.
  */
 
-// Package helper makes our integration tests easier
+// Simple copy file
 package helper
 
 import (

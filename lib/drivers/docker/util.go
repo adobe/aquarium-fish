@@ -13,12 +13,9 @@
 package docker
 
 import (
-	"bytes"
-	"context"
 	"fmt"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -28,6 +25,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 func (d *Driver) getContainersResources(containerIDs []string) (types.Resources, error) {
@@ -36,7 +34,7 @@ func (d *Driver) getContainersResources(containerIDs []string) (types.Resources,
 	// Getting current running containers info - will return "<ncpu>,<mem_bytes>\n..." for each one
 	dockerArgs := []string{"inspect", "--format", "{{ .HostConfig.NanoCpus }},{{ .HostConfig.Memory }}"}
 	dockerArgs = append(dockerArgs, containerIDs...)
-	stdout, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, dockerArgs...)
+	stdout, _, err := util.RunAndLog("DOCKER", 5*time.Second, nil, d.cfg.DockerPath, dockerArgs...)
 	if err != nil {
 		return out, fmt.Errorf("Docker: Unable to inspect the containers to get used resources: %v", err)
 	}
@@ -72,7 +70,7 @@ func (d *Driver) getInitialUsage() (types.Resources, error) {
 	var out types.Resources
 	// The driver is configured as remote so collecting the current remote docker usage
 	// Listing the existing containers ID's to use in inpect command later
-	stdout, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, "ps", "--format", "{{ .ID }}")
+	stdout, _, err := util.RunAndLog("DOCKER", 5*time.Second, nil, d.cfg.DockerPath, "ps", "--format", "{{ .ID }}")
 	if err != nil {
 		return out, fmt.Errorf("Docker: Unable to list the running containers: %v", err)
 	}
@@ -190,7 +188,7 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 		if subdirVerEnd > 0 {
 			imageFound := ""
 			// Search the image by image ID prefix and list the image tags
-			imageTags, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, "image", "inspect",
+			imageTags, _, err := util.RunAndLog("DOCKER", 5*time.Second, nil, d.cfg.DockerPath, "image", "inspect",
 				fmt.Sprintf("sha256:%s", subdir[subdirVerEnd+1:]),
 				"--format", "{{ range .RepoTags }}{{ println . }}{{ end }}",
 			)
@@ -220,7 +218,7 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 		// Load the docker image
 		// sha256 prefix the same
 		imageArchive := filepath.Join(imageUnpacked, subdir, image.Name+".tar")
-		stdout, _, err := runAndLog(5*time.Minute, d.cfg.DockerPath, "image", "load", "-q", "-i", imageArchive)
+		stdout, _, err := util.RunAndLog("DOCKER", 5*time.Minute, nil, d.cfg.DockerPath, "image", "load", "-q", "-i", imageArchive)
 		if err != nil {
 			log.Error("Docker: Unable to load the image:", imageArchive, err)
 			return "", fmt.Errorf("Docker: The image was unpacked incorrectly, please check log for the errors")
@@ -254,7 +252,7 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 // Receives the container ID out of the container name
 func (d *Driver) getAllocatedContainerID(cName string) string {
 	// Probably it's better to store the current list in the memory
-	stdout, _, err := runAndLog(5*time.Second, d.cfg.DockerPath, "ps", "-a", "-q", "--filter", "name="+cName)
+	stdout, _, err := util.RunAndLog("DOCKER", 5*time.Second, nil, d.cfg.DockerPath, "ps", "-a", "-q", "--filter", "name="+cName)
 	if err != nil {
 		return ""
 	}
@@ -264,7 +262,7 @@ func (d *Driver) getAllocatedContainerID(cName string) string {
 
 // Ensures the network is available
 func (d *Driver) isNetworkExists(name string) bool {
-	stdout, stderr, err := runAndLog(5*time.Second, d.cfg.DockerPath, "network", "ls", "-q", "--filter", "name=aquarium-"+name)
+	stdout, stderr, err := util.RunAndLog("DOCKER", 5*time.Second, nil, d.cfg.DockerPath, "network", "ls", "-q", "--filter", "name=aquarium-"+name)
 	if err != nil {
 		log.Error("Docker: Unable to list the docker network:", stdout, stderr, err)
 		return false
@@ -328,7 +326,7 @@ func (d *Driver) disksCreate(cName string, runArgs *[]string, disks map[string]t
 				"-volname", label,
 				"-size", fmt.Sprintf("%dm", disk.Size*1024),
 			}
-			if _, _, err := runAndLog(10*time.Minute, "/usr/bin/hdiutil", args...); err != nil {
+			if _, _, err := util.RunAndLog("DOCKER", 10*time.Minute, nil, "/usr/bin/hdiutil", args...); err != nil {
 				return log.Error("Docker: Unable to create dmg disk:", dmgPath, err)
 			}
 		}
@@ -336,7 +334,7 @@ func (d *Driver) disksCreate(cName string, runArgs *[]string, disks map[string]t
 		mountPoint := filepath.Join("/Volumes", fmt.Sprintf("%s-%s", cName, dName))
 
 		// Attach & mount disk
-		if _, _, err := runAndLog(10*time.Second, "/usr/bin/hdiutil", "attach", dmgPath, "-mountpoint", mountPoint); err != nil {
+		if _, _, err := util.RunAndLog("DOCKER", 10*time.Second, nil, "/usr/bin/hdiutil", "attach", dmgPath, "-mountpoint", mountPoint); err != nil {
 			return log.Error("Docker: Unable to attach dmg disk:", dmgPath, mountPoint, err)
 		}
 
@@ -385,69 +383,4 @@ func (d *Driver) envCreate(cName string, metadata map[string]any) (string, error
 	}
 
 	return envFilePath, nil
-}
-
-// Runs & logs the executable command
-func runAndLog(timeout time.Duration, path string, arg ...string) (string, string, error) {
-	var stdout, stderr bytes.Buffer
-
-	// Running command with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, path, arg...)
-
-	log.Debug("Docker: Executing:", cmd.Path, strings.Join(cmd.Args[1:], " "))
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-
-	stdoutString := strings.TrimSpace(stdout.String())
-	stderrString := strings.TrimSpace(stderr.String())
-
-	// Check the context error to see if the timeout was executed
-	if ctx.Err() == context.DeadlineExceeded {
-		err = fmt.Errorf("Docker: Command timed out")
-	} else if _, ok := err.(*exec.ExitError); ok {
-		message := stderrString
-		if message == "" {
-			message = stdoutString
-		}
-
-		err = fmt.Errorf("Docker: Command exited with error: %v: %s", err, message)
-	}
-
-	if len(stdoutString) > 0 {
-		log.Debug("Docker: stdout:", stdoutString)
-	}
-	if len(stderrString) > 0 {
-		log.Debug("Docker: stderr:", stderrString)
-	}
-
-	// Replace these for Windows, we only want to deal with Unix style line endings.
-	returnStdout := strings.ReplaceAll(stdout.String(), "\r\n", "\n")
-	returnStderr := strings.ReplaceAll(stderr.String(), "\r\n", "\n")
-
-	return returnStdout, returnStderr, err
-}
-
-// Will retry on error and store the retry output and errors to return
-func runAndLogRetry(retry int, timeout time.Duration, path string, arg ...string) (stdout string, stderr string, err error) {
-	counter := 0
-	for {
-		counter++
-		rout, rerr, err := runAndLog(timeout, path, arg...)
-		if err != nil {
-			stdout += fmt.Sprintf("\n--- Fish: Command execution attempt %d ---\n", counter)
-			stdout += rout
-			stderr += fmt.Sprintf("\n--- Fish: Command execution attempt %d ---\n", counter)
-			stderr += rerr
-			if counter <= retry {
-				// Give command 5 seconds to rest
-				time.Sleep(5 * time.Second)
-				continue
-			}
-		}
-		return stdout, stderr, err
-	}
 }
