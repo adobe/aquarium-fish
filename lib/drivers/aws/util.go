@@ -717,7 +717,7 @@ func (d *Driver) deleteImage(conn *ec2.Client, id string) (err error) {
 func awsLastYearFilterValues(till time.Time) (out []string) {
 	date := till
 	// Iterating over months to cover the last year
-	for date.Year() == till.Year() || date.Month() >= till.Month() {
+	for date.Year() == till.Year() || date.Month() > till.Month() {
 		out = append(out, date.Format("2006-01-*"))
 		date = date.AddDate(0, -1, 0)
 	}
