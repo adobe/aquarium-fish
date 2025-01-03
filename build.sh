@@ -53,7 +53,8 @@ BINARY_NAME="aquarium-fish-$git_version"
 
 echo
 echo "--- RUN UNIT TESTS ---"
-go test -ldflags="$version_flags" -v ./lib/...
+# Unit tests should not consume more then 5 sec per run - for that we have integration tests
+go test -timeout=5s -ldflags="$version_flags" -v ./lib/...
 
 echo
 echo "--- BUILD ${BINARY_NAME} ($MAXJOBS in parallel) ---"
