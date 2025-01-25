@@ -521,9 +521,9 @@ func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 func (w *dedicatedPoolWorker) allocateDedicatedHosts(amount int32) ([]string, error) {
 	log.Infof("AWS: dedicated %q: Allocating %d dedicated hosts of type %q", w.name, amount, w.record.Type)
 
-	conn := w.driver.newEC2Conn()
 	// Storing happened issues to later show in log as error
-	out_errors := []string{}
+	errors := []string{}
+	conn := w.driver.newEC2Conn()
 
 	for _, zone := range w.record.Zones {
 		input := ec2.AllocateHostsInput{
@@ -551,8 +551,8 @@ func (w *dedicatedPoolWorker) allocateDedicatedHosts(amount int32) ([]string, er
 		// SDK can't return the partially executed request (where some of the hosts are allocated)
 		resp, err := conn.AllocateHosts(context.TODO(), &input)
 		if err != nil {
-			if !slices.Contains(out_errors, err.Error()) {
-				out_errors = append(out_errors, err.Error())
+			if !slices.Contains(errors, err.Error()) {
+				errors = append(errors, err.Error())
 			}
 			log.Debugf("AWS: dedicated %q: Unable to allocate dedicated hosts in zone %s: %v", w.name, zone, err)
 			continue
@@ -563,7 +563,7 @@ func (w *dedicatedPoolWorker) allocateDedicatedHosts(amount int32) ([]string, er
 		return resp.HostIds, nil
 	}
 
-	return nil, log.Errorf("AWS: dedicated %q: Unable to allocate dedicated hosts in zones %s: %v", w.name, w.record.Zones, out_errors)
+	return nil, log.Errorf("AWS: dedicated %q: Unable to allocate dedicated hosts in zones %s: %v", w.name, w.record.Zones, errors)
 }
 
 // Will request a release for a bunch of hosts and return unsuccessful id's or error
