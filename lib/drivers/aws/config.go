@@ -48,9 +48,9 @@ type Config struct {
 // DedicatedPoolRecord stores the configuration of AWS dedicated pool of particular type to manage
 // aws ec2 allocate-hosts --availability-zone "us-west-2c" --auto-placement "on" --host-recovery "off" --host-maintenance "off" --quantity 1 --instance-type "mac2.metal"
 type DedicatedPoolRecord struct {
-	Type string `json:"type"` // Instance type handled by the dedicated hosts pool (example: "mac2.metal")
-	Zone string `json:"zone"` // Where to allocate the dedicated host (example: "us-west-2c")
-	Max  uint   `json:"max"`  // Maximum dedicated hosts to allocate (they sometimes can handle more than 1 capacity slot)
+	Type  string   `json:"type"`  // Instance type handled by the dedicated hosts pool (example: "mac2.metal")
+	Zones []string `json:"zones"` // Where to allocate the dedicated host (example: ["us-west-2a", "us-west-2c"])
+	Max   uint     `json:"max"`   // Maximum dedicated hosts to allocate (they sometimes can handle more than 1 capacity slot)
 
 	// Is a special optimization for the Mac dedicated hosts to send them in [scrubbing process] to
 	// save money when we can't release the host due to Apple's license of [24 hours] min limit.

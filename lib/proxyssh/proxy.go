@@ -344,7 +344,7 @@ func (p *proxySSH) publicKeyCallback(incomingConn ssh.ConnMetadata, key ssh.Publ
 
 	ra, err := p.fish.ResourceAccessSingleUseKey(fishUser.Name, stringKey)
 	if err != nil {
-		log.Errorf("PROXYSSH: %s: Invalid access for user %q: %v", incomingConn.RemoteAddr(), user, err)
+		log.Errorf("PROXYSSH: %s: Invalid access for user %q: %v", incomingConn.RemoteAddr(), fishUser.Name, err)
 		return nil, fmt.Errorf("Invalid access")
 	}
 

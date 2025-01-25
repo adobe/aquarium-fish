@@ -41,7 +41,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validate OpenAPI definition
-        uses: swaggerexpert/swagger-editor-validate@452076dc45d5d1f09dd55440c9bffc372de4da25  # Jul 29, 2024
+        uses: swaggerexpert/swagger-editor-validate@e8e51dbc8c18e87f96b082b18a6a7cbd3c44abd8  # v1.4.2, Dec 31 2024
         with:
           swagger-editor-url: http://localhost/
           definition-file: docs/openapi.yaml
