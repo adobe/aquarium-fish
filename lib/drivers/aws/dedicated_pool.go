@@ -16,6 +16,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -453,7 +454,7 @@ func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 	log.Debugf("AWS: dedicated %q: Updating dedicated pool hosts list", w.name)
 	conn := w.driver.newEC2Conn()
 
-	p := ec2.NewDescribeHostsPaginator(conn, &ec2.DescribeHostsInput{
+	input := ec2.DescribeHostsInput{
 		Filter: []ec2types.Filter{
 			// We don't need released hosts, so skipping them
 			{
@@ -467,7 +468,7 @@ func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 			},
 			{
 				Name:   aws.String("availability-zone"),
-				Values: []string{w.record.Zone},
+				Values: w.record.Zones,
 			},
 			{
 				Name:   aws.String("instance-type"),
@@ -478,7 +479,8 @@ func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 				Values: []string{"AquariumDedicatedPool-" + w.name},
 			},
 		},
-	})
+	}
+	p := ec2.NewDescribeHostsPaginator(conn, &input)
 
 	// Processing the hosts
 	currActiveHosts := make(map[string]ec2types.Host)
@@ -520,37 +522,48 @@ func (w *dedicatedPoolWorker) allocateDedicatedHosts(amount int32) ([]string, er
 	log.Infof("AWS: dedicated %q: Allocating %d dedicated hosts of type %q", w.name, amount, w.record.Type)
 
 	conn := w.driver.newEC2Conn()
+	// Storing happened issues to later show in log as error
+	out_errors := []string{}
 
-	input := &ec2.AllocateHostsInput{
-		AvailabilityZone: aws.String(w.record.Zone),
-		AutoPlacement:    ec2types.AutoPlacementOff, // Managed hosts are for targeted workload
-		InstanceType:     aws.String(w.record.Type),
-		Quantity:         aws.Int32(amount),
+	for _, zone := range w.record.Zones {
+		input := ec2.AllocateHostsInput{
+			AvailabilityZone: aws.String(zone),
+			AutoPlacement:    ec2types.AutoPlacementOff, // Managed hosts are for targeted workload
+			InstanceType:     aws.String(w.record.Type),
+			Quantity:         aws.Int32(amount),
 
-		TagSpecifications: []ec2types.TagSpecification{{
-			ResourceType: ec2types.ResourceTypeDedicatedHost,
-			Tags: []ec2types.Tag{
-				{
-					Key:   aws.String("AquariumDedicatedPoolName"),
-					Value: aws.String(w.name),
+			TagSpecifications: []ec2types.TagSpecification{{
+				ResourceType: ec2types.ResourceTypeDedicatedHost,
+				Tags: []ec2types.Tag{
+					{
+						Key:   aws.String("AquariumDedicatedPoolName"),
+						Value: aws.String(w.name),
+					},
+					// Needed to simplify the filtering for list, because Input filter doesn't support tag:<KEY>
+					{
+						Key:   aws.String("AquariumDedicatedPool-" + w.name),
+						Value: aws.String(""),
+					},
 				},
-				// Needed to simplify the filtering for list, because Input filter doesn't support tag:<KEY>
-				{
-					Key:   aws.String("AquariumDedicatedPool-" + w.name),
-					Value: aws.String(""),
-				},
-			},
-		}},
+			}},
+		}
+
+		// SDK can't return the partially executed request (where some of the hosts are allocated)
+		resp, err := conn.AllocateHosts(context.TODO(), &input)
+		if err != nil {
+			if !slices.Contains(out_errors, err.Error()) {
+				out_errors = append(out_errors, err.Error())
+			}
+			log.Debugf("AWS: dedicated %q: Unable to allocate dedicated hosts in zone %s: %v", w.name, zone, err)
+			continue
+		}
+
+		log.Infof("AWS: dedicated %q: Allocated hosts: %v", w.name, resp.HostIds)
+
+		return resp.HostIds, nil
 	}
 
-	resp, err := conn.AllocateHosts(context.TODO(), input)
-	if err != nil {
-		return nil, log.Errorf("AWS: dedicated %q: Unable to allocate dedicated hosts: %v", w.name, err)
-	}
-
-	log.Infof("AWS: dedicated %q: Allocated hosts: %v", w.name, resp.HostIds)
-
-	return resp.HostIds, nil
+	return nil, log.Errorf("AWS: dedicated %q: Unable to allocate dedicated hosts in zones %s: %v", w.name, w.record.Zones, out_errors)
 }
 
 // Will request a release for a bunch of hosts and return unsuccessful id's or error
@@ -562,9 +575,9 @@ func (w *dedicatedPoolWorker) releaseDedicatedHosts(ids []string) ([]string, err
 
 	conn := w.driver.newEC2Conn()
 
-	input := &ec2.ReleaseHostsInput{HostIds: ids}
+	input := ec2.ReleaseHostsInput{HostIds: ids}
 
-	resp, err := conn.ReleaseHosts(context.TODO(), input)
+	resp, err := conn.ReleaseHosts(context.TODO(), &input)
 	if err != nil {
 		return ids, log.Errorf("AWS: dedicated %q: Unable to release dedicated hosts: %v", w.name, err)
 	}
