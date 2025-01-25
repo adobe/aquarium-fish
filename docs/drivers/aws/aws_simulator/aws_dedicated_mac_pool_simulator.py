@@ -294,7 +294,7 @@ class Event:
         print("Hosts           h/mon:", " ".join(["{:>10.2f}".format(h) for h in Event.stat_hosts_hours_per_month]))
         print("Queue           h/mon:", " ".join(["{:>10.2f}".format(hs) for hs in Event.stat_queue_hours_per_month]))
         # Mean wait means - if the item got into queue - for how long it usually waits before get executed
-        print("Queue Mean wait s/mon:", " ".join(["{:>10.2f}".format((statistics.mean(ss)) if ss else 0.0) for ss in Event.stat_queue_mean_wait_mins_per_month]))
+        print("Queue Mean wait m/mon:", " ".join(["{:>10.2f}".format((statistics.mean(mm)) if mm else 0.0) for mm in Event.stat_queue_mean_wait_mins_per_month]))
 
     def __init__(self, start, fun, params):
         self.start = start
