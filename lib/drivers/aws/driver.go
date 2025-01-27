@@ -242,7 +242,7 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ types.Resources, def types.La
 	// Make sure we have enough IP's in the selected VPC or subnet
 	var ipCount int64
 	var err error
-	if _, ipCount, err = d.getSubnetID(connEc2, def.Resources.Network); err != nil {
+	if _, ipCount, err = d.getSubnetID(connEc2, def.Resources.Network, ""); err != nil {
 		log.Error("AWS: Error during requesting subnet:", err)
 		return -1
 	}
@@ -272,15 +272,9 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 
 	conn := d.newEC2Conn()
 
-	// Checking the VPC exists or use default one
-	vmNetwork := def.Resources.Network
-	var err error
-	if vmNetwork, _, err = d.getSubnetID(conn, vmNetwork); err != nil {
-		return nil, fmt.Errorf("AWS: %s: Unable to get subnet: %v", iName, err)
-	}
-	log.Infof("AWS: %s: Selected subnet: %q", iName, vmNetwork)
-
+	// Looking for the AMI
 	vmImage := opts.Image
+	var err error
 	if vmImage, err = d.getImageID(conn, vmImage); err != nil {
 		return nil, fmt.Errorf("AWS: %s: Unable to get image: %v", iName, err)
 	}
@@ -291,19 +285,11 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 		ImageId:      aws.String(vmImage),
 		InstanceType: ec2types.InstanceType(opts.InstanceType),
 
-		NetworkInterfaces: []ec2types.InstanceNetworkInterfaceSpecification{
-			{
-				AssociatePublicIpAddress: aws.Bool(false),
-				DeleteOnTermination:      aws.Bool(true),
-				DeviceIndex:              aws.Int32(0),
-				SubnetId:                 aws.String(vmNetwork),
-			},
-		},
-
 		MinCount: aws.Int32(1),
 		MaxCount: aws.Int32(1),
 	}
 
+	netZone := ""
 	if opts.Pool != "" {
 		// Let's reserve or allocate the host for the new instance
 		p, ok := d.dedicatedPools[opts.Pool]
@@ -311,8 +297,8 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 			return nil, fmt.Errorf("AWS: %s: Unable to locate the dedicated pool: %s", iName, opts.Pool)
 		}
 
-		hostID := p.ReserveAllocateHost(opts.InstanceType)
-		if hostID == "" {
+		hostID := ""
+		if hostID, netZone = p.ReserveAllocateHost(opts.InstanceType); hostID == "" {
 			return nil, fmt.Errorf("AWS: %s: Unable to reserve host in dedicated pool %q", iName, opts.Pool)
 		}
 		input.Placement = &ec2types.Placement{
@@ -325,6 +311,22 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 		input.Placement = &ec2types.Placement{
 			Tenancy: ec2types.TenancyHost,
 		}
+	}
+
+	// Checking the VPC exists or use default one
+	subnetID := def.Resources.Network
+	if subnetID, _, err = d.getSubnetID(conn, subnetID, netZone); err != nil {
+		return nil, fmt.Errorf("AWS: %s: Unable to get subnet: %v", iName, err)
+	}
+	log.Infof("AWS: %s: Selected subnet: %q", iName, subnetID)
+
+	input.NetworkInterfaces = []ec2types.InstanceNetworkInterfaceSpecification{
+		{
+			AssociatePublicIpAddress: aws.Bool(false),
+			DeleteOnTermination:      aws.Bool(true),
+			DeviceIndex:              aws.Int32(0),
+			SubnetId:                 aws.String(subnetID),
+		},
 	}
 
 	if opts.UserDataFormat != "" {

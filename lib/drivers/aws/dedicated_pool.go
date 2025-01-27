@@ -104,10 +104,10 @@ func (w *dedicatedPoolWorker) AvailableCapacity(instanceType string) int64 {
 }
 
 // Internally reserves the existing dedicated host if possible till the next list update
-func (w *dedicatedPoolWorker) ReserveHost(instanceType string) string {
+func (w *dedicatedPoolWorker) ReserveHost(instanceType string) (string, string) {
 	if instanceType != w.record.Type {
 		log.Warnf("AWS: dedicated %q: Incorrect pool type requested: %s", w.name, instanceType)
-		return ""
+		return "", ""
 	}
 
 	// Using write lock here because it modifies the list of hosts in the end
@@ -125,7 +125,7 @@ func (w *dedicatedPoolWorker) ReserveHost(instanceType string) string {
 
 	if len(availableHosts) < 1 {
 		log.Infof("AWS: dedicated %q: No available hosts found in the current active list", w.name)
-		return ""
+		return "", ""
 	}
 
 	// Pick random one from the list of available hosts to reduce the possibility of conflict
@@ -133,41 +133,41 @@ func (w *dedicatedPoolWorker) ReserveHost(instanceType string) string {
 	// Mark it as reserved temporary to ease multi-allocation at the same time
 	host.State = HostReserved
 	w.activeHosts[aws.ToString(host.HostId)] = host
-	return aws.ToString(host.HostId)
+	return aws.ToString(host.HostId), aws.ToString(host.AvailabilityZone)
 }
 
 // Allocates the new dedicated host if possible
-func (w *dedicatedPoolWorker) AllocateHost(instanceType string) string {
+func (w *dedicatedPoolWorker) AllocateHost(instanceType string) (string, string) {
 	if instanceType != w.record.Type {
 		log.Warnf("AWS: dedicated %q: Incorrect pool type requested: %s", w.name, instanceType)
-		return ""
+		return "", ""
 	}
 
 	currActiveHosts := len(w.activeHosts)
 	if w.record.Max <= uint(currActiveHosts) {
 		log.Warnf("AWS: dedicated %q: Unable to request new host due to reached the maximum limit: %d <= %d", w.name, w.record.Max, currActiveHosts)
-		return ""
+		return "", ""
 	}
 
-	hosts, err := w.allocateDedicatedHosts(1)
-	if err != nil || len(hosts) < 1 {
+	host, zone, err := w.allocateDedicatedHost()
+	if err != nil || host == "" {
 		log.Errorf("AWS: dedicated %q: Failed to allocate the new host: %v", w.name, err)
-		return ""
+		return "", ""
 	}
 
-	return hosts[0]
+	return host, zone
 }
 
 // Will reserve existing or allocate the new host
-func (w *dedicatedPoolWorker) ReserveAllocateHost(instanceType string) string {
+func (w *dedicatedPoolWorker) ReserveAllocateHost(instanceType string) (string, string) {
 	if instanceType != w.record.Type {
 		log.Warnf("AWS: dedicated %q: Incorrect pool type requested: %s", w.name, instanceType)
-		return ""
+		return "", ""
 	}
 
-	out := w.ReserveHost(instanceType)
-	if out != "" {
-		return out
+	host, zone := w.ReserveHost(instanceType)
+	if host != "" {
+		return host, zone
 	}
 	return w.AllocateHost(instanceType)
 }
@@ -518,8 +518,8 @@ func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 	return nil
 }
 
-func (w *dedicatedPoolWorker) allocateDedicatedHosts(amount int32) ([]string, error) {
-	log.Infof("AWS: dedicated %q: Allocating %d dedicated hosts of type %q", w.name, amount, w.record.Type)
+func (w *dedicatedPoolWorker) allocateDedicatedHost() (string, string, error) {
+	log.Infof("AWS: dedicated %q: Allocating dedicated host of type %q", w.name, w.record.Type)
 
 	// Storing happened issues to later show in log as error
 	errors := []string{}
@@ -530,7 +530,7 @@ func (w *dedicatedPoolWorker) allocateDedicatedHosts(amount int32) ([]string, er
 			AvailabilityZone: aws.String(zone),
 			AutoPlacement:    ec2types.AutoPlacementOff, // Managed hosts are for targeted workload
 			InstanceType:     aws.String(w.record.Type),
-			Quantity:         aws.Int32(amount),
+			Quantity:         aws.Int32(1),
 
 			TagSpecifications: []ec2types.TagSpecification{{
 				ResourceType: ec2types.ResourceTypeDedicatedHost,
@@ -558,12 +558,12 @@ func (w *dedicatedPoolWorker) allocateDedicatedHosts(amount int32) ([]string, er
 			continue
 		}
 
-		log.Infof("AWS: dedicated %q: Allocated hosts: %v", w.name, resp.HostIds)
+		log.Infof("AWS: dedicated %q: Allocated host in zone %s: %v", w.name, zone, resp.HostIds[0])
 
-		return resp.HostIds, nil
+		return resp.HostIds[0], zone, nil
 	}
 
-	return nil, log.Errorf("AWS: dedicated %q: Unable to allocate dedicated hosts in zones %s: %v", w.name, w.record.Zones, errors)
+	return "", "", log.Errorf("AWS: dedicated %q: Unable to allocate dedicated hosts in zones %s: %v", w.name, w.record.Zones, errors)
 }
 
 // Will request a release for a bunch of hosts and return unsuccessful id's or error
