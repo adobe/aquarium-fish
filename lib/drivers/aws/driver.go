@@ -289,7 +289,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 		MaxCount: aws.Int32(1),
 	}
 
-	netZone := ""
+	var netZone string
 	if opts.Pool != "" {
 		// Let's reserve or allocate the host for the new instance
 		p, ok := d.dedicatedPools[opts.Pool]
@@ -297,7 +297,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 			return nil, fmt.Errorf("AWS: %s: Unable to locate the dedicated pool: %s", iName, opts.Pool)
 		}
 
-		hostID := ""
+		var hostID string
 		if hostID, netZone = p.ReserveAllocateHost(opts.InstanceType); hostID == "" {
 			return nil, fmt.Errorf("AWS: %s: Unable to reserve host in dedicated pool %q", iName, opts.Pool)
 		}
