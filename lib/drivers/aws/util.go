@@ -83,8 +83,9 @@ func (d *Driver) newServiceQuotasConn() *servicequotas.Client {
 
 // Will verify and return subnet id
 // In case vpc id was provided - will chose the subnet with less used ip's
+// If zone is set - will make sure that vpc will have properly picked subnet
 // Returns the found subnet_id, total count of available ip's and error if some
-func (d *Driver) getSubnetID(conn *ec2.Client, idTag string) (string, int64, error) {
+func (d *Driver) getSubnetID(conn *ec2.Client, idTag, zone string) (string, int64, error) {
 	filter := types.Filter{}
 
 	// Check if the tag is provided ("<Key>:<Value>")
@@ -116,9 +117,15 @@ func (d *Driver) getSubnetID(conn *ec2.Client, idTag string) (string, int64, err
 					},
 				},
 			}
+			if zone != "" {
+				req.Filters = append(req.Filters, types.Filter{
+					Name:   aws.String("availability-zone"),
+					Values: []string{zone},
+				})
+			}
 			resp, err := conn.DescribeSubnets(context.TODO(), &req)
 			if err != nil || len(resp.Subnets) == 0 {
-				return "", 0, fmt.Errorf("AWS: Unable to locate vpc or subnet with specified tag: %s:%q, %v", aws.ToString(filter.Name), filter.Values, err)
+				return "", 0, fmt.Errorf("AWS: Unable to locate vpc or subnet with specified tag %s:%q: %v", aws.ToString(filter.Name), filter.Values, err)
 			}
 			idTag = aws.ToString(resp.Subnets[0].SubnetId)
 			return idTag, int64(aws.ToInt32(resp.Subnets[0].AvailableIpAddressCount)), nil
@@ -177,12 +184,18 @@ func (d *Driver) getSubnetID(conn *ec2.Client, idTag string) (string, int64, err
 			filter,
 		},
 	}
+	if zone != "" {
+		req.Filters = append(req.Filters, types.Filter{
+			Name:   aws.String("availability-zone"),
+			Values: []string{zone},
+		})
+	}
 	resp, err := conn.DescribeSubnets(context.TODO(), &req)
 	if err != nil {
-		return "", 0, fmt.Errorf("AWS: Unable to locate subnet: %v", err)
+		return "", 0, fmt.Errorf("AWS: Unable to locate subnet for %q with zone %s: %v", idTag, zone, err)
 	}
 	if len(resp.Subnets) == 0 {
-		return "", 0, fmt.Errorf("AWS: No Subnets available in the project")
+		return "", 0, fmt.Errorf("AWS: No Subnets available in the project for %q with zone %s", idTag, zone)
 	}
 
 	if strings.HasPrefix(idTag, "vpc-") {

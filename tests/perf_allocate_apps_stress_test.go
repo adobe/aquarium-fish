@@ -86,36 +86,34 @@ drivers:
 	wg := &sync.WaitGroup{}
 	for i := 0; i < 50; i++ {
 		wg.Add(1)
-		go allocateAppsStressWorker(t, wg, i, afi, label.UID.String())
+		go func(t *testing.T, wg *sync.WaitGroup, id int, afi *h.AFInstance, label string) {
+			defer wg.Done()
+
+			tr := &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			}
+			cli := &http.Client{
+				Timeout:   time.Second * 5,
+				Transport: tr,
+			}
+
+			var app types.Application
+			t.Run(fmt.Sprintf("%04d Create Application", id), func(t *testing.T) {
+				apitest.New().
+					EnableNetworking(cli).
+					Post(afi.APIAddress("api/v1/application/")).
+					JSON(`{"label_UID":"`+label+`"}`).
+					BasicAuth("admin", afi.AdminToken()).
+					Expect(t).
+					Status(http.StatusOK).
+					End().
+					JSON(&app)
+
+				if app.UID == uuid.Nil {
+					t.Errorf("Application UID is incorrect: %v", app.UID)
+				}
+			})
+		}(t, wg, i, afi, label.UID.String())
 	}
 	wg.Wait()
-}
-
-func allocateAppsStressWorker(t *testing.T, wg *sync.WaitGroup, id int, afi *h.AFInstance, label string) {
-	defer wg.Done()
-
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	cli := &http.Client{
-		Timeout:   time.Second * 5,
-		Transport: tr,
-	}
-
-	var app types.Application
-	t.Run(fmt.Sprintf("%04d Create Application", id), func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/application/")).
-			JSON(`{"label_UID":"`+label+`"}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&app)
-
-		if app.UID == uuid.Nil {
-			t.Errorf("Application UID is incorrect: %v", app.UID)
-		}
-	})
 }
