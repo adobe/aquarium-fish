@@ -69,7 +69,6 @@ func (f *Fish) ApplicationResourceAccessDeleteByResource(appresUID types.Applica
 func (f *Fish) ApplicationResourceAccessSingleUsePasswordHash(username string, hash string) (*types.ApplicationResourceAccess, error) {
 	if all, err := f.ApplicationResourceAccessList(); err == nil {
 		for _, ra := range all {
-			fmt.Println("!!!!! pwd:", ra.Username, username, ra.Password, hash)
 			if ra.Username == username && ra.Password == hash {
 				if err = f.ApplicationResourceAccessDelete(ra.UID); err != nil {
 					// NOTE: in rare occasions, `err` here could end up propagating to the
@@ -92,7 +91,6 @@ func (f *Fish) ApplicationResourceAccessSingleUsePasswordHash(username string, h
 func (f *Fish) ApplicationResourceAccessSingleUseKey(username string, key string) (*types.ApplicationResourceAccess, error) {
 	if all, err := f.ApplicationResourceAccessList(); err == nil {
 		for _, ra := range all {
-			fmt.Println("!!!!! key:", ra.Username, username, ra.Key, key)
 			if ra.Username == username && ra.Key == key {
 				if err = f.ApplicationResourceAccessDelete(ra.UID); err != nil {
 					// NOTE: in rare occasions, `err` here could end up propagating to the
