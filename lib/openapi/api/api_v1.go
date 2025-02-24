@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/pprof"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -53,7 +54,7 @@ func NewV1Router(e *echo.Echo, f *fish.Fish) {
 // BasicAuth middleware to ensure API will not be used by crocodile
 func (e *Processor) BasicAuth(username, password string, c echo.Context) (bool, error) {
 	c.Set("uid", crypt.RandString(8))
-	log.Debugf("API: %s: New request received: %s %s", username, c.Get("uid"), c.Path())
+	log.Debugf("API: %s: New request received: %s %s %s", username, c.Get("uid"), c.Path(), c.Request().URL.String())
 	user := e.fish.UserAuth(username, password)
 
 	// Clean Auth header and set the user
@@ -77,7 +78,7 @@ func (*Processor) UserMeGet(c echo.Context) error {
 }
 
 // UserListGet API call processor
-func (e *Processor) UserListGet(c echo.Context, params types.UserListGetParams) error {
+func (e *Processor) UserListGet(c echo.Context) error {
 	// Only admin can list users
 	user, ok := c.Get("user").(*types.User)
 	if !ok {
@@ -89,7 +90,7 @@ func (e *Processor) UserListGet(c echo.Context, params types.UserListGetParams) 
 		return fmt.Errorf("Only 'admin' user can list users")
 	}
 
-	out, err := e.fish.UserFind(params.Filter)
+	out, err := e.fish.UserList()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the user list: %v", err)})
 		return fmt.Errorf("Unable to get the user list: %w", err)
@@ -190,65 +191,21 @@ func (e *Processor) UserDelete(c echo.Context, name string) error {
 	return c.JSON(http.StatusOK, H{"message": "User removed"})
 }
 
-// ResourceListGet API call processor
-func (e *Processor) ResourceListGet(c echo.Context, params types.ResourceListGetParams) error {
-	// Only admin can list the resources
-	user, ok := c.Get("user").(*types.User)
-	if !ok {
-		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
-		return fmt.Errorf("Not authentified")
-	}
-	if user.Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can list resource"})
-		return fmt.Errorf("Only 'admin' user can list resource")
-	}
-
-	out, err := e.fish.ResourceFind(params.Filter)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the resource list: %v", err)})
-		return fmt.Errorf("Unable to get the resource list: %w", err)
-	}
-
-	return c.JSON(http.StatusOK, out)
-}
-
-// ResourceGet API call processor
-func (e *Processor) ResourceGet(c echo.Context, uid types.ResourceUID) error {
-	// Only admin can get the resource directly
-	user, ok := c.Get("user").(*types.User)
-	if !ok {
-		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
-		return fmt.Errorf("Not authentified")
-	}
-	if user.Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can get resource"})
-		return fmt.Errorf("Only 'admin' user can get resource")
-	}
-
-	out, err := e.fish.ResourceGet(uid)
-	if err != nil {
-		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Resource not found: %v", err)})
-		return fmt.Errorf("Resource not found: %w", err)
-	}
-
-	return c.JSON(http.StatusOK, out)
-}
-
-// ResourceAccessPut API call processor
-func (e *Processor) ResourceAccessPut(c echo.Context, uid types.ResourceUID) error {
+// ApplicationResourceAccessPut API call processor
+func (e *Processor) ApplicationResourceAccessPut(c echo.Context, uid types.ApplicationResourceUID) error {
 	user, ok := c.Get("user").(*types.User)
 	if !ok {
 		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
 		return fmt.Errorf("Not authentified")
 	}
 
-	res, err := e.fish.ResourceGet(uid)
+	res, err := e.fish.ApplicationResourceGet(uid)
 	if err != nil {
-		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Resource not found: %v", err)})
-		return fmt.Errorf("Resource not found: %w", err)
+		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("ApplicationResource not found: %v", err)})
+		return fmt.Errorf("ApplicationResource not found: %w", err)
 	}
 
-	// Only the owner and admin can create access for application resource
+	// Only the owner and admin can create access for ApplicationResource
 	app, err := e.fish.ApplicationGet(res.ApplicationUID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", res.ApplicationUID)})
@@ -273,19 +230,19 @@ func (e *Processor) ResourceAccessPut(c echo.Context, uid types.ResourceUID) err
 		c.JSON(http.StatusBadRequest, H{"message": "Unable to generate SSH public key"})
 		return fmt.Errorf("Unable to generate SSH public key: %w", err)
 	}
-	rAccess := types.ResourceAccess{
-		ResourceUID: res.UID,
+	rAccess := types.ApplicationResourceAccess{
+		ApplicationResourceUID: res.UID,
 		// Storing address of the proxy to give the user idea of where to connect to.
 		// Later when cluster will be here - it could contain a different node IP instead, because
 		// this particular one could not be able to serve the connection.
 		Address:  e.fish.GetProxySSHEndpoint(),
 		Username: user.Name,
 		// We should not store clear password, so convert it to salted hash
-		Password: string(pwdHash),
+		Password: fmt.Sprintf("%x", pwdHash),
 		// Key need to be stored as public key
 		Key: string(pubkey),
 	}
-	e.fish.ResourceAccessCreate(&rAccess)
+	e.fish.ApplicationResourceAccessCreate(&rAccess)
 
 	// Now database has had the hashed credentials stored, we store the original
 	// values to return so user have access to the actual credentials.
@@ -296,8 +253,8 @@ func (e *Processor) ResourceAccessPut(c echo.Context, uid types.ResourceUID) err
 }
 
 // ApplicationListGet API call processor
-func (e *Processor) ApplicationListGet(c echo.Context, params types.ApplicationListGetParams) error {
-	out, err := e.fish.ApplicationFind(params.Filter)
+func (e *Processor) ApplicationListGet(c echo.Context) error {
+	out, err := e.fish.ApplicationList()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the application list: %v", err)})
 		return fmt.Errorf("Unable to get the application list: %w", err)
@@ -387,10 +344,10 @@ func (e *Processor) ApplicationResourceGet(c echo.Context, uid types.Application
 		return fmt.Errorf("Only the owner and admin can request the Application resource")
 	}
 
-	out, err := e.fish.ResourceGetByApplication(uid)
+	out, err := e.fish.ApplicationResourceGetByApplication(uid)
 	if err != nil {
-		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Resource not found: %v", err)})
-		return fmt.Errorf("Resource not found: %w", err)
+		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("ApplicationResource not found: %v", err)})
+		return fmt.Errorf("ApplictionResource not found: %w", err)
 	}
 
 	return c.JSON(http.StatusOK, out)
@@ -425,7 +382,7 @@ func (e *Processor) ApplicationStateGet(c echo.Context, uid types.ApplicationUID
 }
 
 // ApplicationTaskListGet API call processor
-func (e *Processor) ApplicationTaskListGet(c echo.Context, appUID types.ApplicationUID, params types.ApplicationTaskListGetParams) error {
+func (e *Processor) ApplicationTaskListGet(c echo.Context, appUID types.ApplicationUID) error {
 	app, err := e.fish.ApplicationGet(appUID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", appUID)})
@@ -443,7 +400,7 @@ func (e *Processor) ApplicationTaskListGet(c echo.Context, appUID types.Applicat
 		return fmt.Errorf("Only the owner of Application & admin can get the Application Tasks")
 	}
 
-	out, err := e.fish.ApplicationTaskFindByApplication(appUID, params.Filter)
+	out, err := e.fish.ApplicationTaskListByApplication(appUID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the Application Tasks list: %v", err)})
 		return fmt.Errorf("Unable to get the Application Tasks list: %w", err)
@@ -564,7 +521,25 @@ func (e *Processor) ApplicationDeallocateGet(c echo.Context, uid types.Applicati
 
 // LabelListGet API call processor
 func (e *Processor) LabelListGet(c echo.Context, params types.LabelListGetParams) error {
-	out, err := e.fish.LabelFind(params.Filter)
+	// Deprecated functionality:
+	// For backward compatibility and easier migration support "name=" and "version=" filter
+	// It's dirty, so no doubt it will fail for complicated cases - so migrate to proper filters
+	if params.Filter != nil {
+		// Name label usually doesn't contain spaces, so using as separator
+		filter_split := strings.Split(*params.Filter, " ")
+		for _, item := range filter_split {
+			if params.Name == nil && strings.HasPrefix(item, "name=") {
+				val := strings.Trim(strings.SplitN(item, "=", 2)[1], "\"'")
+				params.Name = &val
+			}
+			if params.Version == nil && strings.HasPrefix(item, "version=") {
+				val := strings.Trim(strings.SplitN(item, "=", 2)[1], "\"'")
+				params.Version = &val
+			}
+		}
+		params.Filter = nil
+	}
+	out, err := e.fish.LabelList(params)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the label list: %v", err)})
 		return fmt.Errorf("Unable to get the label list: %w", err)
@@ -633,8 +608,8 @@ func (e *Processor) LabelDelete(c echo.Context, uid types.LabelUID) error {
 }
 
 // NodeListGet API call processor
-func (e *Processor) NodeListGet(c echo.Context, params types.NodeListGetParams) error {
-	out, err := e.fish.NodeFind(params.Filter)
+func (e *Processor) NodeListGet(c echo.Context) error {
+	out, err := e.fish.NodeList()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the node list: %v", err)})
 		return fmt.Errorf("Unable to get the node list: %w", err)
@@ -728,7 +703,7 @@ func (*Processor) NodeThisProfilingGet(c echo.Context, handler string) error {
 }
 
 // VoteListGet API call processor
-func (e *Processor) VoteListGet(c echo.Context, params types.VoteListGetParams) error {
+func (e *Processor) VoteListGet(c echo.Context) error {
 	user, ok := c.Get("user").(*types.User)
 	if !ok {
 		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
@@ -739,60 +714,9 @@ func (e *Processor) VoteListGet(c echo.Context, params types.VoteListGetParams) 
 		return fmt.Errorf("Only 'admin' user can get votes")
 	}
 
-	out, err := e.fish.VoteFind(params.Filter)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the vote list: %v", err)})
-		return fmt.Errorf("Unable to get the vote list: %w", err)
-	}
+	out := e.fish.VoteActiveList()
 
 	return c.JSON(http.StatusOK, out)
-}
-
-// LocationListGet API call processor
-func (e *Processor) LocationListGet(c echo.Context, params types.LocationListGetParams) error {
-	user, ok := c.Get("user").(*types.User)
-	if !ok {
-		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
-		return fmt.Errorf("Not authentified")
-	}
-	if user.Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can get locations"})
-		return fmt.Errorf("Only 'admin' user can get locations")
-	}
-
-	out, err := e.fish.LocationFind(params.Filter)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the location list: %v", err)})
-		return fmt.Errorf("Unable to get the location list: %w", err)
-	}
-
-	return c.JSON(http.StatusOK, out)
-}
-
-// LocationCreatePost API call processor
-func (e *Processor) LocationCreatePost(c echo.Context) error {
-	user, ok := c.Get("user").(*types.User)
-	if !ok {
-		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
-		return fmt.Errorf("Not authentified")
-	}
-	if user.Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can create location"})
-		return fmt.Errorf("Only 'admin' user can create location")
-	}
-
-	var data types.Location
-	if err := c.Bind(&data); err != nil {
-		c.JSON(http.StatusBadRequest, H{"error": fmt.Sprintf("Wrong request body: %v", err)})
-		return fmt.Errorf("Wrong request body: %w", err)
-	}
-
-	if err := e.fish.LocationCreate(&data); err != nil {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to create location: %v", err)})
-		return fmt.Errorf("Unable to create location: %w", err)
-	}
-
-	return c.JSON(http.StatusOK, data)
 }
 
 // ServiceMappingGet API call processor
@@ -817,7 +741,7 @@ func (e *Processor) ServiceMappingGet(c echo.Context, uid types.ServiceMappingUI
 }
 
 // ServiceMappingListGet API call processor
-func (e *Processor) ServiceMappingListGet(c echo.Context, params types.ServiceMappingListGetParams) error {
+func (e *Processor) ServiceMappingListGet(c echo.Context) error {
 	user, ok := c.Get("user").(*types.User)
 	if !ok {
 		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
@@ -828,7 +752,7 @@ func (e *Processor) ServiceMappingListGet(c echo.Context, params types.ServiceMa
 		return fmt.Errorf("Only 'admin' user can get service mappings")
 	}
 
-	out, err := e.fish.ServiceMappingFind(params.Filter)
+	out, err := e.fish.ServiceMappingList()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the servicemappings list: %v", err)})
 		return fmt.Errorf("Unable to get the servicemappings list: %w", err)

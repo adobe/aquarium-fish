@@ -5,7 +5,7 @@ openapi: 3.0.0
 
 servers:
   - url: https://0.0.0.0:8001/
-    description: Main API available for the Users and Meta API for the Resources
+    description: Main API available for the Users and Meta API for the ApplicationResources
 
 info:
   description: API of the Fish node/cluster
@@ -28,13 +28,6 @@ paths:
       operationId: UserListGet
       tags:
         - User
-      parameters:
-        - name: filter
-          in: query
-          description: SQL `WHERE` filter for the object data
-          required: false
-          schema:
-            type: string
       responses:
         '200':
           description: Successful operation
@@ -160,9 +153,21 @@ paths:
       tags:
         - Label
       parameters:
-        - name: filter
+        - name: filter  # Deprecated: keeping it for backward-compatibility till the release
           in: query
-          description: SQL `WHERE` filter for the object data
+          description: DEPRECATED, supports only name='<value>' and version=<version> request
+          required: false
+          schema:
+            type: string
+        - name: name
+          in: query
+          description: Filter the list by name of the label
+          required: false
+          schema:
+            type: string
+        - name: version
+          in: query
+          description: Filter the list by version of the label, "last" will return only latest versions of labels
           required: false
           schema:
             type: string
@@ -261,41 +266,13 @@ paths:
       security:
         - basic_auth: []
 
-  /api/v1/resource/:
+  /api/v1/applicationresource/{uid}/access:
     get:
-      summary: Get list of Resources
-      description: Returns a list of existing Resources
-      operationId: ResourceListGet
+      summary: Get SSH access credentials by ApplicationResource UID
+      description: Display any known SSH access information for the ApplicationResource
+      operationId: ApplicationResourceAccessPut
       tags:
-        - Resource
-      parameters:
-        - name: filter
-          in: query
-          description: SQL `WHERE` filter for the object data
-          required: false
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Resource'
-        '401':
-          $ref: '#/components/responses/UnauthorizedError'
-      security:
-        - basic_auth: []
-
-  /api/v1/resource/{uid}:
-    get:
-      summary: Get Resource by UID
-      description: Returns a single Resource by it's UID
-      operationId: ResourceGet
-      tags:
-        - Resource
+        - ApplicationResourceAccess
       parameters:
         - name: uid
           in: path
@@ -310,40 +287,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Resource'
+                $ref: '#/components/schemas/ApplicationResourceAccess'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '404':
-          description: Resource not found
-      security:
-        - basic_auth: []
-
-  /api/v1/resource/{uid}/access:
-    get:
-      summary: Get SSH access credentials by Resource UID
-      description: Display any known SSH access information for the Resource
-      operationId: ResourceAccessPut
-      tags:
-        - ResourceAccess
-      parameters:
-        - name: uid
-          in: path
-          description: UID of the object
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ResourceAccess'
-        '401':
-          $ref: '#/components/responses/UnauthorizedError'
-        '404':
-          description: Resource not found
+          description: ApplicationResource not found
       security:
         - basic_auth: []
 
@@ -354,13 +302,6 @@ paths:
       operationId: ApplicationListGet
       tags:
         - Application
-      parameters:
-        - name: filter
-          in: query
-          description: SQL `WHERE` filter for the object data
-          required: false
-          schema:
-            type: string
       responses:
         '200':
           description: Successful operation
@@ -464,8 +405,8 @@ paths:
 
   /api/v1/application/{uid}/resource:
     get:
-      summary: Get Resource by Application UID
-      description: Returns a Resource by it's Application UID
+      summary: Get ApplicationResource by Application UID
+      description: Returns a ApplicationResource by it's Application UID
       operationId: ApplicationResourceGet
       tags:
         - Application
@@ -483,11 +424,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Resource'
+                $ref: '#/components/schemas/ApplicationResource'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '404':
-          description: Resource not found
+          description: ApplicationResource not found
       security:
         - basic_auth: []
 
@@ -506,12 +447,6 @@ paths:
           schema:
             type: string
             format: uuid
-        - name: filter
-          in: query
-          description: SQL `WHERE` filter for the object data
-          required: false
-          schema:
-            type: string
       responses:
         '200':
           description: Successful operation
@@ -627,13 +562,6 @@ paths:
       operationId: VoteListGet
       tags:
         - Vote
-      parameters:
-        - name: filter
-          in: query
-          description: SQL `WHERE` filter for the object data
-          required: false
-          schema:
-            type: string
       responses:
         '200':
           description: Successful operation
@@ -655,13 +583,6 @@ paths:
       operationId: NodeListGet
       tags:
         - Node
-      parameters:
-        - name: filter
-          in: query
-          description: SQL `WHERE` filter for the object data
-          required: false
-          schema:
-            type: string
       responses:
         '200':
           description: Successful operation
@@ -787,63 +708,6 @@ paths:
       security:
         - basic_auth: []
 
-  /api/v1/location/:
-    get:
-      summary: Get list of locations
-      description: Returns a list of existing Locations
-      operationId: LocationListGet
-      tags:
-        - Location
-      parameters:
-        - name: filter
-          in: query
-          description: SQL `WHERE` filter for the object data
-          required: false
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Location'
-        '401':
-          $ref: '#/components/responses/UnauthorizedError'
-      security:
-        - basic_auth: []
-    post:
-      summary: Create new Location
-      description: Creates & return the created Location
-      operationId: LocationCreatePost
-      tags:
-        - Location
-      parameters: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Location'
-          application/yaml:
-            schema:
-              $ref: '#/components/schemas/Location'
-      responses:
-        '200':
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Location'
-        '400':
-          description: Bad request
-        '401':
-          $ref: '#/components/responses/UnauthorizedError'
-      security:
-        - basic_auth: []
-
   /api/v1/servicemapping/:
     get:
       summary: Get list of service mappings
@@ -851,13 +715,6 @@ paths:
       operationId: ServiceMappingListGet
       tags:
         - ServiceMapping
-      parameters:
-        - name: filter
-          in: query
-          description: SQL `WHERE` filter for the object data
-          required: false
-          schema:
-            type: string
       responses:
         '200':
           description: Successful operation
@@ -957,9 +814,9 @@ paths:
 
   /meta/v1/data/:
     get:
-      summary: Get the Resource metadata
+      summary: Get the ApplicationResource metadata
       description:
-        Returns the hash of the Resource metadata (combined Label and Application metadata)
+        Returns the hash of the ApplicationResource metadata (combined Label and Application metadata)
       operationId: DataGetList
       tags:
         - MetaData
@@ -994,14 +851,14 @@ paths:
               schema:
                 type: string
         '401':
-          description: Not in controlled network or Resource with IpAddr or HwAddr not found
+          description: Not in controlled network or ApplicationResource with IpAddr or HwAddr not found
         '404':
           description: Key path not found
 
   /meta/v1/data/{key_path}:
     get:
       summary: TODO Get value by key path
-      description: Returns a required Resource metadata key path value
+      description: Returns a required ApplicationResource metadata key path value
       operationId: DataGet
       tags:
         - MetaData
@@ -1042,7 +899,7 @@ paths:
               schema:
                 type: string
         '401':
-          description: Not in controlled network or Resource with IpAddr or HwAddr not found
+          description: Not in controlled network or ApplicationResource with IpAddr or HwAddr not found
         '404':
           description: Key path not found
 
@@ -1071,13 +928,11 @@ components:
     ApplicationUID:
       type: string
       format: uuid
-      x-oapi-codegen-extra-tags:
-        gorm: primaryKey
     Application:
       type: object
       description: >
-        Resource request created by the user. Each node votes for the availability to allocate the
-        resource and the cluster choose which one node will actually do the work.
+        Allocation request created by the user. Each node votes for the availability to allocate
+        the ApplicationResource and the cluster choose which one node will actually do the work.
       required:
         - UID
         - created_at
@@ -1087,8 +942,6 @@ components:
       properties:
         UID:
           $ref: '#/components/schemas/ApplicationUID'
-          x-oapi-codegen-extra-tags:
-            gorm: primaryKey
         created_at:
           x-go-type: time.Time
         owner_name:
@@ -1111,17 +964,15 @@ components:
     ApplicationStateUID:
       type: string
       format: uuid
-      x-oapi-codegen-extra-tags:
-        gorm: primaryKey
     ApplicationStatus:
       type: string
       enum:
         - NEW          # The Application just created (active)
         - ELECTED      # Node is elected during the voting process (active)
-        - ALLOCATED    # The Resource is allocated and starting up (active)
+        - ALLOCATED    # The ApplicationResource is allocated and starting up (active)
         - DEALLOCATE   # User requested the Application deallocate (not active)
         - RECALLED     # User requested the Application deallocate, but it was not allocated (not active)
-        - DEALLOCATED  # The Resource is deallocated (not active)
+        - DEALLOCATED  # The ApplicationResource is deallocated (not active)
         - ERROR        # The error happened (not active)
     ApplicationState:
       type: object
@@ -1138,8 +989,6 @@ components:
       properties:
         UID:
           $ref: '#/components/schemas/ApplicationStateUID'
-          x-oapi-codegen-extra-tags:
-            gorm: primaryKey
         created_at:
           x-go-type: time.Time
         application_UID:
@@ -1157,14 +1006,13 @@ components:
     ApplicationTaskUID:
       type: string
       format: uuid
-      x-oapi-codegen-extra-tags:
-        gorm: primaryKey
     ApplicationTask:
       type: object
       description: >
         Is needed to execute some sort of async action on the Application. For example snapshot
         operation, because the request could get from anywhere. Usually app tasks are not a part of
-        standard Application state graph and could be not executed if the resource is destroyed.
+        standard Application state graph and could be not executed if the Applicationresource is
+        destroyed.
 
         Results are filled by the executor of the task and really depends on what kind of operation
         is executed and really depends on the driver - it could support the task or not.
@@ -1182,8 +1030,6 @@ components:
       properties:
         UID:
           $ref: '#/components/schemas/ApplicationTaskUID'
-          x-oapi-codegen-extra-tags:
-            gorm: primaryKey
         created_at:
           x-go-type: time.Time
         updated_at:
@@ -1211,9 +1057,6 @@ components:
 
     UserName:
       type: string
-      x-oapi-codegen-extra-tags:
-        gorm: primaryKey
-
     User:
       type: object
       description: >
@@ -1229,8 +1072,6 @@ components:
       properties:
         name:
           $ref: '#/components/schemas/UserName'
-          x-oapi-codegen-extra-tags:
-            gorm: primaryKey
         created_at:
           x-go-type: time.Time
         updated_at:
@@ -1266,13 +1107,12 @@ components:
     LabelUID:
       type: string
       format: uuid
-      x-oapi-codegen-extra-tags:
-        gorm: primaryKey
     LabelDefinitions:
       type: array
       items:
         $ref: '#/components/schemas/LabelDefinition'
-      description: List of label definitions that describes resources, driver and it's options.
+      description: |
+        List of label definitions that describes required resources, driver and it's options.
         The order is sequential - so the priority is to the first driver and if it's not
         available than the next definitions will be used.
       example:
@@ -1308,8 +1148,8 @@ components:
     LabelDefinition:
       type: object
       description: >
-        Describes Label's ways to provide a Resource - it contains name of the driver, it's
-        resource and additional options.
+        Describes Label's ways to provide aa ApplciationResource - it contains name of the driver,
+        it's resource and additional options.
       required:
         - driver
         - resources
@@ -1356,20 +1196,14 @@ components:
       properties:
         UID:
           $ref: '#/components/schemas/LabelUID'
-          x-oapi-codegen-extra-tags:
-            gorm: primaryKey
         created_at:
           x-go-type: time.Time
         name:
           type: string
-          x-oapi-codegen-extra-tags:
-            gorm: uniqueIndex:idx_label_uniq
           description: Simple name to identify the Label
           example: xcode12.2
         version:
           type: integer
-          x-oapi-codegen-extra-tags:
-            gorm: uniqueIndex:idx_label_uniq
           description: >
             In order to update the labels freely and save the previous Label state for the past
             builds.
@@ -1377,7 +1211,7 @@ components:
           $ref: '#/components/schemas/LabelDefinitions'
         metadata:
           x-go-type: util.UnparsedJSON
-          description: Basic metadata to pass to the Resource
+          description: Basic metadata to pass to the ApplicationResource
           example:
             JENKINS_AGENT_WORKSPACE: D:\
 
@@ -1442,10 +1276,11 @@ components:
         lifetime:
           type: string
           description: |
-            Total lifetime of the resource in Time Duration (ex. "1h30m30s"). Begins on Resource
-            create time till deallocate by user or auto deallocate by timeout. If it's empty or "0"
-            then default value from fish node config will be used. If it's negative (ex. "-1s")
-            then the resource will live forever or until the user requests deallocate.
+            Total lifetime of the ApplicationResource in Time Duration (ex. "1h30m30s"). Begins on
+            ApplicationResource create time till deallocate by user or auto deallocate by timeout.
+            If it's empty or "0" then default value from fish node config will be used. If it's
+            negative (ex. "-1s") then the ApplicationResource will live forever or until the user
+            requests deallocate.
 
     ResourcesDisk:
       type: object
@@ -1478,8 +1313,6 @@ components:
     NodeUID:
       type: string
       format: uuid
-      x-oapi-codegen-extra-tags:
-        gorm: primaryKey
     Node:
       type: object
       description: >
@@ -1493,13 +1326,11 @@ components:
         - updated_at
         - name
         - definition
-        - location_name
+        - location
         - address
       properties:
         UID:
           $ref: '#/components/schemas/NodeUID'
-          x-oapi-codegen-extra-tags:
-            gorm: primaryKey
         created_at:
           x-go-type: time.Time
         updated_at:
@@ -1512,7 +1343,7 @@ components:
           description: Unique name of the Node
         definition:
           $ref: '#/components/schemas/NodeDefinition'
-        location_name:
+        location:
           # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/LocationName'
           type: string
           description: Where the Node is located
@@ -1551,17 +1382,15 @@ components:
           items:
             x-go-type: net.InterfaceStat
 
-    ResourceUID:
+    ApplicationResourceUID:
       type: string
       format: uuid
-      x-oapi-codegen-extra-tags:
-        gorm: primaryKey
-    Resource:
+    ApplicationResource:
       type: object
       description: >
-        Active resource definition to be able to properly restore the state during the cluster node
-        restart. Also contains additional info about the resource, for example user requested
-        metadata, which is available for the resource through the `Meta API`.
+        Managed instance definition to be able to properly restore the state during the cluster
+        node restart. Also contains additional info about the instance, for example user requested
+        metadata, which is available for the instance through the `Meta API`.
 
         Could be created and updated only by the node which won the Application execution.
       required:
@@ -1578,9 +1407,7 @@ components:
         - metadata
       properties:
         UID:
-          $ref: '#/components/schemas/ResourceUID'
-          x-oapi-codegen-extra-tags:
-            gorm: primaryKey
+          $ref: '#/components/schemas/ApplicationResourceUID'
         created_at:
           x-go-type: time.Time
         updated_at:
@@ -1608,11 +1435,11 @@ components:
         identifier:
           type: string
           description: |
-            Unique for driver identifier of the resource which can be used to find it later.
+            Unique for driver identifier of the instance which can be used to find it later.
         ip_addr:
           type: string
           description: >
-            Is a weak current network IP address of the resource, usually gathered based on the
+            Is a weak current network IP address of the instance, usually gathered based on the
             `hw_addr`.
         hw_addr:
           type: string
@@ -1623,7 +1450,7 @@ components:
           x-go-type: util.UnparsedJSON
           description: >
             Combined Application and Label metadata (in this order) to make it available through
-            `Meta API` to the resource.
+            `Meta API` to the instance.
           example:
             JENKINS_URL: 'http://172.16.1.1:8085/'
             JENKINS_AGENT_SECRET: 03839eabcf945b1e780be8f9488d264c4c57bf388546da9a84588345555f29b0
@@ -1633,12 +1460,10 @@ components:
           $ref: '#/components/schemas/Authentication'
           description: Authentication information to connect.
 
-    ResourceAccessUID:
+    ApplicationResourceAccessUID:
       type: string
       format: uuid
-      x-oapi-codegen-extra-tags:
-        gorm: primaryKey
-    ResourceAccess:
+    ApplicationResourceAccess:
       type: object
       description: >
         An accessor entry to be able to identify and look up different
@@ -1648,24 +1473,22 @@ components:
       required:
         - UID
         - created_at
-        - resource_UID
+        - application_resource_UID
         - address
         - username
         - password
         - key
       properties:
         UID:
-          $ref: '#/components/schemas/ResourceAccessUID'
-          x-oapi-codegen-extra-tags:
-            gorm: primaryKey
+          $ref: '#/components/schemas/ApplicationResourceAccessUID'
         created_at:
           x-go-type: time.Time
-        resource_UID:
-          # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/ResourceAccessUID'
+        application_resource_UID:
+          # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/ApplicationResourceAccessUID'
           type: string
           format: uuid
           x-oapi-codegen-extra-tags:
-            yaml: resource_UID
+            yaml: application_resource_UID
         address:
           type: string
           description: |
@@ -1696,15 +1519,15 @@ components:
         username:
           type: string
           description: |
-            The username to login into the Resource.
+            The username to login into the ApplicationResource.
         password:
           type: string
           description: >
-            The password to login into the Resource.
+            The password to login into the ApplicationResource.
         key:
           type: string
           description: >
-            SSH private key to use instead of password to login into the Resource.
+            SSH private key to use instead of password to login into the ApplicationResource.
         port:
           type: integer
           description: >
@@ -1713,14 +1536,13 @@ components:
     VoteUID:
       type: string
       format: uuid
-      x-oapi-codegen-extra-tags:
-        gorm: primaryKey
     Vote:
       type: object
       description: >
         When Application becomes available for the node it starts to vote to notify the cluster
         about its availability. Votes are basically "yes" or "no" and could take a number of rounds
         depends on the cluster voting and election rules.
+        Votes are not stored in DB and lives only in-memory.
       required:
         - UID
         - created_at
@@ -1728,12 +1550,11 @@ components:
         - node_UID
         - round
         - available
+        - rule_result
         - rand
       properties:
         UID:
           $ref: '#/components/schemas/VoteUID'
-          x-oapi-codegen-extra-tags:
-            gorm: primaryKey
         created_at:
           x-go-type: time.Time
         application_UID:
@@ -1742,18 +1563,14 @@ components:
           format: uuid
           x-oapi-codegen-extra-tags:
             yaml: application_UID
-            gorm: uniqueIndex:idx_node_app_round_uniq
         node_UID:
           # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/NodeUID'
           type: string
           format: uuid
           x-oapi-codegen-extra-tags:
             yaml: node_UID
-            gorm: uniqueIndex:idx_node_app_round_uniq
         round:
           x-go-type: uint16
-          x-oapi-codegen-extra-tags:
-            gorm: uniqueIndex:idx_node_app_round_uniq
           description: >
             Round of the election, because it can take a number of rounds to figure out the Only
             One.
@@ -1763,40 +1580,16 @@ components:
             Node places answer to the Vote for the Application's definitions, the number represents
             the first available index of the definition which fits the node available resources. In
             case it's `-1` then node can't run any of the definitions.
+        rule_result:
+          x-go-type: uint32
+          description: The custom rule result is needed to store the custom rule decision
         rand:
           x-go-type: uint32
           description: The last resort to figure out for the winner.
 
-    LocationName:
-      type: string
-      description: Name of the location
-      x-oapi-codegen-extra-tags:
-        gorm: primaryKey
-    Location:
-      type: object
-      description: >
-        In order to properly distribute the nodes across locations it's better to have this in
-        place to properly redirect the services to the nearest one according to the node location.
-      required:
-        - name
-        - created_at
-        - description
-      properties:
-        name:
-          $ref: '#/components/schemas/LocationName'
-          x-oapi-codegen-extra-tags:
-            gorm: primaryKey
-        created_at:
-          x-go-type: time.Time
-        description:
-          type: string
-          description: Additional information about the location
-
     ServiceMappingUID:
       type: string
       format: uuid
-      x-oapi-codegen-extra-tags:
-        gorm: primaryKey
     ServiceMapping:
       type: object
       description: >
@@ -1807,15 +1600,13 @@ components:
       required:
         - UID
         - created_at
-        - location_name
+        - location
         - service
         - redirect
         - application_UID
       properties:
         UID:
           $ref: '#/components/schemas/ServiceMappingUID'
-          x-oapi-codegen-extra-tags:
-            gorm: primaryKey
         created_at:
           x-go-type: time.Time
         service:
@@ -1826,7 +1617,7 @@ components:
         redirect:
           type: string
           description: FQDN or IP address of where to rediect the service request
-        location_name:
+        location:
           # TODO: in OAPI v3.1.0 siblings: $ref: '#/components/schemas/LocationName'
           type: string
           x-oapi-codegen-extra-tags:

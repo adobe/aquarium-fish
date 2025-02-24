@@ -260,7 +260,7 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ types.Resources, def types.La
 //
 // It selects the AMI and run instance
 // Uses metadata to fill EC2 instance userdata
-func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*types.Resource, error) {
+func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*types.ApplicationResource, error) {
 	// Generate fish name
 	buf := crypt.RandBytes(6)
 	iName := fmt.Sprintf("fish-%02x%02x%02x%02x%02x%02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5])
@@ -493,7 +493,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 		}
 	}
 
-	res := &types.Resource{}
+	res := &types.ApplicationResource{}
 
 	// Wait for IP address to be assigned to the instance
 	timeout := 60
@@ -525,7 +525,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 }
 
 // Status shows status of the resource
-func (d *Driver) Status(res *types.Resource) (string, error) {
+func (d *Driver) Status(res *types.ApplicationResource) (string, error) {
 	if res == nil || res.Identifier == "" {
 		return "", fmt.Errorf("AWS: Invalid resource: %v", res)
 	}
@@ -562,7 +562,7 @@ func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
 }
 
 // Deallocate the resource
-func (d *Driver) Deallocate(res *types.Resource) error {
+func (d *Driver) Deallocate(res *types.ApplicationResource) error {
 	if res == nil || res.Identifier == "" {
 		return fmt.Errorf("AWS: Invalid resource: %v", res)
 	}

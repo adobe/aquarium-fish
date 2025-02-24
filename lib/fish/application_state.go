@@ -14,6 +14,7 @@ package fish
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -22,7 +23,7 @@ import (
 
 // ApplicationStateList returns list of ApplicationStates
 func (f *Fish) ApplicationStateList() (ass []types.ApplicationState, err error) {
-	err = f.db.Find(&ass).Error
+	err = f.db.Collection("application_state").List(&ass)
 	return ass, err
 }
 
@@ -36,7 +37,8 @@ func (f *Fish) ApplicationStateCreate(as *types.ApplicationState) error {
 	}
 
 	as.UID = f.NewUID()
-	return f.db.Create(as).Error
+	as.CreatedAt = time.Now()
+	return f.db.Collection("application_state").Add(as.UID.String(), as)
 }
 
 // Intentionally disabled, application state can't be updated
@@ -46,16 +48,54 @@ func (f *Fish) ApplicationStateCreate(as *types.ApplicationState) error {
 
 // ApplicationStateGet returns specific ApplicationState
 func (f *Fish) ApplicationStateGet(uid types.ApplicationStateUID) (as *types.ApplicationState, err error) {
-	as = &types.ApplicationState{}
-	err = f.db.First(as, uid).Error
+	err = f.db.Collection("application_state").Get(uid.String(), &as)
 	return as, err
 }
 
-// ApplicationStateGetByApplication returns ApplicationState by ApplicationUID
-func (f *Fish) ApplicationStateGetByApplication(appUID types.ApplicationUID) (as *types.ApplicationState, err error) {
-	as = &types.ApplicationState{}
-	err = f.db.Where("application_uid = ?", appUID).Order("created_at desc").First(as).Error
-	return as, err
+// ApplicationStatesGetByApplication returns all ApplicationStates with ApplicationUID
+func (f *Fish) ApplicationStatesGetByApplication(appUID types.ApplicationUID) (states []types.ApplicationState, err error) {
+	if all, err := f.ApplicationStateList(); err == nil {
+		for _, as := range all {
+			if as.ApplicationUID == appUID {
+				states = append(states, as)
+			}
+		}
+	} else {
+		return states, err
+	}
+	return states, err
+}
+
+// ApplicationStatesGetLatest returns latest ApplicationState per Application
+func (f *Fish) ApplicationStatesGetLatest() (out []types.ApplicationState, err error) {
+	states := make(map[types.ApplicationUID]*types.ApplicationState)
+	if all, err := f.ApplicationStateList(); err == nil {
+		for _, as := range all {
+			if stat, ok := states[as.ApplicationUID]; !ok || stat.CreatedAt.Before(as.CreatedAt) {
+				states[as.ApplicationUID] = &as
+			}
+		}
+	} else {
+		return out, err
+	}
+	for _, as := range states {
+		out = append(out, *as)
+	}
+	return out, nil
+}
+
+// ApplicationStateGetByApplication returns latest ApplicationState of requested ApplicationUID
+func (f *Fish) ApplicationStateGetByApplication(appUID types.ApplicationUID) (state *types.ApplicationState, err error) {
+	if all, err := f.ApplicationStatesGetByApplication(appUID); err == nil {
+		for _, as := range all {
+			if state == nil || state.CreatedAt.Before(as.CreatedAt) {
+				state = &as
+			}
+		}
+	} else {
+		return nil, err
+	}
+	return state, err
 }
 
 // ApplicationStateIsActive returns false if Status in ERROR, DEALLOCATE or DEALLOCATED state

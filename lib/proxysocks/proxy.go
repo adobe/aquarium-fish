@@ -43,7 +43,7 @@ func (p *ProxyAccess) Allow(ctx context.Context, req *socks5.Request) (context.C
 	log.Debug("Proxy: Requested proxy from", req.RemoteAddr, "to", req.DestAddr)
 
 	// Only the existing node resource can use the proxy
-	res, err := p.fish.ResourceGetByIP(req.RemoteAddr.IP.String())
+	res, err := p.fish.ApplicationResourceGetByIP(req.RemoteAddr.IP.String())
 	if err != nil {
 		log.Warn("Proxy: Denied proxy from the unauthorized client:", req.RemoteAddr, err)
 		return ctx, false
@@ -54,7 +54,7 @@ func (p *ProxyAccess) Allow(ctx context.Context, req *socks5.Request) (context.C
 	if dest == "" {
 		dest = req.DestAddr.IP.String()
 	}
-	overDest := p.fish.ResourceServiceMappingByApplicationAndDest(res.ApplicationUID, dest)
+	overDest := p.fish.ServiceMappingByApplicationAndDest(res.ApplicationUID, dest)
 	if overDest == "" {
 		log.Warn("Proxy: Denied proxy from", req.RemoteAddr, "to", req.DestAddr)
 		return ctx, false

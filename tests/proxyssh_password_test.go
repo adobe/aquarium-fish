@@ -134,7 +134,7 @@ drivers:
 		})
 	})
 
-	var res types.Resource
+	var res types.ApplicationResource
 	t.Run("Resource should be created", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
@@ -151,11 +151,11 @@ drivers:
 	})
 
 	// Now working with the created Application to get access
-	var acc types.ResourceAccess
+	var acc types.ApplicationResourceAccess
 	t.Run("Requesting access to the Application Resource", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/resource/"+res.UID.String()+"/access")).
+			Get(afi.APIAddress("api/v1/applicationresource/"+res.UID.String()+"/access")).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
@@ -305,7 +305,7 @@ drivers:
 		})
 	})
 
-	var res types.Resource
+	var res types.ApplicationResource
 	t.Run("Resource should be created", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
@@ -322,11 +322,11 @@ drivers:
 	})
 
 	// Now working with the created Application to get access
-	var acc types.ResourceAccess
+	var acc types.ApplicationResourceAccess
 	t.Run("Requesting access to the Application Resource", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/resource/"+res.UID.String()+"/access")).
+			Get(afi.APIAddress("api/v1/applicationresource/"+res.UID.String()+"/access")).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
@@ -372,7 +372,7 @@ drivers:
 	t.Run("Requesting access 2 to the Application Resource", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/resource/"+res.UID.String()+"/access")).
+			Get(afi.APIAddress("api/v1/applicationresource/"+res.UID.String()+"/access")).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).

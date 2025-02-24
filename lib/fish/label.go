@@ -14,26 +14,64 @@ package fish
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
-	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
-	"github.com/adobe/aquarium-fish/lib/util"
 )
 
-// LabelFind returns list of Labels that fits filter
-func (f *Fish) LabelFind(filter *string) (labels []types.Label, err error) {
-	db := f.db
-	if filter != nil {
-		securedFilter, err := util.ExpressionSQLFilter(*filter)
-		if err != nil {
-			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
-			// We do not fail here because we should not give attacker more information
-			return labels, nil
+// LabelFind returns list of Labels that fits filters
+func (f *Fish) LabelList(filters types.LabelListGetParams) (labels []types.Label, err error) {
+	err = f.db.Collection("label").List(&labels)
+	filter_version := 0
+	if filters.Version != nil && *filters.Version != "last" {
+		// Try to convert to int and if fails
+		if filter_version, err = strconv.Atoi(*filters.Version); err != nil {
+			return labels, fmt.Errorf("Unable to parse Version integer: %v", err)
 		}
-		db = db.Where(securedFilter)
 	}
-	err = db.Find(&labels).Error
+	if err == nil && (filters.Name != nil || filters.Version != nil) {
+		passed := []types.Label{}
+		unique_labels := make(map[string]types.Label)
+		for _, label := range labels {
+			if filters.Name != nil && label.Name != *filters.Name {
+				continue
+			}
+			if filters.Version != nil {
+				if *filters.Version == "last" {
+					if item, ok := unique_labels[label.Name]; !ok || item.Version < label.Version {
+						unique_labels[label.Name] = label
+					}
+					continue
+				} else {
+					// Filtering specific version
+					if label.Version != filter_version {
+						continue
+					}
+				}
+			}
+			passed = append(passed, label)
+		}
+		if filters.Version != nil && *filters.Version == "last" {
+			for _, label := range unique_labels {
+				passed = append(passed, label)
+			}
+			labels = passed
+		}
+		labels = passed
+	}
+	return labels, err
+}
+
+func (f *Fish) LabelListName(name string) (labels []types.Label, err error) {
+	allLabels := []types.Label{}
+	if err = f.db.Collection("label").List(&allLabels); err == nil {
+		for _, l := range allLabels {
+			if l.Name == name {
+				labels = append(labels, l)
+			}
+		}
+	}
 	return labels, err
 }
 
@@ -41,6 +79,9 @@ func (f *Fish) LabelFind(filter *string) (labels []types.Label, err error) {
 func (f *Fish) LabelCreate(l *types.Label) error {
 	if l.Name == "" {
 		return fmt.Errorf("Fish: Name can't be empty")
+	}
+	if l.Version < 1 {
+		return fmt.Errorf("Fish: Version can't be less then 1")
 	}
 	for i, def := range l.Definitions {
 		if def.Driver == "" {
@@ -64,8 +105,16 @@ func (f *Fish) LabelCreate(l *types.Label) error {
 		l.Metadata = "{}"
 	}
 
+	// Name and version need to be unique
+	strversion := fmt.Sprintf("%d", l.Version)
+	founds, err := f.LabelList(types.LabelListGetParams{Name: &l.Name, Version: &strversion})
+	if err != nil || len(founds) != 0 {
+		return fmt.Errorf("Fish: Label name + version is not unique: %v", err)
+	}
+
 	l.UID = f.NewUID()
-	return f.db.Create(l).Error
+	l.CreatedAt = time.Now()
+	return f.db.Collection("label").Add(l.UID.String(), l)
 }
 
 // Intentionally disabled - labels can be created once and can't be updated
@@ -76,12 +125,11 @@ func (f *Fish) LabelCreate(l *types.Label) error {
 
 // LabelGet returns Label by UID
 func (f *Fish) LabelGet(uid types.LabelUID) (label *types.Label, err error) {
-	label = &types.Label{}
-	err = f.db.First(label, uid).Error
+	err = f.db.Collection("label").Get(uid.String(), &label)
 	return label, err
 }
 
 // LabelDelete deletes the Label by UID
 func (f *Fish) LabelDelete(uid types.LabelUID) error {
-	return f.db.Delete(&types.Label{}, uid).Error
+	return f.db.Collection("label").Delete(uid.String())
 }

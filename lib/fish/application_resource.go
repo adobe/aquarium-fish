@@ -16,40 +16,37 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mostlygeek/arp"
-	"gorm.io/gorm"
+	"go.mills.io/bitcask/v2"
 
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
-	"github.com/adobe/aquarium-fish/lib/util"
 )
 
-// ResourceFind lists Resources that fits filter
-func (f *Fish) ResourceFind(filter *string) (rs []types.Resource, err error) {
-	db := f.db
-	if filter != nil {
-		securedFilter, err := util.ExpressionSQLFilter(*filter)
-		if err != nil {
-			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
-			// We do not fail here because we should not give attacker more information
-			return rs, nil
+// ApplicationResourceList returns a list of all known ApplicationResource objects
+func (f *Fish) ApplicationResourceList() (rs []types.ApplicationResource, err error) {
+	err = f.db.Collection("application_resource").List(&rs)
+	return rs, err
+}
+
+// ApplicationResourceListNode returns list of resources for provided NodeUID
+func (f *Fish) ApplicationResourceListNode(nodeUID types.NodeUID) (rs []types.ApplicationResource, err error) {
+	all := []types.ApplicationResource{}
+	if all, err = f.ApplicationResourceList(); err == nil {
+		for _, r := range all {
+			if r.NodeUID == nodeUID {
+				rs = append(rs, r)
+			}
 		}
-		db = db.Where(securedFilter)
 	}
-	err = db.Find(&rs).Error
 	return rs, err
 }
 
-// ResourceListNode returns list of resources for provided NodeUID
-func (f *Fish) ResourceListNode(nodeUID types.NodeUID) (rs []types.Resource, err error) {
-	err = f.db.Where("node_uid = ?", nodeUID).Find(&rs).Error
-	return rs, err
-}
-
-// ResourceCreate makes new Resource
-func (f *Fish) ResourceCreate(r *types.Resource) error {
+// ApplicationResourceCreate makes new Resource
+func (f *Fish) ApplicationResourceCreate(r *types.ApplicationResource) error {
 	if r.ApplicationUID == uuid.Nil {
 		return fmt.Errorf("Fish: ApplicationUID can't be unset")
 	}
@@ -68,29 +65,31 @@ func (f *Fish) ResourceCreate(r *types.Resource) error {
 	}
 
 	r.UID = f.NewUID()
-	return f.db.Create(r).Error
+	r.CreatedAt = time.Now()
+	r.UpdatedAt = r.CreatedAt
+	return f.db.Collection("application_resource").Add(r.UID.String(), r)
 }
 
-// ResourceDelete removes Resource
-func (f *Fish) ResourceDelete(uid types.ResourceUID) error {
+// ApplicationResourceDelete removes Resource
+func (f *Fish) ApplicationResourceDelete(uid types.ApplicationResourceUID) error {
 	// First delete any references to this resource.
-	err := f.ResourceAccessDeleteByResource(uid)
+	err := f.ApplicationResourceAccessDeleteByResource(uid)
 	if err != nil {
-		log.Errorf("Unable to delete ResourceAccess associated with Resource UID=%v: %v", uid, err)
+		log.Warnf("Unable to delete ApplicationResourceAccess associated with ApplicationResourceUID %s: %v", uid, err)
 	}
 	// Now purge the resource.
-	return f.db.Delete(&types.Resource{}, uid).Error
+	return f.db.Collection("application_resource").Delete(uid.String())
 }
 
-// ResourceSave stores Resource
-func (f *Fish) ResourceSave(res *types.Resource) error {
-	return f.db.Save(res).Error
+// ApplicationResourceSave stores ApplicationResource
+func (f *Fish) ApplicationResourceSave(res *types.ApplicationResource) error {
+	res.UpdatedAt = time.Now()
+	return f.db.Collection("application_resource").Add(res.UID.String(), res)
 }
 
-// ResourceGet returns Resource by it's UID
-func (f *Fish) ResourceGet(uid types.ResourceUID) (res *types.Resource, err error) {
-	res = &types.Resource{}
-	err = f.db.First(res, uid).Error
+// ApplicationResourceGet returns Resource by it's UID
+func (f *Fish) ApplicationResourceGet(uid types.ApplicationResourceUID) (res *types.ApplicationResource, err error) {
+	err = f.db.Collection("application_resource").Get(uid.String(), &res)
 	return res, err
 }
 
@@ -149,16 +148,24 @@ func isControlledNetwork(ip string) bool {
 	return false
 }
 
-// ResourceGetByIP returns Resource by it's IP address
-func (f *Fish) ResourceGetByIP(ip string) (res *types.Resource, err error) {
-	res = &types.Resource{}
-
+// ApplicationResourceGetByIP returns Resource by it's IP address
+func (f *Fish) ApplicationResourceGetByIP(ip string) (res *types.ApplicationResource, err error) {
 	// Check by IP first
-	err = f.db.Where("node_uid = ?", f.GetNodeUID()).Where("ip_addr = ?", ip).First(res).Error
-	if err == nil {
+	all := []types.ApplicationResource{}
+	if all, err = f.ApplicationResourceList(); err == nil {
+		for _, r := range all {
+			if r.NodeUID == f.GetNodeUID() && r.IpAddr == ip {
+				res = &r
+				break
+			}
+		}
+	} else {
+		return nil, fmt.Errorf("Fish: Unable to get any ApplicationResource")
+	}
+	if res != nil {
 		// Check if the state is allocated to prevent old resources access
 		if f.ApplicationIsAllocated(res.ApplicationUID) != nil {
-			return nil, fmt.Errorf("Fish: Prohibited to access the Resource of not allocated Application")
+			return nil, fmt.Errorf("Fish: Prohibited to access the ApplicationResource of not allocated Application")
 		}
 
 		return res, nil
@@ -167,51 +174,46 @@ func (f *Fish) ResourceGetByIP(ip string) (res *types.Resource, err error) {
 	// Make sure the IP is the controlled network, otherwise someone from outside
 	// could become a local node resource, so let's be careful
 	if !isControlledNetwork(ip) {
-		return nil, fmt.Errorf("Fish: Prohibited to serve the Resource IP from not controlled network")
+		return nil, fmt.Errorf("Fish: Prohibited to serve the ApplicationResource IP from not controlled network")
 	}
 
 	// Check by MAC and update IP if found
 	// need to fix due to on mac arp can return just one digit
 	hwAddr := fixHwAddr(arp.Search(ip))
 	if hwAddr == "" {
-		return nil, gorm.ErrRecordNotFound
+		return nil, bitcask.ErrKeyNotFound
 	}
-	err = f.db.Where("node_uid = ?", f.GetNodeUID()).Where("hw_addr = ?", hwAddr).First(res).Error
-	if err != nil {
-		return nil, fmt.Errorf("Fish: %s for HW address %s", err, hwAddr)
+	for _, r := range all {
+		if r.NodeUID == f.GetNodeUID() && r.HwAddr == hwAddr {
+			res = &r
+			break
+		}
+	}
+	if res == nil {
+		return nil, fmt.Errorf("Fish: No ApplicationResource with HW address %s", hwAddr)
 	}
 
 	// Check if the state is allocated to prevent old resources access
 	if f.ApplicationIsAllocated(res.ApplicationUID) != nil {
-		return nil, fmt.Errorf("Fish: Prohibited to access the Resource of not allocated Application")
+		return nil, fmt.Errorf("Fish: Prohibited to access the ApplicationResource of not allocated Application")
 	}
 
-	log.Debug("Fish: Update IP address for the Resource of Application", res.ApplicationUID, ip)
+	log.Debug("Fish: Update IP address for the ApplicationResource", res.ApplicationUID, ip)
 	res.IpAddr = ip
-	err = f.ResourceSave(res)
+	err = f.ApplicationResourceSave(res)
 
 	return res, err
 }
 
-// ResourceGetByApplication returns Resource by ApplicationUID
-func (f *Fish) ResourceGetByApplication(appUID types.ApplicationUID) (res *types.Resource, err error) {
-	res = &types.Resource{}
-	err = f.db.Where("application_uid = ?", appUID).First(res).Error
-	return res, err
-}
-
-// ResourceServiceMappingByApplicationAndDest is trying to find the ResourceServiceMapping record with Application and Location if possible.
-// The application in priority, location - secondary priority, if no such records found - default will be used.
-func (f *Fish) ResourceServiceMappingByApplicationAndDest(appUID types.ApplicationUID, dest string) string {
-	sm := &types.ServiceMapping{}
-
-	err := f.db.Where(
-		"application_uid = ?", appUID).Where(
-		"location_uid = ?", f.GetLocationName()).Where(
-		"service = ?", dest).Order("application_uid DESC").Order("location_uid DESC").First(sm).Error
-	if err != nil {
-		return ""
+// ApplicationResourceGetByApplication returns ApplicationResource by ApplicationUID
+func (f *Fish) ApplicationResourceGetByApplication(appUID types.ApplicationUID) (res *types.ApplicationResource, err error) {
+	all := []types.ApplicationResource{}
+	if all, err = f.ApplicationResourceList(); err == nil {
+		for _, r := range all {
+			if r.ApplicationUID == appUID {
+				return &r, nil
+			}
+		}
 	}
-
-	return sm.Redirect
+	return res, fmt.Errorf("Fish: Unable to find ApplicationResource with requested Application UID: %s", appUID.String())
 }

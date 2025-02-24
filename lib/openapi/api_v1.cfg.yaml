@@ -4,11 +4,11 @@ output: api/server_v1.gen.go
 output-options:
   include-tags:
     - Application
+    - ApplicationResource
+    - ApplicationResourceAccess
     - Label
     - Location
     - Node
-    - Resource
-    - ResourceAccess
     - ServiceMapping
     - User
 generate:

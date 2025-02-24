@@ -145,7 +145,7 @@ func (d *Driver) AvailableCapacity(nodeUsage types.Resources, req types.LabelDef
 }
 
 // Allocate - pretends to Allocate (actually not) the Resource
-func (d *Driver) Allocate(def types.LabelDefinition, _ /*metadata*/ map[string]any) (*types.Resource, error) {
+func (d *Driver) Allocate(def types.LabelDefinition, _ /*metadata*/ map[string]any) (*types.ApplicationResource, error) {
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
 		return nil, log.Error("TEST: Unable to apply options:", err)
@@ -156,7 +156,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, _ /*metadata*/ map[string]a
 	}
 
 	// Generate random resource id and if exists - regenerate
-	res := &types.Resource{
+	res := &types.ApplicationResource{
 		IpAddr:         "127.0.0.1",
 		Authentication: def.Authentication,
 	}
@@ -180,7 +180,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, _ /*metadata*/ map[string]a
 }
 
 // Status shows status of the resource
-func (d *Driver) Status(res *types.Resource) (string, error) {
+func (d *Driver) Status(res *types.ApplicationResource) (string, error) {
 	if res == nil || res.Identifier == "" {
 		return "", fmt.Errorf("TEST: Invalid resource: %v", res)
 	}
@@ -217,7 +217,7 @@ func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
 }
 
 // Deallocate the resource
-func (d *Driver) Deallocate(res *types.Resource) error {
+func (d *Driver) Deallocate(res *types.ApplicationResource) error {
 	if res == nil || res.Identifier == "" {
 		return log.Error("TEST: Invalid resource:", res)
 	}

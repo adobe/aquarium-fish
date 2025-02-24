@@ -21,29 +21,17 @@ import (
 
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
-	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 // NodeFind returns list of Nodes that fits filter
-func (f *Fish) NodeFind(filter *string) (ns []types.Node, err error) {
-	db := f.db
-	if filter != nil {
-		securedFilter, err := util.ExpressionSQLFilter(*filter)
-		if err != nil {
-			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
-			// We do not fail here because we should not give attacker more information
-			return ns, nil
-		}
-		db = db.Where(securedFilter)
-	}
-	err = db.Find(&ns).Error
+func (f *Fish) NodeList() (ns []types.Node, err error) {
+	err = f.db.Collection("node").List(&ns)
 	return ns, err
 }
 
 // NodeGet returns Node by it's unique name
 func (f *Fish) NodeGet(name string) (node *types.Node, err error) {
-	node = &types.Node{}
-	err = f.db.Where("name = ?", name).First(node).Error
+	err = f.db.Collection("node").Get(name, &node)
 	return node, err
 }
 
@@ -51,7 +39,15 @@ func (f *Fish) NodeGet(name string) (node *types.Node, err error) {
 func (f *Fish) NodeActiveList() (ns []types.Node, err error) {
 	// Only the nodes that pinged at least twice the delay time
 	t := time.Now().Add(-types.NodePingDelay * 2 * time.Second)
-	err = f.db.Where("updated_at > ?", t).Find(&ns).Error
+	if all, err := f.NodeList(); err == nil {
+		for _, n := range all {
+			if t.Before(n.UpdatedAt) {
+				ns = append(ns, n)
+			}
+		}
+	} else {
+		return ns, err
+	}
 	return ns, err
 }
 
@@ -68,30 +64,36 @@ func (f *Fish) NodeCreate(n *types.Node) error {
 	hash := sha256.New()
 	hash.Write(*n.Pubkey)
 	n.UID = uuid.NewHash(hash, uuid.UUID{}, *n.Pubkey, 0)
-	return f.db.Create(n).Error
+	n.CreatedAt = time.Now()
+	n.UpdatedAt = n.CreatedAt
+	return f.db.Collection("node").Add(n.Name, n)
 }
 
 // NodeSave stores Node
 func (f *Fish) NodeSave(node *types.Node) error {
-	return f.db.Save(node).Error
+	node.UpdatedAt = time.Now()
+	return f.db.Collection("node").Add(node.Name, node)
 }
 
 // NodePing updates Node and shows that it's active
 func (f *Fish) NodePing(node *types.Node) error {
-	return f.db.Model(node).Update("name", node.Name).Error
+	return f.NodeSave(node)
 }
 
 func (f *Fish) pingProcess() {
+	f.routines.Add(1)
+	defer f.routines.Done()
+	defer log.Info("Fish Node: pingProcess stopped")
+
 	// In order to optimize network & database - update just UpdatedAt field
 	pingTicker := time.NewTicker(types.NodePingDelay * time.Second)
 	for {
-		if !f.running {
-			break
+		select {
+		case <-f.running.Done():
+			return
+		case <-pingTicker.C:
+			log.Debug("Fish Node: ping")
+			f.NodePing(f.node)
 		}
-
-		// TODO: Here should be select with quit in case app is stopped to not wait next ticker
-		<-pingTicker.C
-		log.Debug("Fish Node: ping")
-		f.NodePing(f.node)
 	}
 }

@@ -27,9 +27,9 @@ import (
 type TaskSnapshot struct {
 	driver *Driver
 
-	*types.ApplicationTask `json:"-"` // Info about the requested task
-	*types.LabelDefinition `json:"-"` // Info about the used label definition
-	*types.Resource        `json:"-"` // Info about the processed resource
+	*types.ApplicationTask     `json:"-"` // Info about the requested task
+	*types.LabelDefinition     `json:"-"` // Info about the used label definition
+	*types.ApplicationResource `json:"-"` // Info about the processed resource
 
 	Full bool `json:"full"` // Make full (all disks including OS image), or just the additional disks snapshot
 }
@@ -46,10 +46,10 @@ func (t *TaskSnapshot) Clone() drivers.ResourceDriverTask {
 }
 
 // SetInfo defines the task environment
-func (t *TaskSnapshot) SetInfo(task *types.ApplicationTask, def *types.LabelDefinition, res *types.Resource) {
+func (t *TaskSnapshot) SetInfo(task *types.ApplicationTask, def *types.LabelDefinition, res *types.ApplicationResource) {
 	t.ApplicationTask = task
 	t.LabelDefinition = def
-	t.Resource = res
+	t.ApplicationResource = res
 }
 
 // Execute runs the task
@@ -60,16 +60,16 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 	if t.LabelDefinition == nil {
 		return []byte(`{"error":"internal: invalid label definition"}`), log.Error("TEST: Invalid label definition:", t.LabelDefinition)
 	}
-	if t.Resource == nil || t.Resource.Identifier == "" {
-		return []byte(`{"error":"internal: invalid resource"}`), log.Error("TEST: Invalid resource:", t.Resource)
+	if t.ApplicationResource == nil || t.ApplicationResource.Identifier == "" {
+		return []byte(`{"error":"internal: invalid resource"}`), log.Error("TEST: Invalid resource:", t.ApplicationResource)
 	}
-	if err := randomFail(fmt.Sprintf("Snapshot %s", t.Resource.Identifier), t.driver.cfg.FailSnapshot); err != nil {
+	if err := randomFail(fmt.Sprintf("Snapshot %s", t.ApplicationResource.Identifier), t.driver.cfg.FailSnapshot); err != nil {
 		return []byte(`{}`), log.Error("TEST: RandomFail:", err)
 	}
 
-	resFile := filepath.Join(t.driver.cfg.WorkspacePath, t.Resource.Identifier)
+	resFile := filepath.Join(t.driver.cfg.WorkspacePath, t.ApplicationResource.Identifier)
 	if _, err := os.Stat(resFile); os.IsNotExist(err) {
-		return []byte(`{}`), fmt.Errorf("TEST: Unable to snapshot unavailable resource '%s'", t.Resource.Identifier)
+		return []byte(`{}`), fmt.Errorf("TEST: Unable to snapshot unavailable resource '%s'", t.ApplicationResource.Identifier)
 	}
 
 	return json.Marshal(map[string]any{"snapshots": []string{"test-snapshot"}, "when": t.ApplicationTask.When})

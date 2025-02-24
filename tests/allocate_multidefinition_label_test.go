@@ -116,7 +116,7 @@ drivers:
 		})
 	})
 
-	var res types.Resource
+	var res types.ApplicationResource
 	t.Run("Resource should be created with 1 in definition index", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).

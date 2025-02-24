@@ -14,28 +14,30 @@ package fish
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 
-	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
+// ApplicationTaskList returns all known ApplicationTasks
+func (f *Fish) ApplicationTaskList() (at []types.ApplicationTask, err error) {
+	err = f.db.Collection("application_task").List(&at)
+	return at, err
+}
+
 // ApplicationTaskFindByApplication allows to find all the ApplicationTasks by ApplciationUID
-func (f *Fish) ApplicationTaskFindByApplication(uid types.ApplicationUID, filter *string) (at []types.ApplicationTask, err error) {
-	db := f.db.Where("application_uid = ?", uid)
-	if filter != nil {
-		securedFilter, err := util.ExpressionSQLFilter(*filter)
-		if err != nil {
-			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
-			// We do not fail here because we should not give attacker more information
-			return at, nil
+func (f *Fish) ApplicationTaskListByApplication(uid types.ApplicationUID) (at []types.ApplicationTask, err error) {
+	all := []types.ApplicationTask{}
+	if all, err = f.ApplicationTaskList(); err == nil {
+		for _, a := range all {
+			if a.ApplicationUID == uid {
+				at = append(at, a)
+			}
 		}
-		// Adding parentheses to be sure we're have `application_uid AND (filter)`
-		db = db.Where("(" + securedFilter + ")")
 	}
-	err = db.Find(&at).Error
 	return at, err
 }
 
@@ -55,23 +57,34 @@ func (f *Fish) ApplicationTaskCreate(at *types.ApplicationTask) error {
 	}
 
 	at.UID = f.NewUID()
-	return f.db.Create(at).Error
+	at.CreatedAt = time.Now()
+	at.UpdatedAt = at.CreatedAt
+	return f.db.Collection("application_task").Add(at.UID.String(), at)
 }
 
 // ApplicationTaskSave stores the ApplicationTask
 func (f *Fish) ApplicationTaskSave(at *types.ApplicationTask) error {
-	return f.db.Save(at).Error
+	if at.UID == uuid.Nil {
+		return fmt.Errorf("Fish: UID can't be unset")
+	}
+	return f.db.Collection("application_task").Add(at.UID.String(), at)
 }
 
 // ApplicationTaskGet returns the ApplicationTask by ApplicationTaskUID
 func (f *Fish) ApplicationTaskGet(uid types.ApplicationTaskUID) (at *types.ApplicationTask, err error) {
-	at = &types.ApplicationTask{}
-	err = f.db.First(at, uid).Error
+	err = f.db.Collection("application_task").Get(uid.String(), &at)
 	return at, err
 }
 
 // ApplicationTaskListByApplicationAndWhen returns list of ApplicationTasks by ApplicationUID and When it need to be executed
 func (f *Fish) ApplicationTaskListByApplicationAndWhen(appUID types.ApplicationUID, when types.ApplicationStatus) (at []types.ApplicationTask, err error) {
-	err = f.db.Where(`application_uid = ? AND "when" = ?`, appUID, when).Order("created_at desc").Find(&at).Error
+	all := []types.ApplicationTask{}
+	if all, err = f.ApplicationTaskListByApplication(appUID); err == nil {
+		for _, a := range all {
+			if a.When == when {
+				at = append(at, a)
+			}
+		}
+	}
 	return at, err
 }

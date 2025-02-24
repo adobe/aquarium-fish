@@ -174,7 +174,7 @@ func (d *Driver) AvailableCapacity(nodeUsage types.Resources, req types.LabelDef
 //
 // It automatically download the required images, unpack them and runs the workload.
 // Using metadata to pass the env to the entry point of the image.
-func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*types.Resource, error) {
+func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*types.ApplicationResource, error) {
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
 		return nil, log.Error("Native: Unable to apply options:", err)
@@ -215,11 +215,11 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 
 	log.Infof("Native: Started environment for user %q", user)
 
-	return &types.Resource{Identifier: user}, nil
+	return &types.ApplicationResource{Identifier: user}, nil
 }
 
 // Status shows status of the resource
-func (*Driver) Status(res *types.Resource) (string, error) {
+func (*Driver) Status(res *types.ApplicationResource) (string, error) {
 	if res == nil || res.Identifier == "" {
 		return "", fmt.Errorf("Native: Invalid resource: %v", res)
 	}
@@ -251,7 +251,7 @@ func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
 }
 
 // Deallocate the resource
-func (d *Driver) Deallocate(res *types.Resource) error {
+func (d *Driver) Deallocate(res *types.ApplicationResource) error {
 	if res == nil || res.Identifier == "" {
 		return fmt.Errorf("Native: Invalid resource: %v", res)
 	}
