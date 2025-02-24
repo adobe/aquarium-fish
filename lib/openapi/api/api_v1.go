@@ -526,8 +526,8 @@ func (e *Processor) LabelListGet(c echo.Context, params types.LabelListGetParams
 	// It's dirty, so no doubt it will fail for complicated cases - so migrate to proper filters
 	if params.Filter != nil {
 		// Name label usually doesn't contain spaces, so using as separator
-		filter_split := strings.Split(*params.Filter, " ")
-		for _, item := range filter_split {
+		filterSplit := strings.Split(*params.Filter, " ")
+		for _, item := range filterSplit {
 			if params.Name == nil && strings.HasPrefix(item, "name=") {
 				val := strings.Trim(strings.SplitN(item, "=", 2)[1], "\"'")
 				params.Name = &val

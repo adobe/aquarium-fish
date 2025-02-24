@@ -34,8 +34,8 @@ func (f *Fish) ApplicationResourceList() (rs []types.ApplicationResource, err er
 
 // ApplicationResourceListNode returns list of resources for provided NodeUID
 func (f *Fish) ApplicationResourceListNode(nodeUID types.NodeUID) (rs []types.ApplicationResource, err error) {
-	all := []types.ApplicationResource{}
-	if all, err = f.ApplicationResourceList(); err == nil {
+	all, err := f.ApplicationResourceList()
+	if err == nil {
 		for _, r := range all {
 			if r.NodeUID == nodeUID {
 				rs = append(rs, r)
@@ -151,16 +151,15 @@ func isControlledNetwork(ip string) bool {
 // ApplicationResourceGetByIP returns Resource by it's IP address
 func (f *Fish) ApplicationResourceGetByIP(ip string) (res *types.ApplicationResource, err error) {
 	// Check by IP first
-	all := []types.ApplicationResource{}
-	if all, err = f.ApplicationResourceList(); err == nil {
-		for _, r := range all {
-			if r.NodeUID == f.GetNodeUID() && r.IpAddr == ip {
-				res = &r
-				break
-			}
-		}
-	} else {
+	all, err := f.ApplicationResourceList()
+	if err != nil {
 		return nil, fmt.Errorf("Fish: Unable to get any ApplicationResource")
+	}
+	for _, r := range all {
+		if r.NodeUID == f.GetNodeUID() && r.IpAddr == ip {
+			res = &r
+			break
+		}
 	}
 	if res != nil {
 		// Check if the state is allocated to prevent old resources access
@@ -207,8 +206,8 @@ func (f *Fish) ApplicationResourceGetByIP(ip string) (res *types.ApplicationReso
 
 // ApplicationResourceGetByApplication returns ApplicationResource by ApplicationUID
 func (f *Fish) ApplicationResourceGetByApplication(appUID types.ApplicationUID) (res *types.ApplicationResource, err error) {
-	all := []types.ApplicationResource{}
-	if all, err = f.ApplicationResourceList(); err == nil {
+	all, err := f.ApplicationResourceList()
+	if err == nil {
 		for _, r := range all {
 			if r.ApplicationUID == appUID {
 				return &r, nil

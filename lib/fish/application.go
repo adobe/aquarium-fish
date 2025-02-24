@@ -62,16 +62,16 @@ func (f *Fish) ApplicationGet(uid types.ApplicationUID) (a *types.Application, e
 
 // ApplicationListGetStatusNew returns new Applications
 func (f *Fish) ApplicationListGetStatusNew() (as []types.Application, err error) {
-	if states, err := f.ApplicationStatesGetLatest(); err == nil {
-		for _, stat := range states {
-			if stat.Status == types.ApplicationStatusNEW {
-				if app, err := f.ApplicationGet(stat.ApplicationUID); err == nil && app != nil {
-					as = append(as, *app)
-				}
+	states, err := f.ApplicationStatesGetLatest()
+	if err != nil {
+		return as, err
+	}
+	for _, stat := range states {
+		if stat.Status == types.ApplicationStatusNEW {
+			if app, err := f.ApplicationGet(stat.ApplicationUID); err == nil && app != nil {
+				as = append(as, *app)
 			}
 		}
-	} else {
-		return as, err
 	}
 	return as, err
 }

@@ -23,37 +23,36 @@ import (
 // LabelFind returns list of Labels that fits filters
 func (f *Fish) LabelList(filters types.LabelListGetParams) (labels []types.Label, err error) {
 	err = f.db.Collection("label").List(&labels)
-	filter_version := 0
+	filterVersion := 0
 	if filters.Version != nil && *filters.Version != "last" {
 		// Try to convert to int and if fails
-		if filter_version, err = strconv.Atoi(*filters.Version); err != nil {
+		if filterVersion, err = strconv.Atoi(*filters.Version); err != nil {
 			return labels, fmt.Errorf("Unable to parse Version integer: %v", err)
 		}
 	}
 	if err == nil && (filters.Name != nil || filters.Version != nil) {
 		passed := []types.Label{}
-		unique_labels := make(map[string]types.Label)
+		uniqueLabels := make(map[string]types.Label)
 		for _, label := range labels {
 			if filters.Name != nil && label.Name != *filters.Name {
 				continue
 			}
 			if filters.Version != nil {
 				if *filters.Version == "last" {
-					if item, ok := unique_labels[label.Name]; !ok || item.Version < label.Version {
-						unique_labels[label.Name] = label
+					if item, ok := uniqueLabels[label.Name]; !ok || item.Version < label.Version {
+						uniqueLabels[label.Name] = label
 					}
 					continue
-				} else {
-					// Filtering specific version
-					if label.Version != filter_version {
-						continue
-					}
+				}
+				// Filtering specific version
+				if label.Version != filterVersion {
+					continue
 				}
 			}
 			passed = append(passed, label)
 		}
 		if filters.Version != nil && *filters.Version == "last" {
-			for _, label := range unique_labels {
+			for _, label := range uniqueLabels {
 				passed = append(passed, label)
 			}
 			labels = passed

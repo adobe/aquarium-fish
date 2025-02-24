@@ -54,14 +54,14 @@ func (f *Fish) ApplicationStateGet(uid types.ApplicationStateUID) (as *types.App
 
 // ApplicationStatesGetByApplication returns all ApplicationStates with ApplicationUID
 func (f *Fish) ApplicationStatesGetByApplication(appUID types.ApplicationUID) (states []types.ApplicationState, err error) {
-	if all, err := f.ApplicationStateList(); err == nil {
-		for _, as := range all {
-			if as.ApplicationUID == appUID {
-				states = append(states, as)
-			}
-		}
-	} else {
+	all, err := f.ApplicationStateList()
+	if err != nil {
 		return states, err
+	}
+	for _, as := range all {
+		if as.ApplicationUID == appUID {
+			states = append(states, as)
+		}
 	}
 	return states, err
 }
@@ -69,14 +69,14 @@ func (f *Fish) ApplicationStatesGetByApplication(appUID types.ApplicationUID) (s
 // ApplicationStatesGetLatest returns latest ApplicationState per Application
 func (f *Fish) ApplicationStatesGetLatest() (out []types.ApplicationState, err error) {
 	states := make(map[types.ApplicationUID]*types.ApplicationState)
-	if all, err := f.ApplicationStateList(); err == nil {
-		for _, as := range all {
-			if stat, ok := states[as.ApplicationUID]; !ok || stat.CreatedAt.Before(as.CreatedAt) {
-				states[as.ApplicationUID] = &as
-			}
-		}
-	} else {
+	all, err := f.ApplicationStateList()
+	if err != nil {
 		return out, err
+	}
+	for _, as := range all {
+		if stat, ok := states[as.ApplicationUID]; !ok || stat.CreatedAt.Before(as.CreatedAt) {
+			states[as.ApplicationUID] = &as
+		}
 	}
 	for _, as := range states {
 		out = append(out, *as)
@@ -86,14 +86,14 @@ func (f *Fish) ApplicationStatesGetLatest() (out []types.ApplicationState, err e
 
 // ApplicationStateGetByApplication returns latest ApplicationState of requested ApplicationUID
 func (f *Fish) ApplicationStateGetByApplication(appUID types.ApplicationUID) (state *types.ApplicationState, err error) {
-	if all, err := f.ApplicationStatesGetByApplication(appUID); err == nil {
-		for _, as := range all {
-			if state == nil || state.CreatedAt.Before(as.CreatedAt) {
-				state = &as
-			}
-		}
-	} else {
+	all, err := f.ApplicationStatesGetByApplication(appUID)
+	if err != nil {
 		return nil, err
+	}
+	for _, as := range all {
+		if state == nil || state.CreatedAt.Before(as.CreatedAt) {
+			state = &as
+		}
 	}
 	return state, err
 }

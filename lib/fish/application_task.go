@@ -30,8 +30,8 @@ func (f *Fish) ApplicationTaskList() (at []types.ApplicationTask, err error) {
 
 // ApplicationTaskFindByApplication allows to find all the ApplicationTasks by ApplciationUID
 func (f *Fish) ApplicationTaskListByApplication(uid types.ApplicationUID) (at []types.ApplicationTask, err error) {
-	all := []types.ApplicationTask{}
-	if all, err = f.ApplicationTaskList(); err == nil {
+	all, err := f.ApplicationTaskList()
+	if err == nil {
 		for _, a := range all {
 			if a.ApplicationUID == uid {
 				at = append(at, a)
@@ -78,8 +78,8 @@ func (f *Fish) ApplicationTaskGet(uid types.ApplicationTaskUID) (at *types.Appli
 
 // ApplicationTaskListByApplicationAndWhen returns list of ApplicationTasks by ApplicationUID and When it need to be executed
 func (f *Fish) ApplicationTaskListByApplicationAndWhen(appUID types.ApplicationUID, when types.ApplicationStatus) (at []types.ApplicationTask, err error) {
-	all := []types.ApplicationTask{}
-	if all, err = f.ApplicationTaskListByApplication(appUID); err == nil {
+	all, err := f.ApplicationTaskListByApplication(appUID)
+	if err == nil {
 		for _, a := range all {
 			if a.When == when {
 				at = append(at, a)

@@ -55,7 +55,7 @@ type Fish struct {
 	Quit chan os.Signal
 
 	// Allows us to gracefully close all the subroutines
-	running       context.Context
+	running       context.Context //nolint:containedctx
 	runningCancel context.CancelFunc
 	routines      sync.WaitGroup
 
@@ -388,7 +388,7 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 		roundEndsAt := app.CreatedAt.Add(time.Duration(ElectionRoundTime*(vote.Round+1)) * time.Second)
 
 		// Loop to recheck status within the round
-		for roundEndsAt.Sub(time.Now()) > 0 {
+		for time.Until(roundEndsAt) > 0 {
 			// Check all the cluster nodes voted
 			nodes, err := f.NodeActiveList()
 			if err != nil {
@@ -451,7 +451,7 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 				// Wait till the next round
 				// Doesn't matter what's the result of the round - we need to wait till the next one
 				// anyway to check if the Application was served or run another round
-				toSleep := roundEndsAt.Sub(time.Now())
+				toSleep := time.Until(roundEndsAt)
 				time.Sleep(toSleep)
 
 				// Check if the Application changed state
@@ -872,11 +872,11 @@ func (f *Fish) activeVotesGet(appUID types.ApplicationUID) (*types.Vote, error) 
 	return nil, fmt.Errorf("Fish: Unable to find the app vote")
 }
 
-func (f *Fish) voteCurrentRoundGet(appCreatedAt time.Time) uint16 {
+func (*Fish) voteCurrentRoundGet(appCreatedAt time.Time) uint16 {
 	// In order to not start round too late - adding 1 second for processing, sending and syncing.
 	// Otherwise if the node is just started and the round is almost completed - there is no use
 	// to participate in the current round.
-	return uint16((time.Now().Sub(appCreatedAt).Seconds() + 1) / ElectionRoundTime)
+	return uint16((time.Since(appCreatedAt).Seconds() + 1) / ElectionRoundTime)
 }
 
 // activeVotesRemove completes the voting process by removing active Vote from the list
@@ -926,8 +926,8 @@ func (f *Fish) storageVotesCleanup() {
 	f.storageVotesMutex.Lock()
 	defer f.storageVotesMutex.Unlock()
 
-	found := false
-	for voteUid, vote := range f.storageVotes {
+	var found bool
+	for voteUID, vote := range f.storageVotes {
 		found = false
 		for appUID, round := range activeApps {
 			if vote.ApplicationUID == appUID && vote.Round == round {
@@ -936,7 +936,7 @@ func (f *Fish) storageVotesCleanup() {
 			}
 		}
 		if !found {
-			delete(f.storageVotes, voteUid)
+			delete(f.storageVotes, voteUID)
 		}
 	}
 }
@@ -1003,8 +1003,8 @@ func (f *Fish) activateShutdown() {
 					delayTimer = time.NewTimer(f.shutdownDelay)
 
 					// Those defers will be executed just once, so no issues with loop & defer
-					defer delayTickerReport.Stop() //nolint:revive
-					defer delayTimer.Stop()        //nolint:revive
+					defer delayTickerReport.Stop()
+					defer delayTimer.Stop()
 				} else {
 					// No delay is needed, so shutdown now
 					fireShutdown <- true

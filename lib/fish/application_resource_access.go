@@ -52,14 +52,14 @@ func (f *Fish) ApplicationResourceAccessDelete(uid types.ApplicationResourceAcce
 
 // ApplicationResourceAccessDeleteByResource removes ResourceAccess by ResourceUID
 func (f *Fish) ApplicationResourceAccessDeleteByResource(appresUID types.ApplicationResourceUID) error {
-	if all, err := f.ApplicationResourceAccessList(); err == nil {
-		for _, a := range all {
-			if a.ApplicationResourceUID == appresUID {
-				return f.ApplicationResourceAccessDelete(a.UID)
-			}
-		}
-	} else {
+	all, err := f.ApplicationResourceAccessList()
+	if err != nil {
 		return fmt.Errorf("Fish: Unable to find any ApplicationResourceAccess object to delete")
+	}
+	for _, a := range all {
+		if a.ApplicationResourceUID == appresUID {
+			return f.ApplicationResourceAccessDelete(a.UID)
+		}
 	}
 	return fmt.Errorf("Fish: Unable to find ApplicationResourceAccess with ApplicationResourceUID: %s", appresUID.String())
 }
@@ -67,21 +67,21 @@ func (f *Fish) ApplicationResourceAccessDeleteByResource(appresUID types.Applica
 // ApplicationResourceAccessSingleUsePasswordHash retrieves the password hash from the database *AND* deletes
 // it. Users must request a new Resource Access to connect again.
 func (f *Fish) ApplicationResourceAccessSingleUsePasswordHash(username string, hash string) (*types.ApplicationResourceAccess, error) {
-	if all, err := f.ApplicationResourceAccessList(); err == nil {
-		for _, ra := range all {
-			if ra.Username == username && ra.Password == hash {
-				if err = f.ApplicationResourceAccessDelete(ra.UID); err != nil {
-					// NOTE: in rare occasions, `err` here could end up propagating to the
-					// caller with a valid `ra`.  However, see ssh_proxy/proxy.go usage,
-					// in the event that our deletion failed (but nothing else), the single
-					// use connection ultimately gets rejected.
-					log.Errorf("Fish: Unable to remove ApplicationResourceAccess %s: %v", ra.UID.String(), err)
-				}
-				return &ra, f.ApplicationResourceAccessDelete(ra.UID)
-			}
-		}
-	} else {
+	all, err := f.ApplicationResourceAccessList()
+	if err != nil {
 		return nil, fmt.Errorf("Fish: No available ApplicationResourceAccess objects")
+	}
+	for _, ra := range all {
+		if ra.Username == username && ra.Password == hash {
+			if err = f.ApplicationResourceAccessDelete(ra.UID); err != nil {
+				// NOTE: in rare occasions, `err` here could end up propagating to the
+				// caller with a valid `ra`.  However, see ssh_proxy/proxy.go usage,
+				// in the event that our deletion failed (but nothing else), the single
+				// use connection ultimately gets rejected.
+				log.Errorf("Fish: Unable to remove ApplicationResourceAccess %s: %v", ra.UID.String(), err)
+			}
+			return &ra, f.ApplicationResourceAccessDelete(ra.UID)
+		}
 	}
 	return nil, fmt.Errorf("Fish: No ApplicationResourceAccess found")
 }
@@ -89,21 +89,21 @@ func (f *Fish) ApplicationResourceAccessSingleUsePasswordHash(username string, h
 // ApplicationResourceAccessSingleUseKey retrieves the key from the database *AND* deletes it.
 // Users must request a new resource access to connect again.
 func (f *Fish) ApplicationResourceAccessSingleUseKey(username string, key string) (*types.ApplicationResourceAccess, error) {
-	if all, err := f.ApplicationResourceAccessList(); err == nil {
-		for _, ra := range all {
-			if ra.Username == username && ra.Key == key {
-				if err = f.ApplicationResourceAccessDelete(ra.UID); err != nil {
-					// NOTE: in rare occasions, `err` here could end up propagating to the
-					// caller with a valid `ra`.  However, see ssh_proxy/proxy.go usage,
-					// in the event that our deletion failed (but nothing else), the single
-					// use connection ultimately gets rejected.
-					log.Errorf("Fish: Unable to remove ApplicationResourceAccess %s: %v", ra.UID.String(), err)
-				}
-				return &ra, f.ApplicationResourceAccessDelete(ra.UID)
-			}
-		}
-	} else {
+	all, err := f.ApplicationResourceAccessList()
+	if err != nil {
 		return nil, fmt.Errorf("Fish: No available ApplicationResourceAccess objects")
+	}
+	for _, ra := range all {
+		if ra.Username == username && ra.Key == key {
+			if err = f.ApplicationResourceAccessDelete(ra.UID); err != nil {
+				// NOTE: in rare occasions, `err` here could end up propagating to the
+				// caller with a valid `ra`.  However, see ssh_proxy/proxy.go usage,
+				// in the event that our deletion failed (but nothing else), the single
+				// use connection ultimately gets rejected.
+				log.Errorf("Fish: Unable to remove ApplicationResourceAccess %s: %v", ra.UID.String(), err)
+			}
+			return &ra, f.ApplicationResourceAccessDelete(ra.UID)
+		}
 	}
 	return nil, fmt.Errorf("Fish: No ApplicationResourceAccess found")
 }

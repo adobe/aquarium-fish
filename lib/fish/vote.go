@@ -20,7 +20,7 @@ import (
 )
 
 // VoteCreate makes new Vote
-func (f *Fish) VoteCreate(appUID types.ApplicationUID) types.Vote {
+func (*Fish) VoteCreate(appUID types.ApplicationUID) types.Vote {
 	return types.Vote{
 		CreatedAt:      time.Now(),
 		ApplicationUID: appUID,
@@ -51,17 +51,17 @@ func (f *Fish) voteListGetApplicationRound(appUID types.ApplicationUID, round ui
 	f.storageVotesMutex.RLock()
 	defer f.storageVotesMutex.RUnlock()
 
-	found_current := false
+	found := false
 	for _, vote := range f.storageVotes {
 		if vote.ApplicationUID == appUID && vote.Round == round {
 			votes = append(votes, vote)
 			if vote.NodeUID == f.node.UID {
-				found_current = true
+				found = true
 			}
 		}
 	}
 
-	if !found_current {
+	if !found {
 		// Current node vote is not in the storage, so quickly looking into
 		if activeVote, err := f.activeVotesGet(appUID); activeVote != nil && err == nil {
 			votes = append(votes, *activeVote)

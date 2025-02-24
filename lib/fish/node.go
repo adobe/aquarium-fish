@@ -39,14 +39,14 @@ func (f *Fish) NodeGet(name string) (node *types.Node, err error) {
 func (f *Fish) NodeActiveList() (ns []types.Node, err error) {
 	// Only the nodes that pinged at least twice the delay time
 	t := time.Now().Add(-types.NodePingDelay * 2 * time.Second)
-	if all, err := f.NodeList(); err == nil {
-		for _, n := range all {
-			if t.Before(n.UpdatedAt) {
-				ns = append(ns, n)
-			}
-		}
-	} else {
+	all, err := f.NodeList()
+	if err != nil {
 		return ns, err
+	}
+	for _, n := range all {
+		if t.Before(n.UpdatedAt) {
+			ns = append(ns, n)
+		}
 	}
 	return ns, err
 }
