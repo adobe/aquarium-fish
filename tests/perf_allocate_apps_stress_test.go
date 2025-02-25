@@ -117,3 +117,96 @@ drivers:
 	}
 	wg.Wait()
 }
+
+// Checks if node can handle multiple application requests at a time with no auth
+// Without auth it should be relatively simple for the fish node to ingest 200 requests in less then a second
+func Test_allocate_apps_noauth_stress(t *testing.T) {
+	//t.Parallel()  - nope just one at a time
+	afi := h.NewAquariumFish(t, "node-1", `---
+node_location: test_loc
+cpu_limit: 1
+mem_target: "512MB"
+
+api_address: 127.0.0.1:0
+proxy_ssh_address: 127.0.0.1:0
+
+disable_auth: true
+
+drivers:
+  - name: test
+    cfg:
+      cpu_limit: 1000
+      ram_limit: 2000`)
+
+	t.Cleanup(func() {
+		afi.Cleanup(t)
+	})
+
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered in f", r)
+		}
+	}()
+
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	cli := &http.Client{
+		Timeout:   time.Second * 5,
+		Transport: tr,
+	}
+
+	var label types.Label
+	t.Run("Create Label", func(t *testing.T) {
+		apitest.New().
+			EnableNetworking(cli).
+			Post(afi.APIAddress("api/v1/label/")).
+			JSON(`{"name":"test-label", "version":1, "definitions": [
+				{"driver":"test", "resources":{"cpu":1,"ram":2}}
+			]}`).
+			BasicAuth("admin", "notoken").
+			Expect(t).
+			Status(http.StatusOK).
+			End().
+			JSON(&label)
+
+		if label.UID == uuid.Nil {
+			t.Fatalf("Label UID is incorrect: %v", label.UID)
+		}
+	})
+
+	// Spin up 200 of threads to create application and look what will happen
+	wg := &sync.WaitGroup{}
+	for i := 0; i < 200; i++ {
+		wg.Add(1)
+		go func(t *testing.T, wg *sync.WaitGroup, id int, afi *h.AFInstance, label string) {
+			defer wg.Done()
+
+			tr := &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			}
+			cli := &http.Client{
+				Timeout:   time.Second * 5,
+				Transport: tr,
+			}
+
+			var app types.Application
+			t.Run(fmt.Sprintf("%04d Create Application", id), func(t *testing.T) {
+				apitest.New().
+					EnableNetworking(cli).
+					Post(afi.APIAddress("api/v1/application/")).
+					JSON(`{"label_UID":"`+label+`"}`).
+					BasicAuth("admin", "notoken").
+					Expect(t).
+					Status(http.StatusOK).
+					End().
+					JSON(&app)
+
+				if app.UID == uuid.Nil {
+					t.Errorf("Application UID is incorrect: %v", app.UID)
+				}
+			})
+		}(t, wg, i, afi, label.UID.String())
+	}
+	wg.Wait()
+}

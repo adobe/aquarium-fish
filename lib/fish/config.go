@@ -45,6 +45,8 @@ type Config struct {
 
 	DefaultResourceLifetime string `json:"default_resource_lifetime"` // Sets the lifetime of the resource which will be used if label definition one is not set
 
+	DisableAuth bool `json:"disable_auth"` // WARNING! For performance testing only
+
 	// Configuration for the node drivers, if defined - only the listed plugins will be loaded
 	// Each configuration could instantinate the same driver multiple times by adding instance name
 	// separated from driver by slash symbol (like "<driver>/prod" - will create "prod" instance).

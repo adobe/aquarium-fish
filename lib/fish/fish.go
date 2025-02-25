@@ -233,9 +233,9 @@ func (f *Fish) GetNode() *types.Node {
 	return f.node
 }
 
-// GetProxySSHEndpoint returns address to connect by user to sshproxy
-func (f *Fish) GetProxySSHEndpoint() string {
-	return f.cfg.ProxySSHAddress
+// GetCfg returns fish configuration
+func (f *Fish) GetCfg() Config {
+	return *f.cfg
 }
 
 // NewUID Creates new UID with 6 starting bytes of Node UID as prefix

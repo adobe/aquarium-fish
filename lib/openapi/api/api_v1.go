@@ -55,7 +55,18 @@ func NewV1Router(e *echo.Echo, f *fish.Fish) {
 func (e *Processor) BasicAuth(username, password string, c echo.Context) (bool, error) {
 	c.Set("uid", crypt.RandString(8))
 	log.Debugf("API: %s: New request received: %s %s %s", username, c.Get("uid"), c.Path(), c.Request().URL.String())
-	user := e.fish.UserAuth(username, password)
+
+	var user *types.User
+	if e.fish.GetCfg().DisableAuth {
+		// This logic executed during performance tests only
+		var err error
+		user, err = e.fish.UserGet(username)
+		if err != nil {
+			return false, err
+		}
+	} else {
+		user = e.fish.UserAuth(username, password)
+	}
 
 	// Clean Auth header and set the user
 	c.Response().Header().Del("Authorization")
@@ -235,7 +246,7 @@ func (e *Processor) ApplicationResourceAccessPut(c echo.Context, uid types.Appli
 		// Storing address of the proxy to give the user idea of where to connect to.
 		// Later when cluster will be here - it could contain a different node IP instead, because
 		// this particular one could not be able to serve the connection.
-		Address:  e.fish.GetProxySSHEndpoint(),
+		Address:  e.fish.GetCfg().ProxySSHAddress,
 		Username: user.Name,
 		// We should not store clear password, so convert it to salted hash
 		Password: fmt.Sprintf("%x", pwdHash),
