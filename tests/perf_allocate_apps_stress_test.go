@@ -124,8 +124,8 @@ func Test_allocate_apps_noauth_stress(t *testing.T) {
 	//t.Parallel()  - nope just one at a time
 	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
-cpu_limit: 1
-mem_target: "512MB"
+cpu_limit: 8
+mem_target: "1024MB"
 
 api_address: 127.0.0.1:0
 proxy_ssh_address: 127.0.0.1:0
@@ -148,18 +148,18 @@ drivers:
 		}
 	}()
 
-	tr := &http.Transport{
+	tr := http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
-	cli := &http.Client{
+	cli := http.Client{
 		Timeout:   time.Second * 5,
-		Transport: tr,
+		Transport: &tr,
 	}
 
 	var label types.Label
 	t.Run("Create Label", func(t *testing.T) {
 		apitest.New().
-			EnableNetworking(cli).
+			EnableNetworking(&cli).
 			Post(afi.APIAddress("api/v1/label/")).
 			JSON(`{"name":"test-label", "version":1, "definitions": [
 				{"driver":"test", "resources":{"cpu":1,"ram":2}}
@@ -175,38 +175,36 @@ drivers:
 		}
 	})
 
-	// Spin up 200 of threads to create application and look what will happen
-	wg := &sync.WaitGroup{}
-	for i := 0; i < 200; i++ {
-		wg.Add(1)
-		go func(t *testing.T, wg *sync.WaitGroup, id int, afi *h.AFInstance, label string) {
-			defer wg.Done()
+	// Flooding the node with 100 batches of 200 parallel Applications requests
+	for b := 0; b < 100; b++ {
+		// Spin up 200 of threads to create application and look what will happen
+		wg := &sync.WaitGroup{}
+		afi.PrintMemUsage(t)
+		for i := 0; i < 200; i++ {
+			wg.Add(1)
+			go func(t *testing.T, wg *sync.WaitGroup, batch, id int, afi *h.AFInstance, label string) {
+				defer wg.Done()
 
-			tr := &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			}
-			cli := &http.Client{
-				Timeout:   time.Second * 5,
-				Transport: tr,
-			}
+				var app types.Application
+				t.Run(fmt.Sprintf("%03d-%04d Create Application", batch, id), func(t *testing.T) {
+					apitest.New().
+						EnableNetworking(&cli).
+						Post(afi.APIAddress("api/v1/application/")).
+						JSON(`{"label_UID":"`+label+`"}`).
+						BasicAuth("admin", "notoken").
+						Expect(t).
+						Status(http.StatusOK).
+						End().
+						JSON(&app)
 
-			var app types.Application
-			t.Run(fmt.Sprintf("%04d Create Application", id), func(t *testing.T) {
-				apitest.New().
-					EnableNetworking(cli).
-					Post(afi.APIAddress("api/v1/application/")).
-					JSON(`{"label_UID":"`+label+`"}`).
-					BasicAuth("admin", "notoken").
-					Expect(t).
-					Status(http.StatusOK).
-					End().
-					JSON(&app)
-
-				if app.UID == uuid.Nil {
-					t.Errorf("Application UID is incorrect: %v", app.UID)
-				}
-			})
-		}(t, wg, i, afi, label.UID.String())
+					if app.UID == uuid.Nil {
+						t.Errorf("Application UID is incorrect: %v", app.UID)
+					}
+				})
+			}(t, wg, b, i, afi, label.UID.String())
+		}
+		wg.Wait()
+		time.Sleep(100 * time.Millisecond)
 	}
-	wg.Wait()
+	afi.PrintMemUsage(t)
 }

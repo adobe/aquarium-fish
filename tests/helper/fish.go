@@ -16,10 +16,12 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"github.com/shirou/gopsutil/v4/process"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -154,13 +156,35 @@ func (afi *AFInstance) Stop(tb testing.TB) {
 	tb.Log("INFO: Wait 10s for fish node to stop:", afi.nodeName, afi.workspace)
 	for i := 1; i < 20; i++ {
 		if !afi.running {
+			tb.Log("INFO: MaxRSS:", afi.cmd.ProcessState.SysUsage().(*syscall.Rusage).Maxrss)
 			return
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 	}
 
 	// Hard killing the process
 	afi.fishKill()
+	for i := 1; i < 20; i++ {
+		if !afi.running {
+			tb.Log("INFO: MaxRSS:", afi.cmd.ProcessState.SysUsage().(*syscall.Rusage).Maxrss)
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+func (afi *AFInstance) PrintMemUsage(tb testing.TB) {
+	proc, err := process.NewProcess(int32(afi.cmd.Process.Pid))
+	if err != nil {
+		tb.Log("ERROR: Unable to read process for PID", afi.cmd.Process.Pid, err)
+		return
+	}
+	mem, err := proc.MemoryInfo()
+	if err != nil {
+		tb.Log("ERROR: Unable to read process memory info for PID", afi.cmd.Process.Pid, err)
+		return
+	}
+	tb.Log("INFO: node", afi.nodeName, "memory usage:", mem.String())
 }
 
 // Start the fish node executable
@@ -226,8 +250,8 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 	go func() {
 		afi.running = true
 		defer func() {
-			afi.running = false
 			r.Close()
+			afi.running = false
 		}()
 		if err := afi.cmd.Wait(); err != nil {
 			tb.Log("WARN: AquariumFish process was stopped:", err)

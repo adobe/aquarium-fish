@@ -1,0 +1,164 @@
+From 8ba6b39c3f327af8646de058ebc6e78c4e046152 Mon Sep 17 00:00:00 2001
+From: Sergei Parshev <parshev@adobe.com>
+Date: Wed, 26 Feb 2025 15:45:30 -0500
+Subject: [PATCH] Fix datafiles concurrent map read and map write
+
+---
+ bitcask.go     | 25 ++++++++++++++++++++++++-
+ stats.go       |  3 +++
+ transaction.go |  7 ++-----
+ 3 files changed, 29 insertions(+), 6 deletions(-)
+
+diff --git a/bitcask.go b/bitcask.go
+index 0f2c3f6..d3a87a2 100644
+--- a/bitcask.go
++++ b/bitcask.go
+@@ -65,7 +65,10 @@ type Bitcask struct {
+ 	options   []Option
+ 	path      string
+ 	current   data.Datafile
+-	datafiles map[int]data.Datafile
++
++	datafiles   map[int]data.Datafile
++	datafilesMu sync.RWMutex
++
+ 	trie      *iradix.Tree[internal.Item]
+ 	indexer   index.Indexer[internal.Item]
+ 	metadata  *metadata.MetaData
+@@ -103,6 +106,8 @@ func (b *Bitcask) close() error {
+ 		}
+ 	}
+ 
++	b.datafilesMu.RLock()
++	defer b.datafilesMu.RUnlock()
+ 	for _, df := range b.datafiles {
+ 		if err := df.Close(); err != nil {
+ 			return err
+@@ -226,7 +231,9 @@ func (b *Bitcask) read(key []byte) (internal.Entry, error) {
+ 	if item.FileID == b.current.FileID() {
+ 		df = b.current
+ 	} else {
++		b.datafilesMu.RLock()
+ 		df = b.datafiles[item.FileID]
++		b.datafilesMu.RUnlock()
+ 	}
+ 
+ 	e, err := df.ReadAt(item.Offset, item.Size)
+@@ -254,7 +261,9 @@ func (b *Bitcask) maybeRotate() error {
+ 	}
+ 
+ 	id := b.current.FileID()
++	b.datafilesMu.Lock()
+ 	b.datafiles[id] = b.current
++	b.datafilesMu.Unlock()
+ 	current, err := data.NewOnDiskDatafile(
+ 		b.path, id+1, false,
+ 		b.config.MaxKeySize,
+@@ -286,7 +295,10 @@ func (b *Bitcask) closeCurrentFile() error {
+ 		return err
+ 	}
+ 
++	b.datafilesMu.Lock()
++	defer b.datafilesMu.Unlock()
+ 	b.datafiles[id] = df
++
+ 	return nil
+ }
+ 
+@@ -335,6 +347,9 @@ func (b *Bitcask) reopen(readonly bool) error {
+ 
+ 	b.trie = t
+ 	b.current = current
++
++	b.datafilesMu.Lock()
++	defer b.datafilesMu.Unlock()
+ 	b.datafiles = datafiles
+ 
+ 	return nil
+@@ -368,9 +383,11 @@ func (b *Bitcask) Merge() error {
+ 		return err
+ 	}
+ 	filesToMerge := make([]int, 0, len(b.datafiles))
++	b.datafilesMu.RLock()
+ 	for k := range b.datafiles {
+ 		filesToMerge = append(filesToMerge, k)
+ 	}
++	b.datafilesMu.RUnlock()
+ 	err = b.openNewWriteableFile()
+ 	if err != nil {
+ 		b.mu.Unlock()
+@@ -608,6 +625,12 @@ func (b *Bitcask) saveMetadata() error {
+ 	return b.metadata.Save(filepath.Join(b.path, "meta.json"), b.config.FileMode)
+ }
+ 
++func (b *Bitcask) datafilesGet(id int) data.Datafile {
++	b.datafilesMu.RLock()
++	defer b.datafilesMu.RUnlock()
++	return b.datafiles[id]
++}
++
+ func loadDatafiles(path string, maxKeySize uint32, maxValueSize uint64, fileModeBeforeUmask os.FileMode) (datafiles map[int]data.Datafile, lastID int, err error) {
+ 	fns, err := internal.GetDatafiles(path)
+ 	if err != nil {
+diff --git a/stats.go b/stats.go
+index 3ce7522..264d1a8 100644
+--- a/stats.go
++++ b/stats.go
+@@ -17,7 +17,10 @@ func (b *Bitcask) Stats() (stats Stats, err error) {
+ 		return
+ 	}
+ 
++	b.datafilesMu.RLock()
+ 	stats.Datafiles = len(b.datafiles)
++	b.datafilesMu.RUnlock()
++
+ 	stats.Keys = b.trie.Len()
+ 	stats.Reclaimable = b.metadata.ReclaimableSpace
+ 
+diff --git a/transaction.go b/transaction.go
+index ea41cfa..33a85c0 100644
+--- a/transaction.go
++++ b/transaction.go
+@@ -21,7 +21,6 @@ type Txn struct {
+ 	db        *Bitcask
+ 	current   data.Datafile
+ 	previous  data.Datafile
+-	datafiles map[int]data.Datafile
+ 	batch     *Batch
+ 	trie      *iradix.Txn[internal.Item]
+ }
+@@ -74,7 +73,7 @@ func (t *Txn) get(key []byte) (internal.Entry, error) {
+ 	case t.previous.FileID():
+ 		df = t.previous
+ 	default:
+-		df = t.datafiles[item.FileID]
++		df = t.db.datafilesGet(item.FileID)
+ 	}
+ 
+ 	e, err := df.ReadAt(item.Offset, item.Size)
+@@ -105,7 +104,7 @@ func (t *Txn) getReader(key []byte) (io.ReadSeeker, error) {
+ 	case t.previous.FileID():
+ 		df = t.previous
+ 	default:
+-		df = t.datafiles[item.FileID]
++		df = t.db.datafilesGet(item.FileID)
+ 	}
+ 
+ 	return io.NewSectionReader(df.Reader(), item.Offset, item.Size), nil
+@@ -231,13 +230,11 @@ func (b *Bitcask) Transaction() *Txn {
+ 
+ 	current := data.NewInMemoryDatafile(-1, b.config.MaxKeySize, b.config.MaxValueSize)
+ 	previous := b.current.ReopenReadonly()
+-	datafiles := b.datafiles
+ 
+ 	return &Txn{
+ 		db:        b,
+ 		current:   current,
+ 		previous:  previous,
+-		datafiles: datafiles,
+ 		batch:     b.Batch(),
+ 		trie:      b.trie.Txn(),
+ 	}
+-- 
+2.39.3 (Apple Git-145)
+

@@ -20,8 +20,8 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/shirou/gopsutil/v3/cpu"
-	"github.com/shirou/gopsutil/v3/mem"
+	"github.com/shirou/gopsutil/v4/cpu"
+	"github.com/shirou/gopsutil/v4/mem"
 
 	"github.com/adobe/aquarium-fish/lib/log"
 )
