@@ -25,7 +25,7 @@ require (
 	github.com/spf13/cobra v1.8.0
 	github.com/steinfletcher/apitest v1.5.15
 	github.com/ulikunitz/xz v0.5.11
-	go.mills.io/bitcask/v2 v2.1.1
+	go.mills.io/bitcask/v2 v2.1.2
 	golang.org/x/crypto v0.26.0
 	golang.org/x/net v0.21.0
 	gopkg.in/yaml.v3 v3.0.1

@@ -51,20 +51,6 @@ BINARY_NAME="aquarium-fish-$git_version"
 # Doing check after generation because generated sources requires additional modules
 ./check.sh
 
-# Special fix for Bitcask 2.1.1
-if [ -d "$gopath/pkg/mod/go.mills.io/bitcask/v2@v2.1.1" ]; then
-    echo
-    echo "--- PATCH BITCASK #270 ---"
-    if grep -q 'datafilesGet(' "$gopath/pkg/mod/go.mills.io/bitcask/v2@v2.1.1/transaction.go"; then
-        echo "Already applied"
-    else
-        chmod -R +w "$gopath/pkg/mod/go.mills.io/bitcask/v2@v2.1.1"
-        patch -N -d "$gopath/pkg/mod/go.mills.io/bitcask/v2@v2.1.1" -p 1 < ./0001-Fix-datafiles-concurrent-map-read-and-map-write.patch
-        # Ensure it's patched
-        grep -q 'datafilesGet(' "$gopath/pkg/mod/go.mills.io/bitcask/v2@v2.1.1/transaction.go" || exit 1
-    fi
-fi
-
 echo
 echo "--- RUN UNIT TESTS ---"
 # Unit tests should not consume more then 5 sec per run - for that we have integration tests
