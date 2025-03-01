@@ -76,6 +76,11 @@ func (f *Fish) ApplicationTaskGet(uid types.ApplicationTaskUID) (at *types.Appli
 	return at, err
 }
 
+// ApplicationTaskDelete removes the ApplicationTask
+func (f *Fish) ApplicationTaskDelete(uid types.ApplicationTaskUID) (err error) {
+	return f.db.Collection("application_task").Delete(uid.String())
+}
+
 // ApplicationTaskListByApplicationAndWhen returns list of ApplicationTasks by ApplicationUID and When it need to be executed
 func (f *Fish) ApplicationTaskListByApplicationAndWhen(appUID types.ApplicationUID, when types.ApplicationStatus) (at []types.ApplicationTask, err error) {
 	all, err := f.ApplicationTaskListByApplication(appUID)

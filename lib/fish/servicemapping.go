@@ -55,6 +55,18 @@ func (f *Fish) ServiceMappingDelete(uid types.ServiceMappingUID) error {
 	return f.db.Collection("service_mapping").Delete(uid.String())
 }
 
+// ServiceMappingByApplication returns ServiceMapping list with specified ApplicationUID
+func (f *Fish) ServiceMappingListByApplication(appUID types.ApplicationUID) (sms []types.ServiceMapping, err error) {
+	if all, err := f.ServiceMappingList(); err == nil {
+		for _, sm := range all {
+			if sm.ApplicationUID == appUID {
+				sms = append(sms, sm)
+			}
+		}
+	}
+	return sms, err
+}
+
 // ServiceMappingByApplicationAndDest is trying to find the ServiceMapping record with Application and Location
 // The application in priority, location - secondary priority, if no such records found - default will be used.
 func (f *Fish) ServiceMappingByApplicationAndDest(appUID types.ApplicationUID, dest string) string {

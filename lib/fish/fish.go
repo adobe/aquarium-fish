@@ -51,6 +51,9 @@ type Fish struct {
 	node    *types.Node
 	cluster ClusterInterface
 
+	// When the fish was started
+	startup time.Time
+
 	// Signal to stop the fish
 	Quit chan os.Signal
 
@@ -96,6 +99,7 @@ func New(db *bitcask.Bitcask, cfg *Config) (*Fish, error) {
 
 // Init initializes the Fish node
 func (f *Fish) Init() error {
+	f.startup = time.Now()
 	f.shutdownCancel = make(chan bool)
 	f.Quit = make(chan os.Signal, 1)
 	signal.Notify(f.Quit, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
@@ -317,8 +321,17 @@ func (f *Fish) dbCleanupCompactProcess() {
 	defer log.Info("Fish: dbCleanupCompactProcess stopped")
 
 	// Checking the completed/error applications and clean up if they've sit there for > 5 minutes
-	cleanupTicker := time.NewTicker(5 * time.Minute)
+	dbCleanupDelay, err := time.ParseDuration(f.cfg.DBCleanupDelay)
+	if err != nil {
+		dbCleanupDelay = DefaultDBCleanupDelay
+		log.Errorf("Fish: dbCleanupCompactProcess: Delay is set incorrectly in fish config, using default %s: %v", dbCleanupDelay, err)
+	}
+	cleanupTicker := time.NewTicker(dbCleanupDelay / 2)
+	log.Infof("Fish: dbCleanupCompactProcess: Triggering CleanupDB once per %s", dbCleanupDelay/2)
+
 	compactionTicker := time.NewTicker(time.Hour)
+	log.Infof("Fish: dbCleanupCompactProcess: Triggering CompactDB once per %s", time.Hour)
+
 	for {
 		select {
 		case <-f.running.Done():
@@ -331,19 +344,84 @@ func (f *Fish) dbCleanupCompactProcess() {
 	}
 }
 
-// CleanupDB runs stale Applications and data removing from database to keep it slim
+// CleanupDB removing stale Applications and data from database to keep it slim
 func (f *Fish) CleanupDB() {
 	log.Debug("Fish: CleanupDB running...")
+	defer log.Debug("Fish: CleanupDB completed")
+
+	// Detecting the time we need to use as a cutting point
+	dbCleanupDelay, err := time.ParseDuration(f.cfg.DBCleanupDelay)
+	if err != nil {
+		dbCleanupDelay = DefaultDBCleanupDelay
+		log.Errorf("Fish: CleanupDB: Delay is set incorrectly in fish config, using default %s: %v", dbCleanupDelay, err)
+	}
+
+	cutTime := time.Now().Add(-dbCleanupDelay)
+
+	// In case fish just started - need to give some time before cleaning the database
+	log.Debugf("Fish: CleanupDB: Cut time: %v, %v", f.startup, cutTime)
+	if cutTime.Before(f.startup.Add(-dbCleanupDelay)) {
+		cutTime = f.startup.Add(-dbCleanupDelay)
+	}
+
 	// Look for the stale Applications
-	// TODO: implement the function
-	defer log.Debug("Fish: CleanupDB done")
+	states, err := f.ApplicationStateListLatest()
+	if err != nil {
+		log.Warnf("Fish: CleanupDB: Unable to get ApplicationStates: %v", err)
+		return
+	}
+	for _, state := range states {
+		if state.Status != types.ApplicationStatusERROR && state.Status != types.ApplicationStatusDEALLOCATED {
+			continue
+		}
+		log.Debugf("Fish: CleanupDB: Checking Application %s (%s): %v, %v", state.UID, state.Status, state.CreatedAt, cutTime)
+		if state.CreatedAt.After(cutTime) {
+			continue
+		}
+
+		log.Debugf("Fish: CleanupDB: Removing everything related to Application %s (%s)", state.ApplicationUID, state.Status)
+
+		// First of all removing the Application itself to make sure it will not be restarted
+		if err = f.ApplicationDelete(state.ApplicationUID); err != nil {
+			log.Errorf("Fish: CleanupDB: Unable to remove Application %s: %v", state.ApplicationUID, err)
+			continue
+		}
+
+		ats, _ := f.ApplicationTaskListByApplication(state.ApplicationUID)
+		for _, at := range ats {
+			if err = f.ApplicationTaskDelete(at.UID); err != nil {
+				log.Errorf("Fish: CleanupDB: Unable to remove ApplicationTask %s: %v", at.UID, err)
+			}
+		}
+
+		sms, _ := f.ServiceMappingListByApplication(state.ApplicationUID)
+		for _, sm := range sms {
+			if err = f.ServiceMappingDelete(sm.UID); err != nil {
+				log.Errorf("Fish: CleanupDB: Unable to remove ServiceMapping %s: %v", sm.UID, err)
+			}
+		}
+
+		ss, _ := f.ApplicationStateListByApplication(state.ApplicationUID)
+		for _, s := range ss {
+			if err = f.ApplicationStateDelete(s.UID); err != nil {
+				log.Errorf("Fish: CleanupDB: Unable to remove ApplicationState %s: %v", s.UID, err)
+			}
+		}
+	}
 }
 
 // CompactDB runs stale Applications and data removing
 func (f *Fish) CompactDB() {
 	log.Debug("Fish: CompactDB running...")
-	f.db.Merge()
 	defer log.Debug("Fish: CompactDB done")
+
+	s, _ := f.db.Stats()
+	log.Debugf("Fish: CompactDB: Before compaction: Datafiles: %d, Keys: %d, Size: %d, Reclaimable: %d", s.Datafiles, s.Keys, s.Size, s.Reclaimable)
+
+	f.db.Merge()
+
+	s, _ = f.db.Stats()
+	log.Debugf("Fish: CompactDB: After compaction: Datafiles: %d, Keys: %d, Size: %d, Reclaimable: %d", s.Datafiles, s.Keys, s.Size, s.Reclaimable)
 }
 
 // electionProcess performs & monitors the election process for the new Application until the exec
@@ -455,15 +533,17 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 				time.Sleep(toSleep)
 
 				// Check if the Application changed state
-				if s, err := f.ApplicationStateGetByApplication(appUID); err == nil {
-					if s.Status != types.ApplicationStatusNEW {
-						// The Application state was changed by some node, so we can drop the election process
-						f.activeVotesRemove(vote.UID)
-						f.storageVotesCleanup()
-						return nil
-					}
-				} else {
+				if s, err := f.ApplicationStateGetByApplication(appUID); err != nil {
 					log.Errorf("Fish: Vote %q: Unable to get the Application state: %v", appUID, err)
+					// The Application state was changed by some node, so we can drop the election process
+					f.activeVotesRemove(vote.UID)
+					f.storageVotesCleanup()
+					return nil
+				} else if s.Status != types.ApplicationStatusNEW {
+					// The Application state was changed by some node, so we can drop the election process
+					f.activeVotesRemove(vote.UID)
+					f.storageVotesCleanup()
+					return nil
 				}
 
 				// Next round seems needed

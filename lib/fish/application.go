@@ -60,9 +60,14 @@ func (f *Fish) ApplicationGet(uid types.ApplicationUID) (a *types.Application, e
 	return a, err
 }
 
+// ApplicationDelete removes the Application
+func (f *Fish) ApplicationDelete(uid types.ApplicationUID) (err error) {
+	return f.db.Collection("application").Delete(uid.String())
+}
+
 // ApplicationListGetStatusNew returns new Applications
 func (f *Fish) ApplicationListGetStatusNew() (as []types.Application, err error) {
-	states, err := f.ApplicationStatesGetLatest()
+	states, err := f.ApplicationStateListLatest()
 	if err != nil {
 		return as, err
 	}

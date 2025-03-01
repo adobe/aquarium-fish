@@ -97,7 +97,7 @@ jobs:
           INPUT_PUBLISH: true
           INPUT_CHECKS: true
           INPUT_PRUNE_COUNT: 30
-          INPUT_GO_TEST_FLAGS: "-run=^# -cpu 1,2 -benchmem"
+          INPUT_GO_TEST_FLAGS: "-run=^# -cpu 1,2 -benchmem -cpuprofile cpu.prof -memprofile mem.prof"
           INPUT_CHECKS_CONFIG: gobenchdata-checks.yml
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
 
@@ -108,14 +108,14 @@ jobs:
           INPUT_PUBLISH: false
           INPUT_CHECKS: true
           INPUT_PRUNE_COUNT: 30
-          INPUT_GO_TEST_FLAGS: "-run=^# -cpu 1,2 -benchmem"
+          INPUT_GO_TEST_FLAGS: "-run=^# -cpu 1,2 -benchmem -cpuprofile cpu.prof -memprofile mem.prof"
           INPUT_CHECKS_CONFIG: gobenchdata-checks.yml
 
       - name: Integration Tests
         run: |
           go install github.com/jstemmer/go-junit-report/v2@85bf471  # Oct 18, 2023
           name="$(ls aquarium-fish-*.linux_amd64)"
-          FISH_PATH="$PWD/$name" go test -v -parallel 4 -count=1 ./tests/... 2>&1 | go-junit-report -iocopy -set-exit-code -out report.xml
+          FISH_PATH="$PWD/$name" go test -v -parallel 4 -count=1 -cover -race ./tests/... 2>&1 | go-junit-report -iocopy -set-exit-code -out report.xml
 
       - name: Upload test results
         uses: actions/upload-artifact@v4

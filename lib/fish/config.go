@@ -21,6 +21,8 @@ import (
 	"github.com/ghodss/yaml"
 )
 
+const DefaultDBCleanupDelay = 10 * time.Minute
+
 // Config defines Fish node configuration
 type Config struct {
 	Directory string `json:"directory"` // Where to store database and other useful data (if relative - to CWD)
@@ -44,6 +46,8 @@ type Config struct {
 	NodeSSHKey string `json:"ssh_key"` // The SSH RSA identity private key for the fish node (if relative - to directory)
 
 	DefaultResourceLifetime string `json:"default_resource_lifetime"` // Sets the lifetime of the resource which will be used if label definition one is not set
+
+	DBCleanupDelay string `json:"db_cleanup_delay"` // Defines the database item cleanup delay when Applciation reached the end of life (by error or deallocated)
 
 	DisableAuth bool `json:"disable_auth"` // WARNING! For performance testing only
 
@@ -91,6 +95,10 @@ func (c *Config) ReadConfigFile(cfgPath string) error {
 		return fmt.Errorf("Fish: Default Resource Lifetime parse error: %v", err)
 	}
 
+	if _, err = time.ParseDuration(c.DBCleanupDelay); err != nil {
+		return fmt.Errorf("Fish: DB Cleanup Delay parse error: %v", err)
+	}
+
 	return nil
 }
 
@@ -104,4 +112,5 @@ func (c *Config) initDefaults() {
 	c.TLSCrt = "" // ...
 	c.TLSCaCrt = "ca.crt"
 	c.NodeName, _ = os.Hostname()
+	c.DBCleanupDelay = fmt.Sprintf("%s", DefaultDBCleanupDelay)
 }

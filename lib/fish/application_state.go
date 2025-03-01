@@ -52,8 +52,13 @@ func (f *Fish) ApplicationStateGet(uid types.ApplicationStateUID) (as *types.App
 	return as, err
 }
 
-// ApplicationStatesGetByApplication returns all ApplicationStates with ApplicationUID
-func (f *Fish) ApplicationStatesGetByApplication(appUID types.ApplicationUID) (states []types.ApplicationState, err error) {
+// ApplicationStateDelete removes the ApplicationState
+func (f *Fish) ApplicationStateDelete(uid types.ApplicationStateUID) (err error) {
+	return f.db.Collection("application_state").Delete(uid.String())
+}
+
+// ApplicationStateListByApplication returns all ApplicationStates with ApplicationUID
+func (f *Fish) ApplicationStateListByApplication(appUID types.ApplicationUID) (states []types.ApplicationState, err error) {
 	all, err := f.ApplicationStateList()
 	if err != nil {
 		return states, err
@@ -66,8 +71,8 @@ func (f *Fish) ApplicationStatesGetByApplication(appUID types.ApplicationUID) (s
 	return states, err
 }
 
-// ApplicationStatesGetLatest returns latest ApplicationState per Application
-func (f *Fish) ApplicationStatesGetLatest() (out []types.ApplicationState, err error) {
+// ApplicationStateListLatest returns list of latest ApplicationState per Application
+func (f *Fish) ApplicationStateListLatest() (out []types.ApplicationState, err error) {
 	states := make(map[types.ApplicationUID]*types.ApplicationState)
 	all, err := f.ApplicationStateList()
 	if err != nil {
@@ -86,7 +91,7 @@ func (f *Fish) ApplicationStatesGetLatest() (out []types.ApplicationState, err e
 
 // ApplicationStateGetByApplication returns latest ApplicationState of requested ApplicationUID
 func (f *Fish) ApplicationStateGetByApplication(appUID types.ApplicationUID) (state *types.ApplicationState, err error) {
-	all, err := f.ApplicationStatesGetByApplication(appUID)
+	all, err := f.ApplicationStateListByApplication(appUID)
 	if err != nil {
 		return nil, err
 	}
@@ -94,6 +99,9 @@ func (f *Fish) ApplicationStateGetByApplication(appUID types.ApplicationUID) (st
 		if state == nil || state.CreatedAt.Before(as.CreatedAt) {
 			state = &as
 		}
+	}
+	if state == nil {
+		err = fmt.Errorf("Fish: Unable to find any state with ApplicationUID %s", appUID)
 	}
 	return state, err
 }
