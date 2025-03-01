@@ -112,5 +112,5 @@ func (c *Config) initDefaults() {
 	c.TLSCrt = "" // ...
 	c.TLSCaCrt = "ca.crt"
 	c.NodeName, _ = os.Hostname()
-	c.DBCleanupDelay = fmt.Sprintf("%s", DefaultDBCleanupDelay)
+	c.DBCleanupDelay = DefaultDBCleanupDelay.String()
 }
