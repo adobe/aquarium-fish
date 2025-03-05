@@ -20,7 +20,6 @@ import (
 	"os/signal"
 	"path"
 	"path/filepath"
-	"sort"
 	"sync"
 	"syscall"
 	"time"
@@ -80,7 +79,7 @@ type Fish struct {
 
 	// Used to temporary store the won Votes by Application create time
 	wonVotesMutex sync.Mutex
-	wonVotes      map[int64]types.Vote
+	wonVotes      []types.Vote
 
 	// Stores the current usage of the node resources
 	nodeUsageMutex sync.Mutex // Is needed to protect node resources from concurrent allocations
@@ -105,7 +104,6 @@ func (f *Fish) Init() error {
 	signal.Notify(f.Quit, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 
 	// Init variables
-	f.wonVotes = make(map[int64]types.Vote, 5)
 	f.storageVotes = make(map[types.VoteUID]types.Vote)
 
 	// Create admin user and ignore errors if it's existing
@@ -292,24 +290,20 @@ func (f *Fish) checkNewApplicationProcess() {
 
 			// Check the Applications ready to be allocated
 			// It's needed to be single-threaded to have some order in allocation - FIFO principle,
-			// who requested first should be processed first.
+			// who won first should be processed first.
 			f.wonVotesMutex.Lock()
-			{
-				// We need to sort the won_votes by key which is time they was created
-				keys := make([]int64, 0, len(f.wonVotes))
-				for k := range f.wonVotes {
-					keys = append(keys, k)
-				}
-				sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
-
-				for _, k := range keys {
-					if err := f.executeApplication(f.wonVotes[k].ApplicationUID, f.wonVotes[k].Available); err != nil {
-						log.Errorf("Fish: Can't execute Application %s: %v", f.wonVotes[k].ApplicationUID, err)
-					}
-					delete(f.wonVotes, k)
-				}
+			toProcess := []types.Vote{}
+			for _, v := range f.wonVotes {
+				toProcess = append(toProcess, v)
 			}
 			f.wonVotesMutex.Unlock()
+
+			for _, v := range toProcess {
+				if err := f.executeApplication(v.ApplicationUID, v.Available); err != nil {
+					log.Errorf("Fish: Can't execute Application %s: %v", v.ApplicationUID, err)
+				}
+				f.wonVotesRemove(v.UID)
+			}
 		}
 	}
 }
@@ -439,9 +433,6 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 		return log.Errorf("Fish: Vote %q: Fatal: Unable to get the Application: %v", appUID, err)
 	}
 
-	// Set the initial round based on the time of Application creation
-	vote.Round = f.voteCurrentRoundGet(app.CreatedAt)
-
 	// Get label with the definitions
 	label, err := f.LabelGet(app.LabelUID)
 	if err != nil {
@@ -450,6 +441,9 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 
 	// Loop to reiterate each new round
 	for {
+		// Set the round based on the time of Application creation
+		vote.Round = f.voteCurrentRoundGet(app.CreatedAt)
+
 		log.Infof("Fish: Vote %q: Starting Application election round %d", appUID, vote.Round)
 
 		// Determine answer for this round, it will try find the first possible definition to serve
@@ -519,9 +513,7 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 					log.Infof("Fish: Vote %q: No candidates in round %d", appUID, vote.Round)
 				} else if bestVote.NodeUID == f.node.UID {
 					log.Infof("Fish: Vote %q: I won the election", appUID)
-					f.wonVotesMutex.Lock()
-					f.wonVotes[app.CreatedAt.UnixMicro()] = bestVote
-					f.wonVotesMutex.Unlock()
+					f.wonVotesAdd(bestVote)
 				} else {
 					log.Infof("Fish: Vote %q: I lost the election to Node %s", appUID, vote.NodeUID)
 				}
@@ -535,7 +527,7 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 				// Check if the Application changed state
 				if s, err := f.ApplicationStateGetByApplication(appUID); err != nil {
 					log.Errorf("Fish: Vote %q: Unable to get the Application state: %v", appUID, err)
-					// The Application state was changed by some node, so we can drop the election process
+					// The Application state is not found, so we can drop the election process
 					f.activeVotesRemove(vote.UID)
 					f.storageVotesCleanup()
 					return nil
@@ -547,7 +539,6 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 				}
 
 				// Next round seems needed
-				vote.Round++
 				vote.UID = uuid.Nil
 				break
 			}
@@ -952,13 +943,6 @@ func (f *Fish) activeVotesGet(appUID types.ApplicationUID) (*types.Vote, error) 
 	return nil, fmt.Errorf("Fish: Unable to find the app vote")
 }
 
-func (*Fish) voteCurrentRoundGet(appCreatedAt time.Time) uint16 {
-	// In order to not start round too late - adding 1 second for processing, sending and syncing.
-	// Otherwise if the node is just started and the round is almost completed - there is no use
-	// to participate in the current round.
-	return uint16((time.Since(appCreatedAt).Seconds() + 1) / ElectionRoundTime)
-}
-
 // activeVotesRemove completes the voting process by removing active Vote from the list
 func (f *Fish) activeVotesRemove(voteUID types.VoteUID) {
 	f.activeVotesMutex.Lock()
@@ -972,6 +956,33 @@ func (f *Fish) activeVotesRemove(voteUID types.VoteUID) {
 		f.activeVotes = av[:len(av)-1]
 		break
 	}
+}
+
+func (f *Fish) wonVotesAdd(vote types.Vote) {
+	f.wonVotesMutex.Lock()
+	defer f.wonVotesMutex.Unlock()
+	f.wonVotes = append(f.wonVotes, vote)
+}
+
+func (f *Fish) wonVotesRemove(voteUID types.VoteUID) {
+	f.wonVotesMutex.Lock()
+	defer f.wonVotesMutex.Unlock()
+	av := f.wonVotes
+	for i, v := range f.wonVotes {
+		if v.UID != voteUID {
+			continue
+		}
+		av[i] = av[len(av)-1]
+		f.wonVotes = av[:len(av)-1]
+		break
+	}
+}
+
+func (*Fish) voteCurrentRoundGet(appCreatedAt time.Time) uint16 {
+	// In order to not start round too late - adding 1 second for processing, sending and syncing.
+	// Otherwise if the node is just started and the round is almost completed - there is no use
+	// to participate in the current round.
+	return uint16((time.Since(appCreatedAt).Seconds() + 1) / ElectionRoundTime)
 }
 
 // StorageVotesAdd puts received votes from the cluster to the list
