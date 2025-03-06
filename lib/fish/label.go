@@ -86,7 +86,8 @@ func (f *Fish) LabelCreate(l *types.Label) error {
 		if def.Driver == "" {
 			return fmt.Errorf("Fish: Driver can't be empty in Label Definition %d", i)
 		}
-		if err := def.Resources.Validate([]string{}, false); err != nil {
+		// Executing Validate here on the list to allow to modify the incorrect data
+		if err := l.Definitions[i].Resources.Validate([]string{}, false); err != nil {
 			return fmt.Errorf("Fish: Resources validation failed: %v", err)
 		}
 		if def.Options == "" {

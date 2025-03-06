@@ -228,10 +228,16 @@ It uses the configuration from .golangci.yml file.
 
 ### Integration tests
 
-To verify that everything works as expected you can run integration tests like that:
-```sh
-$ FISH_PATH=$PWD/aquarium-fish.darwin_amd64 go test -v -failfast -parallel 4 ./tests/...
-```
+* To verify that everything works as expected you can run integration tests like that:
+   ```sh
+   $ FISH_PATH=$PWD/aquarium-fish.darwin_amd64 go test -v -failfast -count 1 ./tests
+   ```
+* To run just one test of the suite:
+   ```sh
+   $ FISH_PATH=$PWD/aquarium-fish.darwin_amd64 go test -v -failfast -count 1 -run '^TEST_NAME$' ./tests
+   ```
+* You can also validate what's happening in the apitest request by adding `Debug().` before Get/Post
+  specification.
 
 ### Benchmarks
 
