@@ -293,9 +293,7 @@ func (f *Fish) checkNewApplicationProcess() {
 			// who won first should be processed first.
 			f.wonVotesMutex.Lock()
 			toProcess := []types.Vote{}
-			for _, v := range f.wonVotes {
-				toProcess = append(toProcess, v)
-			}
+			toProcess = append(toProcess, f.wonVotes...)
 			f.wonVotesMutex.Unlock()
 
 			for _, v := range toProcess {
@@ -513,7 +511,7 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 					log.Infof("Fish: Vote %q: No candidates in round %d", appUID, vote.Round)
 				} else if bestVote.NodeUID == f.node.UID {
 					log.Infof("Fish: Vote %q: I won the election", appUID)
-					f.wonVotesAdd(bestVote)
+					f.wonVotesAdd(bestVote, app.CreatedAt)
 				} else {
 					log.Infof("Fish: Vote %q: I lost the election to Node %s", appUID, vote.NodeUID)
 				}
@@ -958,22 +956,31 @@ func (f *Fish) activeVotesRemove(voteUID types.VoteUID) {
 	}
 }
 
-func (f *Fish) wonVotesAdd(vote types.Vote) {
+// wonVotesAdd will add won vote to the list in order of Application CreatedAt
+func (f *Fish) wonVotesAdd(vote types.Vote, appCreatedAt time.Time) {
 	f.wonVotesMutex.Lock()
 	defer f.wonVotesMutex.Unlock()
 	f.wonVotes = append(f.wonVotes, vote)
+	for i, v := range f.wonVotes {
+		if app, err := f.ApplicationGet(v.ApplicationUID); err != nil || app.CreatedAt.Before(appCreatedAt) {
+			continue
+		}
+		copy(f.wonVotes[i+1:], f.wonVotes[i:])
+		f.wonVotes[i] = vote
+		break
+	}
 }
 
 func (f *Fish) wonVotesRemove(voteUID types.VoteUID) {
 	f.wonVotesMutex.Lock()
 	defer f.wonVotesMutex.Unlock()
-	av := f.wonVotes
+	wv := f.wonVotes
 	for i, v := range f.wonVotes {
 		if v.UID != voteUID {
 			continue
 		}
-		av[i] = av[len(av)-1]
-		f.wonVotes = av[:len(av)-1]
+		wv[i] = wv[len(wv)-1]
+		f.wonVotes = wv[:len(wv)-1]
 		break
 	}
 }
