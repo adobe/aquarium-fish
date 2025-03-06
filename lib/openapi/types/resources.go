@@ -13,44 +13,12 @@
 package types
 
 import (
-	"database/sql/driver"
-	"encoding/json"
 	"fmt"
 	"path"
+	"time"
 
 	"github.com/adobe/aquarium-fish/lib/util"
 )
-
-// GormDataType describes how to store Resources in database
-func (Resources) GormDataType() string {
-	return "blob"
-}
-
-// Scan converts the Resources to json bytes
-func (r *Resources) Scan(value any) error {
-	bytes, ok := value.([]byte)
-	if !ok {
-		return fmt.Errorf("Failed to unmarshal JSONB value: %s", value)
-	}
-
-	err := json.Unmarshal(bytes, r)
-
-	// Init the value, otherwise will return undesired nil
-	if err == nil && r.NodeFilter == nil {
-		r.NodeFilter = []string{}
-	}
-
-	return err
-}
-
-// Value converts json bytes to Resources
-func (r Resources) Value() (driver.Value, error) {
-	// Init the value, otherwise will return undesired nil
-	if r.NodeFilter == nil {
-		r.NodeFilter = []string{}
-	}
-	return json.Marshal(r)
-}
 
 // Validate makes sure the Resources are defined correctly
 func (r *Resources) Validate(diskTypes []string, checkNet bool) error {
@@ -72,7 +40,10 @@ func (r *Resources) Validate(diskTypes []string, checkNet bool) error {
 			return fmt.Errorf("Resources: Size of the disk can't be less than 1GB")
 		}
 	}
-	if len(r.NodeFilter) > 0 {
+	if r.NodeFilter == nil {
+		// OpenAPI requires here actual array instead of nil
+		r.NodeFilter = []string{}
+	} else {
 		// Check filter patterns are correct
 		for _, pattern := range r.NodeFilter {
 			_, err := path.Match(pattern, "whatever")
@@ -81,6 +52,12 @@ func (r *Resources) Validate(diskTypes []string, checkNet bool) error {
 			}
 		}
 	}
+
+	_, err := time.ParseDuration(r.Lifetime)
+	if r.Lifetime != "" && err != nil {
+		return fmt.Errorf("Resources: Unable to parse lifetime: %v", err)
+	}
+
 	if checkNet && r.Network != "" && r.Network != "nat" {
 		return fmt.Errorf("Resources: The network configuration must be either '' (empty for hostonly) or 'nat'")
 	}

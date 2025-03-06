@@ -13,37 +13,12 @@
 package types
 
 import (
-	"database/sql/driver"
-	"encoding/json"
-	"fmt"
-
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/disk"
 	"github.com/shirou/gopsutil/v4/host"
 	"github.com/shirou/gopsutil/v4/mem"
 	"github.com/shirou/gopsutil/v4/net"
 )
-
-// GormDataType describes how to store NodeDefinition in database
-func (NodeDefinition) GormDataType() string {
-	return "blob"
-}
-
-// Scan converts the NodeDefinition to json bytes
-func (nd *NodeDefinition) Scan(value any) error {
-	bytes, ok := value.([]byte)
-	if !ok {
-		return fmt.Errorf("Failed to unmarshal JSONB value: %s", value)
-	}
-
-	err := json.Unmarshal(bytes, nd)
-	return err
-}
-
-// Value converts json bytes to NodeDefinition
-func (nd NodeDefinition) Value() (driver.Value, error) {
-	return json.Marshal(nd)
-}
 
 // Update syncs the NodeDefinition to the current machine state
 func (nd *NodeDefinition) Update() {

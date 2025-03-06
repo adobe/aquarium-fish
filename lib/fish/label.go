@@ -86,15 +86,8 @@ func (f *Fish) LabelCreate(l *types.Label) error {
 		if def.Driver == "" {
 			return fmt.Errorf("Fish: Driver can't be empty in Label Definition %d", i)
 		}
-		if def.Resources.Cpu < 1 {
-			return fmt.Errorf("Fish: Resources CPU can't be less than 1 in Label Definition %d", i)
-		}
-		if def.Resources.Ram < 1 {
-			return fmt.Errorf("Fish: Resources RAM can't be less than 1 in Label Definition %d", i)
-		}
-		_, err := time.ParseDuration(def.Resources.Lifetime)
-		if def.Resources.Lifetime != "" && err != nil {
-			return fmt.Errorf("Fish: Resources Lifetime parse error in Label Definition %d: %v", i, err)
+		if err := def.Resources.Validate([]string{}, false); err != nil {
+			return fmt.Errorf("Fish: Resources validation failed: %v", err)
 		}
 		if def.Options == "" {
 			l.Definitions[i].Options = "{}"
