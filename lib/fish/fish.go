@@ -350,12 +350,6 @@ func (f *Fish) CleanupDB() {
 
 	cutTime := time.Now().Add(-dbCleanupDelay)
 
-	// In case fish just started - need to give some time before cleaning the database
-	log.Debugf("Fish: CleanupDB: Cut time: %v, %v", f.startup, cutTime)
-	if cutTime.Before(f.startup.Add(-dbCleanupDelay)) {
-		cutTime = f.startup.Add(-dbCleanupDelay)
-	}
-
 	// Look for the stale Applications
 	states, err := f.ApplicationStateListLatest()
 	if err != nil {
@@ -367,7 +361,13 @@ func (f *Fish) CleanupDB() {
 			continue
 		}
 		log.Debugf("Fish: CleanupDB: Checking Application %s (%s): %v, %v", state.UID, state.Status, state.CreatedAt, cutTime)
+
 		if state.CreatedAt.After(cutTime) {
+			continue
+		}
+
+		// If the Application died before the Fish is started - then we need to give it aditional dbCleanupDelay time
+		if state.CreatedAt.Before(f.startup.Add(dbCleanupDelay)) {
 			continue
 		}
 
