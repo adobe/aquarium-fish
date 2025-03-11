@@ -14,26 +14,16 @@ package fish
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
-	"github.com/adobe/aquarium-fish/lib/util"
 )
 
-// UserFind returns list of users that fits the filter
-func (f *Fish) UserFind(filter *string) (us []types.User, err error) {
-	db := f.db
-	if filter != nil {
-		securedFilter, err := util.ExpressionSQLFilter(*filter)
-		if err != nil {
-			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
-			// We do not fail here because we should not give attacker more information
-			return us, nil
-		}
-		db = db.Where(securedFilter)
-	}
-	err = db.Find(&us).Error
+// UserList returns list of users
+func (f *Fish) UserList() (us []types.User, err error) {
+	err = f.db.Collection("user").List(&us)
 	return us, err
 }
 
@@ -46,19 +36,26 @@ func (f *Fish) UserCreate(u *types.User) error {
 		return fmt.Errorf("Fish: Hash can't be empty")
 	}
 
-	return f.db.Create(u).Error
+	u.CreatedAt = time.Now()
+	u.UpdatedAt = u.CreatedAt
+	return f.db.Collection("user").Add(u.Name, u)
 }
 
 // UserSave stores User
 func (f *Fish) UserSave(u *types.User) error {
-	return f.db.Save(u).Error
+	u.UpdatedAt = time.Now()
+	return f.db.Collection("user").Add(u.Name, &u)
 }
 
 // UserGet returns User by unique name
 func (f *Fish) UserGet(name string) (u *types.User, err error) {
-	u = &types.User{}
-	err = f.db.Where("name = ?", name).First(u).Error
+	err = f.db.Collection("user").Get(name, &u)
 	return u, err
+}
+
+// UserDelete removes User
+func (f *Fish) UserDelete(name string) error {
+	return f.db.Collection("user").Delete(name)
 }
 
 // UserAuth returns User if name and password are correct
@@ -98,9 +95,4 @@ func (f *Fish) UserNew(name string, password string) (string, *types.User, error
 	}
 
 	return password, user, nil
-}
-
-// UserDelete removes User
-func (f *Fish) UserDelete(name string) error {
-	return f.db.Where("name = ?", name).Delete(&types.User{}).Error
 }

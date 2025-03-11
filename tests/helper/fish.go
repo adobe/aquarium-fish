@@ -20,8 +20,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
+	"syscall"
 	"testing"
 	"time"
+
+	"github.com/shirou/gopsutil/v4/process"
 )
 
 var fishPath = os.Getenv("FISH_PATH") // Full path to the aquarium-fish binary
@@ -38,6 +42,9 @@ type AFInstance struct {
 
 	apiEndpoint      string
 	proxysshEndpoint string
+
+	waitForLog   map[string]func(string, string) bool
+	waitForLogMu sync.RWMutex
 }
 
 // NewAquariumFish simple creates and run the fish node
@@ -54,7 +61,8 @@ func NewAfInstance(tb testing.TB, name, cfg string) *AFInstance {
 	tb.Helper()
 	tb.Log("INFO: Creating new node:", name)
 	afi := &AFInstance{
-		nodeName: name,
+		nodeName:   name,
+		waitForLog: make(map[string]func(string, string) bool),
 	}
 
 	afi.workspace = tb.TempDir()
@@ -154,13 +162,61 @@ func (afi *AFInstance) Stop(tb testing.TB) {
 	tb.Log("INFO: Wait 10s for fish node to stop:", afi.nodeName, afi.workspace)
 	for i := 1; i < 20; i++ {
 		if !afi.running {
+			usage, ok := afi.cmd.ProcessState.SysUsage().(*syscall.Rusage)
+			if ok {
+				tb.Log("INFO: MaxRSS:", usage.Maxrss)
+			}
 			return
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 	}
 
 	// Hard killing the process
 	afi.fishKill()
+	for i := 1; i < 20; i++ {
+		if !afi.running {
+			usage, ok := afi.cmd.ProcessState.SysUsage().(*syscall.Rusage)
+			if ok {
+				tb.Log("INFO: MaxRSS:", usage.Maxrss)
+			}
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+func (afi *AFInstance) PrintMemUsage(tb testing.TB) {
+	tb.Helper()
+	proc, err := process.NewProcess(int32(afi.cmd.Process.Pid))
+	if err != nil {
+		tb.Log("ERROR: Unable to read process for PID", afi.cmd.Process.Pid, err)
+		return
+	}
+	mem, err := proc.MemoryInfo()
+	if err != nil {
+		tb.Log("ERROR: Unable to read process memory info for PID", afi.cmd.Process.Pid, err)
+		return
+	}
+	tb.Log("INFO: node", afi.nodeName, "memory usage:", mem.String())
+}
+
+// WaitForLog stores substring to be looked in the Fish log to execute call function with substring & found line
+func (afi *AFInstance) WaitForLog(substring string, call func(string, string) bool) {
+	afi.waitForLogMu.Lock()
+	defer afi.waitForLogMu.Unlock()
+	afi.waitForLog[substring] = call
+}
+
+// callWaitForLog is called by log scanner when substring from waitForLog was found
+func (afi *AFInstance) callWaitForLog(substring, line string) {
+	afi.waitForLogMu.RLock()
+	call := afi.waitForLog[substring]
+	afi.waitForLogMu.RUnlock()
+	if processed := call(substring, line); processed {
+		afi.waitForLogMu.Lock()
+		delete(afi.waitForLog, substring)
+		afi.waitForLogMu.Unlock()
+	}
 }
 
 // Start the fish node executable
@@ -182,40 +238,72 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 
 	initDone := make(chan string)
 	scanner := bufio.NewScanner(r)
+
+	afi.WaitForLog("Admin user pass: ", func(substring, line string) bool {
+		if !strings.HasPrefix(line, substring) {
+			return false
+		}
+		val := strings.SplitN(strings.TrimSpace(line), substring, 2)
+		if len(val) < 2 {
+			initDone <- fmt.Sprintf("ERROR: No token after %q", substring)
+			return false
+		}
+		afi.adminToken = val[1]
+
+		return true
+	})
+
+	afi.WaitForLog("API listening on: ", func(substring, line string) bool {
+		val := strings.SplitN(strings.TrimSpace(line), substring, 2)
+		if len(val) < 2 {
+			initDone <- fmt.Sprintf("ERROR: No address after %q", substring)
+			return false
+		}
+		afi.apiEndpoint = val[1]
+
+		return true
+	})
+	afi.WaitForLog("PROXYSSH listening on: ", func(substring, line string) bool {
+		val := strings.SplitN(strings.TrimSpace(line), substring, 2)
+		if len(val) < 2 {
+			initDone <- fmt.Sprintf("ERROR: No address after %q", substring)
+			return false
+		}
+		afi.proxysshEndpoint = val[1]
+
+		return true
+	})
+	afi.WaitForLog("Fish initialized", func(substring, line string) bool {
+		if !strings.HasSuffix(line, substring) {
+			return false
+		}
+
+		// Found the needed values and continue to process to print the fish output for
+		// test debugging purposes
+		initDone <- ""
+
+		return true
+	})
+
 	// TODO: Add timeout for waiting of API available
 	go func() {
 		// Listening for log and scan for token and address
 		for scanner.Scan() {
 			line := scanner.Text()
 			tb.Log(afi.nodeName, line)
-			if strings.HasPrefix(line, "Admin user pass: ") {
-				val := strings.SplitN(strings.TrimSpace(line), "Admin user pass: ", 2)
-				if len(val) < 2 {
-					initDone <- "ERROR: No token after 'Admin user pass: '"
-					break
-				}
-				afi.adminToken = val[1]
+
+			afi.waitForLogMu.RLock()
+			var substrings []string
+			for key := range afi.waitForLog {
+				substrings = append(substrings, key)
 			}
-			if strings.Contains(line, "API listening on: ") {
-				val := strings.SplitN(strings.TrimSpace(line), "API listening on: ", 2)
-				if len(val) < 2 {
-					initDone <- "ERROR: No address after 'API listening on: '"
-					break
+			afi.waitForLogMu.RUnlock()
+
+			for _, substring := range substrings {
+				if !strings.Contains(line, substring) {
+					continue
 				}
-				afi.apiEndpoint = val[1]
-			}
-			if strings.Contains(line, "PROXYSSH listening on: ") {
-				val := strings.SplitN(strings.TrimSpace(line), "PROXYSSH listening on: ", 2)
-				if len(val) < 2 {
-					initDone <- "ERROR: No address after 'API listening on: '"
-					break
-				}
-				afi.proxysshEndpoint = val[1]
-			}
-			if strings.HasSuffix(line, "Fish initialized") {
-				// Found the needed values and continue to process to print the fish output for
-				// test debugging purposes
-				initDone <- ""
+				afi.callWaitForLog(substring, line)
 			}
 		}
 		tb.Log("INFO: Reading of AquariumFish output is done")
@@ -226,8 +314,8 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 	go func() {
 		afi.running = true
 		defer func() {
-			afi.running = false
 			r.Close()
+			afi.running = false
 		}()
 		if err := afi.cmd.Wait(); err != nil {
 			tb.Log("WARN: AquariumFish process was stopped:", err)

@@ -14,25 +14,14 @@ package fish
 
 import (
 	"fmt"
+	"time"
 
-	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
-	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 // ServiceMappingFind returns list of ServiceMappings that fits the filter
-func (f *Fish) ServiceMappingFind(filter *string) (sms []types.ServiceMapping, err error) {
-	db := f.db
-	if filter != nil {
-		securedFilter, err := util.ExpressionSQLFilter(*filter)
-		if err != nil {
-			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
-			// We do not fail here because we should not give attacker more information
-			return sms, nil
-		}
-		db = db.Where(securedFilter)
-	}
-	err = db.Find(&sms).Error
+func (f *Fish) ServiceMappingList() (sms []types.ServiceMapping, err error) {
+	err = f.db.Collection("application_task").List(&sms)
 	return sms, err
 }
 
@@ -46,22 +35,47 @@ func (f *Fish) ServiceMappingCreate(sm *types.ServiceMapping) error {
 	}
 
 	sm.UID = f.NewUID()
-	return f.db.Create(sm).Error
+	sm.CreatedAt = time.Now()
+	return f.db.Collection("service_mapping").Add(sm.UID.String(), sm)
 }
 
 // ServiceMappingSave stores ServiceMapping
 func (f *Fish) ServiceMappingSave(sm *types.ServiceMapping) error {
-	return f.db.Save(sm).Error
+	return f.db.Collection("service_mapping").Add(sm.UID.String(), sm)
 }
 
 // ServiceMappingGet returns ServiceMapping by UID
 func (f *Fish) ServiceMappingGet(uid types.ServiceMappingUID) (sm *types.ServiceMapping, err error) {
-	sm = &types.ServiceMapping{}
-	err = f.db.First(sm, uid).Error
+	err = f.db.Collection("service_mapping").Get(uid.String(), &sm)
 	return sm, err
 }
 
 // ServiceMappingDelete removes ServiceMapping
 func (f *Fish) ServiceMappingDelete(uid types.ServiceMappingUID) error {
-	return f.db.Delete(&types.ServiceMapping{}, uid).Error
+	return f.db.Collection("service_mapping").Delete(uid.String())
+}
+
+// ServiceMappingByApplication returns ServiceMapping list with specified ApplicationUID
+func (f *Fish) ServiceMappingListByApplication(appUID types.ApplicationUID) (sms []types.ServiceMapping, err error) {
+	if all, err := f.ServiceMappingList(); err == nil {
+		for _, sm := range all {
+			if sm.ApplicationUID == appUID {
+				sms = append(sms, sm)
+			}
+		}
+	}
+	return sms, err
+}
+
+// ServiceMappingByApplicationAndDest is trying to find the ServiceMapping record with Application and Location
+// The application in priority, location - secondary priority, if no such records found - default will be used.
+func (f *Fish) ServiceMappingByApplicationAndDest(appUID types.ApplicationUID, dest string) string {
+	if all, err := f.ServiceMappingList(); err == nil {
+		for _, sm := range all {
+			if sm.ApplicationUID == appUID && sm.Location == f.GetLocation() && sm.Service == dest {
+				return sm.Redirect
+			}
+		}
+	}
+	return ""
 }

@@ -61,7 +61,7 @@ read w1
 
 # Passwords are one-time use, after it has been used you must re-issue this
 # curl command to get a new password.
-curl -u "admin:$token" -k "https://$hostport/api/v1/resource/$resource_UID/access"
+curl -u "admin:$token" -k "https://$hostport/api/v1/applicationresource/$resource_UID/access"
 
 echo "Press key to deallocate the application resource"
 read w1

@@ -26,7 +26,7 @@ type ResourceDriverTask interface {
 	Clone() ResourceDriverTask
 
 	// Fish provides the task information about the operated items
-	SetInfo(task *types.ApplicationTask, def *types.LabelDefinition, res *types.Resource)
+	SetInfo(task *types.ApplicationTask, def *types.LabelDefinition, res *types.ApplicationResource)
 
 	// Run the task operation
 	// <- result - json data with results of operation

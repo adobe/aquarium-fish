@@ -16,6 +16,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,17 +27,20 @@ import (
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
-// This is a simple test with one application and without any limits:
+// Ensure the database is cleaned after the application deallocate
 // * Allocate Application
 // * Get Application information
 // * Destroy Application
-func Test_simple_app_create_destroy(t *testing.T) {
+// * Check all the related db objects are removed
+func Test_cleanupdb_check(t *testing.T) {
 	t.Parallel()
 	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0
 proxy_ssh_address: 127.0.0.1:0
+
+db_cleanup_delay: 10s
 
 drivers:
   - name: test`)
@@ -152,5 +156,43 @@ drivers:
 				r.Fatalf("Application Status is incorrect: %v", appState.Status)
 			}
 		})
+	})
+
+	t.Run("Application should be cleaned from DB and compacted", func(t *testing.T) {
+		// Wait for the next 3 cleanupdb completed which should cleanup the deallocated application
+		cleaned := make(chan any)
+		for range 3 {
+			afi.WaitForLog("Fish: CleanupDB completed", func(substring, line string) bool {
+				cleaned <- nil
+				return true
+			})
+			<-cleaned
+		}
+
+		compacted := make(chan error)
+		afi.WaitForLog("Fish: CompactDB: After compaction: ", func(substring, line string) bool {
+			// Check the Keys get back to normal
+			spl := strings.Split(line, ", ")
+			for _, val := range spl {
+				if !strings.Contains(val, "Keys: ") {
+					continue
+				}
+				spl = strings.Split(val, ": ")
+				// Database should have just 3 keys left: user/admin, label/UID and node/node-1
+				if spl[1] != "3" {
+					t.Errorf("Wrong amount of keys left in the database: %s != 3", spl[1])
+					break
+				}
+			}
+			if spl[0] != "Keys" {
+				t.Errorf("Unable to locate database compaction result for Keys: %s", spl[0])
+			}
+			compacted <- nil
+			return true
+		})
+		// Stopping the node to trigger CompactDB process
+		afi.Stop(t)
+
+		<-compacted
 	})
 }

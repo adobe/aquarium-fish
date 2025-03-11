@@ -435,7 +435,7 @@ func (w *dedicatedPoolWorker) updateDedicatedHostsProcess() ([]ec2types.Host, er
 		w.activeHostsMu.RUnlock()
 		if lastUpdate.Before(time.Now().Add(-updateDelay)) {
 			if err := w.updateDedicatedHosts(); err != nil {
-				log.Warnf("AWS: dedicated %q: Error happened during the regular hosts update, continue with updated on %q: %v", lastUpdate, err)
+				log.Warnf("AWS: dedicated %q: Error happened during the regular hosts update, continue with updated on %q: %v", w.name, lastUpdate, err)
 			}
 		}
 	}

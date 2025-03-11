@@ -163,10 +163,14 @@ func (c *Config) Validate() (err error) {
 	if c.DedicatedPool == nil {
 		c.DedicatedPool = make(map[string]DedicatedPoolRecord)
 	}
-	// Make sure the ScrubbingDelay either unset or >= 1min or we will face often update API reqs
 	for name, pool := range c.DedicatedPool {
+		// Make sure the ScrubbingDelay either unset or >= 1min or we will face often update API reqs
 		if pool.ScrubbingDelay > 0 && time.Duration(pool.ScrubbingDelay) < 1*time.Minute {
 			return fmt.Errorf("AWS: Scrubbing delay of pool %q is less then 1 minute: %v", name, pool.ScrubbingDelay)
+		}
+		// Zones need to be set, otherwise it's quite hard to figure out where to allocate and where to manage
+		if len(pool.Zones) == 0 {
+			return fmt.Errorf("AWS: Zones of pool %q are not set to at least one value", name)
 		}
 	}
 

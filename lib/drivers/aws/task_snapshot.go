@@ -31,9 +31,9 @@ import (
 type TaskSnapshot struct {
 	driver *Driver
 
-	*types.ApplicationTask `json:"-"` // Info about the requested task
-	*types.LabelDefinition `json:"-"` // Info about the used label definition
-	*types.Resource        `json:"-"` // Info about the processed resource
+	*types.ApplicationTask     `json:"-"` // Info about the requested task
+	*types.LabelDefinition     `json:"-"` // Info about the used label definition
+	*types.ApplicationResource `json:"-"` // Info about the processed resource
 
 	Full bool `json:"full"` // Make full (all disks including OS image), or just the additional disks snapshot
 }
@@ -50,10 +50,10 @@ func (t *TaskSnapshot) Clone() drivers.ResourceDriverTask {
 }
 
 // SetInfo defines information of the environment
-func (t *TaskSnapshot) SetInfo(task *types.ApplicationTask, def *types.LabelDefinition, res *types.Resource) {
+func (t *TaskSnapshot) SetInfo(task *types.ApplicationTask, def *types.LabelDefinition, res *types.ApplicationResource) {
 	t.ApplicationTask = task
 	t.LabelDefinition = def
-	t.Resource = res
+	t.ApplicationResource = res
 }
 
 // Execute -  Snapshot task could be executed during ALLOCATED & DEALLOCATE ApplicationStatus
@@ -64,8 +64,8 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 	if t.LabelDefinition == nil {
 		return []byte(`{"error":"internal: invalid label definition"}`), log.Error("AWS: Invalid label definition:", t.LabelDefinition)
 	}
-	if t.Resource == nil || t.Resource.Identifier == "" {
-		return []byte(`{"error":"internal: invalid resource"}`), log.Error("AWS: Invalid resource:", t.Resource)
+	if t.ApplicationResource == nil || t.ApplicationResource.Identifier == "" {
+		return []byte(`{"error":"internal: invalid resource"}`), log.Error("AWS: Invalid resource:", t.ApplicationResource)
 	}
 	log.Infof("AWS: TaskSnapshot %s: Creating snapshot for Application %s", t.ApplicationTask.UID, t.ApplicationTask.ApplicationUID)
 	conn := t.driver.newEC2Conn()
@@ -73,18 +73,18 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 	if t.ApplicationTask.When == types.ApplicationStatusDEALLOCATE {
 		// We need to stop the instance before executing snapshot to ensure it will be consistent
 		input := ec2.StopInstancesInput{
-			InstanceIds: []string{t.Resource.Identifier},
+			InstanceIds: []string{t.ApplicationResource.Identifier},
 		}
 
-		log.Infof("AWS: TaskSnapshot %s: Stopping instance %q...", t.ApplicationTask.UID, t.Resource.Identifier)
+		log.Infof("AWS: TaskSnapshot %s: Stopping instance %q...", t.ApplicationTask.UID, t.ApplicationResource.Identifier)
 		result, err := conn.StopInstances(context.TODO(), &input)
 		if err != nil {
 			// Do not fail hard here - it's still possible to take snapshot of the instance
-			log.Errorf("AWS: TaskSnapshot %s: Error during stopping the instance %s: %v", t.ApplicationTask.UID, t.Resource.Identifier, err)
+			log.Errorf("AWS: TaskSnapshot %s: Error during stopping the instance %s: %v", t.ApplicationTask.UID, t.ApplicationResource.Identifier, err)
 		}
-		if len(result.StoppingInstances) < 1 || *result.StoppingInstances[0].InstanceId != t.Resource.Identifier {
+		if len(result.StoppingInstances) < 1 || *result.StoppingInstances[0].InstanceId != t.ApplicationResource.Identifier {
 			// Do not fail hard here - it's still possible to take snapshot of the instance
-			log.Errorf("AWS: TaskSnapshot %s: Wrong instance id result during stopping: %s", t.ApplicationTask.UID, t.Resource.Identifier)
+			log.Errorf("AWS: TaskSnapshot %s: Wrong instance id result during stopping: %s", t.ApplicationTask.UID, t.ApplicationResource.Identifier)
 		}
 
 		// Wait for instance stopped before going forward with snapshot
@@ -92,18 +92,18 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 		maxWait := 10 * time.Minute
 		waitInput := ec2.DescribeInstancesInput{
 			InstanceIds: []string{
-				t.Resource.Identifier,
+				t.ApplicationResource.Identifier,
 			},
 		}
 		if err := sw.Wait(context.TODO(), &waitInput, maxWait); err != nil {
 			// Do not fail hard here - it's still possible to take snapshot of the instance
-			log.Errorf("AWS: TaskSnapshot %s: Error during wait for instance %s stop: %v", t.ApplicationTask.UID, t.Resource.Identifier, err)
+			log.Errorf("AWS: TaskSnapshot %s: Error during wait for instance %s stop: %v", t.ApplicationTask.UID, t.ApplicationResource.Identifier, err)
 		}
 	}
 
 	spec := ec2types.InstanceSpecification{
 		ExcludeBootVolume: aws.Bool(!t.Full),
-		InstanceId:        aws.String(t.Resource.Identifier),
+		InstanceId:        aws.String(t.ApplicationResource.Identifier),
 	}
 	input := ec2.CreateSnapshotsInput{
 		InstanceSpecification: &spec,
@@ -114,7 +114,7 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 			Tags: []ec2types.Tag{
 				{
 					Key:   aws.String("InstanceId"),
-					Value: aws.String(t.Resource.Identifier),
+					Value: aws.String(t.ApplicationResource.Identifier),
 				},
 				{
 					Key:   aws.String("ApplicationTask"),
@@ -124,13 +124,13 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 		}},
 	}
 
-	log.Debugf("AWS: TaskSnapshot %s: Creating snapshot for %q...", t.ApplicationTask.UID, t.Resource.Identifier)
+	log.Debugf("AWS: TaskSnapshot %s: Creating snapshot for %q...", t.ApplicationTask.UID, t.ApplicationResource.Identifier)
 	resp, err := conn.CreateSnapshots(context.TODO(), &input)
 	if err != nil {
-		return []byte(`{"error":"internal: failed to create snapshots for instance"}`), log.Errorf("AWS: Unable to create snapshots for instance %s: %v", t.Resource.Identifier, err)
+		return []byte(`{"error":"internal: failed to create snapshots for instance"}`), log.Errorf("AWS: Unable to create snapshots for instance %s: %v", t.ApplicationResource.Identifier, err)
 	}
 	if len(resp.Snapshots) < 1 {
-		return []byte(`{"error":"internal: no snapshots was created for instance"}`), log.Errorf("AWS: No snapshots was created for instance %s", t.Resource.Identifier)
+		return []byte(`{"error":"internal: no snapshots was created for instance"}`), log.Errorf("AWS: No snapshots was created for instance %s", t.ApplicationResource.Identifier)
 	}
 
 	snapshots := []string{}
@@ -150,7 +150,7 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 		log.Errorf("AWS: TaskSnapshot %s: Error during wait snapshots availability: %s, %v", t.ApplicationTask.UID, snapshots, err)
 	}
 
-	log.Infof("AWS: TaskSnapshot %s: Created snapshots for instance %s: %s", t.ApplicationTask.UID, t.Resource.Identifier, strings.Join(snapshots, ", "))
+	log.Infof("AWS: TaskSnapshot %s: Created snapshots for instance %s: %s", t.ApplicationTask.UID, t.ApplicationResource.Identifier, strings.Join(snapshots, ", "))
 
 	return json.Marshal(map[string]any{"snapshots": snapshots})
 }

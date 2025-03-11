@@ -62,12 +62,12 @@ type ResourceDriver interface {
 	// -> def - describes the driver options to allocate the required resource
 	// -> metadata - user metadata to use during resource allocation
 	// <- res - initial resource information to store driver instance state
-	Allocate(def types.LabelDefinition, metadata map[string]any) (res *types.Resource, err error)
+	Allocate(def types.LabelDefinition, metadata map[string]any) (res *types.ApplicationResource, err error)
 
 	// Get the status of the resource with given hw address
 	// -> res - resource information with stored driver instance state
 	// <- status - current status of the resource
-	Status(res *types.Resource) (status string, err error)
+	Status(res *types.ApplicationResource) (status string, err error)
 
 	// Get task struct with implementation to execute it later
 	// -> task - identifier of the task operation
@@ -76,5 +76,5 @@ type ResourceDriver interface {
 
 	// Deallocate resource with provided hw addr
 	// -> res - resource information with stored driver instance state
-	Deallocate(res *types.Resource) error
+	Deallocate(res *types.ApplicationResource) error
 }

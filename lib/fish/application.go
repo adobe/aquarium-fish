@@ -15,27 +15,16 @@ package fish
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 
-	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
-	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 // ApplicationFind lists Applications by filter
-func (f *Fish) ApplicationFind(filter *string) (as []types.Application, err error) {
-	db := f.db
-	if filter != nil {
-		securedFilter, err := util.ExpressionSQLFilter(*filter)
-		if err != nil {
-			log.Warn("Fish: SECURITY: weird SQL filter received:", err)
-			// We do not fail here because we should not give attacker more information
-			return as, nil
-		}
-		db = db.Where(securedFilter)
-	}
-	err = db.Find(&as).Error
+func (f *Fish) ApplicationList() (as []types.Application, err error) {
+	err = f.db.Collection("application").List(&as)
 	return as, err
 }
 
@@ -49,7 +38,8 @@ func (f *Fish) ApplicationCreate(a *types.Application) error {
 	}
 
 	a.UID = f.NewUID()
-	err := f.db.Create(a).Error
+	a.CreatedAt = time.Now()
+	err := f.db.Collection("application").Add(a.UID.String(), a)
 
 	// Create ApplicationState NEW too
 	f.ApplicationStateCreate(&types.ApplicationState{
@@ -66,23 +56,28 @@ func (f *Fish) ApplicationCreate(a *types.Application) error {
 
 // ApplicationGet returns Application by UID
 func (f *Fish) ApplicationGet(uid types.ApplicationUID) (a *types.Application, err error) {
-	a = &types.Application{}
-	err = f.db.First(a, uid).Error
+	err = f.db.Collection("application").Get(uid.String(), &a)
 	return a, err
+}
+
+// ApplicationDelete removes the Application
+func (f *Fish) ApplicationDelete(uid types.ApplicationUID) (err error) {
+	return f.db.Collection("application").Delete(uid.String())
 }
 
 // ApplicationListGetStatusNew returns new Applications
 func (f *Fish) ApplicationListGetStatusNew() (as []types.Application, err error) {
-	// SELECT * FROM applications WHERE UID in (
-	//    SELECT application_uid FROM (
-	//        SELECT application_uid, status, max(created_at) FROM application_states GROUP BY application_uid
-	//    ) WHERE status = "NEW"
-	// ) ORDER BY created_at
-	err = f.db.Order("created_at").Where("UID in (?)",
-		f.db.Select("application_uid").Table("(?)",
-			f.db.Model(&types.ApplicationState{}).Select("application_uid, status, max(created_at)").Group("application_uid"),
-		).Where("Status = ?", types.ApplicationStatusNEW),
-	).Find(&as).Error
+	states, err := f.ApplicationStateListLatest()
+	if err != nil {
+		return as, err
+	}
+	for _, stat := range states {
+		if stat.Status == types.ApplicationStatusNEW {
+			if app, err := f.ApplicationGet(stat.ApplicationUID); err == nil && app != nil {
+				as = append(as, *app)
+			}
+		}
+	}
 	return as, err
 }
 

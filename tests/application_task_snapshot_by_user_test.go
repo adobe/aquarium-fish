@@ -124,7 +124,7 @@ drivers:
 		})
 	})
 
-	var res types.Resource
+	var res types.ApplicationResource
 	t.Run("Resource should be created", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
@@ -189,6 +189,12 @@ drivers:
 			if len(appTasks) != 2 {
 				r.Fatalf("Application Tasks list does not contain 2 tasks")
 			}
+
+			// Tasks could return in any order, so reversing if first one is actually a second
+			if appTasks[0].UID != appTask1.UID {
+				appTasks[0], appTasks[1] = appTasks[1], appTasks[0]
+			}
+
 			if appTasks[0].UID != appTask1.UID {
 				r.Fatalf("ApplicationTask 1 UID is incorrect: %v != %v", appTasks[0].UID, appTask1.UID)
 			}
@@ -228,6 +234,12 @@ drivers:
 			if len(appTasks) != 2 {
 				r.Fatalf("Application Tasks list does not contain 2 tasks")
 			}
+
+			// Tasks could return in any order, so reversing if first one is actually a second
+			if appTasks[1].UID != appTask2.UID {
+				appTasks[0], appTasks[1] = appTasks[1], appTasks[0]
+			}
+
 			if appTasks[1].UID != appTask2.UID {
 				r.Fatalf("ApplicationTask 2 UID is incorrect: %v != %v", appTasks[1].UID, appTask2.UID)
 			}

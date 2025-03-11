@@ -20,8 +20,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/shirou/gopsutil/v3/cpu"
-	"github.com/shirou/gopsutil/v3/mem"
+	"github.com/shirou/gopsutil/v4/cpu"
+	"github.com/shirou/gopsutil/v4/mem"
 
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/drivers"
@@ -155,7 +155,7 @@ func (d *Driver) AvailableCapacity(nodeUsage types.Resources, req types.LabelDef
 //
 // It automatically download the required images, unpack them and runs the VM.
 // Not using metadata because there is no good interfaces to pass it to VM.
-func (d *Driver) Allocate(def types.LabelDefinition, _ /*metadata*/ map[string]any) (*types.Resource, error) {
+func (d *Driver) Allocate(def types.LabelDefinition, _ /*metadata*/ map[string]any) (*types.ApplicationResource, error) {
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
 		return nil, log.Error("VMX: Unable to apply options:", err)
@@ -227,7 +227,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, _ /*metadata*/ map[string]a
 	}
 
 	log.Info("VMX: Allocate of VM completed:", vmxPath)
-	return &types.Resource{
+	return &types.ApplicationResource{
 		Identifier:     vmxPath,
 		HwAddr:         vmHwaddr,
 		Authentication: def.Authentication,
@@ -235,7 +235,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, _ /*metadata*/ map[string]a
 }
 
 // Status shows status of the resource
-func (d *Driver) Status(res *types.Resource) (string, error) {
+func (d *Driver) Status(res *types.ApplicationResource) (string, error) {
 	if res == nil || res.Identifier == "" {
 		return "", fmt.Errorf("VMX: Invalid resource: %v", res)
 	}
@@ -267,7 +267,7 @@ func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
 }
 
 // Deallocate the resource
-func (d *Driver) Deallocate(res *types.Resource) error {
+func (d *Driver) Deallocate(res *types.ApplicationResource) error {
 	if res == nil || res.Identifier == "" {
 		return fmt.Errorf("VMX: Invalid resource: %v", res)
 	}

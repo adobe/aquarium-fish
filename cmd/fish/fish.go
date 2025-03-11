@@ -22,10 +22,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/glebarez/sqlite"
 	"github.com/spf13/cobra"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
+	"go.mills.io/bitcask/v2"
 
 	"github.com/adobe/aquarium-fish/lib/build"
 	"github.com/adobe/aquarium-fish/lib/crypt"
@@ -130,23 +128,11 @@ func main() {
 				return err
 			}
 
-			log.Info("Fish starting ORM...")
-			db, err := gorm.Open(sqlite.Open(filepath.Join(dir, "sqlite.db")), &gorm.Config{
-				Logger: logger.New(log.GetErrorLogger(), logger.Config{
-					SlowThreshold:             500 * time.Millisecond,
-					LogLevel:                  logger.Error,
-					IgnoreRecordNotFoundError: true,
-					Colorful:                  false,
-				}),
-			})
+			log.Info("Fish starting DB...")
+			db, err := bitcask.Open(filepath.Join(dir, "bitcask.db"))
 			if err != nil {
 				return err
 			}
-
-			// Set one connection and WAL mode to handle "database is locked" errors
-			sqlDb, _ := db.DB()
-			sqlDb.SetMaxOpenConns(1)
-			sqlDb.Exec("PRAGMA journal_mode=WAL;")
 
 			log.Info("Fish starting node...")
 			fish, err := fish.New(db, cfg)

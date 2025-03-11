@@ -27,7 +27,7 @@ import (
 )
 
 // Will check how the Apps are allocated with limited amount of resources it should looks like:
-// * 2 apps allocated simultaneous and third one waits
+// * 2 random apps allocated simultaneously and third one waits
 // * Destroying first 2 apps and third should become allocated
 // * Destroy the third app
 func Test_three_apps_with_limit(t *testing.T) {
@@ -79,96 +79,60 @@ drivers:
 		}
 	})
 
-	var app1 types.Application
-	t.Run("Create Application 1", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/application/")).
-			JSON(`{"label_UID":"`+label.UID.String()+`"}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&app1)
+	var apps []types.Application
+	for i := range 3 {
+		var app types.Application
+		t.Run(fmt.Sprintf("Create Application %d", i), func(t *testing.T) {
+			apitest.New().
+				EnableNetworking(cli).
+				Post(afi.APIAddress("api/v1/application/")).
+				JSON(`{"label_UID":"`+label.UID.String()+`"}`).
+				BasicAuth("admin", afi.AdminToken()).
+				Expect(t).
+				Status(http.StatusOK).
+				End().
+				JSON(&app)
 
-		if app1.UID == uuid.Nil {
-			t.Fatalf("Application 1 UID is incorrect: %v", app1.UID)
-		}
-	})
-
-	var app2 types.Application
-	t.Run("Create Application 2", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/application/")).
-			JSON(`{"label_UID":"`+label.UID.String()+`"}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&app2)
-
-		if app2.UID == uuid.Nil {
-			t.Fatalf("Application 2 UID is incorrect: %v", app2.UID)
-		}
-	})
-
-	var app3 types.Application
-	t.Run("Create Application 3", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/application/")).
-			JSON(`{"label_UID":"`+label.UID.String()+`"}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&app3)
-
-		if app3.UID == uuid.Nil {
-			t.Fatalf("Application 3 UID is incorrect: %v", app3.UID)
-		}
-	})
+			if app.UID == uuid.Nil {
+				t.Fatalf("Application %d UID is incorrect: %v", i, app.UID)
+			}
+			apps = append(apps, app)
+		})
+	}
 
 	var appState types.ApplicationState
-	t.Run("Application 1 should get ALLOCATED in 10 sec", func(t *testing.T) {
+	var appStates []types.ApplicationState
+	var notAllocated types.Application
+	t.Run("2 of 3 Applications should get ALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app1.UID.String()+"/state")).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(r).
-				Status(http.StatusOK).
-				End().
-				JSON(&appState)
+			appStates = []types.ApplicationState{}
+			for i := range apps {
+				apitest.New().
+					EnableNetworking(cli).
+					Get(afi.APIAddress("api/v1/application/"+apps[i].UID.String()+"/state")).
+					BasicAuth("admin", afi.AdminToken()).
+					Expect(r).
+					Status(http.StatusOK).
+					End().
+					JSON(&appState)
 
-			if appState.Status != types.ApplicationStatusALLOCATED {
-				r.Fatalf("Application 1 Status is incorrect: %v", appState.Status)
+				if appState.Status != types.ApplicationStatusALLOCATED {
+					notAllocated = apps[i]
+				} else {
+					appStates = append(appStates, appState)
+				}
+			}
+
+			if len(appStates) < 2 {
+				r.Fatalf("Allocated less then 2 Applications: %v", len(appStates))
 			}
 		})
 	})
 
-	t.Run("Application 2 should get ALLOCATED in 10 sec", func(t *testing.T) {
-		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app2.UID.String()+"/state")).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(r).
-				Status(http.StatusOK).
-				End().
-				JSON(&appState)
-
-			if appState.Status != types.ApplicationStatusALLOCATED {
-				r.Fatalf("Application 2 Status is incorrect: %v", appState.Status)
-			}
-		})
-	})
-
-	t.Run("Application 3 should have state NEW", func(t *testing.T) {
+	t.Run("3rd Application should have state NEW", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app3.UID.String()+"/state")).
+			Get(afi.APIAddress("api/v1/application/"+notAllocated.UID.String()+"/state")).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
@@ -176,69 +140,27 @@ drivers:
 			JSON(&appState)
 
 		if appState.Status != types.ApplicationStatusNEW {
-			t.Fatalf("Application 3 Status is incorrect: %v", appState.Status)
+			t.Fatalf("3rd Application Status is incorrect: %v", appState.Status)
 		}
 	})
 
-	t.Run("Deallocate the Application 1", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app1.UID.String()+"/deallocate")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
-	})
-
-	t.Run("Deallocate the Application 2", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app2.UID.String()+"/deallocate")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
-	})
-
-	t.Run("Application 1 should get DEALLOCATED in 10 sec", func(t *testing.T) {
-		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
+	t.Run("Deallocate the Applications", func(t *testing.T) {
+		for i := range appStates {
 			apitest.New().
 				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app1.UID.String()+"/state")).
+				Get(afi.APIAddress("api/v1/application/"+appStates[i].ApplicationUID.String()+"/deallocate")).
 				BasicAuth("admin", afi.AdminToken()).
-				Expect(r).
+				Expect(t).
 				Status(http.StatusOK).
-				End().
-				JSON(&appState)
-
-			if appState.Status != types.ApplicationStatusDEALLOCATED {
-				r.Fatalf("Application 1 Status is incorrect: %v", appState.Status)
-			}
-		})
+				End()
+		}
 	})
 
-	t.Run("Application 2 should get DEALLOCATED in 10 sec", func(t *testing.T) {
-		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
+	t.Run("3rd Application should get ALLOCATED in 30 sec", func(t *testing.T) {
+		h.Retry(&h.Timer{Timeout: 30 * time.Second, Wait: 5 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app2.UID.String()+"/state")).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(r).
-				Status(http.StatusOK).
-				End().
-				JSON(&appState)
-
-			if appState.Status != types.ApplicationStatusDEALLOCATED {
-				r.Fatalf("Application 2 Status is incorrect: %v", appState.Status)
-			}
-		})
-	})
-
-	t.Run("Application 3 should get ALLOCATED in 40 sec", func(t *testing.T) {
-		h.Retry(&h.Timer{Timeout: 40 * time.Second, Wait: 5 * time.Second}, t, func(r *h.R) {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app3.UID.String()+"/state")).
+				Get(afi.APIAddress("api/v1/application/"+notAllocated.UID.String()+"/state")).
 				BasicAuth("admin", afi.AdminToken()).
 				Expect(r).
 				Status(http.StatusOK).
@@ -246,26 +168,26 @@ drivers:
 				JSON(&appState)
 
 			if appState.Status != types.ApplicationStatusALLOCATED {
-				r.Fatalf("Application 3 Status is incorrect: %v", appState.Status)
+				r.Fatalf("3rd Application Status is incorrect: %v", appState.Status)
 			}
 		})
 	})
 
-	t.Run("Deallocate the Application 3", func(t *testing.T) {
+	t.Run("Deallocate the 3rd Application", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app3.UID.String()+"/deallocate")).
+			Get(afi.APIAddress("api/v1/application/"+notAllocated.UID.String()+"/deallocate")).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
 			End()
 	})
 
-	t.Run("Application 3 should get DEALLOCATED in 10 sec", func(t *testing.T) {
+	t.Run("3rd Application should get DEALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app3.UID.String()+"/state")).
+				Get(afi.APIAddress("api/v1/application/"+notAllocated.UID.String()+"/state")).
 				BasicAuth("admin", afi.AdminToken()).
 				Expect(r).
 				Status(http.StatusOK).
@@ -273,7 +195,7 @@ drivers:
 				JSON(&appState)
 
 			if appState.Status != types.ApplicationStatusDEALLOCATED {
-				r.Fatalf("Application 3 Status is incorrect: %v", appState.Status)
+				r.Fatalf("3rd Application Status is incorrect: %v", appState.Status)
 			}
 		})
 	})

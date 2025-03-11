@@ -45,7 +45,7 @@ type proxySSH struct {
 
 // session is stored in proxySSH::sessions.
 type session struct {
-	ResourceAccessor *types.ResourceAccess
+	ResourceAccessor *types.ApplicationResourceAccess
 	SrcAddr          net.Addr
 
 	// This work group used to track the routines of the session
@@ -75,9 +75,9 @@ func (p *proxySSH) serveConnection(clientConn net.Conn) error {
 	}
 
 	// Getting the info about the destination resource
-	resource, err := p.fish.ResourceGet(session.ResourceAccessor.ResourceUID)
+	resource, err := p.fish.ApplicationResourceGet(session.ResourceAccessor.ApplicationResourceUID)
 	if err != nil {
-		return log.Errorf("PROXYSSH: %s: Unable to retrieve Resource %s: %v", session.SrcAddr, session.ResourceAccessor.ResourceUID, err)
+		return log.Errorf("PROXYSSH: %s: Unable to retrieve Resource %s: %v", session.SrcAddr, session.ResourceAccessor.ApplicationResourceUID, err)
 	}
 	if resource.Authentication == nil || resource.Authentication.Username == "" && resource.Authentication.Password == "" {
 		return log.Errorf("PROXYSSH: %s: Resource Authentication not provided", session.SrcAddr)
@@ -126,7 +126,7 @@ func (p *proxySSH) getSession(sessionID []byte) (*session, error) {
 	return session, nil
 }
 
-func (s *session) connectToDestination(res *types.Resource) (*ssh.Client, error) {
+func (s *session) connectToDestination(res *types.ApplicationResource) (*ssh.Client, error) {
 	dstAddr := net.JoinHostPort(res.IpAddr, strconv.Itoa(res.Authentication.Port))
 	dstConfig := &ssh.ClientConfig{
 		User:            res.Authentication.Username,
@@ -309,9 +309,9 @@ func (p *proxySSH) passwordCallback(incomingConn ssh.ConnMetadata, pass []byte) 
 	// The proxy password is temporary (for the lifetime of the Resource) and one-time
 	// so lack of salt will not be a big deal - the params will contribute to salt majorily.
 	passHash := crypt.NewHash(string(pass), []byte{}).Hash
-	passHashStr := string(passHash)
+	passHashStr := fmt.Sprintf("%x", passHash)
 
-	ra, err := p.fish.ResourceAccessSingleUsePasswordHash(fishUser.Name, passHashStr)
+	ra, err := p.fish.ApplicationResourceAccessSingleUsePasswordHash(fishUser.Name, passHashStr)
 	if err != nil {
 		log.Errorf("PROXYSSH: %s: Invalid access for user %q: %v", incomingConn.RemoteAddr(), fishUser.Name, err)
 		return nil, fmt.Errorf("Invalid access")
@@ -342,7 +342,7 @@ func (p *proxySSH) publicKeyCallback(incomingConn ssh.ConnMetadata, key ssh.Publ
 
 	stringKey := string(ssh.MarshalAuthorizedKey(key))
 
-	ra, err := p.fish.ResourceAccessSingleUseKey(fishUser.Name, stringKey)
+	ra, err := p.fish.ApplicationResourceAccessSingleUseKey(fishUser.Name, stringKey)
 	if err != nil {
 		log.Errorf("PROXYSSH: %s: Invalid access for user %q: %v", incomingConn.RemoteAddr(), fishUser.Name, err)
 		return nil, fmt.Errorf("Invalid access")

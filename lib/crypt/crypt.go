@@ -49,7 +49,7 @@ const (
 // Hash contains everything needed for storing and reproducing password hash
 type Hash struct {
 	Algo string     `json:"algo"`
-	Prop properties `gorm:"embedded;embeddedPrefix:prop_" json:"prop"`
+	Prop properties `json:"prop"`
 	Salt []byte     `json:"salt"`
 	Hash []byte     `json:"hash"`
 }

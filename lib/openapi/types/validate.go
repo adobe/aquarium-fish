@@ -10,32 +10,20 @@
  * governing permissions and limitations under the License.
  */
 
-// Package types stores generated types and their special functions
 package types
 
 import (
-	"database/sql/driver"
-	"encoding/json"
 	"fmt"
+
+	"github.com/google/uuid"
 )
 
-// GormDataType describes how to store Authentication in database
-func (Authentication) GormDataType() string {
-	return "blob"
-}
-
-// Scan converts the Authentication to json bytes
-func (auth *Authentication) Scan(value any) error {
-	bytes, ok := value.([]byte)
-	if !ok {
-		return fmt.Errorf("Failed to unmarshal JSONB value: %s", value)
+func (v *Vote) Validate() error {
+	if v.ApplicationUID == uuid.Nil {
+		return fmt.Errorf("Types: ApplicationUID can't be unset")
 	}
-
-	err := json.Unmarshal(bytes, auth)
-	return err
-}
-
-// Value converts json bytes to Authentication
-func (auth Authentication) Value() (driver.Value, error) {
-	return json.Marshal(auth)
+	if v.NodeUID == uuid.Nil {
+		return fmt.Errorf("Types: NodeUID can't be unset")
+	}
+	return nil
 }

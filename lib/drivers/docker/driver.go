@@ -181,7 +181,7 @@ func (d *Driver) AvailableCapacity(nodeUsage types.Resources, req types.LabelDef
 //
 // It automatically download the required images, unpack them and runs the container.
 // Using metadata to create env file and pass it to the container.
-func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*types.Resource, error) {
+func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*types.ApplicationResource, error) {
 	if d.cfg.IsRemote {
 		// It's remote so let's use docker_usage to store modificators properly
 		d.dockerUsageMutex.Lock()
@@ -263,11 +263,11 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 
 	log.Info("Docker: Allocate of Container completed:", cHwaddr, cName)
 
-	return &types.Resource{Identifier: cName, HwAddr: cHwaddr}, nil
+	return &types.ApplicationResource{Identifier: cName, HwAddr: cHwaddr}, nil
 }
 
 // Status shows status of the resource
-func (d *Driver) Status(res *types.Resource) (string, error) {
+func (d *Driver) Status(res *types.ApplicationResource) (string, error) {
 	if res == nil || res.Identifier == "" {
 		return "", fmt.Errorf("Docker: Invalid resource: %v", res)
 	}
@@ -299,7 +299,7 @@ func (d *Driver) GetTask(name, options string) drivers.ResourceDriverTask {
 }
 
 // Deallocate the resource
-func (d *Driver) Deallocate(res *types.Resource) error {
+func (d *Driver) Deallocate(res *types.ApplicationResource) error {
 	if res == nil || res.Identifier == "" {
 		return fmt.Errorf("Docker: Invalid resource: %v", res)
 	}

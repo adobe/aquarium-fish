@@ -59,7 +59,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: stable  # Linter will use go.mod file to adjust the rules properly
+          go-version-file: ./go.mod
 
       - name: Generate code
         run: ONLYGEN=1 ./build.sh
@@ -67,7 +67,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.60
+          version: v1.64.5
 
   Build:
     runs-on: ubuntu-latest
