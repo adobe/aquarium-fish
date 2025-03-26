@@ -38,6 +38,9 @@ func (f *Fish) clusterVoteSend(v *types.Vote) error {
 	// Make sure the rand is reset every time
 	v.Rand = rand.Uint32() // #nosec G404
 
+	// Adding the vote to the storage before sending to the cluster
+	f.StorageVotesAdd([]types.Vote{*v})
+
 	if f.cluster != nil {
 		return f.cluster.SendVote(v)
 	}
@@ -51,20 +54,9 @@ func (f *Fish) voteListGetApplicationRound(appUID types.ApplicationUID, round ui
 	f.storageVotesMutex.RLock()
 	defer f.storageVotesMutex.RUnlock()
 
-	found := false
 	for _, vote := range f.storageVotes {
 		if vote.ApplicationUID == appUID && vote.Round == round {
 			votes = append(votes, vote)
-			if vote.NodeUID == f.node.UID {
-				found = true
-			}
-		}
-	}
-
-	if !found {
-		// Current node vote is not in the storage, so quickly looking into
-		if activeVote, err := f.activeVotesGet(appUID); activeVote != nil && err == nil {
-			votes = append(votes, *activeVote)
 		}
 	}
 

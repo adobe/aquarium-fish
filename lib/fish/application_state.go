@@ -73,18 +73,18 @@ func (f *Fish) ApplicationStateListByApplication(appUID types.ApplicationUID) (s
 
 // ApplicationStateListLatest returns list of latest ApplicationState per Application
 func (f *Fish) ApplicationStateListLatest() (out []types.ApplicationState, err error) {
-	states := make(map[types.ApplicationUID]*types.ApplicationState)
+	states := make(map[types.ApplicationUID]types.ApplicationState)
 	all, err := f.ApplicationStateList()
 	if err != nil {
 		return out, err
 	}
 	for _, as := range all {
 		if stat, ok := states[as.ApplicationUID]; !ok || stat.CreatedAt.Before(as.CreatedAt) {
-			states[as.ApplicationUID] = &as
+			states[as.ApplicationUID] = as
 		}
 	}
 	for _, as := range states {
-		out = append(out, *as)
+		out = append(out, as)
 	}
 	return out, nil
 }

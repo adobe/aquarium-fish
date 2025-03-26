@@ -75,7 +75,8 @@ func (f *Fish) ApplicationResourceDelete(uid types.ApplicationResourceUID) error
 	// First delete any references to this resource.
 	err := f.ApplicationResourceAccessDeleteByResource(uid)
 	if err != nil {
-		log.Warnf("Unable to delete ApplicationResourceAccess associated with ApplicationResourceUID %s: %v", uid, err)
+		// This issue is not a big deal, because most of the time there is no access to delete
+		log.Debugf("Unable to delete ApplicationResourceAccess associated with ApplicationResourceUID %s: %v", uid, err)
 	}
 	// Now purge the resource.
 	return f.db.Collection("application_resource").Delete(uid.String())
