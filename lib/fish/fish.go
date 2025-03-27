@@ -297,11 +297,21 @@ func (f *Fish) checkNewApplicationProcess() {
 			toProcess = append(toProcess, f.wonVotes...)
 			f.wonVotesMutex.Unlock()
 
-			for _, v := range toProcess {
-				if err := f.executeApplication(v.ApplicationUID, v.Available); err != nil {
-					log.Errorf("Fish: Can't execute Application %s: %v", v.ApplicationUID, err)
+			if len(toProcess) > 0 {
+				log.Debug("Fish: Processing the Applications to allocate:", len(toProcess))
+
+				before := time.Now()
+				for _, v := range toProcess {
+					if err := f.executeApplication(v.ApplicationUID, v.Available); err != nil {
+						log.Errorf("Fish: Can't execute Application %s: %v", v.ApplicationUID, err)
+					}
+					f.wonVotesRemove(v.UID)
 				}
-				f.wonVotesRemove(v.UID)
+				elapsed := time.Since(before)
+
+				if elapsed > 10*time.Second {
+					log.Warnf("Fish: %d Applications allocation took %s", len(toProcess), elapsed)
+				}
 			}
 		}
 	}
@@ -629,32 +639,25 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 		return fmt.Errorf("Fish: The definition index for Application %s is not chosen: %v", appUID, defIndex)
 	}
 
-	// Locking the node resources until the app will be allocated
-	f.nodeUsageMutex.Lock()
-
 	app, err := f.ApplicationGet(appUID)
 	if err != nil {
-		f.nodeUsageMutex.Unlock()
 		return fmt.Errorf("Fish: Unable to get the Application: %v", err)
 	}
 
 	// Check current Application state
 	appState, err := f.ApplicationStateGetByApplication(app.UID)
 	if err != nil {
-		f.nodeUsageMutex.Unlock()
 		return fmt.Errorf("Fish: Unable to get the Application state: %v", err)
 	}
 
 	// Get label with the definitions
 	label, err := f.LabelGet(app.LabelUID)
 	if err != nil {
-		f.nodeUsageMutex.Unlock()
 		return fmt.Errorf("Fish: Unable to find Label %s: %v", app.LabelUID, err)
 	}
 
 	// Extract the Label Definition by the provided index
 	if len(label.Definitions) <= defIndex {
-		f.nodeUsageMutex.Unlock()
 		return fmt.Errorf("Fish: ERROR: The chosen Definition not exists in the Label %s: %v (App: %s)", app.LabelUID, defIndex, app.UID)
 	}
 	labelDef := label.Definitions[defIndex]
@@ -665,7 +668,6 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 		// just have not enough resources, so skip it for now to allow the other Nodes to try again.
 		if !f.isNodeAvailableForDefinition(labelDef) {
 			log.Warn("Fish: Not enough resources to execute the Application", app.UID)
-			f.nodeUsageMutex.Unlock()
 			return nil
 		}
 	}
@@ -673,17 +675,15 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 	// Locate the required driver
 	driver := f.driverGet(labelDef.Driver)
 	if driver == nil {
-		f.nodeUsageMutex.Unlock()
 		return fmt.Errorf("Fish: Unable to locate driver for the Application %s: %s", app.UID, labelDef.Driver)
 	}
 
 	// If the driver is not using the remote resources - we need to increase the counter
 	if !driver.IsRemote() {
+		f.nodeUsageMutex.Lock()
 		f.nodeUsage.Add(labelDef.Resources)
+		f.nodeUsageMutex.Unlock()
 	}
-
-	// Unlocking the node resources to allow the other Applications allocation
-	f.nodeUsageMutex.Unlock()
 
 	// Adding the application to list
 	f.applicationsMutex.Lock()
