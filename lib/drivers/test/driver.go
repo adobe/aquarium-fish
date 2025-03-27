@@ -17,9 +17,11 @@ package test
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/rand"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/drivers"
@@ -97,12 +99,16 @@ func (d *Driver) AvailableCapacity(nodeUsage types.Resources, req types.LabelDef
 		return -1
 	}
 
+	if opts.DelayAvailableCapacity > 0 {
+		time.Sleep(time.Duration(math.Floor(float64(opts.DelayAvailableCapacity*1000))) * time.Millisecond)
+	}
+
 	totalCPU := d.cfg.CPULimit
 	totalRAM := d.cfg.RAMLimit
 
 	if totalCPU == 0 && totalRAM == 0 {
 		// Resources are unlimited
-		return 99999
+		return math.MaxInt64
 	}
 
 	// Check if the node has the required resources - otherwise we can't run it anyhow
@@ -153,6 +159,10 @@ func (d *Driver) Allocate(def types.LabelDefinition, _ /*metadata*/ map[string]a
 
 	if err := randomFail("Allocate", opts.FailAllocate); err != nil {
 		return nil, log.Error("TEST: RandomFail:", err)
+	}
+
+	if opts.DelayAllocate > 0 {
+		time.Sleep(time.Duration(math.Floor(float64(opts.DelayAllocate*1000))) * time.Millisecond)
 	}
 
 	// Generate random resource id and if exists - regenerate

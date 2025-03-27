@@ -67,7 +67,7 @@ type Fish struct {
 	shutdownDelay  time.Duration
 
 	activeVotesMutex sync.RWMutex
-	activeVotes      []types.Vote
+	activeVotes      map[types.ApplicationUID]types.Vote
 
 	// Votes of the other nodes in the cluster
 	storageVotesMutex sync.RWMutex
@@ -104,6 +104,7 @@ func (f *Fish) Init() error {
 	signal.Notify(f.Quit, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 
 	// Init variables
+	f.activeVotes = make(map[types.ApplicationUID]types.Vote)
 	f.storageVotes = make(map[types.VoteUID]types.Vote)
 
 	// Create admin user and ignore errors if it's existing
@@ -282,7 +283,7 @@ func (f *Fish) checkNewApplicationProcess() {
 				f.activeVotesMutex.Lock()
 				{
 					// Create new Vote and run background vote process
-					f.activeVotes = append(f.activeVotes, f.VoteCreate(app.UID))
+					f.activeVotes[app.UID] = f.VoteCreate(app.UID)
 					go f.electionProcess(app.UID)
 				}
 				f.activeVotesMutex.Unlock()
@@ -296,11 +297,21 @@ func (f *Fish) checkNewApplicationProcess() {
 			toProcess = append(toProcess, f.wonVotes...)
 			f.wonVotesMutex.Unlock()
 
-			for _, v := range toProcess {
-				if err := f.executeApplication(v.ApplicationUID, v.Available); err != nil {
-					log.Errorf("Fish: Can't execute Application %s: %v", v.ApplicationUID, err)
+			if len(toProcess) > 0 {
+				log.Debug("Fish: Processing the Applications to allocate:", len(toProcess))
+
+				before := time.Now()
+				for _, v := range toProcess {
+					if err := f.executeApplication(v.ApplicationUID, v.Available); err != nil {
+						log.Errorf("Fish: Can't execute Application %s: %v", v.ApplicationUID, err)
+					}
+					f.wonVotesRemove(v.UID)
 				}
-				f.wonVotesRemove(v.UID)
+				elapsed := time.Since(before)
+
+				if elapsed > 10*time.Second {
+					log.Warnf("Fish: %d Applications allocation took %s", len(toProcess), elapsed)
+				}
 			}
 		}
 	}
@@ -421,20 +432,20 @@ func (f *Fish) CompactDB() {
 func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 	vote, err := f.activeVotesGet(appUID)
 	if err != nil {
-		return log.Errorf("Fish: Vote %q: Fatal: Unable to get the Vote for Application: %v", appUID, err)
+		return log.Errorf("Fish: Election %q: Fatal: Unable to get the Vote for Application: %v", appUID, err)
 	}
 	// Make sure the active vote will be removed in case error happens to restart the process next time
-	defer f.activeVotesRemove(vote.UID)
+	defer f.activeVotesRemove(appUID)
 
 	app, err := f.ApplicationGet(appUID)
 	if err != nil {
-		return log.Errorf("Fish: Vote %q: Fatal: Unable to get the Application: %v", appUID, err)
+		return log.Errorf("Fish: Election %q: Fatal: Unable to get the Application: %v", appUID, err)
 	}
 
 	// Get label with the definitions
 	label, err := f.LabelGet(app.LabelUID)
 	if err != nil {
-		return log.Errorf("Fish: Vote %q: Fatal: Unable to get the Label %s: %v", appUID, app.LabelUID, err)
+		return log.Errorf("Fish: Election %q: Fatal: Unable to get the Label %s: %v", appUID, app.LabelUID, err)
 	}
 
 	// Loop to reiterate each new round
@@ -442,7 +453,7 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 		// Set the round based on the time of Application creation
 		vote.Round = f.voteCurrentRoundGet(app.CreatedAt)
 
-		log.Infof("Fish: Vote %q: Starting Application election round %d", appUID, vote.Round)
+		log.Infof("Fish: Election %q: Starting Application election round %d", appUID, vote.Round)
 
 		// Determine answer for this round, it will try find the first possible definition to serve
 		vote.Available = f.isNodeAvailableForDefinitions(label.Definitions)
@@ -450,7 +461,7 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 		// Sync vote with the other nodes
 		if vote.UID == uuid.Nil {
 			if err := f.clusterVoteSend(vote); err != nil {
-				return log.Errorf("Fish: Vote %q: Fatal: Unable to sync vote: %v", appUID, err)
+				return log.Errorf("Fish: Election %q: Fatal: Unable to sync vote: %v", appUID, err)
 			}
 		}
 
@@ -462,11 +473,11 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 			// Check all the cluster nodes voted
 			nodes, err := f.NodeActiveList()
 			if err != nil {
-				return log.Errorf("Fish: Vote %q: Fatal: Unable to get the Node list: %v", appUID, err)
+				return log.Errorf("Fish: Election %q: Fatal: Unable to get the Node list: %v", appUID, err)
 			}
 			votes := f.voteListGetApplicationRound(appUID, vote.Round)
 			if err != nil {
-				return log.Errorf("Fish: Vote %q: Fatal: Unable to get the Vote list: %v", appUID, err)
+				return log.Errorf("Fish: Election %q: Fatal: Unable to get the Vote list: %v", appUID, err)
 			}
 			if len(votes) >= len(nodes) {
 				// Ok, all nodes voted so let's move to election
@@ -495,7 +506,7 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 							if v.Rand < bestVote.Rand {
 								continue
 							} else if v.Rand == bestVote.Rand {
-								log.Warnf("Fish: Vote %q: This round is a lucky one! Rands are equal for nodes %s and %s", appUID, v.NodeUID, bestVote.NodeUID)
+								log.Warnf("Fish: Election %q: This round is a lucky one! Rands are equal for nodes %s and %s", appUID, v.NodeUID, bestVote.NodeUID)
 								bestVote.UID = uuid.Nil
 								break
 							}
@@ -508,23 +519,22 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 
 				// Checking the best vote
 				if bestVote.UID == uuid.Nil {
-					log.Infof("Fish: Vote %q: No candidates in round %d", appUID, vote.Round)
+					log.Infof("Fish: Election %q: No candidates in round %d", appUID, vote.Round)
 				} else if bestVote.NodeUID == f.node.UID {
-					log.Infof("Fish: Vote %q: I won the election", appUID)
+					log.Infof("Fish: Election %q: I won the election", appUID)
 					f.wonVotesAdd(bestVote, app.CreatedAt)
 				} else {
-					log.Infof("Fish: Vote %q: I lost the election to Node %s", appUID, vote.NodeUID)
+					log.Infof("Fish: Election %q: I lost the election to Node %s", appUID, vote.NodeUID)
 				}
 
 				// Wait till the next round
 				// Doesn't matter what's the result of the round - we need to wait till the next one
 				// anyway to check if the Application was served or run another round
-				toSleep := time.Until(roundEndsAt)
-				time.Sleep(toSleep)
+				time.Sleep(time.Until(roundEndsAt))
 
 				// Check if the Application changed state
 				if s, err := f.ApplicationStateGetByApplication(appUID); err != nil {
-					log.Errorf("Fish: Vote %q: Unable to get the Application state: %v", appUID, err)
+					log.Errorf("Fish: Election %q: Unable to get the Application state: %v", appUID, err)
 					// The Application state is not found, so we can drop the election process
 					f.activeVotesRemove(vote.UID)
 					f.storageVotesCleanup()
@@ -541,7 +551,7 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 				break
 			}
 
-			log.Debug("Fish: Some nodes didn't vote, waiting...")
+			log.Debugf("Fish: Election %q: Some nodes didn't vote (%d >= %d), waiting till %v...", appUID, len(votes), len(nodes), roundEndsAt)
 
 			// Wait 5 sec and repeat
 			time.Sleep(5 * time.Second)
@@ -550,11 +560,6 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 }
 
 func (f *Fish) isNodeAvailableForDefinitions(defs []types.LabelDefinition) int {
-	// We can't run multiple resources check at a time or together with allocating application
-	// so using mutex here
-	f.nodeUsageMutex.Lock()
-	defer f.nodeUsageMutex.Unlock()
-
 	available := -1 // Set "nope" answer by default in case all the definitions are not fit
 	for i, def := range defs {
 		if f.isNodeAvailableForDefinition(def) {
@@ -576,6 +581,13 @@ func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 	driver := f.driverGet(def.Driver)
 	if driver == nil {
 		return false
+	}
+
+	// If the driver is using the local resources - we need to lock them to reduce the possibility
+	// of conflict with allocation process. Remote drivers implements their way to lock.
+	if !driver.IsRemote() {
+		f.nodeUsageMutex.Lock()
+		defer f.nodeUsageMutex.Unlock()
 	}
 
 	// Verify node filters because some workload can't be running on all the physical nodes
@@ -627,32 +639,25 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 		return fmt.Errorf("Fish: The definition index for Application %s is not chosen: %v", appUID, defIndex)
 	}
 
-	// Locking the node resources until the app will be allocated
-	f.nodeUsageMutex.Lock()
-
 	app, err := f.ApplicationGet(appUID)
 	if err != nil {
-		f.nodeUsageMutex.Unlock()
 		return fmt.Errorf("Fish: Unable to get the Application: %v", err)
 	}
 
 	// Check current Application state
 	appState, err := f.ApplicationStateGetByApplication(app.UID)
 	if err != nil {
-		f.nodeUsageMutex.Unlock()
 		return fmt.Errorf("Fish: Unable to get the Application state: %v", err)
 	}
 
 	// Get label with the definitions
 	label, err := f.LabelGet(app.LabelUID)
 	if err != nil {
-		f.nodeUsageMutex.Unlock()
 		return fmt.Errorf("Fish: Unable to find Label %s: %v", app.LabelUID, err)
 	}
 
 	// Extract the Label Definition by the provided index
 	if len(label.Definitions) <= defIndex {
-		f.nodeUsageMutex.Unlock()
 		return fmt.Errorf("Fish: ERROR: The chosen Definition not exists in the Label %s: %v (App: %s)", app.LabelUID, defIndex, app.UID)
 	}
 	labelDef := label.Definitions[defIndex]
@@ -663,7 +668,6 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 		// just have not enough resources, so skip it for now to allow the other Nodes to try again.
 		if !f.isNodeAvailableForDefinition(labelDef) {
 			log.Warn("Fish: Not enough resources to execute the Application", app.UID)
-			f.nodeUsageMutex.Unlock()
 			return nil
 		}
 	}
@@ -671,17 +675,15 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 	// Locate the required driver
 	driver := f.driverGet(labelDef.Driver)
 	if driver == nil {
-		f.nodeUsageMutex.Unlock()
 		return fmt.Errorf("Fish: Unable to locate driver for the Application %s: %s", app.UID, labelDef.Driver)
 	}
 
 	// If the driver is not using the remote resources - we need to increase the counter
 	if !driver.IsRemote() {
+		f.nodeUsageMutex.Lock()
 		f.nodeUsage.Add(labelDef.Resources)
+		f.nodeUsageMutex.Unlock()
 	}
-
-	// Unlocking the node resources to allow the other Applications allocation
-	f.nodeUsageMutex.Unlock()
 
 	// Adding the application to list
 	f.applicationsMutex.Lock()
@@ -933,27 +935,18 @@ func (f *Fish) activeVotesGet(appUID types.ApplicationUID) (*types.Vote, error) 
 	f.activeVotesMutex.RLock()
 	defer f.activeVotesMutex.RUnlock()
 
-	for i, vote := range f.activeVotes {
-		if vote.ApplicationUID == appUID {
-			return &f.activeVotes[i], nil
-		}
+	if vote, ok := f.activeVotes[appUID]; ok {
+		return &vote, nil
 	}
-	return nil, fmt.Errorf("Fish: Unable to find the app vote")
+	return nil, fmt.Errorf("Fish: Unable to find the Application vote")
 }
 
 // activeVotesRemove completes the voting process by removing active Vote from the list
-func (f *Fish) activeVotesRemove(voteUID types.VoteUID) {
+func (f *Fish) activeVotesRemove(appUID types.ApplicationUID) {
 	f.activeVotesMutex.Lock()
 	defer f.activeVotesMutex.Unlock()
-	av := f.activeVotes
-	for i, v := range f.activeVotes {
-		if v.UID != voteUID {
-			continue
-		}
-		av[i] = av[len(av)-1]
-		f.activeVotes = av[:len(av)-1]
-		break
-	}
+
+	delete(f.activeVotes, appUID)
 }
 
 // wonVotesAdd will add won vote to the list in order of Application CreatedAt

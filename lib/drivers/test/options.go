@@ -25,6 +25,9 @@ type Options struct {
 	FailOptionsValidate   uint8 `json:"fail_options_validate"`   // Fail on options Validate (0 - not, 1-254 random, 255-yes)
 	FailAvailableCapacity uint8 `json:"fail_available_capacity"` // Fail on executing AvailableCapacity (0 - not, 1-254 random, 255-yes)
 	FailAllocate          uint8 `json:"fail_allocate"`           // Fail on Allocate (0 - not, 1-254 random, 255-yes)
+
+	DelayAvailableCapacity float32 `json:"delay_available_capacity"` // Amount of seconds to sleep within AvailableCapacity request
+	DelayAllocate          float32 `json:"delay_allocate"`           // Amount of seconds to sleep within Allocation request
 }
 
 // Apply takes json and applies it to the options structure

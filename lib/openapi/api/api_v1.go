@@ -333,6 +333,8 @@ func (e *Processor) ApplicationCreatePost(c echo.Context) error {
 		return fmt.Errorf("Unable to create application: %w", err)
 	}
 
+	log.Debug("API: Created new Application:", data.UID)
+
 	return c.JSON(http.StatusOK, data)
 }
 
