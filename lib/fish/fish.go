@@ -107,6 +107,10 @@ func (f *Fish) Init() error {
 	f.activeVotes = make(map[types.ApplicationUID]types.Vote)
 	f.storageVotes = make(map[types.VoteUID]types.Vote)
 
+	// Set slots to 0
+	var val uint = 0
+	f.nodeUsage.Slots = &val
+
 	// Create admin user and ignore errors if it's existing
 	_, err := f.UserGet("admin")
 	if err == bitcask.ErrObjectNotFound {
@@ -588,6 +592,18 @@ func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 	if !driver.IsRemote() {
 		f.nodeUsageMutex.Lock()
 		defer f.nodeUsageMutex.Unlock()
+
+		// Processing node slots only if the limit is set
+		if f.cfg.NodeSlotsLimit > 0 {
+			// Use 1 by default for the definitions where slots value is not set
+			if def.Resources.Slots == nil {
+				var val uint = 1
+				def.Resources.Slots = &val
+			}
+			if (*f.nodeUsage.Slots)+(*def.Resources.Slots) > f.cfg.NodeSlotsLimit {
+				return false
+			}
+		}
 	}
 
 	// Verify node filters because some workload can't be running on all the physical nodes

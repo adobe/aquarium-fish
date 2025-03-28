@@ -42,6 +42,7 @@ type Config struct {
 	NodeName        string   `json:"node_name"`        // Last resort in case you need to override the default host node name
 	NodeLocation    string   `json:"node_location"`    // Specify cluster node location for multi-dc configurations
 	NodeIdentifiers []string `json:"node_identifiers"` // The list of node identifiers which could be used to find the right Node for Resource
+	NodeSlotsLimit  uint     `json:"node_slots_limit"` // Limits the amount of Applications to be executed simultaneously on the node
 
 	NodeSSHKey string `json:"ssh_key"` // The SSH RSA identity private key for the fish node (if relative - to directory)
 
