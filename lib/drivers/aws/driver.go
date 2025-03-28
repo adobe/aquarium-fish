@@ -247,7 +247,7 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ types.Resources, def types.La
 		return -1
 	}
 
-	log.Debugf("AWS: AvailableCapacity: Quotas: %d, IP's: %d", instCount, ipCount)
+	log.Debugf("AWS: AvailableCapacity: Type: %s, Quotas: %d, IP's: %d", opts.InstanceType, instCount, ipCount)
 
 	// Return the most limiting value
 	if ipCount < instCount {

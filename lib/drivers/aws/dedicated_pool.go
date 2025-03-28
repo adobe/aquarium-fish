@@ -265,8 +265,8 @@ func (w *dedicatedPoolWorker) manageHosts() []string {
 			continue
 		}
 
-		// If it's mac not too old and in scrubbing process (pending) - we don't need to bother
-		if host.State == ec2types.AllocationStatePending && isHostMac(&host) && !isMacTooOld(&host) {
+		// If mac host not too old and in scrubbing process (pending) - we don't need to bother
+		if host.State == ec2types.AllocationStatePending && isHostMac(&host) && !w.isHostTooOld(&host) {
 			continue
 		}
 
@@ -284,7 +284,7 @@ func (w *dedicatedPoolWorker) manageHosts() []string {
 
 		// Check if mac - giving it some time before action release or scrubbing
 		// If not mac or mac is old: giving a chance to be reused - will be processed next cycle
-		if isHostMac(&host) && !isMacTooOld(&host) {
+		if isHostMac(&host) && !w.isHostTooOld(&host) {
 			w.toManageAt[hostID] = time.Now().Add(time.Duration(w.record.ScrubbingDelay))
 		} else {
 			w.toManageAt[hostID] = time.Now()
@@ -311,15 +311,16 @@ func (w *dedicatedPoolWorker) releaseHosts(releaseHosts []string) {
 	var macHosts []string
 	var toRelease []string
 	for _, hostID := range releaseHosts {
-		// Special treatment for mac hosts - it makes not much sense to try to release them until
-		// they've live for 24h due to Apple-AWS license.
+		// Special filtering for mac hosts and check if host is ready to be released. It's needed
+		// to obey the rules of mac minimum life for 24h due to Apple-AWS license and in case you
+		// need to keep the allocated dedicated hosts for longer then minimum needed release time.
 		if host, ok := w.activeHosts[hostID]; ok && host.HostProperties != nil {
 			if isHostMac(&host) {
 				macHosts = append(macHosts, hostID)
-				// If mac host not reached 24h since allocation - skipping addition to the release list
-				if !isHostReadyForRelease(&host) {
-					continue
-				}
+			}
+			// If the host not reached ReleaseDelay since allocation - skipping addition to list
+			if !w.isHostReadyForRelease(&host) {
+				continue
 			}
 		}
 		// Adding any host to to_release list
@@ -374,23 +375,23 @@ func isHostMac(host *ec2types.Host) bool {
 	return host.HostProperties != nil && awsInstTypeAny(aws.ToString(host.HostProperties.InstanceType), "mac")
 }
 
-func isMacTooOld(host *ec2types.Host) bool {
-	return aws.ToTime(host.AllocationTime).Before(time.Now().Add(-24 * time.Hour))
+func (w *dedicatedPoolWorker) isHostTooOld(host *ec2types.Host) bool {
+	return aws.ToTime(host.AllocationTime).Before(time.Now().Add(-time.Duration(w.record.ReleaseDelay)))
 }
 
 // Check if the host is ready to be released - if it's mac then it should be older then 24h
-func isHostReadyForRelease(host *ec2types.Host) bool {
+func (w *dedicatedPoolWorker) isHostReadyForRelease(host *ec2types.Host) bool {
 	// Host not used - for sure ready for release
 	if !isHostUsed(host) {
 		// If mac is not old enough - it's not ready for release
-		if isHostMac(host) && !isMacTooOld(host) {
+		if !w.isHostTooOld(host) {
 			return false
 		}
 		return true
 	}
 
-	// Mac in scrubbing process (pending) can be released but should be older then 24h
-	if host.State == ec2types.AllocationStatePending && isHostMac(host) && isMacTooOld(host) {
+	// Host in scrubbing process (pending) can be released but should be old enough
+	if host.State == ec2types.AllocationStatePending && w.isHostTooOld(host) {
 		return true
 	}
 
