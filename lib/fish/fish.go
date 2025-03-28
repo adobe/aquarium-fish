@@ -629,7 +629,13 @@ func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 
 	// Check with the driver if it's possible to allocate the Application resource
 	nodeUsage := f.nodeUsage
-	if capacity := driver.AvailableCapacity(nodeUsage, def); capacity < 1 {
+	before := time.Now()
+	capacity := driver.AvailableCapacity(nodeUsage, def)
+	elapsed := time.Since(before)
+	if elapsed > 300*time.Millisecond {
+		log.Warnf("Fish: AvailableCapacity of %s driver took %s", def.Driver, elapsed)
+	}
+	if capacity < 1 {
 		return false
 	}
 
