@@ -528,12 +528,13 @@ func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 						if _, ok := w.pendingAvailableHosts[hostID]; !ok {
 							delayTill := time.Now().Add(time.Duration(w.record.PendingToAvailableDelay))
 							log.Debugf("AWS: dedicated %q: Delaying availability of host %s till %s", w.name, hostID, delayTill)
-							host := currActiveHosts[hostID]
-							host.State = ec2types.AllocationStatePending
-							currActiveHosts[hostID] = host
 							w.pendingAvailableHosts[hostID] = delayTill
 						}
 						w.pendingAvailableHostsMu.Unlock()
+						// Updating the status each run to make sure it will not switch to Available before delay is out
+						host := currActiveHosts[hostID]
+						host.State = ec2types.AllocationStatePending
+						currActiveHosts[hostID] = host
 					} else if rh.State != ec2types.AllocationStateAvailable {
 						// If the state changed from Available - removing the item
 						w.pendingAvailableHostsMu.Lock()
