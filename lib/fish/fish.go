@@ -108,8 +108,8 @@ func (f *Fish) Init() error {
 	f.storageVotes = make(map[types.VoteUID]types.Vote)
 
 	// Set slots to 0
-	var val uint = 0
-	f.nodeUsage.Slots = &val
+	var zeroSlotsValue uint
+	f.nodeUsage.Slots = &zeroSlotsValue
 
 	// Create admin user and ignore errors if it's existing
 	_, err := f.UserGet("admin")
