@@ -52,6 +52,12 @@ type DedicatedPoolRecord struct {
 	Zones []string `json:"zones"` // Where to allocate the dedicated host (example: ["us-west-2a", "us-west-2c"])
 	Max   uint     `json:"max"`   // Maximum dedicated hosts to allocate (they sometimes can handle more than 1 capacity slot)
 
+	// AWS has a bug in it's API - when you getting the dedicated hosts availability it can say the
+	// host is become available, but in fact it's not. Particularly we see that with mac machines
+	// when they are returning after scrubbing. So this delay will add the requested delay between
+	// previous state of the dedicated host and available state, so the allocations will not fail.
+	PendingToAvailableDelay util.Duration `json:"pending_to_available_delay"`
+
 	// Specifies when the dedicated host can be released after allocation. By default for mac type
 	// it's set to [24h] but you can set to half a year or more to keep the host in your pool as
 	// long as you need. If you want to set it to lower value for mac, then 24h - please consult
