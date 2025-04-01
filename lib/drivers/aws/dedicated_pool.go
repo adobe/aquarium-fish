@@ -47,6 +47,10 @@ type dedicatedPoolWorker struct {
 	activeHostsUpdated time.Time
 	activeHostsMu      sync.RWMutex
 
+	// Storage to delay available state for previously pending state
+	pendingAvailableHosts   map[string]time.Time
+	pendingAvailableHostsMu sync.Mutex
+
 	// Hosts to release or scrub at specified time, used by manageHosts process
 	toManageAt map[string]time.Time
 }
@@ -58,8 +62,9 @@ func (d *Driver) newDedicatedPoolWorker(name string, record DedicatedPoolRecord)
 		driver: d,
 		record: record,
 
-		activeHosts: make(map[string]ec2types.Host),
-		toManageAt:  make(map[string]time.Time),
+		activeHosts:           make(map[string]ec2types.Host),
+		pendingAvailableHosts: make(map[string]time.Time),
+		toManageAt:            make(map[string]time.Time),
 	}
 
 	// Receiving amount of instances per dedicated host
@@ -265,8 +270,8 @@ func (w *dedicatedPoolWorker) manageHosts() []string {
 			continue
 		}
 
-		// If it's mac not too old and in scrubbing process (pending) - we don't need to bother
-		if host.State == ec2types.AllocationStatePending && isHostMac(&host) && !isMacTooOld(&host) {
+		// If mac host not too old and in scrubbing process (pending) - we don't need to bother
+		if host.State == ec2types.AllocationStatePending && isHostMac(&host) && !w.isHostTooOld(&host) {
 			continue
 		}
 
@@ -284,7 +289,7 @@ func (w *dedicatedPoolWorker) manageHosts() []string {
 
 		// Check if mac - giving it some time before action release or scrubbing
 		// If not mac or mac is old: giving a chance to be reused - will be processed next cycle
-		if isHostMac(&host) && !isMacTooOld(&host) {
+		if isHostMac(&host) && !w.isHostTooOld(&host) {
 			w.toManageAt[hostID] = time.Now().Add(time.Duration(w.record.ScrubbingDelay))
 		} else {
 			w.toManageAt[hostID] = time.Now()
@@ -311,15 +316,16 @@ func (w *dedicatedPoolWorker) releaseHosts(releaseHosts []string) {
 	var macHosts []string
 	var toRelease []string
 	for _, hostID := range releaseHosts {
-		// Special treatment for mac hosts - it makes not much sense to try to release them until
-		// they've live for 24h due to Apple-AWS license.
+		// Special filtering for mac hosts and check if host is ready to be released. It's needed
+		// to obey the rules of mac minimum life for 24h due to Apple-AWS license and in case you
+		// need to keep the allocated dedicated hosts for longer then minimum needed release time.
 		if host, ok := w.activeHosts[hostID]; ok && host.HostProperties != nil {
 			if isHostMac(&host) {
 				macHosts = append(macHosts, hostID)
-				// If mac host not reached 24h since allocation - skipping addition to the release list
-				if !isHostReadyForRelease(&host) {
-					continue
-				}
+			}
+			// If the host not reached ReleaseDelay since allocation - skipping addition to list
+			if !w.isHostReadyForRelease(&host) {
+				continue
 			}
 		}
 		// Adding any host to to_release list
@@ -374,23 +380,23 @@ func isHostMac(host *ec2types.Host) bool {
 	return host.HostProperties != nil && awsInstTypeAny(aws.ToString(host.HostProperties.InstanceType), "mac")
 }
 
-func isMacTooOld(host *ec2types.Host) bool {
-	return aws.ToTime(host.AllocationTime).Before(time.Now().Add(-24 * time.Hour))
+func (w *dedicatedPoolWorker) isHostTooOld(host *ec2types.Host) bool {
+	return aws.ToTime(host.AllocationTime).Before(time.Now().Add(-time.Duration(w.record.ReleaseDelay)))
 }
 
 // Check if the host is ready to be released - if it's mac then it should be older then 24h
-func isHostReadyForRelease(host *ec2types.Host) bool {
+func (w *dedicatedPoolWorker) isHostReadyForRelease(host *ec2types.Host) bool {
 	// Host not used - for sure ready for release
 	if !isHostUsed(host) {
 		// If mac is not old enough - it's not ready for release
-		if isHostMac(host) && !isMacTooOld(host) {
+		if !w.isHostTooOld(host) {
 			return false
 		}
 		return true
 	}
 
-	// Mac in scrubbing process (pending) can be released but should be older then 24h
-	if host.State == ec2types.AllocationStatePending && isHostMac(host) && isMacTooOld(host) {
+	// Host in scrubbing process (pending) can be released but should be old enough
+	if host.State == ec2types.AllocationStatePending && w.isHostTooOld(host) {
 		return true
 	}
 
@@ -427,7 +433,27 @@ func (w *dedicatedPoolWorker) updateDedicatedHostsProcess() ([]ec2types.Host, er
 	}
 
 	for {
-		time.Sleep(30 * time.Second)
+		// Running check every 10 seconds
+		time.Sleep(10 * time.Second)
+
+		// Going through the list of newly available hosts to apply if PendingToAvailableDelay is set
+		if w.record.PendingToAvailableDelay > 0 {
+			w.pendingAvailableHostsMu.Lock()
+			for hostID, t := range w.pendingAvailableHosts {
+				if t.Before(time.Now()) {
+					w.activeHostsMu.Lock()
+					delete(w.pendingAvailableHosts, hostID)
+					if host, ok := w.activeHosts[hostID]; ok {
+						log.Debugf("AWS: dedicated %q: Making host %s available after pending", w.name, hostID)
+						host.State = ec2types.AllocationStateAvailable
+						w.activeHosts[hostID] = host
+					}
+					w.activeHostsMu.Unlock()
+				}
+			}
+			w.pendingAvailableHostsMu.Unlock()
+		}
+
 		// We need to keep the request rate budget, so using a delay between regular updates.
 		// If the dedicated hosts are used often, it could wait for a while due to often updates
 		w.activeHostsMu.RLock()
@@ -493,9 +519,32 @@ func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 		for _, rh := range resp.Hosts {
 			hostID := aws.ToString(rh.HostId)
 			currActiveHosts[hostID] = rh
-			// If the response host has not changed, use the same object in the active list
-			if ah, ok := w.activeHosts[hostID]; ok && ah.State == rh.State && len(ah.Instances) == len(rh.Instances) {
-				currActiveHosts[hostID] = w.activeHosts[hostID]
+			// Check if we have this host in the list already
+			if ah, ok := w.activeHosts[hostID]; ok {
+				// When PendingToAvailableDelay is set we use special process to switch from pending state to Available
+				if w.record.PendingToAvailableDelay > 0 {
+					if ah.State == ec2types.AllocationStatePending && rh.State == ec2types.AllocationStateAvailable {
+						w.pendingAvailableHostsMu.Lock()
+						if _, ok := w.pendingAvailableHosts[hostID]; !ok {
+							delayTill := time.Now().Add(time.Duration(w.record.PendingToAvailableDelay))
+							log.Debugf("AWS: dedicated %q: Delaying availability of host %s till %s", w.name, hostID, delayTill)
+							w.pendingAvailableHosts[hostID] = delayTill
+						}
+						w.pendingAvailableHostsMu.Unlock()
+						// Updating the status each run to make sure it will not switch to Available before delay is out
+						host := currActiveHosts[hostID]
+						host.State = ec2types.AllocationStatePending
+						currActiveHosts[hostID] = host
+					} else if rh.State != ec2types.AllocationStateAvailable {
+						// If the state changed from Available - removing the item
+						w.pendingAvailableHostsMu.Lock()
+						if _, ok := w.pendingAvailableHosts[hostID]; ok {
+							log.Debugf("AWS: dedicated %q: Host state changed, so removing host %s from pendingAvailableHosts", w.name, hostID)
+							delete(w.pendingAvailableHosts, hostID)
+						}
+						w.pendingAvailableHostsMu.Unlock()
+					}
+				}
 			}
 		}
 	}

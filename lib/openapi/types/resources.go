@@ -78,6 +78,16 @@ func (r *Resources) Add(res Resources) error {
 	r.Cpu += res.Cpu
 	r.Ram += res.Ram
 
+	if r.Slots != nil {
+		var val uint
+		if res.Slots == nil {
+			val = (*r.Slots) + 1
+		} else {
+			val = (*r.Slots) + (*res.Slots)
+		}
+		r.Slots = &val
+	}
+
 	// TODO: Process disk too
 	return nil
 }
@@ -100,6 +110,16 @@ func (r *Resources) Subtract(res Resources) (err error) {
 		r.Ram -= res.Ram
 	}
 
+	if r.Slots != nil {
+		var val uint
+		if res.Slots == nil {
+			val = (*r.Slots) - 1
+		} else {
+			val = (*r.Slots) - (*res.Slots)
+		}
+		r.Slots = &val
+	}
+
 	// TODO: Process disk too
 
 	return
@@ -114,6 +134,9 @@ func (r *Resources) IsEmpty() bool {
 		return false
 	}
 	if len(r.Disks) > 0 {
+		return false
+	}
+	if r.Slots != nil && (*r.Slots) > 0 {
 		return false
 	}
 

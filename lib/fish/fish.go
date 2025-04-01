@@ -107,6 +107,10 @@ func (f *Fish) Init() error {
 	f.activeVotes = make(map[types.ApplicationUID]types.Vote)
 	f.storageVotes = make(map[types.VoteUID]types.Vote)
 
+	// Set slots to 0
+	var zeroSlotsValue uint
+	f.nodeUsage.Slots = &zeroSlotsValue
+
 	// Create admin user and ignore errors if it's existing
 	_, err := f.UserGet("admin")
 	if err == bitcask.ErrObjectNotFound {
@@ -588,6 +592,18 @@ func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 	if !driver.IsRemote() {
 		f.nodeUsageMutex.Lock()
 		defer f.nodeUsageMutex.Unlock()
+
+		// Processing node slots only if the limit is set
+		if f.cfg.NodeSlotsLimit > 0 {
+			// Use 1 by default for the definitions where slots value is not set
+			if def.Resources.Slots == nil {
+				var val uint = 1
+				def.Resources.Slots = &val
+			}
+			if (*f.nodeUsage.Slots)+(*def.Resources.Slots) > f.cfg.NodeSlotsLimit {
+				return false
+			}
+		}
 	}
 
 	// Verify node filters because some workload can't be running on all the physical nodes
@@ -613,7 +629,13 @@ func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 
 	// Check with the driver if it's possible to allocate the Application resource
 	nodeUsage := f.nodeUsage
-	if capacity := driver.AvailableCapacity(nodeUsage, def); capacity < 1 {
+	before := time.Now()
+	capacity := driver.AvailableCapacity(nodeUsage, def)
+	elapsed := time.Since(before)
+	if elapsed > 300*time.Millisecond {
+		log.Warnf("Fish: AvailableCapacity of %s driver took %s", def.Driver, elapsed)
+	}
+	if capacity < 1 {
 		return false
 	}
 

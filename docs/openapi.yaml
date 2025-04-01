@@ -1236,6 +1236,11 @@ components:
         - ram_overbook
         - lifetime
       properties:
+        slots:
+          x-go-type: uint
+          type: integer
+          minimum: 0
+          description: Global amount of slots to be filled with ApplicationResources
         cpu:
           x-go-type: uint
           type: integer

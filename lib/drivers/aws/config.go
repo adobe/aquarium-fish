@@ -52,6 +52,20 @@ type DedicatedPoolRecord struct {
 	Zones []string `json:"zones"` // Where to allocate the dedicated host (example: ["us-west-2a", "us-west-2c"])
 	Max   uint     `json:"max"`   // Maximum dedicated hosts to allocate (they sometimes can handle more than 1 capacity slot)
 
+	// AWS has a bug in it's API - when you getting the dedicated hosts availability it can say the
+	// host is become available, but in fact it's not. Particularly we see that with mac machines
+	// when they are returning after scrubbing. So this delay will add the requested delay between
+	// previous state of the dedicated host and available state, so the allocations will not fail.
+	PendingToAvailableDelay util.Duration `json:"pending_to_available_delay"`
+
+	// Specifies when the dedicated host can be released after allocation. By default for mac type
+	// it's set to [24h] but you can set to half a year or more to keep the host in your pool as
+	// long as you need. If you want to set it to lower value for mac, then 24h - please consult
+	// the AWS docs regarding that.
+	//
+	// [24h]: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-mac-instances.html#mac-instance-considerations
+	ReleaseDelay util.Duration `json:"release_delay"`
+
 	// Is a special optimization for the Mac dedicated hosts to send them in [scrubbing process] to
 	// save money when we can't release the host due to Apple's license of [24 hours] min limit.
 	//
@@ -164,6 +178,12 @@ func (c *Config) Validate() (err error) {
 		c.DedicatedPool = make(map[string]DedicatedPoolRecord)
 	}
 	for name, pool := range c.DedicatedPool {
+		if awsInstTypeAny(pool.Type, "mac") {
+			// Set default for ReleaseDelay to 24h (due to AWS mac limitation)
+			if pool.ReleaseDelay <= 0 {
+				pool.ReleaseDelay = util.Duration(24 * time.Hour)
+			}
+		}
 		// Make sure the ScrubbingDelay either unset or >= 1min or we will face often update API reqs
 		if pool.ScrubbingDelay > 0 && time.Duration(pool.ScrubbingDelay) < 1*time.Minute {
 			return fmt.Errorf("AWS: Scrubbing delay of pool %q is less then 1 minute: %v", name, pool.ScrubbingDelay)
