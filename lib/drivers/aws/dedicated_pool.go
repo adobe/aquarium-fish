@@ -545,11 +545,6 @@ func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 						w.pendingAvailableHostsMu.Unlock()
 					}
 				}
-
-				// If the response host has not changed, use the same object in the active list
-				if ah.State == rh.State && len(ah.Instances) == len(rh.Instances) {
-					currActiveHosts[hostID] = w.activeHosts[hostID]
-				}
 			}
 		}
 	}
