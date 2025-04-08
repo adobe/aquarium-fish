@@ -257,6 +257,27 @@ func (f *Fish) GetLocation() string {
 	return f.node.Location
 }
 
+// startElection is running when Application is created, so immediately
+// starts the election process in background
+func (f *Fish) startElection(app *types.Application) {
+	// Check if Vote is already here
+	if _, err := f.activeVotesGet(app.UID); err == nil {
+		return
+	}
+	log.Info("Fish: NEW Application with no Vote:", app.UID, app.CreatedAt)
+
+	// Vote not exists in the active votes - running the process
+	// We need to keep this mutex here to ensure vote is put into active votes to not
+	// process it next time accidentally
+	f.activeVotesMutex.Lock()
+	{
+		// Create new Vote and run background vote process
+		f.activeVotes[app.UID] = f.VoteCreate(app.UID)
+		go f.electionProcess(app.UID)
+	}
+	f.activeVotesMutex.Unlock()
+}
+
 func (f *Fish) checkNewApplicationProcess() {
 	f.routines.Add(1)
 	defer f.routines.Done()
@@ -268,31 +289,6 @@ func (f *Fish) checkNewApplicationProcess() {
 		case <-f.running.Done():
 			return
 		case <-checkTicker.C:
-			// Check new apps available for processing
-			newApps, err := f.ApplicationListGetStatusNew()
-			if err != nil {
-				log.Error("Fish: Unable to get NEW ApplicationState list:", err)
-				continue
-			}
-			for _, app := range newApps {
-				// Check if Vote is already here
-				if _, err := f.activeVotesGet(app.UID); err == nil {
-					continue
-				}
-				log.Info("Fish: NEW Application with no Vote:", app.UID, app.CreatedAt)
-
-				// Vote not exists in the active votes - running the process
-				// We need to keep this mutex here to ensure vote is put into active votes to not
-				// process it next time accidentally
-				f.activeVotesMutex.Lock()
-				{
-					// Create new Vote and run background vote process
-					f.activeVotes[app.UID] = f.VoteCreate(app.UID)
-					go f.electionProcess(app.UID)
-				}
-				f.activeVotesMutex.Unlock()
-			}
-
 			// Check the Applications ready to be allocated
 			// It's needed to be single-threaded to have some order in allocation - FIFO principle,
 			// who won first should be processed first.

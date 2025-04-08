@@ -46,6 +46,9 @@ func (f *Fish) ApplicationCreate(a *types.Application) error {
 		ApplicationUID: a.UID, Status: types.ApplicationStatusNEW,
 		Description: "Just created by Fish " + f.node.Name,
 	})
+
+	// Triggering new election process
+	f.startElection(a)
 	return err
 }
 
