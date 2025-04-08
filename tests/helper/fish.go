@@ -328,4 +328,5 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 	if failed != "" {
 		tb.Fatalf("ERROR: Failed to init node %q: %s", afi.nodeName, failed)
 	}
+	tb.Log("INFO: Fish is ready:", afi.nodeName)
 }
