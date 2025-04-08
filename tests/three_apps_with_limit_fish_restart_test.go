@@ -147,9 +147,7 @@ drivers:
 	})
 
 	// Restart the fish app node
-	t.Run("Restart the fish node", func(t *testing.T) {
-		afi.Restart(t)
-	})
+	afi.Restart(t)
 
 	t.Run("2 of 3 Applications should be ALLOCATED right after restart", func(t *testing.T) {
 		for i := range appStates {

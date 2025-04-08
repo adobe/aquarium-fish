@@ -63,6 +63,11 @@ type Driver struct {
 	quotasMutex      sync.Mutex
 	quotasNextUpdate time.Time
 
+	// Stores cache per type of the instance needed
+	typeCache        map[string]int64
+	typeCacheUpdated map[string]time.Time
+	typeCacheMutex   sync.Mutex
+
 	dedicatedPools map[string]*dedicatedPoolWorker
 }
 
@@ -108,6 +113,11 @@ func (d *Driver) Prepare(config []byte) error {
 	}
 	d.quotasMutex.Unlock()
 
+	d.typeCacheMutex.Lock()
+	d.typeCache = make(map[string]int64)
+	d.typeCacheUpdated = make(map[string]time.Time)
+	d.typeCacheMutex.Unlock()
+
 	// Run the background dedicated hosts pool management
 	d.dedicatedPools = make(map[string]*dedicatedPoolWorker)
 	for name, params := range d.cfg.DedicatedPool {
@@ -148,7 +158,9 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ types.Resources, def types.La
 	if opts.Pool != "" {
 		// The pool is specified - let's check if it has the capacity
 		if p, ok := d.dedicatedPools[opts.Pool]; ok {
-			return p.AvailableCapacity(opts.InstanceType)
+			count := p.AvailableCapacity(opts.InstanceType)
+			log.Debugf("AWS: AvailableCapacity: Pool: %s, Type: %s, Count: %d", opts.Pool, opts.InstanceType, count)
+			return count
 		}
 		log.Warn("AWS: Unable to locate dedicated pool:", opts.Pool)
 		return -1
@@ -175,7 +187,15 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ types.Resources, def types.La
 				log.Error("AWS: Error during requesting hosts:", err)
 				return -1
 			}
-			instCount += int64(len(resp.Hosts))
+			if len(resp.Hosts) > 0 {
+				for _, host := range resp.Hosts {
+					// Mac capacity is only one per host, so if it already have
+					// an allocated instance - then no slots are here
+					if len(host.Instances) == 0 {
+						instCount++
+					}
+				}
+			}
 		}
 
 		log.Debug("AWS: AvailableCapacity for dedicated Mac:", opts.InstanceType, instCount)
@@ -184,6 +204,21 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ types.Resources, def types.La
 	}
 
 	// On-Demand hosts
+
+	// Checking cached capacity per requested instance type to prevent spam to the AWS API
+	d.typeCacheMutex.Lock()
+	defer d.typeCacheMutex.Unlock()
+	if upd, ok := d.typeCacheUpdated[opts.InstanceType]; ok {
+		if upd.After(time.Now().Add(-30 * time.Second)) {
+			if val, ok := d.typeCache[opts.InstanceType]; ok {
+				log.Debugf("AWS: AvailableCapacity: Type: %s, Cache: %d", opts.InstanceType, val)
+				return val
+			}
+		}
+	}
+
+	// Cache miss, so requesting the actual data from AWS API
+
 	d.updateQuotas(false)
 
 	d.quotasMutex.Lock()
@@ -250,10 +285,16 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ types.Resources, def types.La
 	log.Debugf("AWS: AvailableCapacity: Type: %s, Quotas: %d, IP's: %d", opts.InstanceType, instCount, ipCount)
 
 	// Return the most limiting value
+	result := instCount
 	if ipCount < instCount {
-		return ipCount
+		result = ipCount
 	}
-	return instCount
+
+	// Updating cache (d.typeCacheMutex is locked earlier)
+	d.typeCacheUpdated[opts.InstanceType] = time.Now()
+	d.typeCache[opts.InstanceType] = result
+
+	return result
 }
 
 // Allocate Instance with provided image

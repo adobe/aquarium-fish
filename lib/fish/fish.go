@@ -306,6 +306,7 @@ func (f *Fish) checkNewApplicationProcess() {
 
 				before := time.Now()
 				for _, v := range toProcess {
+					// TODO: Check if the Vote round & application already over the board - we need to skip
 					if err := f.executeApplication(v.ApplicationUID, v.Available); err != nil {
 						log.Errorf("Fish: Can't execute Application %s: %v", v.ApplicationUID, err)
 					}
@@ -313,9 +314,7 @@ func (f *Fish) checkNewApplicationProcess() {
 				}
 				elapsed := time.Since(before)
 
-				if elapsed > 10*time.Second {
-					log.Warnf("Fish: %d Applications allocation took %s", len(toProcess), elapsed)
-				}
+				log.Debugf("Fish: %d Applications allocation took %s", len(toProcess), elapsed)
 			}
 		}
 	}
@@ -375,14 +374,16 @@ func (f *Fish) CleanupDB() {
 		if state.Status != types.ApplicationStatusERROR && state.Status != types.ApplicationStatusDEALLOCATED {
 			continue
 		}
-		log.Debugf("Fish: CleanupDB: Checking Application %s (%s): %v, %v", state.UID, state.Status, state.CreatedAt, cutTime)
+		log.Debugf("Fish: CleanupDB: Checking Application %s (%s): %v", state.ApplicationUID, state.Status, state.CreatedAt)
 
 		if state.CreatedAt.After(cutTime) {
+			log.Debugf("Fish: CleanupDB: Skipping %s due to not reached the cut time, left: %s", state.ApplicationUID, state.CreatedAt.Sub(cutTime))
 			continue
 		}
 
 		// If the Application died before the Fish is started - then we need to give it aditional dbCleanupDelay time
-		if state.CreatedAt.Before(f.startup.Add(dbCleanupDelay)) {
+		if f.startup.After(cutTime) {
+			log.Debugf("Fish: CleanupDB: Skipping %s due to recent startup, left: %s", state.ApplicationUID, f.startup.Sub(cutTime))
 			continue
 		}
 
@@ -642,7 +643,12 @@ func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 	return true
 }
 
+// executeApplication runs the initial and continuous process of the Application allocation.
+// First stage should execute relatively quickly (to not get over ping delay), otherwise
+// that will cause the cluster to start another round of election. Second stage is executed
+// on background and watches the Application till it's deallocated.
 func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) error {
+	log.Debug("Fish: Start executing Application:", appUID.String())
 	// Check the application is executed already
 	f.applicationsMutex.RLock()
 	{
@@ -680,24 +686,24 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 
 	// Extract the Label Definition by the provided index
 	if len(label.Definitions) <= defIndex {
-		return fmt.Errorf("Fish: ERROR: The chosen Definition not exists in the Label %s: %v (App: %s)", app.LabelUID, defIndex, app.UID)
+		return fmt.Errorf("Fish: The chosen Definition not exists in the Label %s: %v (App: %s)", app.LabelUID, defIndex, app.UID)
 	}
 	labelDef := label.Definitions[defIndex]
-
-	// The already running applications will not consume the additional resources
-	if appState.Status == types.ApplicationStatusNEW {
-		// In case there is multiple Applications won the election process on the same node it could
-		// just have not enough resources, so skip it for now to allow the other Nodes to try again.
-		if !f.isNodeAvailableForDefinition(labelDef) {
-			log.Warn("Fish: Not enough resources to execute the Application", app.UID)
-			return nil
-		}
-	}
 
 	// Locate the required driver
 	driver := f.driverGet(labelDef.Driver)
 	if driver == nil {
 		return fmt.Errorf("Fish: Unable to locate driver for the Application %s: %s", app.UID, labelDef.Driver)
+	}
+
+	// The already running applications will not consume the additional resources
+	if appState.Status == types.ApplicationStatusNEW {
+		// In case there are multiple Applications won the election process on the same node it
+		// could just have not enough resources, so skip it to allow the other Nodes to try again.
+		if !f.isNodeAvailableForDefinition(labelDef) {
+			log.Warn("Fish: Not enough resources to execute the Application", app.UID)
+			return nil
+		}
 	}
 
 	// If the driver is not using the remote resources - we need to increase the counter
@@ -716,7 +722,7 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 	// while, after that the bg process will wait for application state change. We do not separate
 	// it into method because effectively it could not be running without the logic above.
 	go func() {
-		log.Info("Fish: Start executing Application", app.UID, appState.Status)
+		log.Info("Fish: Continuing executing Application", app.UID, appState.Status)
 
 		if appState.Status == types.ApplicationStatusNEW {
 			// Set Application state as ELECTED
@@ -799,7 +805,7 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 				appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusALLOCATED,
 					Description: "Driver allocated the resource",
 				}
-				log.Infof("Fish: Allocated Resource %q for the Application %s", app.UID, res.Identifier)
+				log.Infof("Fish: Allocated Resource for the Application %s: %s", app.UID, res.Identifier)
 			}
 			f.ApplicationStateCreate(appState)
 		}
@@ -836,8 +842,10 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 				return
 			default:
 				appState, err = f.ApplicationStateGetByApplication(app.UID)
-				if err != nil {
+				if err != nil || appState == nil {
 					log.Error("Fish: Unable to get Status for Application:", app.UID, err)
+					time.Sleep(5 * time.Second)
+					continue
 				}
 
 				// Check if it's life timeout for the resource

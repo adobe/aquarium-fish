@@ -469,10 +469,11 @@ func (w *dedicatedPoolWorker) updateDedicatedHostsProcess() ([]ec2types.Host, er
 
 // Will list all the allocated dedicated hosts on AWS with desired zone and tag
 func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
-	// Do not update too often
-	w.activeHostsMu.RLock()
-	readyForUpdate := w.activeHostsUpdated.Before(time.Now().Add(-10 * time.Second))
-	w.activeHostsMu.RUnlock()
+	w.activeHostsMu.Lock()
+	defer w.activeHostsMu.Unlock()
+
+	// We should not update the list too often
+	readyForUpdate := w.activeHostsUpdated.Before(time.Now().Add(-30 * time.Second))
 	if !readyForUpdate {
 		return nil
 	}
@@ -550,9 +551,6 @@ func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 	}
 
 	// Updating the list of hosts with received data
-	w.activeHostsMu.Lock()
-	defer w.activeHostsMu.Unlock()
-
 	w.activeHostsUpdated = time.Now()
 	w.activeHosts = currActiveHosts
 
