@@ -192,7 +192,7 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ types.Resources, def types.La
 					// Mac capacity is only one per host, so if it already have
 					// an allocated instance - then no slots are here
 					if len(host.Instances) == 0 {
-						instCount += 1
+						instCount++
 					}
 				}
 			}
