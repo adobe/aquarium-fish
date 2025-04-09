@@ -75,7 +75,7 @@ type Fish struct {
 	storageVotes      map[types.VoteUID]types.Vote
 
 	// Stores the currently executing Applications
-	applicationsMutex sync.RWMutex
+	applicationsMutex sync.Mutex
 	applications      []types.ApplicationUID
 
 	// Used to temporary store the won Votes by Application create time
@@ -103,6 +103,10 @@ func (f *Fish) Init() error {
 	f.shutdownCancel = make(chan bool)
 	f.Quit = make(chan os.Signal, 1)
 	signal.Notify(f.Quit, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
+
+	// Init channel for applicationState changes
+	f.applicationStateChannel = make(chan *types.ApplicationState)
+	f.db.Subscribe(f.applicationStateChannel)
 
 	// Init variables
 	f.activeVotes = make(map[types.ApplicationUID]types.Vote)
@@ -179,7 +183,7 @@ func (f *Fish) Init() error {
 		return log.Error("Fish: Unable to init drivers:", err)
 	}
 
-	// Continue to execute the assigned applications
+	// Resume to execute the assigned Applications
 	resources, err := f.db.ApplicationResourceListNode(f.db.GetNodeUID())
 	if err != nil {
 		return log.Error("Fish: Unable to get the node resources:", err)
@@ -188,6 +192,9 @@ func (f *Fish) Init() error {
 		if f.db.ApplicationIsAllocated(res.ApplicationUID) == nil {
 			log.Info("Fish: Found allocated resource to serve:", res.UID)
 			if err := f.executeApplication(res.ApplicationUID, res.DefinitionIndex); err != nil {
+				f.applicationsMutex.Lock()
+				f.removeFromExecutingApplincations(app.UID)
+				f.applicationsMutex.Unlock()
 				log.Errorf("Fish: Can't execute Application %s: %v", res.ApplicationUID, err)
 			}
 		} else {
@@ -201,6 +208,32 @@ func (f *Fish) Init() error {
 			f.db.ApplicationStateCreate(appState)
 		}
 	}
+
+	// Resume electionProcess for the NEW and ELECTED Applications
+	electionApps, err := f.db.ApplicationListGetStatusNewElected()
+	if err != nil {
+		log.Error("Fish: Unable to get NEW and ELECTED ApplicationState list:", err)
+		continue
+	}
+	for _, app := range electionApps {
+		// Check if Vote is already here
+		if _, err := f.activeVotesGet(app.UID); err == nil {
+			continue
+		}
+		log.Info("Fish: NEW Application with no Vote:", app.UID, app.CreatedAt)
+
+		// Vote not exists in the active votes - running the process
+		// We need to keep this mutex here to ensure vote is put into active votes to not
+		// process it next time accidentally
+		f.activeVotesMutex.Lock()
+		{
+			// Create new Vote and run background vote process
+			f.activeVotes[app.UID] = f.VoteCreate(app.UID)
+			go f.electionProcess(app.UID)
+		}
+		f.activeVotesMutex.Unlock()
+	}
+
 
 	// Run node ping timer
 	go f.pingProcess()
@@ -266,48 +299,28 @@ func (f *Fish) pingProcess() {
 	}
 }
 
-func (f *Fish) checkNewApplicationProcess() {
+// applicationProcess Is used to start processes to handle ApplicationsState events
+func (f *Fish) applicationProcess() {
 	f.routinesMutex.Lock()
 	f.routines.Add(1)
 	f.routinesMutex.Unlock()
 	defer f.routines.Done()
-	defer log.Info("Fish: checkNewApplicationProcess stopped")
+	defer log.Info("Fish: checkApplicationProcess stopped")
 
-	checkTicker := time.NewTicker(5 * time.Second)
-	defer checkTicker.Stop()
 	for {
 		select {
 		case <-f.running.Done():
 			return
-		case <-checkTicker.C:
-			// Check new apps available for processing
-			newApps, err := f.db.ApplicationListGetStatusNew()
-			if err != nil {
-				log.Error("Fish: Unable to get NEW ApplicationState list:", err)
-				continue
+		case appState := <-f.applicationStateEvent:
+			select appState.Status {
+			case types.ApplicationStatusNEW:
+				// Running election process for the new Application, if it's not already procesing
+			case types.ApplicationStatusELECTED:
+				// Starting Application execution if we are winners of the election
+			case types.ApplicationStatusDEALLOCATE:
+				// Executing deallocation procedures for the Application
 			}
-			for _, app := range newApps {
-				// Check if Vote is already here
-				if _, err := f.activeVotesGet(app.UID); err == nil {
-					continue
-				}
-				log.Info("Fish: NEW Application with no Vote:", app.UID, app.CreatedAt)
-
-				// Vote not exists in the active votes - running the process
-				// We need to keep this mutex here to ensure vote is put into active votes to not
-				// process it next time accidentally
-				f.activeVotesMutex.Lock()
-				{
-					// Create new Vote and run background vote process
-					f.activeVotes[app.UID] = f.VoteCreate(app.UID)
-					go f.electionProcess(app.UID)
-				}
-				f.activeVotesMutex.Unlock()
-			}
-
 			// Check the Applications ready to be allocated
-			// It's needed to be single-threaded to have some order in allocation - FIFO principle,
-			// who won first should be processed first.
 			f.wonVotesMutex.Lock()
 			toProcess := []types.Vote{}
 			toProcess = append(toProcess, f.wonVotes...)
@@ -320,7 +333,27 @@ func (f *Fish) checkNewApplicationProcess() {
 				for _, v := range toProcess {
 					// TODO: Check if the Vote round & application already over the board - we need to skip
 					if err := f.executeApplication(v.ApplicationUID, v.Available); err != nil {
-						log.Errorf("Fish: Can't execute Application %s: %v", v.ApplicationUID, err)
+						f.applicationsMutex.Lock()
+						f.removeFromExecutingApplincations(app.UID)
+						f.applicationsMutex.Unlock()
+
+						// If we have retries left for Application - trying to elect the node again
+						if f.db.ApplicationStateNewCount() < f.cfg.AllocationRetry {
+							log.Warnf("Fish: Can't allocate Application %s, will retry: %v", v.ApplicationUID, err)
+
+							// Returning Application to the original NEW state
+							// to allow the other nodes to try out their luck
+							appState := &types.ApplicationState{
+								ApplicationUID: app.UID,
+								Status:         types.ApplicationStatusNEW,
+								Description:    fmt.Sprintf("Failed to run execution on node %s: %v", f.node.Name, err),
+							}
+							if err := f.ApplicationStateCreate(appState) {
+								log.Errorf("Fish: Unable to create ApplciationState for Applciation %s: %v", v.ApplicationUID, err)
+							}
+						} else {
+							log.Errorf("Fish: Can't allocate Application %s: %v", v.ApplicationUID, err)
+						}
 					}
 					f.wonVotesRemove(v.UID)
 				}
@@ -457,10 +490,8 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 		vote.Available = f.isNodeAvailableForDefinitions(label.Definitions)
 
 		// Sync vote with the other nodes
-		if vote.UID == uuid.Nil {
-			if err := f.clusterVoteSend(vote); err != nil {
-				return log.Errorf("Fish: Election %q: Fatal: Unable to sync vote: %v", appUID, err)
-			}
+		if err := f.clusterVoteSend(vote); err != nil {
+			return log.Errorf("Fish: Election %q: Fatal: Unable to sync vote: %v", appUID, err)
 		}
 
 		// Calculating the end time of the round to not stuck if some nodes are not available
@@ -520,6 +551,17 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 					log.Infof("Fish: Election %q: No candidates in round %d", appUID, vote.Round)
 				} else if bestVote.NodeUID == f.db.GetNodeUID() {
 					log.Infof("Fish: Election %q: I won the election", appUID)
+
+					// Set Application state as ELECTED
+					err := f.db.ApplicationStateCreate(&types.ApplicationState{
+						ApplicationUID: app.UID,
+						Status:         types.ApplicationStatusELECTED,
+						Description:    "Elected node: " + f.node.Name,
+					})
+					if err != nil {
+						return log.Error("Fish: Unable to set Application state:", app.UID, err)
+					}
+
 					f.wonVotesAdd(bestVote, app.CreatedAt)
 				} else {
 					log.Infof("Fish: Election %q: I lost the election to Node %s", appUID, vote.NodeUID)
@@ -537,6 +579,10 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 					f.activeVotesRemove(vote.UID)
 					f.storageVotesCleanup()
 					return nil
+				} else if s.Status == types.ApplicationStatusELECTED {
+					// The Application become elected, so wait for 10 rounds while in ELECTED to
+					// give the node some time to actually allocate the application. When those 10
+					// rounds ended
 				} else if s.Status != types.ApplicationStatusNEW {
 					// The Application state was changed by some node, so we can drop the election process
 					f.activeVotesRemove(vote.UID)
@@ -544,12 +590,11 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 					return nil
 				}
 
-				// Next round seems needed
-				vote.UID = uuid.Nil
+				// We need another round
 				break
 			}
 
-			log.Debugf("Fish: Election %q: Some nodes didn't vote (%d >= %d), waiting till %v...", appUID, len(votes), len(nodes), roundEndsAt)
+			log.Debugf("Fish: Election %q: Some nodes didn't vote in round %d (%d < %d), waiting till %v...", appUID, vote.Round, len(votes), len(nodes), roundEndsAt)
 
 			// Wait 5 sec and repeat
 			time.Sleep(5 * time.Second)
@@ -649,17 +694,17 @@ func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) error {
 	log.Debug("Fish: Start executing Application:", appUID.String())
 	// Check the application is executed already
-	f.applicationsMutex.RLock()
-	{
-		for _, uid := range f.applications {
-			if uid == appUID {
-				// Seems the application is already executing
-				f.applicationsMutex.RUnlock()
-				return nil
-			}
+	f.applicationsMutex.Lock()
+	for _, uid := range f.applications {
+		if uid == appUID {
+			// Seems the application is already executing
+			f.applicationsMutex.Unlock()
+			return nil
 		}
 	}
-	f.applicationsMutex.RUnlock()
+	// Adding the application to list
+	f.applications = append(f.applications, app.UID)
+	f.applicationsMutex.Unlock()
 
 	// Make sure definition is >= 0 which means it was chosen by the node
 	if defIndex < 0 {
@@ -712,31 +757,11 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 		f.nodeUsageMutex.Unlock()
 	}
 
-	// Adding the application to list
-	f.applicationsMutex.Lock()
-	f.applications = append(f.applications, app.UID)
-	f.applicationsMutex.Unlock()
-
 	// The main application processing is executed on background because allocation could take a
 	// while, after that the bg process will wait for application state change. We do not separate
 	// it into method because effectively it could not be running without the logic above.
 	go func() {
 		log.Info("Fish: Continuing executing Application", app.UID, appState.Status)
-
-		if appState.Status == types.ApplicationStatusNEW {
-			// Set Application state as ELECTED
-			appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusELECTED,
-				Description: "Elected node: " + f.db.GetNodeName(),
-			}
-			err := f.db.ApplicationStateCreate(appState)
-			if err != nil {
-				log.Error("Fish: Unable to set Application state:", app.UID, err)
-				f.applicationsMutex.Lock()
-				f.removeFromExecutingApplincations(app.UID)
-				f.applicationsMutex.Unlock()
-				return
-			}
-		}
 
 		// Merge application and label metadata, in this exact order
 		var mergedMetadata []byte
