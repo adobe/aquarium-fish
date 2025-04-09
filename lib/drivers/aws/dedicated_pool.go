@@ -45,11 +45,9 @@ type dedicatedPoolWorker struct {
 	// It's better to update activeHosts by calling updateDedicatedHosts()
 	activeHosts        map[string]ec2types.Host
 	activeHostsUpdated time.Time
-	activeHostsMu      sync.RWMutex
-
 	// Storage to delay available state for previously pending state
-	pendingAvailableHosts   map[string]time.Time
-	pendingAvailableHostsMu sync.Mutex
+	activeHostsPendingAvailable map[string]time.Time
+	activeHostsMu               sync.RWMutex
 
 	// Hosts to release or scrub at specified time, used by manageHosts process
 	toManageAt map[string]time.Time
@@ -62,9 +60,10 @@ func (d *Driver) newDedicatedPoolWorker(name string, record DedicatedPoolRecord)
 		driver: d,
 		record: record,
 
-		activeHosts:           make(map[string]ec2types.Host),
-		pendingAvailableHosts: make(map[string]time.Time),
-		toManageAt:            make(map[string]time.Time),
+		activeHosts:                 make(map[string]ec2types.Host),
+		activeHostsPendingAvailable: make(map[string]time.Time),
+
+		toManageAt: make(map[string]time.Time),
 	}
 
 	// Receiving amount of instances per dedicated host
@@ -438,20 +437,18 @@ func (w *dedicatedPoolWorker) updateDedicatedHostsProcess() ([]ec2types.Host, er
 
 		// Going through the list of newly available hosts to apply if PendingToAvailableDelay is set
 		if w.record.PendingToAvailableDelay > 0 {
-			w.pendingAvailableHostsMu.Lock()
-			for hostID, t := range w.pendingAvailableHosts {
+			w.activeHostsMu.Lock()
+			for hostID, t := range w.activeHostsPendingAvailable {
 				if t.Before(time.Now()) {
-					w.activeHostsMu.Lock()
-					delete(w.pendingAvailableHosts, hostID)
+					delete(w.activeHostsPendingAvailable, hostID)
 					if host, ok := w.activeHosts[hostID]; ok {
 						log.Debugf("AWS: dedicated %q: Making host %s available after pending", w.name, hostID)
 						host.State = ec2types.AllocationStateAvailable
 						w.activeHosts[hostID] = host
 					}
-					w.activeHostsMu.Unlock()
 				}
 			}
-			w.pendingAvailableHostsMu.Unlock()
+			w.activeHostsMu.Unlock()
 		}
 
 		// We need to keep the request rate budget, so using a delay between regular updates.
@@ -525,25 +522,21 @@ func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 				// When PendingToAvailableDelay is set we use special process to switch from pending state to Available
 				if w.record.PendingToAvailableDelay > 0 {
 					if ah.State == ec2types.AllocationStatePending && rh.State == ec2types.AllocationStateAvailable {
-						w.pendingAvailableHostsMu.Lock()
-						if _, ok := w.pendingAvailableHosts[hostID]; !ok {
+						if _, ok := w.activeHostsPendingAvailable[hostID]; !ok {
 							delayTill := time.Now().Add(time.Duration(w.record.PendingToAvailableDelay))
 							log.Debugf("AWS: dedicated %q: Delaying availability of host %s till %s", w.name, hostID, delayTill)
-							w.pendingAvailableHosts[hostID] = delayTill
+							w.activeHostsPendingAvailable[hostID] = delayTill
 						}
-						w.pendingAvailableHostsMu.Unlock()
 						// Updating the status each run to make sure it will not switch to Available before delay is out
 						host := currActiveHosts[hostID]
 						host.State = ec2types.AllocationStatePending
 						currActiveHosts[hostID] = host
 					} else if rh.State != ec2types.AllocationStateAvailable {
 						// If the state changed from Available - removing the item
-						w.pendingAvailableHostsMu.Lock()
-						if _, ok := w.pendingAvailableHosts[hostID]; ok {
-							log.Debugf("AWS: dedicated %q: Host state changed, so removing host %s from pendingAvailableHosts", w.name, hostID)
-							delete(w.pendingAvailableHosts, hostID)
+						if _, ok := w.activeHostsPendingAvailable[hostID]; ok {
+							log.Debugf("AWS: dedicated %q: Host state changed, so removing host %s from activeHostsPendingAvailable", w.name, hostID)
+							delete(w.activeHostsPendingAvailable, hostID)
 						}
-						w.pendingAvailableHostsMu.Unlock()
 					}
 				}
 			}
