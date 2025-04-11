@@ -14,7 +14,7 @@
 package gate
 
 import (
-	"github.com/adobe/aquarium-fish/lib/db"
+	"github.com/adobe/aquarium-fish/lib/database"
 )
 
 // FactoryList is a list of available gates factories
@@ -26,7 +26,7 @@ type DriverFactory interface {
 	Name() string
 
 	// Generates new gate
-	New(*db.Database) Driver
+	New(*database.Database) Driver
 }
 
 // Driver interface of the functions that connects each Gate to Fish

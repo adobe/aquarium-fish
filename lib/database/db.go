@@ -11,7 +11,7 @@
  */
 
 // Database management for the Fish node
-package db
+package database
 
 import (
 	"os"

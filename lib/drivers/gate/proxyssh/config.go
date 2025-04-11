@@ -15,7 +15,7 @@ package proxyssh
 import (
 	"encoding/json"
 
-	"github.com/adobe/aquarium-fish/lib/db"
+	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/log"
 )
 
@@ -28,7 +28,7 @@ type Config struct {
 }
 
 // Apply takes json and applies it to the config structure
-func (c *Config) Apply(config []byte, d *db.Database) error {
+func (c *Config) Apply(config []byte, db *database.Database) error {
 	// Parse json
 	if len(config) > 0 {
 		if err := json.Unmarshal(config, c); err != nil {
@@ -41,15 +41,13 @@ func (c *Config) Apply(config []byte, d *db.Database) error {
 	}
 
 	if c.SSHKey == "" {
-		c.SSHKey = d.GetNodeName() + "_id_ecdsa"
+		c.SSHKey = db.GetNodeName() + "_id_ecdsa"
 	}
 
 	return nil
 }
 
 // Validate makes sure the config have the required defaults & that the required fields are set
-func (c *Config) Validate() (err error) {
-	log.Warn("TODO: Verify binding is possible if BindAddress is set")
-
+func (*Config) Validate() (err error) {
 	return nil
 }

@@ -41,8 +41,6 @@ func (c *Config) Apply(config []byte) error {
 }
 
 // Validate makes sure the config have the required defaults & that the required fields are set
-func (c *Config) Validate() (err error) {
-	log.Warn("TODO: Verify binding is possible if BindAddress is set")
-
+func (*Config) Validate() (err error) {
 	return nil
 }

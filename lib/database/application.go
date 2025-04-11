@@ -10,8 +10,7 @@
  * governing permissions and limitations under the License.
  */
 
-// Package fish core defines all the internals of the Fish processes
-package db
+package database
 
 import (
 	"fmt"

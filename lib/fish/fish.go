@@ -27,7 +27,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mostlygeek/arp"
 
-	"github.com/adobe/aquarium-fish/lib/db"
+	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/drivers/provider"
 	"github.com/adobe/aquarium-fish/lib/log"
@@ -46,7 +46,7 @@ type ClusterInterface interface {
 
 // Fish structure is used to store the node internal state
 type Fish struct {
-	db      *db.Database
+	db      *database.Database
 	cfg     *Config
 	cluster ClusterInterface
 
@@ -87,7 +87,7 @@ type Fish struct {
 }
 
 // New creates new Fish node
-func New(db *db.Database, cfg *Config) (*Fish, error) {
+func New(db *database.Database, cfg *Config) (*Fish, error) {
 	f := &Fish{db: db, cfg: cfg}
 	if err := f.Init(); err != nil {
 		return nil, err
@@ -113,7 +113,7 @@ func (f *Fish) Init() error {
 
 	// Create admin user and ignore errors if it's existing
 	_, err := f.db.UserGet("admin")
-	if err == db.ErrObjectNotFound {
+	if err == database.ErrObjectNotFound {
 		if pass, _, _ := f.db.UserNew("admin", ""); pass != "" {
 			// Print pass of newly created admin user to stderr
 			println("Admin user pass:", pass)
@@ -235,7 +235,7 @@ func (f *Fish) Close() {
 }
 
 // GetNode returns current Fish node spec
-func (f *Fish) DB() *db.Database {
+func (f *Fish) DB() *database.Database {
 	return f.db
 }
 

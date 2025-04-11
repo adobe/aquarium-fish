@@ -19,7 +19,7 @@ import (
 	"github.com/armon/go-socks5"
 	"golang.org/x/net/context"
 
-	"github.com/adobe/aquarium-fish/lib/db"
+	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/log"
 )
 
@@ -35,7 +35,7 @@ func (resolverSkip) Resolve(ctx context.Context, _ /*name*/ string) (context.Con
 
 // proxyAccess configuration to store context while processing the proxy request
 type proxyAccess struct {
-	db *db.Database
+	db *database.Database
 }
 
 // Allow will be executed to allow or deny proxy request
@@ -77,7 +77,7 @@ func (p *proxyAccess) Allow(ctx context.Context, req *socks5.Request) (context.C
 }
 
 // Init will start the socks5 proxy server
-func proxyInit(db *db.Database, address string) error {
+func proxyInit(db *database.Database, address string) error {
 	conf := &socks5.Config{
 		Resolver: &resolverSkip{},  // Skipping the resolver phase until access checked
 		Rules:    &proxyAccess{db}, // Allow only known resources to access proxy

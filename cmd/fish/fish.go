@@ -26,7 +26,7 @@ import (
 
 	"github.com/adobe/aquarium-fish/lib/build"
 	"github.com/adobe/aquarium-fish/lib/crypt"
-	"github.com/adobe/aquarium-fish/lib/db"
+	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi"
@@ -97,7 +97,7 @@ func main() {
 			}
 
 			log.Info("Fish init DB...")
-			database, err := db.New(filepath.Join(cfg.Directory, cfg.NodeAddress))
+			db, err := database.New(filepath.Join(cfg.Directory, cfg.NodeAddress))
 			if err != nil {
 				return err
 			}
@@ -120,7 +120,7 @@ func main() {
 			}
 
 			log.Info("Fish starting node...")
-			fish, err := fish.New(database, cfg)
+			fish, err := fish.New(db, cfg)
 			if err != nil {
 				return err
 			}

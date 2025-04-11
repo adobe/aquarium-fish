@@ -23,7 +23,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/adobe/aquarium-fish/lib/crypt"
-	"github.com/adobe/aquarium-fish/lib/db"
+	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
@@ -33,7 +33,7 @@ import (
 
 // proxySSH keeps state of the SSH server
 type proxySSH struct {
-	db           *db.Database
+	db           *database.Database
 	serverConfig *ssh.ServerConfig
 
 	// Actual listening address of the service
@@ -362,7 +362,7 @@ func (p *proxySSH) publicKeyCallback(incomingConn ssh.ConnMetadata, key ssh.Publ
 }
 
 // Init starts SSH proxy and returns the actual listening address and error if happened
-func proxyInit(db *db.Database, keyPath, address string) (string, error) {
+func proxyInit(db *database.Database, keyPath, address string) (string, error) {
 	// First, try and read the file if it exists already. Otherwise, it is the
 	// first execution, generate the private / public keys. The SSH server
 	// requires at least one identity loaded to run.

@@ -14,7 +14,7 @@
 package proxysocks
 
 import (
-	"github.com/adobe/aquarium-fish/lib/db"
+	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/drivers/gate"
 	"github.com/adobe/aquarium-fish/lib/log"
 )
@@ -28,8 +28,8 @@ func (*Factory) Name() string {
 }
 
 // New creates new gate driver
-func (*Factory) New(d *db.Database) gate.Driver {
-	return &Driver{db: d}
+func (*Factory) New(db *database.Database) gate.Driver {
+	return &Driver{db: db}
 }
 
 func init() {
@@ -39,7 +39,7 @@ func init() {
 // Driver implements drivers.ResourceDriver interface
 type Driver struct {
 	cfg Config
-	db  *db.Database
+	db  *database.Database
 }
 
 // Name returns name of the gate
@@ -48,7 +48,7 @@ func (*Driver) Name() string {
 }
 
 // Prepare initializes the driver
-func (d *Driver) Prepare(wd string, config []byte) error {
+func (d *Driver) Prepare( /*wd*/ _ string, config []byte) error {
 	if err := d.cfg.Apply(config); err != nil {
 		return err
 	}

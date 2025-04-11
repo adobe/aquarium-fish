@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/adobe/aquarium-fish/lib/db"
+	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/drivers/gate"
 	"github.com/adobe/aquarium-fish/lib/drivers/provider"
 	"github.com/adobe/aquarium-fish/lib/log"
@@ -44,8 +44,8 @@ var gateDrivers map[string]gate.Driver
 var providerDrivers map[string]provider.Driver
 
 // Init loads and prepares all kind of available drivers
-func Init(d *db.Database, wd string, configs ConfigDrivers) error {
-	if err := load(d, configs); err != nil {
+func Init(db *database.Database, wd string, configs ConfigDrivers) error {
+	if err := load(db, configs); err != nil {
 		return log.Error("Drivers: Unable to load drivers:", err)
 	}
 	if errs := prepare(wd, configs); errs != nil {
@@ -55,7 +55,7 @@ func Init(d *db.Database, wd string, configs ConfigDrivers) error {
 }
 
 // load making the drivers instances map with specified names
-func load(d *db.Database, configs ConfigDrivers) error {
+func load(db *database.Database, configs ConfigDrivers) error {
 	// Loading providers
 	providerInstances := make(map[string]provider.Driver)
 
@@ -89,7 +89,7 @@ func load(d *db.Database, configs ConfigDrivers) error {
 	if configs.Gates == nil {
 		// If no gates specified in the config - load all the gates
 		for _, fbr := range gate.FactoryList {
-			gateInstances[fbr.Name()] = fbr.New(d)
+			gateInstances[fbr.Name()] = fbr.New(db)
 			log.Info("Drivers: Gate driver loaded:", fbr.Name())
 		}
 	} else {
@@ -97,7 +97,7 @@ func load(d *db.Database, configs ConfigDrivers) error {
 			// One gate could be used multiple times by utilizing config suffixes
 			for name := range configs.Gates {
 				if name == fbr.Name() || strings.HasPrefix(name, fbr.Name()+"/") {
-					gateInstances[name] = fbr.New(d)
+					gateInstances[name] = fbr.New(db)
 					log.Info("Drivers: Gate driver loaded:", fbr.Name(), "as", name)
 				}
 			}
