@@ -1305,7 +1305,7 @@ components:
           x-go-type: uint
           type: integer
           minimum: 0
-          description: Amount of disk space in GB
+          description: Amount of disk space in GB for new disk, could not used if clone is set
         reuse:
           type: boolean
           description: Do not remove the disk and reuse it for the next resource run
