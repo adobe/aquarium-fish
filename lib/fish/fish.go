@@ -26,9 +26,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mostlygeek/arp"
-	"go.mills.io/bitcask/v2"
 
+	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/drivers"
+	"github.com/adobe/aquarium-fish/lib/drivers/provider"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 	"github.com/adobe/aquarium-fish/lib/util"
@@ -45,9 +46,8 @@ type ClusterInterface interface {
 
 // Fish structure is used to store the node internal state
 type Fish struct {
-	db      *bitcask.Bitcask
+	db      *database.Database
 	cfg     *Config
-	node    *types.Node
 	cluster ClusterInterface
 
 	// When the fish was started
@@ -87,7 +87,7 @@ type Fish struct {
 }
 
 // New creates new Fish node
-func New(db *bitcask.Bitcask, cfg *Config) (*Fish, error) {
+func New(db *database.Database, cfg *Config) (*Fish, error) {
 	f := &Fish{db: db, cfg: cfg}
 	if err := f.Init(); err != nil {
 		return nil, err
@@ -112,9 +112,9 @@ func (f *Fish) Init() error {
 	f.nodeUsage.Slots = &zeroSlotsValue
 
 	// Create admin user and ignore errors if it's existing
-	_, err := f.UserGet("admin")
-	if err == bitcask.ErrObjectNotFound {
-		if pass, _, _ := f.UserNew("admin", ""); pass != "" {
+	_, err := f.db.UserGet("admin")
+	if err == database.ErrObjectNotFound {
+		if pass, _, _ := f.db.UserNew("admin", ""); pass != "" {
 			// Print pass of newly created admin user to stderr
 			println("Admin user pass:", pass)
 		}
@@ -124,7 +124,7 @@ func (f *Fish) Init() error {
 
 	// Init node
 	createNode := false
-	node, err := f.NodeGet(f.cfg.NodeName)
+	node, err := f.db.NodeGet(f.cfg.NodeName)
 	if err != nil {
 		log.Info("Fish: Create new node:", f.cfg.NodeName, f.cfg.NodeLocation)
 		createNode = true
@@ -145,13 +145,14 @@ func (f *Fish) Init() error {
 		return fmt.Errorf("Fish: Unable to init node: %v", err)
 	}
 
-	f.node = node
+	f.db.SetNode(*node)
+
 	if createNode {
-		if err = f.NodeCreate(f.node); err != nil {
+		if err = f.db.NodeCreate(f.db.GetNode()); err != nil {
 			return fmt.Errorf("Fish: Unable to create node: %v", err)
 		}
 	} else {
-		if err = f.NodeSave(f.node); err != nil {
+		if err = f.db.NodeSave(f.db.GetNode()); err != nil {
 			return fmt.Errorf("Fish: Unable to save node: %v", err)
 		}
 	}
@@ -173,33 +174,30 @@ func (f *Fish) Init() error {
 	// Fish is running now
 	f.running, f.runningCancel = context.WithCancel(context.Background())
 
-	if err := f.driversSet(); err != nil {
-		return log.Error("Fish: Unable to set drivers:", err)
-	}
-	if errs := f.driversPrepare(f.cfg.Drivers); errs != nil {
-		log.Error("Fish: Unable to prepare some resource drivers:", errs)
+	if err := drivers.Init(f.db, f.cfg.Directory, f.cfg.Drivers); err != nil {
+		return log.Error("Fish: Unable to init drivers:", err)
 	}
 
 	// Continue to execute the assigned applications
-	resources, err := f.ApplicationResourceListNode(f.node.UID)
+	resources, err := f.db.ApplicationResourceListNode(f.db.GetNodeUID())
 	if err != nil {
 		return log.Error("Fish: Unable to get the node resources:", err)
 	}
 	for _, res := range resources {
-		if f.ApplicationIsAllocated(res.ApplicationUID) == nil {
+		if f.db.ApplicationIsAllocated(res.ApplicationUID) == nil {
 			log.Info("Fish: Found allocated resource to serve:", res.UID)
 			if err := f.executeApplication(res.ApplicationUID, res.DefinitionIndex); err != nil {
 				log.Errorf("Fish: Can't execute Application %s: %v", res.ApplicationUID, err)
 			}
 		} else {
 			log.Warn("Fish: Found not allocated Resource of Application, cleaning up:", res.ApplicationUID)
-			if err := f.ApplicationResourceDelete(res.UID); err != nil {
+			if err := f.db.ApplicationResourceDelete(res.UID); err != nil {
 				log.Error("Fish: Unable to delete Resource of Application:", res.ApplicationUID, err)
 			}
 			appState := &types.ApplicationState{ApplicationUID: res.ApplicationUID, Status: types.ApplicationStatusERROR,
 				Description: "Found not cleaned up resource",
 			}
-			f.ApplicationStateCreate(appState)
+			f.db.ApplicationStateCreate(appState)
 		}
 	}
 
@@ -220,24 +218,25 @@ func (f *Fish) Init() error {
 
 // Close tells the node that the Fish execution need to be stopped
 func (f *Fish) Close() {
+	log.Debug("Fish: Stopping the running drivers")
+	if errs := drivers.Shutdown(); len(errs) > 0 {
+		log.Debugf("Fish: Some drivers failed to stop: %v", errs)
+	} else {
+		log.Debug("Fish: All drivers are stopped")
+	}
+
 	f.runningCancel()
 	log.Debug("Fish: Waiting for background routines to shutdown")
 	f.routines.Wait()
 	log.Debug("Fish: All the background routines are stopped")
 
-	log.Debug("Fish: Compacting & closing the DB")
-	f.CompactDB()
-	f.db.Close()
+	log.Debug("Fish: Closing the DB")
+	f.db.Shutdown()
 }
 
-// GetNodeUID returns node UID
-func (f *Fish) GetNodeUID() types.ApplicationUID {
-	return f.node.UID
-}
-
-// GetNode returns Fish node spec
-func (f *Fish) GetNode() *types.Node {
-	return f.node
+// GetNode returns current Fish node spec
+func (f *Fish) DB() *database.Database {
+	return f.db
 }
 
 // GetCfg returns fish configuration
@@ -245,16 +244,22 @@ func (f *Fish) GetCfg() Config {
 	return *f.cfg
 }
 
-// NewUID Creates new UID with 6 starting bytes of Node UID as prefix
-func (f *Fish) NewUID() uuid.UUID {
-	uid := uuid.New()
-	copy(uid[:], f.node.UID[:6])
-	return uid
-}
+func (f *Fish) pingProcess() {
+	f.routines.Add(1)
+	defer f.routines.Done()
+	defer log.Info("Fish Node: pingProcess stopped")
 
-// GetLocation returns node location
-func (f *Fish) GetLocation() string {
-	return f.node.Location
+	// In order to optimize network & database - update just UpdatedAt field
+	pingTicker := time.NewTicker(types.NodePingDelay * time.Second)
+	for {
+		select {
+		case <-f.running.Done():
+			return
+		case <-pingTicker.C:
+			log.Debug("Fish Node: ping")
+			f.db.NodePing(f.db.GetNode())
+		}
+	}
 }
 
 func (f *Fish) checkNewApplicationProcess() {
@@ -269,7 +274,7 @@ func (f *Fish) checkNewApplicationProcess() {
 			return
 		case <-checkTicker.C:
 			// Check new apps available for processing
-			newApps, err := f.ApplicationListGetStatusNew()
+			newApps, err := f.db.ApplicationListGetStatusNew()
 			if err != nil {
 				log.Error("Fish: Unable to get NEW ApplicationState list:", err)
 				continue
@@ -345,7 +350,7 @@ func (f *Fish) dbCleanupCompactProcess() {
 		case <-cleanupTicker.C:
 			f.CleanupDB()
 		case <-compactionTicker.C:
-			f.CompactDB()
+			f.db.CompactDB()
 		}
 	}
 }
@@ -365,7 +370,7 @@ func (f *Fish) CleanupDB() {
 	cutTime := time.Now().Add(-dbCleanupDelay)
 
 	// Look for the stale Applications
-	states, err := f.ApplicationStateListLatest()
+	states, err := f.db.ApplicationStateListLatest()
 	if err != nil {
 		log.Warnf("Fish: CleanupDB: Unable to get ApplicationStates: %v", err)
 		return
@@ -390,46 +395,32 @@ func (f *Fish) CleanupDB() {
 		log.Debugf("Fish: CleanupDB: Removing everything related to Application %s (%s)", state.ApplicationUID, state.Status)
 
 		// First of all removing the Application itself to make sure it will not be restarted
-		if err = f.ApplicationDelete(state.ApplicationUID); err != nil {
+		if err = f.db.ApplicationDelete(state.ApplicationUID); err != nil {
 			log.Errorf("Fish: CleanupDB: Unable to remove Application %s: %v", state.ApplicationUID, err)
 			continue
 		}
 
-		ats, _ := f.ApplicationTaskListByApplication(state.ApplicationUID)
+		ats, _ := f.db.ApplicationTaskListByApplication(state.ApplicationUID)
 		for _, at := range ats {
-			if err = f.ApplicationTaskDelete(at.UID); err != nil {
+			if err = f.db.ApplicationTaskDelete(at.UID); err != nil {
 				log.Errorf("Fish: CleanupDB: Unable to remove ApplicationTask %s: %v", at.UID, err)
 			}
 		}
 
-		sms, _ := f.ServiceMappingListByApplication(state.ApplicationUID)
+		sms, _ := f.db.ServiceMappingListByApplication(state.ApplicationUID)
 		for _, sm := range sms {
-			if err = f.ServiceMappingDelete(sm.UID); err != nil {
+			if err = f.db.ServiceMappingDelete(sm.UID); err != nil {
 				log.Errorf("Fish: CleanupDB: Unable to remove ServiceMapping %s: %v", sm.UID, err)
 			}
 		}
 
-		ss, _ := f.ApplicationStateListByApplication(state.ApplicationUID)
+		ss, _ := f.db.ApplicationStateListByApplication(state.ApplicationUID)
 		for _, s := range ss {
-			if err = f.ApplicationStateDelete(s.UID); err != nil {
+			if err = f.db.ApplicationStateDelete(s.UID); err != nil {
 				log.Errorf("Fish: CleanupDB: Unable to remove ApplicationState %s: %v", s.UID, err)
 			}
 		}
 	}
-}
-
-// CompactDB runs stale Applications and data removing
-func (f *Fish) CompactDB() {
-	log.Debug("Fish: CompactDB running...")
-	defer log.Debug("Fish: CompactDB done")
-
-	s, _ := f.db.Stats()
-	log.Debugf("Fish: CompactDB: Before compaction: Datafiles: %d, Keys: %d, Size: %d, Reclaimable: %d", s.Datafiles, s.Keys, s.Size, s.Reclaimable)
-
-	f.db.Merge()
-
-	s, _ = f.db.Stats()
-	log.Debugf("Fish: CompactDB: After compaction: Datafiles: %d, Keys: %d, Size: %d, Reclaimable: %d", s.Datafiles, s.Keys, s.Size, s.Reclaimable)
 }
 
 // electionProcess performs & monitors the election process for the new Application until the exec
@@ -442,13 +433,13 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 	// Make sure the active vote will be removed in case error happens to restart the process next time
 	defer f.activeVotesRemove(appUID)
 
-	app, err := f.ApplicationGet(appUID)
+	app, err := f.db.ApplicationGet(appUID)
 	if err != nil {
 		return log.Errorf("Fish: Election %q: Fatal: Unable to get the Application: %v", appUID, err)
 	}
 
 	// Get label with the definitions
-	label, err := f.LabelGet(app.LabelUID)
+	label, err := f.db.LabelGet(app.LabelUID)
 	if err != nil {
 		return log.Errorf("Fish: Election %q: Fatal: Unable to get the Label %s: %v", appUID, app.LabelUID, err)
 	}
@@ -476,7 +467,7 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 		// Loop to recheck status within the round
 		for time.Until(roundEndsAt) > 0 {
 			// Check all the cluster nodes voted
-			nodes, err := f.NodeActiveList()
+			nodes, err := f.db.NodeActiveList()
 			if err != nil {
 				return log.Errorf("Fish: Election %q: Fatal: Unable to get the Node list: %v", appUID, err)
 			}
@@ -525,7 +516,7 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 				// Checking the best vote
 				if bestVote.UID == uuid.Nil {
 					log.Infof("Fish: Election %q: No candidates in round %d", appUID, vote.Round)
-				} else if bestVote.NodeUID == f.node.UID {
+				} else if bestVote.NodeUID == f.db.GetNodeUID() {
 					log.Infof("Fish: Election %q: I won the election", appUID)
 					f.wonVotesAdd(bestVote, app.CreatedAt)
 				} else {
@@ -538,7 +529,7 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 				time.Sleep(time.Until(roundEndsAt))
 
 				// Check if the Application changed state
-				if s, err := f.ApplicationStateGetByApplication(appUID); err != nil {
+				if s, err := f.db.ApplicationStateGetByApplication(appUID); err != nil {
 					log.Errorf("Fish: Election %q: Unable to get the Application state: %v", appUID, err)
 					// The Application state is not found, so we can drop the election process
 					f.activeVotesRemove(vote.UID)
@@ -583,7 +574,7 @@ func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 	}
 
 	// Is node supports the required label driver
-	driver := f.driverGet(def.Driver)
+	driver := drivers.GetProvider(def.Driver)
 	if driver == nil {
 		return false
 	}
@@ -667,19 +658,19 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 		return fmt.Errorf("Fish: The definition index for Application %s is not chosen: %v", appUID, defIndex)
 	}
 
-	app, err := f.ApplicationGet(appUID)
+	app, err := f.db.ApplicationGet(appUID)
 	if err != nil {
 		return fmt.Errorf("Fish: Unable to get the Application: %v", err)
 	}
 
 	// Check current Application state
-	appState, err := f.ApplicationStateGetByApplication(app.UID)
+	appState, err := f.db.ApplicationStateGetByApplication(app.UID)
 	if err != nil {
 		return fmt.Errorf("Fish: Unable to get the Application state: %v", err)
 	}
 
 	// Get label with the definitions
-	label, err := f.LabelGet(app.LabelUID)
+	label, err := f.db.LabelGet(app.LabelUID)
 	if err != nil {
 		return fmt.Errorf("Fish: Unable to find Label %s: %v", app.LabelUID, err)
 	}
@@ -691,7 +682,7 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 	labelDef := label.Definitions[defIndex]
 
 	// Locate the required driver
-	driver := f.driverGet(labelDef.Driver)
+	driver := drivers.GetProvider(labelDef.Driver)
 	if driver == nil {
 		return fmt.Errorf("Fish: Unable to locate driver for the Application %s: %s", app.UID, labelDef.Driver)
 	}
@@ -727,9 +718,9 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 		if appState.Status == types.ApplicationStatusNEW {
 			// Set Application state as ELECTED
 			appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusELECTED,
-				Description: "Elected node: " + f.node.Name,
+				Description: "Elected node: " + f.db.GetNodeName(),
 			}
-			err := f.ApplicationStateCreate(appState)
+			err := f.db.ApplicationStateCreate(appState)
 			if err != nil {
 				log.Error("Fish: Unable to set Application state:", app.UID, err)
 				f.applicationsMutex.Lock()
@@ -747,37 +738,37 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 			appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
 				Description: fmt.Sprint("Unable to parse the app metadata:", err),
 			}
-			f.ApplicationStateCreate(appState)
+			f.db.ApplicationStateCreate(appState)
 		}
 		if err := json.Unmarshal([]byte(label.Metadata), &metadata); err != nil {
 			log.Error("Fish: Unable to parse the Label metadata:", label.UID, err)
 			appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
 				Description: fmt.Sprint("Unable to parse the label metadata:", err),
 			}
-			f.ApplicationStateCreate(appState)
+			f.db.ApplicationStateCreate(appState)
 		}
 		if mergedMetadata, err = json.Marshal(metadata); err != nil {
 			log.Error("Fish: Unable to merge metadata:", label.UID, err)
 			appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
 				Description: fmt.Sprint("Unable to merge metadata:", err),
 			}
-			f.ApplicationStateCreate(appState)
+			f.db.ApplicationStateCreate(appState)
 		}
 
 		// Get or create the new resource object
 		res := &types.ApplicationResource{
 			ApplicationUID: app.UID,
-			NodeUID:        f.node.UID,
+			NodeUID:        f.db.GetNodeUID(),
 			Metadata:       util.UnparsedJSON(mergedMetadata),
 		}
 		if appState.Status == types.ApplicationStatusALLOCATED {
-			res, err = f.ApplicationResourceGetByApplication(app.UID)
+			res, err = f.db.ApplicationResourceGetByApplication(app.UID)
 			if err != nil {
 				log.Error("Fish: Unable to get the allocated Resource for Application:", app.UID, err)
 				appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
 					Description: fmt.Sprint("Unable to find the allocated resource:", err),
 				}
-				f.ApplicationStateCreate(appState)
+				f.db.ApplicationStateCreate(appState)
 			}
 		}
 
@@ -798,7 +789,7 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 				res.LabelUID = label.UID
 				res.DefinitionIndex = defIndex
 				res.Authentication = drvRes.Authentication
-				err := f.ApplicationResourceCreate(res)
+				err := f.db.ApplicationResourceCreate(res)
 				if err != nil {
 					log.Error("Fish: Unable to store Resource for Application:", app.UID, err)
 				}
@@ -807,7 +798,7 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 				}
 				log.Infof("Fish: Allocated Resource for the Application %s: %s", app.UID, res.Identifier)
 			}
-			f.ApplicationStateCreate(appState)
+			f.db.ApplicationStateCreate(appState)
 		}
 
 		// Getting the resource lifetime to know how much time it will live
@@ -841,7 +832,7 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 				log.Info("Fish: Dropping the Application execution:", app.UID)
 				return
 			default:
-				appState, err = f.ApplicationStateGetByApplication(app.UID)
+				appState, err = f.db.ApplicationStateGetByApplication(app.UID)
 				if err != nil || appState == nil {
 					log.Error("Fish: Unable to get Status for Application:", app.UID, err)
 					time.Sleep(5 * time.Second)
@@ -856,7 +847,7 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 						appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusDEALLOCATE,
 							Description: fmt.Sprint("Resource lifetime timeout reached:", resourceLifetime),
 						}
-						f.ApplicationStateCreate(appState)
+						f.db.ApplicationStateCreate(appState)
 					}
 				}
 
@@ -887,10 +878,10 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 					}
 					// Destroying the resource anyway to not bloat the table - otherwise it will stuck there and
 					// will block the access to IP of the other VM's that will reuse this IP
-					if err := f.ApplicationResourceDelete(res.UID); err != nil {
+					if err := f.db.ApplicationResourceDelete(res.UID); err != nil {
 						log.Error("Fish: Unable to delete Resource for Application:", app.UID, err)
 					}
-					f.ApplicationStateCreate(appState)
+					f.db.ApplicationStateCreate(appState)
 				} else {
 					time.Sleep(5 * time.Second)
 				}
@@ -917,9 +908,9 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 	return nil
 }
 
-func (f *Fish) executeApplicationTasks(drv drivers.ResourceDriver, def *types.LabelDefinition, res *types.ApplicationResource, appStatus types.ApplicationStatus) error {
+func (f *Fish) executeApplicationTasks(drv provider.Driver, def *types.LabelDefinition, res *types.ApplicationResource, appStatus types.ApplicationStatus) error {
 	// Execute the associated ApplicationTasks if there is some
-	tasks, err := f.ApplicationTaskListByApplicationAndWhen(res.ApplicationUID, appStatus)
+	tasks, err := f.db.ApplicationTaskListByApplicationAndWhen(res.ApplicationUID, appStatus)
 	if err != nil {
 		return log.Error("Fish: Unable to get ApplicationTasks:", res.ApplicationUID, err)
 	}
@@ -942,7 +933,7 @@ func (f *Fish) executeApplicationTasks(drv drivers.ResourceDriver, def *types.La
 			}
 			task.Result = util.UnparsedJSON(result)
 		}
-		if err := f.ApplicationTaskSave(&task); err != nil {
+		if err := f.db.ApplicationTaskSave(&task); err != nil {
 			log.Error("Fish: Error during update the task with result:", task.UID, err)
 		}
 	}
@@ -985,7 +976,7 @@ func (f *Fish) wonVotesAdd(vote types.Vote, appCreatedAt time.Time) {
 	defer f.wonVotesMutex.Unlock()
 	f.wonVotes = append(f.wonVotes, vote)
 	for i, v := range f.wonVotes {
-		if app, err := f.ApplicationGet(v.ApplicationUID); err != nil || app.CreatedAt.Before(appCreatedAt) {
+		if app, err := f.db.ApplicationGet(v.ApplicationUID); err != nil || app.CreatedAt.Before(appCreatedAt) {
 			continue
 		}
 		copy(f.wonVotes[i+1:], f.wonVotes[i:])

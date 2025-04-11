@@ -153,10 +153,14 @@ The way it manages dependencies and subroutines, structures logic makes it much 
 for such purpose. Eventually we've moved away from dqlite (adobe/aquarium-fish#1) but stick with go
 for good.
 
-Resource drivers are the way nodes managing the resources. For example - if I have VMWare Fusion
-installed on my machine - I can run Fish and it's VMX driver will automatically detect that it can
-run VMX images. In case I have docker installed too - I can use both for different workloads or
-select the ones I actually want to use by `--drivers` option or via the API.
+### Drivers
+
+Fish uses 2 driver types - `provider` and `gate`:
+* Provider Driver - manages AppplicationResources from multiple providers (VMX, AWS, ...). It Has
+  no access to Fish core, self-managing and only called by Fish to execute necessary operations to
+  allocate or deallocate ApplicationResources and manipulate them.
+* Gate Driver - allows to ingest external requests and uses Fish core to store data in Fish DB and
+  request allocation/deallocation or somehow else provide access to the custom interfaces.
 
 In the event you need to use more than one configuration for a given driver, you can add a suffix
 `/<name>`. For example, `aws` and `aws/dev` will both utilize the AWS driver, but use a different

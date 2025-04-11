@@ -45,10 +45,13 @@ func Test_proxyssh_ssh_key2password_tty_access(t *testing.T) {
 node_location: test_loc
 
 api_address: 127.0.0.1:0
-proxy_ssh_address: 127.0.0.1:0
 
 drivers:
-  - name: test`)
+  gates:
+    proxyssh:
+      bind_address: 127.0.0.1:0
+  providers:
+    test:`)
 
 	t.Cleanup(func() {
 		afi.Cleanup(t)
@@ -262,10 +265,13 @@ func Test_proxyssh_ssh_key2key_tty_access(t *testing.T) {
 node_location: test_loc
 
 api_address: 127.0.0.1:0
-proxy_ssh_address: 127.0.0.1:0
 
 drivers:
-  - name: test`)
+  gates:
+    proxyssh:
+      bind_address: 127.0.0.1:0
+  providers:
+    test:`)
 
 	t.Cleanup(func() {
 		afi.Cleanup(t)
@@ -557,10 +563,13 @@ func Test_proxyssh_scp_key2password_copy(t *testing.T) {
 node_location: test_loc
 
 api_address: 127.0.0.1:0
-proxy_ssh_address: 127.0.0.1:0
 
 drivers:
-  - name: test`)
+  gates:
+    proxyssh:
+      bind_address: 127.0.0.1:0
+  providers:
+    test:`)
 
 	t.Cleanup(func() {
 		afi.Cleanup(t)
@@ -842,10 +851,13 @@ func Test_proxyssh_port_key2key(t *testing.T) {
 node_location: test_loc
 
 api_address: 127.0.0.1:0
-proxy_ssh_address: 127.0.0.1:0
 
 drivers:
-  - name: test`)
+  gates:
+    proxyssh:
+      bind_address: 127.0.0.1:0
+  providers:
+    test:`)
 
 	t.Cleanup(func() {
 		afi.Cleanup(t)

@@ -30,11 +30,11 @@ func (*Fish) VoteCreate(appUID types.ApplicationUID) types.Vote {
 // clusterVoteSend sends signal to cluster to spread node vote
 func (f *Fish) clusterVoteSend(v *types.Vote) error {
 	// Generating new UID
-	v.UID = f.NewUID()
+	v.UID = f.db.NewUID()
 	// Update create time for the vote
 	v.CreatedAt = time.Now()
 	// Node should be the current one
-	v.NodeUID = f.node.UID
+	v.NodeUID = f.db.GetNodeUID()
 	// Make sure the rand is reset every time
 	v.Rand = rand.Uint32() // #nosec G404
 

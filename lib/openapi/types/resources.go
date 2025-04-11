@@ -36,7 +36,7 @@ func (r *Resources) Validate(diskTypes []string, checkNet bool) error {
 		if len(diskTypes) > 0 && !util.Contains(diskTypes, disk.Type) {
 			return fmt.Errorf("Resources: Type of disk must be one of: %+q", diskTypes)
 		}
-		if disk.Size < 1 {
+		if disk.Clone == "" && disk.Size < 1 {
 			return fmt.Errorf("Resources: Size of the disk can't be less than 1GB")
 		}
 	}
