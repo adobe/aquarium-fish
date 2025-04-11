@@ -35,10 +35,11 @@ func Test_json_label_create(t *testing.T) {
 node_location: test_loc
 
 api_address: 127.0.0.1:0
-proxy_ssh_address: 127.0.0.1:0
 
 drivers:
-  - name: test`)
+  gates:
+  providers:
+    test:`)
 
 	t.Cleanup(func() {
 		afi.Cleanup(t)

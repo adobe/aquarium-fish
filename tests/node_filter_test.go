@@ -39,10 +39,11 @@ node_identifiers:
   - "example2:test2"
 
 api_address: 127.0.0.1:0
-proxy_ssh_address: 127.0.0.1:0
 
 drivers:
-  - name: test`)
+  gates:
+  providers:
+    test:`)
 
 	t.Cleanup(func() {
 		afi.Cleanup(t)
@@ -129,10 +130,11 @@ node_identifiers:
   - "example3:test3"
 
 api_address: 127.0.0.1:0
-proxy_ssh_address: 127.0.0.1:0
 
 drivers:
-  - name: test`)
+  gates:
+  providers:
+    test:`)
 
 	t.Cleanup(func() {
 		afi.Cleanup(t)
@@ -218,10 +220,11 @@ node_identifiers:
   - "example2:test2"
 
 api_address: 127.0.0.1:0
-proxy_ssh_address: 127.0.0.1:0
 
 drivers:
-  - name: test`)
+  gates:
+  providers:
+    test:`)
 
 	t.Cleanup(func() {
 		afi.Cleanup(t)
@@ -306,10 +309,11 @@ node_identifiers:
   - "example:test"
 
 api_address: 127.0.0.1:0
-proxy_ssh_address: 127.0.0.1:0
 
 drivers:
-  - name: test`)
+  gates:
+  providers:
+    test:`)
 
 	t.Cleanup(func() {
 		afi.Cleanup(t)

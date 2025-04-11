@@ -40,11 +40,11 @@ func Test_jenkins_agents_check_pickups(t *testing.T) {
 node_location: test_loc
 
 api_address: 127.0.0.1:0
-proxy_ssh_address: 127.0.0.1:0
 
 drivers:
-  - name: test
-    cfg:
+  gates:
+  providers:
+    test:
       is_remote: true
       cpu_limit: 100000
       ram_limit: 200000`, "--timestamp=true")

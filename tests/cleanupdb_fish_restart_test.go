@@ -33,13 +33,13 @@ func Test_cleanupdb_fish_restart(t *testing.T) {
 node_location: test_loc
 
 api_address: 127.0.0.1:0
-proxy_ssh_address: 127.0.0.1:0
 
 db_cleanup_delay: 10s
 
 drivers:
-  - name: test
-    cfg:
+  gates:
+  providers:
+    test:
       cpu_limit: 4
       ram_limit: 8`)
 
