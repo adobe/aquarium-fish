@@ -23,7 +23,6 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 
 	// Load all the available gate drivers
-	_ "github.com/adobe/aquarium-fish/lib/drivers/gate/github"
 	_ "github.com/adobe/aquarium-fish/lib/drivers/gate/proxysocks"
 	_ "github.com/adobe/aquarium-fish/lib/drivers/gate/proxyssh"
 
