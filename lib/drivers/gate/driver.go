@@ -26,7 +26,7 @@ type DriverFactory interface {
 	Name() string
 
 	// Generates new gate
-	New(*database.Database) Driver
+	New(db *database.Database) Driver
 }
 
 // Driver interface of the functions that connects each Gate to Fish

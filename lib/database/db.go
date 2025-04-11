@@ -31,7 +31,7 @@ type Database struct {
 	// Backend used to store the data
 	be *bitcask.Bitcask
 
-	// Memory storage for current node - we oftenly using it to generate new UIDs
+	// Memory storage for current node - we using it to generate new UIDs
 	node types.Node
 }
 
