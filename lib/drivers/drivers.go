@@ -60,7 +60,7 @@ func load(d *db.Database, configs ConfigDrivers) error {
 	// Loading providers
 	providerInstances := make(map[string]provider.Driver)
 
-	if len(configs.Providers) == 0 {
+	if configs.Providers == nil {
 		// If no providers specified in the config - load all the providers
 		for _, fbr := range provider.FactoryList {
 			providerInstances[fbr.Name()] = fbr.New()
@@ -87,7 +87,7 @@ func load(d *db.Database, configs ConfigDrivers) error {
 	// Loading gates
 	gateInstances := make(map[string]gate.Driver)
 
-	if len(configs.Gates) == 0 {
+	if configs.Gates == nil {
 		// If no gates specified in the config - load all the gates
 		for _, fbr := range gate.FactoryList {
 			gateInstances[fbr.Name()] = fbr.New(d)
