@@ -49,7 +49,7 @@ func NewV1Router(e *echo.Echo, f *fish.Fish) {
 func (e *Processor) AddressAuth(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		// Only the existing local resource access it's metadata
-		res, err := e.fish.ApplicationResourceGetByIP(c.RealIP())
+		res, err := e.fish.DB().ApplicationResourceGetByIP(c.RealIP())
 		if err != nil {
 			log.Warn("API META: Unauthorized access to meta:", err)
 			return echo.NewHTTPError(http.StatusUnauthorized, "Client IP was not found in the node Resources")
