@@ -171,7 +171,7 @@ drivers:
 		}
 
 		compacted := make(chan error)
-		afi.WaitForLog("Fish: CompactDB: After compaction: ", func(substring, line string) bool {
+		afi.WaitForLog("DB: CompactDB: After compaction: ", func(substring, line string) bool {
 			// Check the Keys get back to normal
 			spl := strings.Split(line, ", ")
 			for _, val := range spl {
