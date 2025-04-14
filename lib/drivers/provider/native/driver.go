@@ -79,7 +79,7 @@ func (d *Driver) Prepare(config []byte) error {
 	if err := d.cfg.Apply(config); err != nil {
 		return err
 	}
-	if err := d.cfg.Validate(); err != nil {
+	if err := d.cfg.Validate(d); err != nil {
 		return err
 	}
 
@@ -183,23 +183,23 @@ func (d *Driver) AvailableCapacity(nodeUsage types.Resources, req types.LabelDef
 func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*types.ApplicationResource, error) {
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
-		return nil, log.Error("Native: Unable to apply options:", err)
+		return nil, log.Errorf("NATIVE: %s: Unable to apply options: %v", d.name, err)
 	}
 
 	// Create user to execute the workload
-	user, homedir, err := userCreate(&d.cfg, opts.Groups)
+	user, homedir, err := d.userCreate(opts.Groups)
 	if err != nil {
-		userDelete(&d.cfg, user)
-		return nil, log.Error("Native: Unable to create user:", user, err)
+		d.userDelete(user)
+		return nil, log.Errorf("NATIVE: %s: Unable to create user %q: %v", d.name, user, err)
 	}
-	log.Info("Native: Created user for Application execution:", user)
+	log.Infof("NATIVE: %s: Created user for Application execution: %s", d.name, user)
 
 	// Create and connect volumes to container
 	diskPaths, err := d.disksCreate(user, def.Resources.Disks)
 	if err != nil {
-		disksDelete(&d.cfg, user)
-		userDelete(&d.cfg, user)
-		return nil, log.Error("Native: Unable to create the required disks:", err)
+		d.disksDelete(user)
+		d.userDelete(user)
+		return nil, log.Errorf("NATIVE: %s: Unable to create the required disks: %v", d.name, err)
 	}
 
 	// Set default path as homedir
@@ -207,27 +207,27 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 
 	// Loading images and unpack them to home/disks according
 	if err := d.loadImages(user, opts.Images, diskPaths); err != nil {
-		disksDelete(&d.cfg, user)
-		userDelete(&d.cfg, user)
-		return nil, log.Error("Native: Unable to load and unpack images:", err)
+		d.disksDelete(user)
+		d.userDelete(user)
+		return nil, log.Errorf("NATIVE: %s: Unable to load and unpack images: %v", d.name, err)
 	}
 
 	// Running workload
-	if err := userRun(&d.cfg, &EnvData{Disks: diskPaths}, user, opts.Entry, metadata); err != nil {
-		disksDelete(&d.cfg, user)
-		userDelete(&d.cfg, user)
-		return nil, log.Error("Native: Unable to run the entry workload:", err)
+	if err := d.userRun(&EnvData{Disks: diskPaths}, user, opts.Entry, metadata); err != nil {
+		d.disksDelete(user)
+		d.userDelete(user)
+		return nil, log.Errorf("NATIVE: %s: Unable to run the entry workload: %v", d.name, err)
 	}
 
-	log.Infof("Native: Started environment for user %q", user)
+	log.Infof("NATIVE: %s: Started environment for user %q", d.name, user)
 
 	return &types.ApplicationResource{Identifier: user}, nil
 }
 
 // Status shows status of the resource
-func (*Driver) Status(res *types.ApplicationResource) (string, error) {
+func (d *Driver) Status(res *types.ApplicationResource) (string, error) {
 	if res == nil || res.Identifier == "" {
-		return "", fmt.Errorf("Native: Invalid resource: %v", res)
+		return "", fmt.Errorf("NATIVE: %s: Invalid resource: %v", d.name, res)
 	}
 	if isEnvAllocated(res.Identifier) {
 		return provider.StatusAllocated, nil
@@ -259,19 +259,19 @@ func (d *Driver) GetTask(name, options string) provider.DriverTask {
 // Deallocate the resource
 func (d *Driver) Deallocate(res *types.ApplicationResource) error {
 	if res == nil || res.Identifier == "" {
-		return fmt.Errorf("Native: Invalid resource: %v", res)
+		return fmt.Errorf("NATIVE: %s: Invalid resource: %v", d.name, res)
 	}
 	if !isEnvAllocated(res.Identifier) {
-		return log.Error("Native: Unable to find the environment user:", res.Identifier)
+		return log.Errorf("NATIVE: %s: Unable to find the environment user: %s", d.name, res.Identifier)
 	}
 
 	user := res.Identifier
 
 	// Umounting & delete the user env disks
-	err := disksDelete(&d.cfg, user)
+	err := d.disksDelete(user)
 
 	// Umounting & delete the user env disks
-	err2 := userDelete(&d.cfg, user)
+	err2 := d.userDelete(user)
 
 	log.Info("Docker: Deallocate of user env completed:", user)
 

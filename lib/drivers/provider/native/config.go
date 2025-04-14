@@ -105,7 +105,7 @@ func (c *Config) Apply(config []byte) (err error) {
 }
 
 // Validate makes sure the config have the required defaults & that the required fields are set
-func (c *Config) Validate() (err error) {
+func (c *Config) Validate(drv *Driver) (err error) {
 	// Sudo is used to run commands from superuser and execute a number of
 	// administrative actions to create/delete the user and cleanup
 	if c.SudoPath == "" {
@@ -275,33 +275,33 @@ func (c *Config) Validate() (err error) {
 	// with "fish-" prefix and it's needed quite a good amount of access:
 
 	// Verify user create
-	user, _, err := userCreate(c, opts.Groups)
+	user, _, err := drv.userCreate(opts.Groups)
 	if err != nil {
-		userDelete(c, user)
+		drv.userDelete(user)
 		return fmt.Errorf("Native: Unable to create new user %q: %v", user, err)
 	}
 
 	// Create test init script
 	initPath, err := testScriptCreate(user)
 	if err != nil {
-		userDelete(c, user)
+		drv.userDelete(user)
 		return fmt.Errorf("Native: Unable to create test script in %q: %v", initPath, err)
 	}
 
 	// Run the test init script
-	if err = userRun(c, nil, user, initPath, map[string]any{}); err != nil {
-		userDelete(c, user)
+	if err = drv.userRun(nil, user, initPath, map[string]any{}); err != nil {
+		drv.userDelete(user)
 		return fmt.Errorf("Native: Unable to run test init script %q: %v", initPath, err)
 	}
 
 	// Cleaning up the test script
 	if err := testScriptDelete(initPath); err != nil {
-		userDelete(c, user)
+		drv.userDelete(user)
 		return fmt.Errorf("Native: Unable to delete test script in %q: %v", initPath, err)
 	}
 
 	// Clean after the run
-	if err = userDelete(c, user); err != nil {
+	if err = drv.userDelete(user); err != nil {
 		return fmt.Errorf("Native: Unable to delete user in the end of driver verification %q: %v", user, err)
 	}
 
