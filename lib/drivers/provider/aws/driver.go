@@ -134,7 +134,7 @@ func (d *Driver) Prepare(config []byte) error {
 }
 
 // ValidateDefinition checks LabelDefinition is ok
-func (*Driver) ValidateDefinition(def types.LabelDefinition) error {
+func (d *Driver) ValidateDefinition(def types.LabelDefinition) error {
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
 		return err
@@ -142,7 +142,7 @@ func (*Driver) ValidateDefinition(def types.LabelDefinition) error {
 
 	// Check resources (no disk types supported and no net check)
 	if err := def.Resources.Validate([]string{}, false); err != nil {
-		return fmt.Errorf("AWS: Resources validation failed: %s", err)
+		return fmt.Errorf("AWS: %s: Resources validation failed: %s", d.name, err)
 	}
 
 	return nil
@@ -154,7 +154,7 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ types.Resources, def types.La
 
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
-		log.Error("AWS: Unable to apply options:", err)
+		log.Errorf("AWS: %s: Unable to apply options: %v", d.name, err)
 		return -1
 	}
 
@@ -165,10 +165,10 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ types.Resources, def types.La
 		// The pool is specified - let's check if it has the capacity
 		if p, ok := d.dedicatedPools[opts.Pool]; ok {
 			count := p.AvailableCapacity(opts.InstanceType)
-			log.Debugf("AWS: AvailableCapacity: Pool: %s, Type: %s, Count: %d", opts.Pool, opts.InstanceType, count)
+			log.Debugf("AWS: %s: AvailableCapacity: Pool: %s, Type: %s, Count: %d", d.name, opts.Pool, opts.InstanceType, count)
 			return count
 		}
-		log.Warn("AWS: Unable to locate dedicated pool:", opts.Pool)
+		log.Warnf("AWS: %s: Unable to locate dedicated pool: %s", d.name, opts.Pool)
 		return -1
 	} else if awsInstTypeAny(opts.InstanceType, "mac") {
 		// Ensure we have the available auto-placing dedicated hosts to use as base for resource.
@@ -190,7 +190,7 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ types.Resources, def types.La
 		for p.HasMorePages() {
 			resp, err := p.NextPage(context.TODO())
 			if err != nil {
-				log.Error("AWS: Error during requesting hosts:", err)
+				log.Errorf("AWS: %s: Error during requesting hosts: %v", d.name, err)
 				return -1
 			}
 			if len(resp.Hosts) > 0 {
@@ -204,7 +204,7 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ types.Resources, def types.La
 			}
 		}
 
-		log.Debug("AWS: AvailableCapacity for dedicated Mac:", opts.InstanceType, instCount)
+		log.Debugf("AWS: %s: AvailableCapacity for dedicated Mac: %s %d", d.name, opts.InstanceType, instCount)
 
 		return instCount
 	}
@@ -217,7 +217,7 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ types.Resources, def types.La
 	if upd, ok := d.typeCacheUpdated[opts.InstanceType]; ok {
 		if upd.After(time.Now().Add(-30 * time.Second)) {
 			if val, ok := d.typeCache[opts.InstanceType]; ok {
-				log.Debugf("AWS: AvailableCapacity: Type: %s, Cache: %d", opts.InstanceType, val)
+				log.Debugf("AWS: %s: AvailableCapacity: Type: %s, Cache: %d", d.name, opts.InstanceType, val)
 				return val
 			}
 		}
@@ -265,7 +265,7 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ types.Resources, def types.La
 			cpuQuota = d.quotas["Running On-Demand Standard (A, C, D, H, I, M, R, T, Z) instances"]
 			instTypes = append(instTypes, "a", "c", "d", "h", "i", "m", "r", "t", "z")
 		} else {
-			log.Error("AWS: Driver does not support instance type:", opts.InstanceType)
+			log.Errorf("AWS: %s: Driver does not support instance type: %s", d.name, opts.InstanceType)
 			return -1
 		}
 
@@ -284,11 +284,11 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ types.Resources, def types.La
 	var ipCount int64
 	var err error
 	if _, ipCount, err = d.getSubnetID(connEc2, def.Resources.Network, ""); err != nil {
-		log.Error("AWS: Error during requesting subnet:", err)
+		log.Errorf("AWS: %s: Error during requesting subnet: %v", d.name, err)
 		return -1
 	}
 
-	log.Debugf("AWS: AvailableCapacity: Type: %s, Quotas: %d, IP's: %d", opts.InstanceType, instCount, ipCount)
+	log.Debugf("AWS: %s: AvailableCapacity: Type: %s, Quotas: %d, IP's: %d", d.name, opts.InstanceType, instCount, ipCount)
 
 	// Return the most limiting value
 	result := instCount
@@ -574,12 +574,12 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 // Status shows status of the resource
 func (d *Driver) Status(res *types.ApplicationResource) (string, error) {
 	if res == nil || res.Identifier == "" {
-		return "", fmt.Errorf("AWS: Invalid resource: %v", res)
+		return "", fmt.Errorf("AWS: %s: Invalid resource: %v", d.name, res)
 	}
 	conn := d.newEC2Conn()
 	inst, err := d.getInstance(conn, res.Identifier)
 	if err != nil {
-		return "", fmt.Errorf("AWS: Error during status check for %s: %v", res.Identifier, err)
+		return "", fmt.Errorf("AWS: %s: Error during status check for %s: %v", d.name, res.Identifier, err)
 	}
 	if inst != nil && inst.State.Name != ec2types.InstanceStateNameTerminated {
 		return provider.StatusAllocated, nil
@@ -600,7 +600,7 @@ func (d *Driver) GetTask(name, options string) provider.DriverTask {
 	// Parse options json into task structure
 	if len(options) > 0 {
 		if err := json.Unmarshal([]byte(options), t); err != nil {
-			log.Error("AWS: Unable to apply the task options", err)
+			log.Errorf("AWS: %s: Unable to apply the task options: %v", d.name, err)
 			return nil
 		}
 	}
@@ -611,7 +611,7 @@ func (d *Driver) GetTask(name, options string) provider.DriverTask {
 // Deallocate the resource
 func (d *Driver) Deallocate(res *types.ApplicationResource) error {
 	if res == nil || res.Identifier == "" {
-		return fmt.Errorf("AWS: Invalid resource: %v", res)
+		return fmt.Errorf("AWS: %s: Invalid resource: %v", d.name, res)
 	}
 	conn := d.newEC2Conn()
 
@@ -621,11 +621,11 @@ func (d *Driver) Deallocate(res *types.ApplicationResource) error {
 
 	result, err := conn.TerminateInstances(context.TODO(), &input)
 	if err != nil || len(result.TerminatingInstances) < 1 {
-		return fmt.Errorf("AWS: Error during termianting the instance %s: %s", res.Identifier, err)
+		return fmt.Errorf("AWS: %s: Error during termianting the instance %s: %s", d.name, res.Identifier, err)
 	}
 	inst := result.TerminatingInstances[0]
 	if aws.ToString(inst.InstanceId) != res.Identifier {
-		return fmt.Errorf("AWS: Wrong instance id result %s during terminating of %s", aws.ToString(inst.InstanceId), res.Identifier)
+		return fmt.Errorf("AWS: %s: Wrong instance id result %s during terminating of %s", d.name, aws.ToString(inst.InstanceId), res.Identifier)
 	}
 
 	log.Infof("AWS: %s: Deallocate of instance completed: %s", res.Identifier, inst.CurrentState.Name)
