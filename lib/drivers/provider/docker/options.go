@@ -38,7 +38,7 @@ type Options struct {
 // Apply takes json and applies it to the options structure
 func (o *Options) Apply(options util.UnparsedJSON) error {
 	if err := json.Unmarshal([]byte(options), o); err != nil {
-		return log.Error("Docker: Unable to apply the driver options:", err)
+		return log.Error("DOCKER: Unable to apply the driver options:", err)
 	}
 
 	return o.Validate()
@@ -50,7 +50,7 @@ func (o *Options) Validate() error {
 	var imgErr error
 	for index := range o.Images {
 		if err := o.Images[index].Validate(); err != nil {
-			imgErr = log.Error("Docker: Error during image validation:", err)
+			imgErr = log.Error("DOCKER: Error during image validation:", err)
 		}
 	}
 	if imgErr != nil {
