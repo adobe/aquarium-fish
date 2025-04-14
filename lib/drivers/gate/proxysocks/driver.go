@@ -28,8 +28,11 @@ func (*Factory) Name() string {
 }
 
 // New creates new gate driver
-func (*Factory) New(db *database.Database) gate.Driver {
-	return &Driver{db: db}
+func (f *Factory) New(db *database.Database) gate.Driver {
+	return &Driver{
+		db:   db,
+		name: f.Name(),
+	}
 }
 
 func init() {
@@ -38,13 +41,19 @@ func init() {
 
 // Driver implements drivers.ResourceDriver interface
 type Driver struct {
-	cfg Config
-	db  *database.Database
+	name string
+	cfg  Config
+	db   *database.Database
 }
 
 // Name returns name of the gate
-func (*Driver) Name() string {
-	return "proxysocks"
+func (d *Driver) Name() string {
+	return d.name
+}
+
+// SetName allows to receive the actual name of the driver
+func (d *Driver) SetName(name string) {
+	d.name = name
 }
 
 // Prepare initializes the driver

@@ -71,7 +71,8 @@ func load(db *database.Database, configs ConfigDrivers) error {
 			for name := range configs.Providers {
 				if name == fbr.Name() || strings.HasPrefix(name, fbr.Name()+"/") {
 					providerInstances[name] = fbr.New()
-					log.Info("Drivers: Provider driver loaded:", fbr.Name(), "as", name)
+					providerInstances[name].SetName(name)
+					log.Info("Drivers: Provider driver loaded:", fbr.Name(), "as", providerInstances[name].Name())
 				}
 			}
 		}
@@ -98,7 +99,8 @@ func load(db *database.Database, configs ConfigDrivers) error {
 			for name := range configs.Gates {
 				if name == fbr.Name() || strings.HasPrefix(name, fbr.Name()+"/") {
 					gateInstances[name] = fbr.New(db)
-					log.Info("Drivers: Gate driver loaded:", fbr.Name(), "as", name)
+					gateInstances[name].SetName(name)
+					log.Info("Drivers: Gate driver loaded:", fbr.Name(), "as", gateInstances[name].Name())
 				}
 			}
 		}

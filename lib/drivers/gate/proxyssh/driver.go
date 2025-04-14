@@ -30,8 +30,11 @@ func (*Factory) Name() string {
 }
 
 // New creates new gate driver
-func (*Factory) New(db *database.Database) gate.Driver {
-	return &Driver{db: db}
+func (f *Factory) New(db *database.Database) gate.Driver {
+	return &Driver{
+		db:   db,
+		name: f.Name(),
+	}
 }
 
 func init() {
@@ -40,13 +43,19 @@ func init() {
 
 // Driver implements drivers.ResourceDriver interface
 type Driver struct {
-	cfg Config
-	db  *database.Database
+	name string
+	cfg  Config
+	db   *database.Database
 }
 
 // Name returns name of the gate
-func (*Driver) Name() string {
-	return "proxyssh"
+func (d *Driver) Name() string {
+	return d.name
+}
+
+// Name returns name of the gate
+func (d *Driver) SetName(name string) {
+	d.name = name
 }
 
 // Prepare initializes the driver

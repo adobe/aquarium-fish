@@ -238,6 +238,9 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 
 	initDone := make(chan string)
 	scanner := bufio.NewScanner(r)
+	// Increasing scanner line buffer from 64KB to 1MB
+	buf := make([]byte, 0, 1024*1024)
+	scanner.Buffer(buf, 1024*1024)
 
 	afi.WaitForLog("Admin user pass: ", func(substring, line string) bool {
 		if !strings.HasPrefix(line, substring) {
@@ -306,7 +309,7 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 				afi.callWaitForLog(substring, line)
 			}
 		}
-		tb.Log("INFO: Reading of AquariumFish output is done")
+		tb.Log("INFO: Reading of AquariumFish output is done:", scanner.Err())
 	}()
 
 	afi.cmd.Start()

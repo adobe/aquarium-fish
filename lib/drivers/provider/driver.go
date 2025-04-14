@@ -40,6 +40,9 @@ type Driver interface {
 	// Name of the driver
 	Name() string
 
+	// SetName of the gate
+	SetName(string)
+
 	// If the driver uses local node resources or a cloud or remote resources
 	// it is used to calculate the slots available for the local drivers
 	IsRemote() bool

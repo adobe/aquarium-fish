@@ -38,8 +38,8 @@ func (*Factory) Name() string {
 }
 
 // New creates new provider driver
-func (*Factory) New() provider.Driver {
-	return &Driver{}
+func (f *Factory) New() provider.Driver {
+	return &Driver{name: f.Name()}
 }
 
 func init() {
@@ -48,14 +48,20 @@ func init() {
 
 // Driver implements provider.Driver interface
 type Driver struct {
-	cfg Config
+	name string
+	cfg  Config
 	// Contains the available tasks of the driver
 	tasksList []provider.DriverTask
 }
 
 // Name returns name of the driver
-func (*Driver) Name() string {
-	return "test"
+func (d *Driver) Name() string {
+	return d.name
+}
+
+// Name returns name of the gate
+func (d *Driver) SetName(name string) {
+	d.name = name
 }
 
 // IsRemote needed to detect the out-of-node resources managed by this driver
