@@ -14,7 +14,11 @@
 package proxyssh
 
 import (
+	"net"
 	"path/filepath"
+	"sync"
+
+	"golang.org/x/crypto/ssh"
 
 	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/drivers/gate"
@@ -46,6 +50,15 @@ type Driver struct {
 	name string
 	cfg  Config
 	db   *database.Database
+
+	// Proxy data
+	serverConfig *ssh.ServerConfig
+
+	// Actual listening address of the service
+	Address net.Addr
+
+	// Keeps session info for auth, key is src address, value is session
+	sessions sync.Map
 }
 
 // Name returns name of the gate
@@ -71,8 +84,8 @@ func (d *Driver) Prepare(wd string, config []byte) (err error) {
 	if !filepath.IsAbs(keyPath) {
 		keyPath = filepath.Join(wd, keyPath)
 	}
-	if d.cfg.BindAddress, err = proxyInit(d.db, keyPath, d.cfg.BindAddress); err != nil {
-		return log.Errorf("PROXYSSH: Unable to init proxyssh gate: %v", err)
+	if d.cfg.BindAddress, err = d.proxyInit(keyPath); err != nil {
+		return log.Errorf("PROXYSSH: %s: Unable to init proxyssh gate: %v", d.name, err)
 	}
 
 	return nil

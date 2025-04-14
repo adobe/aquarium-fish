@@ -65,8 +65,8 @@ func (d *Driver) Prepare( /*wd*/ _ string, config []byte) error {
 		return err
 	}
 
-	if err := proxyInit(d.db, d.cfg.BindAddress); err != nil {
-		return log.Errorf("PROXYSOCKS: Unable to init proxysocks gate: %v", err)
+	if err := d.proxyInit(); err != nil {
+		return log.Errorf("PROXYSOCKS: %s: Unable to init proxysocks gate: %v", d.name, err)
 	}
 
 	return nil
