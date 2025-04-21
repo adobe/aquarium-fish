@@ -60,6 +60,7 @@ type Fish struct {
 	running       context.Context //nolint:containedctx
 	runningCancel context.CancelFunc
 	routines      sync.WaitGroup
+	routinesMutex sync.Mutex
 
 	maintenance    bool
 	shutdown       bool
@@ -245,12 +246,15 @@ func (f *Fish) GetCfg() Config {
 }
 
 func (f *Fish) pingProcess() {
+	f.routinesMutex.Lock()
 	f.routines.Add(1)
+	f.routinesMutex.Unlock()
 	defer f.routines.Done()
 	defer log.Info("Fish Node: pingProcess stopped")
 
 	// In order to optimize network & database - update just UpdatedAt field
 	pingTicker := time.NewTicker(types.NodePingDelay * time.Second)
+	defer pingTicker.Stop()
 	for {
 		select {
 		case <-f.running.Done():
@@ -263,11 +267,14 @@ func (f *Fish) pingProcess() {
 }
 
 func (f *Fish) checkNewApplicationProcess() {
+	f.routinesMutex.Lock()
 	f.routines.Add(1)
+	f.routinesMutex.Unlock()
 	defer f.routines.Done()
 	defer log.Info("Fish: checkNewApplicationProcess stopped")
 
 	checkTicker := time.NewTicker(5 * time.Second)
+	defer checkTicker.Stop()
 	for {
 		select {
 		case <-f.running.Done():
@@ -327,17 +334,21 @@ func (f *Fish) checkNewApplicationProcess() {
 
 // dbCleanupCompactProcess background process helping with managing the database cleannes
 func (f *Fish) dbCleanupCompactProcess() {
+	f.routinesMutex.Lock()
 	f.routines.Add(1)
+	f.routinesMutex.Unlock()
 	defer f.routines.Done()
 	defer log.Info("Fish: dbCleanupCompactProcess stopped")
 
 	// Checking the completed/error applications and clean up if they've sit there for > 5 minutes
 	dbCleanupDelay := time.Duration(f.cfg.DBCleanupDelay)
 	cleanupTicker := time.NewTicker(dbCleanupDelay / 2)
+	defer cleanupTicker.Stop()
 	log.Infof("Fish: dbCleanupCompactProcess: Triggering CleanupDB once per %s", dbCleanupDelay/2)
 
 	compactionTicker := time.NewTicker(time.Hour)
 	log.Infof("Fish: dbCleanupCompactProcess: Triggering CompactDB once per %s", time.Hour)
+	defer compactionTicker.Stop()
 
 	for {
 		select {

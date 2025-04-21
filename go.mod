@@ -1,6 +1,8 @@
 module github.com/adobe/aquarium-fish
 
-go 1.22.2
+go 1.23.0
+
+toolchain go1.23.1
 
 require (
 	github.com/alessio/shellescape v1.4.1
@@ -10,10 +12,12 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/kms v1.32.3
 	github.com/aws/aws-sdk-go-v2/service/servicequotas v1.21.10
 	github.com/aws/aws-sdk-go-v2/service/sts v1.28.12
+	github.com/bradleyfalzon/ghinstallation/v2 v2.14.0
 	github.com/creack/pty v1.1.24
 	github.com/getkin/kin-openapi v0.124.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/gliderlabs/ssh v0.3.7
+	github.com/google/go-github/v71 v71.0.0
 	github.com/google/uuid v1.5.0
 	github.com/hpcloud/tail v1.0.0
 	github.com/labstack/echo/v4 v4.11.4
@@ -47,6 +51,9 @@ require (
 	github.com/go-openapi/swag v0.22.8 // indirect
 	github.com/gofrs/flock v0.8.1 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
+	github.com/golang-jwt/jwt/v4 v4.5.1 // indirect
+	github.com/google/go-github/v69 v69.0.0 // indirect
+	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/hashicorp/go-immutable-radix/v2 v2.0.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect

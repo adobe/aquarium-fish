@@ -19,12 +19,22 @@ import (
 	"os"
 )
 
+type verbosityType int8
+
+const (
+	VerbosityNone  verbosityType = iota // 0
+	VerbosityDebug                      // 1
+	VerbosityInfo                       // 2
+	VerbosityWarn                       // 3
+	VerbosityError                      // 4
+)
+
 var (
 	// UseTimestamp needed if you don't want to output timestamp in the logging message
 	// for example that's helpful in case your service journal already contains timestamps
 	UseTimestamp = true
 
-	verbosity int8 = 2
+	verbosity = VerbosityInfo
 
 	debugLogger *log.Logger
 	infoLogger  *log.Logger
@@ -41,13 +51,13 @@ func init() {
 func SetVerbosity(level string) error {
 	switch level {
 	case "debug":
-		verbosity = 1
+		verbosity = VerbosityDebug
 	case "info":
-		verbosity = 2
+		verbosity = VerbosityInfo
 	case "warn":
-		verbosity = 3
+		verbosity = VerbosityWarn
 	case "error":
-		verbosity = 4
+		verbosity = VerbosityError
 	default:
 		return fmt.Errorf("Unable to parse verbosity level: %s", level)
 	}
@@ -56,7 +66,7 @@ func SetVerbosity(level string) error {
 }
 
 // GetVerbosity returns current verbosity level
-func GetVerbosity() int8 {
+func GetVerbosity() verbosityType {
 	return verbosity
 }
 
@@ -67,12 +77,12 @@ func InitLoggers() error {
 	// Skip timestamp if not needed
 	if UseTimestamp {
 		flags |= log.Ldate | log.Ltime
-		if verbosity < 2 {
+		if verbosity < VerbosityInfo {
 			flags |= log.Lmicroseconds
 		}
 	}
 	// Show short file for debug verbosity
-	if verbosity < 2 {
+	if verbosity < VerbosityInfo {
 		flags |= log.Lshortfile
 	}
 
@@ -96,42 +106,42 @@ func GetErrorLogger() *log.Logger {
 
 // Debug logs debug message
 func Debug(v ...any) {
-	if verbosity <= 1 {
+	if verbosity <= VerbosityDebug {
 		debugLogger.Output(2, fmt.Sprintln(v...))
 	}
 }
 
 // Debugf logs debug message with formatting
 func Debugf(format string, v ...any) {
-	if verbosity <= 1 {
+	if verbosity <= VerbosityDebug {
 		debugLogger.Output(2, fmt.Sprintf(format+"\n", v...))
 	}
 }
 
 // Info logs info message
 func Info(v ...any) {
-	if verbosity <= 2 {
+	if verbosity <= VerbosityInfo {
 		infoLogger.Output(2, fmt.Sprintln(v...))
 	}
 }
 
 // Infof logs info message with formatting
 func Infof(format string, v ...any) {
-	if verbosity <= 2 {
+	if verbosity <= VerbosityInfo {
 		infoLogger.Output(2, fmt.Sprintf(format+"\n", v...))
 	}
 }
 
 // Warn logs warning message
 func Warn(v ...any) {
-	if verbosity <= 3 {
+	if verbosity <= VerbosityWarn {
 		warnLogger.Output(2, fmt.Sprintln(v...))
 	}
 }
 
 // Warnf logs warning message with formatting
 func Warnf(format string, v ...any) {
-	if verbosity <= 3 {
+	if verbosity <= VerbosityWarn {
 		warnLogger.Output(2, fmt.Sprintf(format+"\n", v...))
 	}
 }
@@ -139,7 +149,7 @@ func Warnf(format string, v ...any) {
 // Error logs error message
 func Error(v ...any) error {
 	msg := fmt.Sprintln(v...)
-	if verbosity <= 4 {
+	if verbosity <= VerbosityError {
 		errorLogger.Output(2, msg)
 	}
 	return fmt.Errorf("%s", msg)
@@ -147,7 +157,7 @@ func Error(v ...any) error {
 
 // Errorf logs error message with formatting
 func Errorf(format string, v ...any) error {
-	if verbosity <= 4 {
+	if verbosity <= VerbosityError {
 		errorLogger.Output(2, fmt.Sprintf(format+"\n", v...))
 	}
 	return fmt.Errorf(format, v...)
