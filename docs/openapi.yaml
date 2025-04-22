@@ -1408,6 +1408,7 @@ components:
         - ip_addr
         - hw_addr
         - metadata
+        - timeout
       properties:
         UID:
           $ref: '#/components/schemas/ApplicationResourceUID'
@@ -1462,6 +1463,9 @@ components:
         authentication:
           $ref: '#/components/schemas/Authentication'
           description: Authentication information to connect.
+        timeout:
+          x-go-type: time.Time
+          description: Calculated during allocation time of when the Resource have to die anyway
 
     ApplicationResourceAccessUID:
       type: string
