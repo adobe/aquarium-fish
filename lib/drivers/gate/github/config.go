@@ -46,7 +46,8 @@ type Config struct {
 	// and configuration. You have to set at least one filter ('*/*' for example)
 	Filters map[string]Filter `json:"filters"`
 
-	DeliveryValidInterval util.Duration `json:"delivery_valid_interval"` // For how long to see the delivery as valid since it's delivery time, default: 30m
+	DeliveryValidInterval util.Duration `json:"delivery_valid_interval"`  // For how long to see the delivery as valid since it's delivery time, default: 30m
+	DefaultJobMaxLifetime util.Duration `json:"default_job_max_lifetime"` // Used when job is stuck not completed and no lifetime is set for the label, default: 12h
 
 	// If you need to use this gate with GitHub enterprise installation - set those configs
 	EnterpriseBaseURL   string `json:"enterprise_base_url"`   // Format: http(s)://[hostname]/api/v3/
@@ -79,8 +80,12 @@ func (c *Config) Apply(config []byte) error {
 	if c.APIMinCheckInterval <= 0 {
 		c.APIMinCheckInterval = util.Duration(30 * time.Second)
 	}
+
 	if c.DeliveryValidInterval <= 0 {
 		c.DeliveryValidInterval = util.Duration(30 * time.Minute)
+	}
+	if c.DefaultJobMaxLifetime <= 0 {
+		c.DefaultJobMaxLifetime = util.Duration(12 * time.Hour)
 	}
 
 	return nil
