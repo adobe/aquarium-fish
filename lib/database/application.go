@@ -18,6 +18,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
@@ -89,4 +90,32 @@ func (d *Database) ApplicationIsAllocated(appUID types.ApplicationUID) (err erro
 		return fmt.Errorf("Fish: The Application is not allocated")
 	}
 	return nil
+}
+
+// ApplicationDeallocate helps with creating deallocate/recalled state for the Application
+func (d *Database) ApplicationDeallocate(appUID types.ApplicationUID, requestor string) (*types.ApplicationState, error) {
+	out, err := d.ApplicationStateGetByApplication(appUID)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to find status for the Application: %s, %w", appUID, err)
+	}
+	if !d.ApplicationStateIsActive(out.Status) {
+		// Since app can't be deallocated - it's not really an error, treating as precaution
+		log.Warnf("DB: Unable to deallocate the Application %q with status: %s", appUID, out.Status)
+		return out, nil
+	}
+
+	newStatus := types.ApplicationStatusDEALLOCATE
+	if out.Status != types.ApplicationStatusALLOCATED {
+		// The Application was not yet Allocated so just mark it as Recalled
+		newStatus = types.ApplicationStatusRECALLED
+	}
+	as := &types.ApplicationState{ApplicationUID: appUID, Status: newStatus,
+		Description: fmt.Sprintf("Requested by %s", requestor),
+	}
+
+	if err = d.ApplicationStateCreate(as); err != nil {
+		return nil, fmt.Errorf("Unable to deallocate the Application: %s, %w", appUID, err)
+	}
+
+	return as, nil
 }

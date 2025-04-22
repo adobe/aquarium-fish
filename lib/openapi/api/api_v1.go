@@ -505,25 +505,7 @@ func (e *Processor) ApplicationDeallocateGet(c echo.Context, uid types.Applicati
 		return fmt.Errorf("Only the owner & admin can deallocate the Application resource")
 	}
 
-	out, err := e.fish.DB().ApplicationStateGetByApplication(uid)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find status for the Application: %s", uid)})
-		return fmt.Errorf("Unable to find status for the Application: %s, %w", uid, err)
-	}
-	if !e.fish.DB().ApplicationStateIsActive(out.Status) {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to deallocate the Application with status: %s", out.Status)})
-		return fmt.Errorf("Unable to deallocate the Application with status: %s", out.Status)
-	}
-
-	newStatus := types.ApplicationStatusDEALLOCATE
-	if out.Status != types.ApplicationStatusALLOCATED {
-		// The Application was not yet Allocated so just mark it as Recalled
-		newStatus = types.ApplicationStatusRECALLED
-	}
-	as := &types.ApplicationState{ApplicationUID: uid, Status: newStatus,
-		Description: fmt.Sprintf("Requested by user %s", user.Name),
-	}
-	err = e.fish.DB().ApplicationStateCreate(as)
+	as, err := e.fish.DB().ApplicationDeallocate(uid, user.Name)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to deallocate the Application: %s", uid)})
 		return fmt.Errorf("Unable to deallocate the Application: %s, %w", uid, err)
