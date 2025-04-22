@@ -22,6 +22,7 @@ import (
 	"github.com/google/go-github/v71/github"
 	"github.com/google/uuid"
 
+	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
@@ -162,7 +163,7 @@ func (d *Driver) processHookDeliveries(deliveries []*github.HookDelivery, owner,
 	var filteredJobs []*github.WorkflowJob
 	var completed []*github.WorkflowJob
 	for _, job := range jobs {
-		if job.GetStatus() == "completed" {
+		if job.GetStatus() == jobCompleted {
 			completed = append(completed, job)
 		}
 	}
@@ -172,10 +173,13 @@ func (d *Driver) processHookDeliveries(deliveries []*github.HookDelivery, owner,
 	for i := len(jobs) - 1; i >= 0; i-- {
 		job := jobs[i]
 		nomatch := true
-		for _, compJob := range completed {
-			if compJob.GetID() == job.GetID() && compJob.GetRunID() == job.GetRunID() && compJob != job {
-				log.Debugf("GITHUB: %s: Cancelling out queued-completed job: %d-%d", d.name, job.GetRunID(), job.GetID())
-				nomatch = false
+		// Processing only queued jobs
+		if job.GetStatus() == jobQueued {
+			for _, compJob := range completed {
+				if compJob.GetID() == job.GetID() && compJob.GetRunID() == job.GetRunID() {
+					log.Debugf("GITHUB: %s: Cancelling out queued-completed job: %d-%d", d.name, job.GetRunID(), job.GetID())
+					nomatch = false
+				}
 			}
 		}
 		if nomatch {
@@ -304,11 +308,13 @@ func (d *Driver) extractJob(req *github.HookRequest, failOnSecretUnset bool) (*g
 // executeJob is in charge of actual action over the received webhook job, so here magic is happening
 func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 	jobID := fmt.Sprintf("%d-%d", job.GetRunID(), job.GetID())
-	log.Debugf("GITHUB: %s: Executing the job %s for repo %s/%s: %s %q", d.name, jobID, owner, repo, job.GetStatus(), job.Labels)
+	log.Debugf("GITHUB: %s: Executing the job %s for repo %s/%s: %s", d.name, jobID, owner, repo, job.GetStatus())
 
 	// Let's find the job in DB or create it if action "queue"
 	record := dbJob{}
 	err := d.db.GetValue(dbPrefixJob, jobID, &record)
+
+	// Processing queued event
 	if err == database.ErrObjectNotFound && job.GetStatus() == jobQueued {
 		// Checking labels on the job to link the right one
 		if job.Labels == nil || len(job.Labels) < 2 || job.Labels[0] != "self-hosted" {
@@ -332,18 +338,23 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 			return nil
 		}
 
-		// Creating new self-hosted configuration to allow the worker to connect to github
-		runnerCfg, err := d.apiCreateRunner(owner, repo, job.Labels)
+		// Unfortunately JIT runners has quite tight timeouts on connection (<5min) and has builtin
+		// configuration right in JIT token that prevents proper configuration on the image. So
+		// here we using self-registering runners with 1h tokens instead.
+		runnerToken, err := d.apiCreateRunnerToken(owner, repo)
 		if err != nil {
 			return fmt.Errorf("Unable to create runner config: %v", err)
 		}
-		log.Debugf("GITHUB: %s: Job %s of repo %s/%s: Created runner %d %q: %q", d.name, jobID, owner, repo, runnerCfg.Runner.GetID(), runnerCfg.Runner.GetName(), runnerCfg.GetEncodedJITConfig())
+		fishName := fmt.Sprintf("fish-%s", crypt.RandString(8))
+		log.Debugf("GITHUB: %s: Job %s of repo %s/%s: Created runner token for Fish %q: %q", d.name, jobID, owner, repo, fishName, runnerToken.GetToken())
 
 		// Sending allocation request to the Fish core to write down the ApplicationUID
 		log.Debugf("GITHUB: %s: Job %s of repo %s/%s: Creating Application using Label %q", d.name, jobID, owner, repo, labels[0].UID)
 		metadata, err := json.Marshal(map[string]string{
-			"GITHUB_URL":       "TODO",
-			"GITHUB_JIT_TOKEN": runnerCfg.GetEncodedJITConfig(),
+			"GITHUB_RUNNER_URL":       fmt.Sprintf("%s/%s/%s", d.githubURL, owner, repo),
+			"GITHUB_RUNNER_NAME":      fishName,
+			"GITHUB_RUNNER_LABELS":    strings.Join(job.Labels[:2], ","), // Using just first 2 validated labels
+			"GITHUB_RUNNER_REG_TOKEN": runnerToken.GetToken(),
 		})
 		app := types.Application{
 			LabelUID:  labels[0].UID,
@@ -362,14 +373,92 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 			Description: fmt.Sprintf("Created by node %s", d.db.GetNodeName()),
 
 			ApplicationUID: app.UID,
-			RunnerID:       runnerCfg.Runner.GetID(),
 		}
 		if err := d.db.SetValue(dbPrefixJob, jobID, &j); err != nil {
 			return fmt.Errorf("Unable to create db entry for job %d-%d: %v", job.GetRunID(), job.GetID(), err)
 		}
+
+		// TODO: probably here we need a monitor that ensure the node was allocated properly
+		// It will need to make sure the Applciation is Allocated and then delay till timeout,
+		// Application state change - which should trigger deallocate/create new Application if the
+		// job still waits for the runner or dbJob update to in_progress, where monitoring stops.
+		return nil
 	}
 
-	// TODO: Run monitoring on successful queue or retry
+	// Processing in_progress job
+	if err == nil && job.GetStatus() == jobInProgress {
+		// Ok the node is connected and workload started execution
+		// The node could be taken from a different webhook, because there is (sadly) no pinning
+
+		log.Infof("GITHUB: %s: The runner %q (%d) was allocated and executing job: %s", d.name, job.GetRunnerName(), job.GetRunnerID(), jobID)
+
+		// Updating the record in database to reflect the successfull allocation
+		j := dbJob{
+			CreatedAt:   time.Now(),
+			Status:      job.GetStatus(),
+			NodeUID:     record.NodeUID,
+			Description: fmt.Sprintf("Created by node %s", d.db.GetNodeName()),
+
+			ApplicationUID: record.ApplicationUID,
+			RunnerID:       job.GetRunnerID(),
+		}
+		if err := d.db.SetValue(dbPrefixJob, jobID, &j); err != nil {
+			return fmt.Errorf("Unable to create db entry for job %d-%d: %v", job.GetRunID(), job.GetID(), err)
+		}
+
+		return nil
+	}
+
+	// Processing completed job
+	if err == nil && job.GetStatus() == jobCompleted {
+		// Job completed, so it's time to deallocate the worker and make sure no residue is left
+		log.Infof("GITHUB: %s: The job %s is completed as %q, deallocating the runner: %d", d.name, jobID, job.GetConclusion(), record.RunnerID)
+
+		// Requesting deallocate of the Application
+		out, err := d.db.ApplicationStateGetByApplication(record.ApplicationUID)
+		if err != nil {
+			return fmt.Errorf("Unable to find status for the Application: %s, %w", record.ApplicationUID, err)
+		}
+		if d.db.ApplicationStateIsActive(out.Status) {
+			newStatus := types.ApplicationStatusDEALLOCATE
+			if out.Status != types.ApplicationStatusALLOCATED {
+				// The Application was not yet Allocated so just mark it as Recalled
+				newStatus = types.ApplicationStatusRECALLED
+			}
+			err = d.db.ApplicationStateCreate(&types.ApplicationState{
+				ApplicationUID: record.ApplicationUID,
+				Status:         newStatus,
+				Description:    fmt.Sprintf("Triggered by github/%s", d.name),
+			})
+			if err != nil {
+				return fmt.Errorf("Unable to deallocate the Application: %s, %w", record.ApplicationUID, err)
+			}
+		} else {
+			log.Warnf("Unable to deallocate the Application with status: %s", out.Status)
+		}
+
+		// Updating the record in database to reflect the successfull deallocation
+		j := dbJob{
+			CreatedAt:   time.Now(),
+			Status:      job.GetStatus(),
+			NodeUID:     record.NodeUID,
+			Description: fmt.Sprintf("Created by node %s", d.db.GetNodeName()),
+
+			ApplicationUID: record.ApplicationUID,
+			RunnerID:       record.RunnerID,
+		}
+		if err := d.db.SetValue(dbPrefixJob, jobID, &j); err != nil {
+			return fmt.Errorf("Unable to create db entry for job %d-%d: %v", job.GetRunID(), job.GetID(), err)
+		}
+
+		// TODO: Check behavior of the runner - is there any leftovers if the host gets disconnected
+		// or something... Probably we need a proper cleanup mechanism of the residue runners records
+
+		return nil
+	}
+
+	log.Debugf("GITHUB: %s: Job %s with status %q was skipped: doesn't fit the regular workflow: %v", jobID, job.GetStatus(), err)
+
 	return nil
 }
 
@@ -486,10 +575,34 @@ func (d *Driver) init() error {
 		// TODO: Listen for webhook
 	}
 
+	// TEMP: Remove runners from repo
+	/*d.lockClient()
+	resp, err := d.cl.Actions.RemoveRunner(context.Background(), "Photoshop-Adobe", "tmp-workflow", 23)
+	d.clMutex.Unlock()
+	if err = d.apiCheckResponse(resp, err); err != nil {
+		return err
+	}
+	d.lockClient()
+	resp, err = d.cl.Actions.RemoveRunner(context.Background(), "Photoshop-Adobe", "tmp-workflow", 24)
+	d.clMutex.Unlock()
+	if err = d.apiCheckResponse(resp, err); err != nil {
+		return err
+	}
+	if d.cfg.isAPIEnabled() {
+		return nil
+	}*/
+
 	// Now running relatively slow API repo updater to ensure the creds are working correctly
 	if d.cfg.isAPIEnabled() {
-		if err := d.updateHooks(); err != nil {
-			return log.Errorf("GITHUB: %s: Failed to update the repositories list:", err)
+		// Validating client
+		var err error
+		if d.cl, err = d.createClient(); err != nil {
+			return log.Errorf("GITHUB: %s: Failed to create client: %v", d.name, err)
+		}
+
+		// Receiving hooks from github
+		if err = d.updateHooks(); err != nil {
+			return log.Errorf("GITHUB: %s: Failed to update the repositories list: %v", d.name, err)
 		}
 
 		// Run schedule to update deliveries periodically

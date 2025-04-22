@@ -16,6 +16,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"path"
 	"slices"
 	"time"
@@ -23,7 +24,6 @@ import (
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v71/github"
 
-	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/log"
 )
 
@@ -58,6 +58,20 @@ func (d *Driver) createClient() (client *github.Client, err error) {
 		client = github.NewClient(nil).WithAuthToken(d.cfg.APIToken)
 	} else {
 		return nil, log.Errorf("GITHUB: %s: No auth is available", d.name)
+	}
+
+	if d.cfg.EnterpriseBaseURL != "" && d.cfg.EnterpriseUploadURL != "" {
+		parsedURL, err := url.Parse(d.cfg.EnterpriseBaseURL)
+		if err != nil {
+			return nil, fmt.Errorf("Unable to parse EnterpriseBaseURL: %v", err)
+		}
+		client.BaseURL = parsedURL
+
+		parsedURL, err = url.Parse(d.cfg.EnterpriseUploadURL)
+		if err != nil {
+			return nil, fmt.Errorf("Unable to parse EnterpriseUploadURL: %v", err)
+		}
+		client.UploadURL = parsedURL
 	}
 
 	return client, nil
@@ -239,8 +253,20 @@ func (d *Driver) apiGetFullDelivery(owner, repo string, hook int64, delivery int
 	return respDelivery, err
 }
 
+// apiCreateRunnerToken will return registration token to allow the worker to connect as runner
+func (d *Driver) apiCreateRunnerToken(owner, repo string) (*github.RegistrationToken, error) {
+	d.lockClient()
+	respRegToken, resp, err := d.cl.Actions.CreateRegistrationToken(context.Background(), owner, repo)
+	d.clMutex.Unlock()
+	if err = d.apiCheckResponse(resp, err); err != nil {
+		return nil, err
+	}
+
+	return respRegToken, nil
+}
+
 // Will return the actual body of the delivery
-func (d *Driver) apiCreateRunner(owner, repo string, labels []string) (*github.JITRunnerConfig, error) {
+/*func (d *Driver) apiCreateRunner(owner, repo string, labels []string) (*github.JITRunnerConfig, error) {
 	d.lockClient()
 	req := github.GenerateJITConfigRequest{
 		Name:   fmt.Sprintf("fish-%s", crypt.RandString(8)),
@@ -256,4 +282,4 @@ func (d *Driver) apiCreateRunner(owner, repo string, labels []string) (*github.J
 	}
 
 	return respRunnerCfg, nil
-}
+}*/

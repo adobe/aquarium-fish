@@ -47,6 +47,11 @@ type Config struct {
 	Filters map[string]Filter `json:"filters"`
 
 	DeliveryValidInterval util.Duration `json:"delivery_valid_interval"` // For how long to see the delivery as valid since it's delivery time, default: 30m
+
+	// If you need to use this gate with GitHub enterprise installation - set those configs
+	EnterpriseBaseURL   string `json:"enterprise_base_url"`   // Format: http(s)://[hostname]/api/v3/
+	EnterpriseUploadURL string `json:"enterprise_upload_url"` // Format: http(s)://[hostname]/api/uploads/
+
 }
 
 type Filter struct {

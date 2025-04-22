@@ -15,7 +15,9 @@ package github
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
@@ -50,6 +52,9 @@ type Driver struct {
 	name string
 	cfg  Config
 	db   *database.Database
+
+	// Storing the github url here to use during workers provisioning
+	githubURL string
 
 	// Keeping the rate available to properly distribute it's resource over time
 	apiRate      github.Rate
@@ -96,6 +101,20 @@ func (d *Driver) Prepare(wd string, config []byte) error {
 	}
 	if err := d.cfg.Validate(); err != nil {
 		return err
+	}
+
+	if d.cfg.EnterpriseBaseURL == "" {
+		d.githubURL = "https://github.com/"
+	} else {
+		parsedURL, err := url.Parse(d.cfg.EnterpriseBaseURL)
+		if err != nil {
+			return fmt.Errorf("Unable to parse EnterpriseBaseURL: %v", err)
+		}
+		baseURL := &url.URL{
+			Scheme: parsedURL.Scheme,
+			Host:   parsedURL.Host,
+		}
+		d.githubURL = baseURL.String()
 	}
 
 	// Set checkpoint to reasonable time, othwerise it's doomed to process all the deliveries
