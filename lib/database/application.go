@@ -28,7 +28,7 @@ func (d *Database) ApplicationList() (as []types.Application, err error) {
 	return as, err
 }
 
-// ApplicationCreate makes new Applciation
+// ApplicationCreate makes new Application
 func (d *Database) ApplicationCreate(a *types.Application) error {
 	if a.LabelUID == uuid.Nil {
 		return fmt.Errorf("Fish: LabelUID can't be unset")

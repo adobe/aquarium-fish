@@ -28,7 +28,7 @@ func (d *Database) ApplicationTaskList() (at []types.ApplicationTask, err error)
 	return at, err
 }
 
-// ApplicationTaskFindByApplication allows to find all the ApplicationTasks by ApplciationUID
+// ApplicationTaskFindByApplication allows to find all the ApplicationTasks by ApplicationUID
 func (d *Database) ApplicationTaskListByApplication(uid types.ApplicationUID) (at []types.ApplicationTask, err error) {
 	all, err := d.ApplicationTaskList()
 	if err == nil {

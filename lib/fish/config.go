@@ -45,7 +45,7 @@ type Config struct {
 
 	DefaultResourceLifetime util.Duration `json:"default_resource_lifetime"` // Sets the lifetime of the resource which will be used if label definition one is not set
 
-	DBCleanupDelay util.Duration `json:"db_cleanup_delay"` // Defines the database item cleanup delay when Applciation reached the end of life (by error or deallocated)
+	DBCleanupDelay util.Duration `json:"db_cleanup_delay"` // Defines the database item cleanup delay when Application reached the end of life (by error or deallocated)
 
 	DisableAuth bool `json:"disable_auth"` // WARNING! For performance testing only
 
