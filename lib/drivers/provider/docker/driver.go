@@ -60,6 +60,9 @@ type Driver struct {
 
 	dockerUsageMutex sync.Mutex
 	dockerUsage      types.Resources // Used when the docker is remote
+
+	// We should not execute some operations at the same
+	lockOperationMutex sync.Mutex
 }
 
 // Name returns name of the driver
@@ -101,7 +104,7 @@ func (d *Driver) Prepare(config []byte) error {
 	if err != nil {
 		return fmt.Errorf("DOCKER: %s: Unable to parse CPU uint: %v (%q)", d.name, err, cpuMem[0])
 	}
-	d.totalCPU = uint(parsedCPU / 1000000000) // Originally in NCPU
+	d.totalCPU = uint(parsedCPU)
 	parsedRAM, err := strconv.ParseUint(cpuMem[1], 10, 64)
 	if err != nil {
 		return fmt.Errorf("DOCKER: %s: Unable to parse RAM uint: %v (%q)", d.name, err, cpuMem[1])
@@ -146,9 +149,11 @@ func (d *Driver) AvailableCapacity(nodeUsage types.Resources, req types.LabelDef
 
 	// Check if the node has the required resources - otherwise we can't run it anyhow
 	if req.Resources.Cpu > availCPU {
+		log.Debugf("DOCKER: %s: Not enough CPU: %d > %d", d.name, req.Resources.Cpu, availCPU)
 		return 0
 	}
 	if req.Resources.Ram > availRAM {
+		log.Debugf("DOCKER: %s: Not enough RAM: %d > %d", d.name, req.Resources.Ram, availRAM)
 		return 0
 	}
 	// TODO: Check disk requirements
@@ -214,15 +219,8 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 	if cNetwork == "" {
 		cNetwork = "hostonly"
 	}
-	if !d.isNetworkExists(cNetwork) {
-		netArgs := []string{"network", "create", "-d", "bridge"}
-		if cNetwork == "hostonly" {
-			netArgs = append(netArgs, "--internal")
-		}
-		netArgs = append(netArgs, "aquarium-"+cNetwork)
-		if _, _, err := util.RunAndLog("DOCKER", 5*time.Second, nil, d.cfg.DockerPath, netArgs...); err != nil {
-			return nil, err
-		}
+	if err := d.ensureNetwork(cNetwork); err != nil {
+		return nil, err
 	}
 
 	// Load the images

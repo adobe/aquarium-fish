@@ -260,7 +260,25 @@ func (d *Driver) getAllocatedContainerID(cName string) string {
 	return strings.TrimSpace(stdout)
 }
 
-// Ensures the network is available
+// ensureNetwork makes everything possible to create network
+func (d *Driver) ensureNetwork(name string) error {
+	d.lockOperationMutex.Lock()
+	defer d.lockOperationMutex.Unlock()
+	if !d.isNetworkExists(name) {
+		netArgs := []string{"network", "create", "-d", "bridge"}
+		if name == "hostonly" {
+			netArgs = append(netArgs, "--internal")
+		}
+		netArgs = append(netArgs, "aquarium-"+name)
+		if _, _, err := util.RunAndLog("DOCKER", 5*time.Second, nil, d.cfg.DockerPath, netArgs...); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Checks if the network is available
 func (d *Driver) isNetworkExists(name string) bool {
 	stdout, stderr, err := util.RunAndLog("DOCKER", 5*time.Second, nil, d.cfg.DockerPath, "network", "ls", "-q", "--filter", "name=aquarium-"+name)
 	if err != nil {

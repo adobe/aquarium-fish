@@ -561,12 +561,14 @@ func (f *Fish) isNodeAvailableForDefinitions(defs []types.LabelDefinition) int {
 func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 	// When node is in maintenance mode - it should not accept any Applications
 	if f.maintenance {
+		log.Debug("Fish: Maintenance mode blocks node availability")
 		return false
 	}
 
 	// Is node supports the required label driver
 	driver := drivers.GetProvider(def.Driver)
 	if driver == nil {
+		log.Debugf("Fish: No driver found with name %q", def.Driver)
 		return false
 	}
 
@@ -583,7 +585,9 @@ func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 				var val uint = 1
 				def.Resources.Slots = &val
 			}
-			if (*f.nodeUsage.Slots)+(*def.Resources.Slots) > f.cfg.NodeSlotsLimit {
+			neededSlots := (*f.nodeUsage.Slots) + (*def.Resources.Slots)
+			if neededSlots > f.cfg.NodeSlotsLimit {
+				log.Debugf("Fish: Not enough slots to execute definition: %d > %d", neededSlots, f.cfg.NodeSlotsLimit)
 				return false
 			}
 		}
@@ -604,6 +608,7 @@ func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 			}
 			if !found {
 				// One of the required node identifiers did not matched the node ones
+				log.Debugf("Fish: NodeFilter prevents to run on this node: %q", needed)
 				return false
 			}
 		}
@@ -619,6 +624,7 @@ func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 		log.Warnf("Fish: AvailableCapacity of %s driver took %s", def.Driver, elapsed)
 	}
 	if capacity < 1 {
+		log.Debugf("Fish: Driver %q has not enough capacity: %d", driver.Name(), capacity)
 		return false
 	}
 
