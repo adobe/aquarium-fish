@@ -23,7 +23,7 @@ import (
 // Raw operations for drivers that has no special functions to operate
 // They are protecting regular Fish keys by restricting using of "/" in key string
 
-// HasValue checks if the key exists
+// Has checks if the key exists
 func (d *Database) Has(prefix, key string) (bool, error) {
 	fullkey := fmt.Sprintf("%s:%s", prefix, key)
 	if strings.Contains(fullkey, "/") {
@@ -32,7 +32,7 @@ func (d *Database) Has(prefix, key string) (bool, error) {
 	return d.be.Has(bitcask.Key(fullkey)), nil
 }
 
-// GetValue returns data by key
+// Get returns data by key
 func (d *Database) Get(prefix, key string, obj any) error {
 	fullkey := fmt.Sprintf("%s:%s", prefix, key)
 	if strings.Contains(fullkey, "/") {
@@ -48,7 +48,7 @@ func (d *Database) Get(prefix, key string, obj any) error {
 	return json.Unmarshal(data, obj)
 }
 
-// SetValue puts value in database
+// Set puts value in database
 func (d *Database) Set(prefix, key string, obj any) error {
 	fullkey := fmt.Sprintf("%s:%s", prefix, key)
 	if strings.Contains(fullkey, "/") {
@@ -62,7 +62,7 @@ func (d *Database) Set(prefix, key string, obj any) error {
 	return d.be.Put(bitcask.Key(fullkey), v)
 }
 
-// DelValue removes key from DB
+// Del removes key from DB
 func (d *Database) Del(prefix, key string) error {
 	fullkey := fmt.Sprintf("%s:%s", prefix, key)
 	if strings.Contains(fullkey, "/") {
@@ -71,7 +71,7 @@ func (d *Database) Del(prefix, key string) error {
 	return d.be.Delete(bitcask.Key(fullkey))
 }
 
-// ScanValue iterates over key prefixes and executing the provided function for each one
+// Scan iterates over key prefixes and executing the provided function for each one
 func (d *Database) Scan(prefix string, f func(string) error) error {
 	if strings.Contains(prefix, "/") {
 		return fmt.Errorf("DB: Scan can't use '/' in prefix: %s", prefix)

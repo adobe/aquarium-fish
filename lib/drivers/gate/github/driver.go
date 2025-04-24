@@ -104,7 +104,7 @@ func (d *Driver) Prepare(wd string, config []byte) error {
 	}
 
 	if d.cfg.EnterpriseBaseURL == "" {
-		d.githubURL = "https://github.com/"
+		d.githubURL = "https://github.com"
 	} else {
 		parsedURL, err := url.Parse(d.cfg.EnterpriseBaseURL)
 		if err != nil {

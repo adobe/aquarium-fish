@@ -89,7 +89,8 @@ func (d *Driver) checkDeliveries() (outerr error) {
 
 	// Set the checkpoint to the last delivery of the first hook
 	if !checkpointUpdate.IsZero() {
-		d.apiCheckpoint = checkpointUpdate
+		// We need to add 1 microsecond here because we comparing it to delivery as After
+		d.apiCheckpoint = checkpointUpdate.Add(1)
 		log.Debugf("GITHUB: %s: Updated deliveries checkpoint to %s", d.name, d.apiCheckpoint)
 	}
 

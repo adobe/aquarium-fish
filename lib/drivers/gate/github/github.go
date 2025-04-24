@@ -273,7 +273,7 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 	// Processing completed job
 	if err == nil && job.GetStatus() == jobCompleted {
 		// Job completed, so it's time to deallocate the worker and make sure no residue is left
-		log.Infof("GITHUB: %s: The job %s is completed as %q, deallocating the runner: %d", d.name, runJobID, job.GetConclusion(), record.RunnerID)
+		log.Infof("GITHUB: %s: The job %s is completed as %q, runner should be gone: %d", d.name, runJobID, job.GetConclusion(), record.RunnerID)
 
 		// Requesting deallocate of the Application
 		if _, err := d.db.ApplicationDeallocate(record.ApplicationUID, fmt.Sprintf("gate/%s", d.name)); err != nil {
@@ -302,7 +302,7 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 		return nil
 	}
 
-	log.Debugf("GITHUB: %s: Job %s with status %q was skipped: doesn't fit the regular workflow: %v", runJobID, job.GetStatus(), err)
+	log.Debugf("GITHUB: %s: Job %s with status %q was skipped: doesn't fit the regular workflow: %v", d.name, runJobID, job.GetStatus(), err)
 
 	return nil
 }
@@ -348,6 +348,7 @@ func (d *Driver) cleanupDB() error {
 		var hook dbWebhook
 		d.db.Get(dbPrefixHook, key, &hook)
 		if hook.CreatedAt.Before(deliveryCutTime) {
+			log.Debugf("GITHUB: %s: cleanupDB: Cleaning webhook record: %s:%s", d.name, dbPrefixHook, key)
 			d.db.Del(dbPrefixHook, key)
 			counterMutex.Lock()
 			counterRemoved += 1
@@ -370,10 +371,14 @@ func (d *Driver) cleanupDB() error {
 			switch job.Status {
 			case jobCompleted:
 				// The easiest case is with completed jobs - means the application is deallocated
-				d.db.Del(dbPrefixJob, key)
-				counterMutex.Lock()
-				counterRemoved += 1
-				counterMutex.Unlock()
+				log.Debugf("GITHUB: %s: cleanupDB: Cleaning job %s record: %s:%s", d.name, job.Status, dbPrefixJob, key)
+				if err := d.db.Del(dbPrefixJob, key); err != nil {
+					log.Errorf("GITHUB: %s: cleanupDB: Cleaning job %s record: %s:%s failed: %v", d.name, job.Status, dbPrefixJob, key, err)
+				} else {
+					counterMutex.Lock()
+					counterRemoved += 1
+					counterMutex.Unlock()
+				}
 			case jobQueued:
 				// Job can stuck in queue for a number of reasons, but it will always be updated by
 				// the monitoring to kep the gears rolling. In case it's stall - we will clean it
@@ -387,10 +392,13 @@ func (d *Driver) cleanupDB() error {
 						// Will try next time
 						return nil
 					}
-					d.db.Del(dbPrefixJob, key)
-					counterMutex.Lock()
-					counterRemoved += 1
-					counterMutex.Unlock()
+					if err := d.db.Del(dbPrefixJob, key); err != nil {
+						log.Errorf("GITHUB: %s: cleanupDB: Cleaning job %s record: %s:%s failed: %v", d.name, job.Status, dbPrefixJob, key, err)
+					} else {
+						counterMutex.Lock()
+						counterRemoved += 1
+						counterMutex.Unlock()
+					}
 				}
 			case jobInProgress:
 				// In theory those are in progress, so should be concluded by cancelling or
@@ -401,10 +409,13 @@ func (d *Driver) cleanupDB() error {
 				appRes, err := d.db.ApplicationResourceGetByApplication(job.ApplicationUID)
 				if err != nil {
 					log.Warnf("GITHUB: %s: cleanupDB: Forcefully removing stale %s job: %s, Application: %s : %v", d.name, job.Status, key, job.ApplicationUID, err)
-					d.db.Del(dbPrefixJob, key)
-					counterMutex.Lock()
-					counterRemoved += 1
-					counterMutex.Unlock()
+					if err := d.db.Del(dbPrefixJob, key); err != nil {
+						log.Errorf("GITHUB: %s: cleanupDB: Cleaning job %s record: %s:%s failed: %v", d.name, job.Status, dbPrefixJob, key, err)
+					} else {
+						counterMutex.Lock()
+						counterRemoved += 1
+						counterMutex.Unlock()
+					}
 					return nil
 				}
 
@@ -412,10 +423,13 @@ func (d *Driver) cleanupDB() error {
 				appState, err := d.db.ApplicationStateGetByApplication(job.ApplicationUID)
 				if err != nil || !d.db.ApplicationStateIsActive(appState.Status) {
 					log.Warnf("GITHUB: %s: cleanupDB: Forcefully removing stale %s job: %s, Application: %s : %v", d.name, job.Status, key, job.ApplicationUID, err)
-					d.db.Del(dbPrefixJob, key)
-					counterMutex.Lock()
-					counterRemoved += 1
-					counterMutex.Unlock()
+					if err := d.db.Del(dbPrefixJob, key); err != nil {
+						log.Errorf("GITHUB: %s: cleanupDB: Cleaning job %s record: %s:%s failed: %v", d.name, job.Status, dbPrefixJob, key, err)
+					} else {
+						counterMutex.Lock()
+						counterRemoved += 1
+						counterMutex.Unlock()
+					}
 					return nil
 				}
 
@@ -435,10 +449,13 @@ func (d *Driver) cleanupDB() error {
 						// Will try next time
 						return nil
 					}
-					d.db.Del(dbPrefixJob, key)
-					counterMutex.Lock()
-					counterRemoved += 1
-					counterMutex.Unlock()
+					if err := d.db.Del(dbPrefixJob, key); err != nil {
+						log.Errorf("GITHUB: %s: cleanupDB: Cleaning job %s record: %s:%s failed: %v", d.name, job.Status, dbPrefixJob, key, err)
+					} else {
+						counterMutex.Lock()
+						counterRemoved += 1
+						counterMutex.Unlock()
+					}
 				}
 			}
 		}
