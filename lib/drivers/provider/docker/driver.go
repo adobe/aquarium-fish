@@ -312,8 +312,8 @@ func (d *Driver) Deallocate(res *types.ApplicationResource) error {
 		d.dockerUsageMutex.Lock()
 		defer d.dockerUsageMutex.Unlock()
 	}
-	cName := d.getContainerName(res.Identifier)
-	cID := d.getAllocatedContainerID(res.Identifier)
+	cName := res.Identifier
+	cID := d.getAllocatedContainerID(cName)
 	if len(cID) == 0 {
 		return log.Errorf("DOCKER: %s: Unable to find container with identifier: %s", d.name, res.Identifier)
 	}
