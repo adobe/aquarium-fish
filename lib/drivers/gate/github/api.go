@@ -31,7 +31,17 @@ import (
 // github.com recommendations on using REST APIand repeats client creation until it's connected
 func (d *Driver) lockClient() {
 	d.clMutex.Lock()
-	// TODO: Sleep till time if limits were busted
+
+	// In case REST API requested to back off for a bit
+	for time.Now().Before(d.clDelayTill) {
+		toSleep := d.clDelayTill.Sub(time.Now())
+		log.Warnf("GITHUB: %s: REST API operations suspended for the next %s", toSleep)
+		if toSleep > 31*time.Second {
+			toSleep = 30 * time.Second
+		}
+		time.Sleep(toSleep)
+	}
+
 	var err error
 	for d.cl == nil {
 		d.cl, err = d.createClient()
@@ -77,6 +87,8 @@ func (d *Driver) createClient() (client *github.Client, err error) {
 	return client, nil
 }
 
+// apiCheckResponse makes sure response is ok
+// WARNING: the client should be already locked by the function clientLock
 func (d *Driver) apiCheckResponse(resp *github.Response, err error) error {
 	if resp != nil {
 		d.apiRateMutex.Lock()
@@ -87,14 +99,19 @@ func (d *Driver) apiCheckResponse(resp *github.Response, err error) error {
 
 	// Check errors and response to get the data off it
 	if err != nil {
-		if _, ok := err.(*github.RateLimitError); ok {
-			// TODO: Special processing to delay next API request till cutoff time
-			return log.Errorf("GITHUB: %s: Hit rate limit", d.name)
-		}
 		if _, ok := err.(*github.AbuseRateLimitError); ok {
-			// TODO: Special processing to delay next API request to reduce pressure
-			return log.Errorf("GITHUB: %s: Hit secondary rate limit", d.name)
+			// Since we hit secondary rate limit - wait a minute for the next request
+			d.clDelayTill = time.Now().Add(time.Minute)
+			log.Errorf("GITHUB: %s: Hit REST API frequency rate limit, delay next request by 1m", d.name)
 		}
+		if _, ok := err.(*github.RateLimitError); ok {
+			// Since we hit the rate limit - waiting until the next reset + 30 seconds in case time is off
+			d.clDelayTill = resp.Rate.Reset.Add(30 * time.Second)
+			log.Errorf("GITHUB: %s: Hit REST API rate limit, delay next request till next reset: %v", d.name, d.clDelayTill.Sub(time.Now()))
+		}
+
+		log.Debugf("GITHUB: %s: Resetting client: %v")
+		d.cl = nil
 		return log.Errorf("GITHUB: %s: Request: %v", d.name, err)
 	}
 
@@ -118,7 +135,6 @@ func (d *Driver) apiGetRepos() (repos []string, err error) {
 
 			d.lockClient()
 			listRepos, resp, err = d.cl.Apps.ListRepos(context.Background(), &opts)
-			d.clMutex.Unlock()
 
 			if listRepos != nil {
 				respRepos = listRepos.Repositories
@@ -127,15 +143,19 @@ func (d *Driver) apiGetRepos() (repos []string, err error) {
 			// In case Token auth is active
 			d.lockClient()
 			respRepos, resp, err = d.cl.Repositories.ListByAuthenticatedUser(context.Background(), &opts2)
-			d.clMutex.Unlock()
+		} else {
+			return repos, fmt.Errorf("No auth is set")
 		}
 
 		allRepos = append(allRepos, respRepos...)
 
-		if err = d.apiCheckResponse(resp, err); err != nil {
+		err = d.apiCheckResponse(resp, err)
+		d.clMutex.Unlock()
+		if err != nil {
 			log.Errorf("GITHUB: %s: Receiving repos list: %v", d.name, err)
 			break
 		}
+
 		opts.Page = resp.NextPage
 		opts2.Page = resp.NextPage
 
@@ -174,8 +194,9 @@ func (d *Driver) apiGetHooks(owner, repo string) (hooks []*github.Hook, err erro
 	for {
 		d.lockClient()
 		respHooks, resp, respErr := d.cl.Repositories.ListHooks(context.Background(), owner, repo, &opts)
+		err = d.apiCheckResponse(resp, respErr)
 		d.clMutex.Unlock()
-		if err = d.apiCheckResponse(resp, respErr); err != nil {
+		if err != nil {
 			break
 		}
 
@@ -207,8 +228,9 @@ func (d *Driver) apiGetDeliveriesList(owner, repo string, hook int64) (deliverie
 	for {
 		d.lockClient()
 		respDeliveries, resp, respErr := d.cl.Repositories.ListHookDeliveries(context.Background(), owner, repo, hook, &opts)
+		err = d.apiCheckResponse(resp, respErr)
 		d.clMutex.Unlock()
-		if err = d.apiCheckResponse(resp, respErr); err != nil {
+		if err != nil {
 			break
 		}
 
@@ -245,8 +267,9 @@ func (d *Driver) apiGetDeliveriesList(owner, repo string, hook int64) (deliverie
 func (d *Driver) apiGetFullDelivery(owner, repo string, hook int64, delivery int64) (*github.HookDelivery, error) {
 	d.lockClient()
 	respDelivery, resp, err := d.cl.Repositories.GetHookDelivery(context.Background(), owner, repo, hook, delivery)
+	err = d.apiCheckResponse(resp, err)
 	d.clMutex.Unlock()
-	if err = d.apiCheckResponse(resp, err); err != nil {
+	if err != nil {
 		return nil, err
 	}
 
@@ -257,29 +280,11 @@ func (d *Driver) apiGetFullDelivery(owner, repo string, hook int64, delivery int
 func (d *Driver) apiCreateRunnerToken(owner, repo string) (*github.RegistrationToken, error) {
 	d.lockClient()
 	respRegToken, resp, err := d.cl.Actions.CreateRegistrationToken(context.Background(), owner, repo)
+	err = d.apiCheckResponse(resp, err)
 	d.clMutex.Unlock()
-	if err = d.apiCheckResponse(resp, err); err != nil {
+	if err != nil {
 		return nil, err
 	}
 
 	return respRegToken, nil
 }
-
-// Will return the actual body of the delivery
-/*func (d *Driver) apiCreateRunner(owner, repo string, labels []string) (*github.JITRunnerConfig, error) {
-	d.lockClient()
-	req := github.GenerateJITConfigRequest{
-		Name:   fmt.Sprintf("fish-%s", crypt.RandString(8)),
-		Labels: labels,
-
-		RunnerGroupID: 1,
-		WorkFolder:    github.Ptr("."),
-	}
-	respRunnerCfg, resp, err := d.cl.Actions.GenerateRepoJITConfig(context.Background(), owner, repo, &req)
-	d.clMutex.Unlock()
-	if err = d.apiCheckResponse(resp, err); err != nil {
-		return nil, err
-	}
-
-	return respRunnerCfg, nil
-}*/

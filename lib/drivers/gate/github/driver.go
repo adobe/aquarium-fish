@@ -71,8 +71,9 @@ type Driver struct {
 	tr http.RoundTripper
 
 	// Client requests need to be serial, without it it's relatively easy to hit secondary limits
-	cl      *github.Client
-	clMutex sync.Mutex
+	cl          *github.Client
+	clDelayTill time.Time
+	clMutex     sync.Mutex
 
 	// This mutex is needed to prevent simultaneous processing of received webhook & API delivery
 	webhooksMutex sync.Mutex

@@ -472,24 +472,9 @@ func (d *Driver) init() error {
 	// Starting webhook listener first to quickly recover after restart
 	if d.cfg.isWebhookEnabled() {
 		// TODO: Listen for webhook
+		// It's easy to do - just listen for post requests on BindAddress from config and send to
+		// existing procesing function d.extractJob and then to d.executeJob
 	}
-
-	// TEMP: Remove runners from repo
-	/*d.lockClient()
-	resp, err := d.cl.Actions.RemoveRunner(context.Background(), "Photoshop-Adobe", "tmp-workflow", 23)
-	d.clMutex.Unlock()
-	if err = d.apiCheckResponse(resp, err); err != nil {
-		return err
-	}
-	d.lockClient()
-	resp, err = d.cl.Actions.RemoveRunner(context.Background(), "Photoshop-Adobe", "tmp-workflow", 24)
-	d.clMutex.Unlock()
-	if err = d.apiCheckResponse(resp, err); err != nil {
-		return err
-	}
-	if d.cfg.isAPIEnabled() {
-		return nil
-	}*/
 
 	// Now running relatively slow API repo updater to ensure the creds are working correctly
 	if d.cfg.isAPIEnabled() {
