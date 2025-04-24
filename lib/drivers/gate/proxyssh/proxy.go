@@ -407,7 +407,7 @@ func (d *Driver) proxyInit(keyPath string) (string, error) {
 		}
 	}()
 
-	log.Infof("PROXYSSH listening on: %s", d.name, listener.Addr())
+	log.Infof("PROXYSSH listening on: %s", listener.Addr())
 
 	return listener.Addr().String(), nil
 }
