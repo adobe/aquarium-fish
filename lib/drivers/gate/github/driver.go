@@ -130,7 +130,9 @@ func (d *Driver) Prepare(wd string, config []byte) error {
 
 // Shutdown gracefully stops the gate
 func (d *Driver) Shutdown() error {
-	d.runningCancel()
+	if d.runningCancel != nil {
+		d.runningCancel()
+	}
 	d.routines.Wait()
 	return nil
 }

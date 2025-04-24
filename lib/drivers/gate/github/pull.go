@@ -71,7 +71,7 @@ func (d *Driver) checkDeliveries() (outerr error) {
 			outerr = log.Errorf("GITHUB: %s: Repo %q hook %d deliveries list request: %v", d.name, repoName, hook.GetID(), err)
 		}
 		if len(deliveries) == 0 {
-			log.Warnf("GITHUB: %s: Repo %q hook %d deliveries list is empty: %d", d.name, repoName, hook.GetID(), len(deliveries))
+			log.Debugf("GITHUB: %s: Repo %q hook %d no new deliveries found", d.name, repoName, hook.GetID())
 			continue
 		}
 

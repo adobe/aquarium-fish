@@ -110,7 +110,7 @@ func (d *Driver) apiCheckResponse(resp *github.Response, err error) error {
 			log.Errorf("GITHUB: %s: Hit REST API rate limit, delay next request till next reset: %v", d.name, d.clDelayTill.Sub(time.Now()))
 		}
 
-		log.Debugf("GITHUB: %s: Resetting client: %v")
+		log.Debugf("GITHUB: %s: Resetting client", d.name)
 		d.cl = nil
 		return log.Errorf("GITHUB: %s: Request: %v", d.name, err)
 	}
