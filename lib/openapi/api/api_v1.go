@@ -363,6 +363,9 @@ func (e *Processor) ApplicationResourceGet(c echo.Context, uid types.Application
 		return fmt.Errorf("ApplictionResource not found: %w", err)
 	}
 
+	// TODO: Implement better way to ignore new fields in java jenkins side of things
+	out.Timeout = nil
+
 	return c.JSON(http.StatusOK, out)
 }
 

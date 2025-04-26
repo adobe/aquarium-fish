@@ -802,7 +802,8 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 					}
 				}
 
-				res.Timeout = res.CreatedAt.Add(resourceLifetime)
+				timeout := time.Now().Add(resourceLifetime)
+				res.Timeout = &timeout
 
 				if err = f.db.ApplicationResourceCreate(res); err != nil {
 					log.Error("Fish: Unable to store Resource for Application:", app.UID, err)
@@ -816,7 +817,7 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 		}
 
 		if appState.Status == types.ApplicationStatusALLOCATED {
-			if !res.Timeout.IsZero() {
+			if res.Timeout != nil && !res.Timeout.IsZero() {
 				log.Infof("Fish: Resource of Application %s will be deallocated by timeout at %s", app.UID, res.Timeout)
 			} else {
 				log.Warn("Fish: Resource have no lifetime set and will live until deallocated by user:", app.UID)
@@ -839,7 +840,7 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 				}
 
 				// Check if it's life timeout for the resource
-				if !res.Timeout.IsZero() {
+				if res.Timeout != nil && !res.Timeout.IsZero() {
 					// The time limit is set - so let's use resource create time and find out timeout
 					if res.Timeout.Before(time.Now()) {
 						// Seems the timeout has come, so fish asks for application deallocate

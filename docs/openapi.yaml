@@ -1408,7 +1408,6 @@ components:
         - ip_addr
         - hw_addr
         - metadata
-        - timeout
       properties:
         UID:
           $ref: '#/components/schemas/ApplicationResourceUID'
