@@ -35,6 +35,7 @@ type Config struct {
 	// Optional
 	AccountIDs   []string          `json:"account_ids"`   // AWS Trusted account IDs to filter vpc, subnet, sg, images, snapshots...
 	InstanceTags map[string]string `json:"instance_tags"` // AWS Instance tags to use when this node provision them
+	InstanceKey  string            `json:"instance_key"`  // AWS Instance Key Pair name to use while creating of the instance
 
 	// Manage the AWS dedicated hosts to keep them busy and deallocate when not needed
 	// Key of the map is name of the pool - will be used for identification of the pool

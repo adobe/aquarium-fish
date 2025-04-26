@@ -336,6 +336,11 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 		MaxCount: aws.Int32(1),
 	}
 
+	if d.cfg.InstanceKey != "" {
+		input.KeyName = aws.String(d.cfg.InstanceKey)
+		log.Debugf("AWS: %s: Using keypair: %q", iName, d.cfg.InstanceKey)
+	}
+
 	var netZone string
 	if opts.Pool != "" {
 		// Let's reserve or allocate the host for the new instance
