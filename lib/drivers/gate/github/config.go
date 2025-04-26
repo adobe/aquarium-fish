@@ -38,8 +38,12 @@ type Config struct {
 
 	APIPerPage int `json:"api_per_page"` // In case you want to save rate limit on lists, default: 100
 
-	APIUpdateHooksInterval util.Duration `json:"api_update_hooks_interval"` // Interval between hooks updates, default: 1h
-	APIMinCheckInterval    util.Duration `json:"api_min_check_interval"`    // Minimal interval in between deliveries checks, default: 30s
+	// Interval between hooks updates (set to -1 if don't want it to run periodically), default: 1h
+	APIUpdateHooksInterval util.Duration `json:"api_update_hooks_interval"`
+	// Interval between cleanups of runners (set to -1 if don't want to run it periodically), default: 1h
+	APICleanupRunnersInterval util.Duration `json:"api_cleanup_runners_interval"`
+	// Minimal interval in between deliveries checks, default: 30s
+	APIMinCheckInterval util.Duration `json:"api_min_check_interval"`
 
 	// Common configs
 	// Filter contains pattern of the repos full name "org/repo" (accepts path.Match patterns)
@@ -74,8 +78,11 @@ func (c *Config) Apply(config []byte) error {
 		c.APIPerPage = 100
 	}
 
-	if c.APIUpdateHooksInterval <= 0 {
+	if c.APIUpdateHooksInterval == 0 {
 		c.APIUpdateHooksInterval = util.Duration(time.Hour)
+	}
+	if c.APICleanupRunnersInterval == 0 {
+		c.APICleanupRunnersInterval = util.Duration(time.Hour)
 	}
 	if c.APIMinCheckInterval <= 0 {
 		c.APIMinCheckInterval = util.Duration(30 * time.Second)

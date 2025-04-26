@@ -16,7 +16,6 @@ package github
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"net/url"
 	"sync"
 	"time"
@@ -67,9 +66,6 @@ type Driver struct {
 	hooks      []*github.Hook
 	hooksMutex sync.RWMutex
 
-	// Needed for GitHub App auth to share TCP connections
-	tr http.RoundTripper
-
 	// Client requests need to be serial, without it it's relatively easy to hit secondary limits
 	cl          *github.Client
 	clDelayTill time.Time
@@ -83,6 +79,9 @@ type Driver struct {
 	runningCancel context.CancelFunc
 	routines      sync.WaitGroup
 	routinesMutex sync.Mutex
+
+	// Storing bad (disconnected) runners to clean up
+	runnersNaughtyList []string
 }
 
 // Name returns name of the gate
@@ -120,9 +119,6 @@ func (d *Driver) Prepare(wd string, config []byte) error {
 
 	// Set checkpoint to reasonable time, othwerise it's doomed to process all the deliveries
 	d.apiCheckpoint = time.Now().Add(-time.Duration(d.cfg.DeliveryValidInterval))
-
-	// Init common shared transport
-	d.tr = http.DefaultTransport
 
 	d.running, d.runningCancel = context.WithCancel(context.Background())
 	return d.init()

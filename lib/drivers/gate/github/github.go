@@ -307,7 +307,7 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 	return nil
 }
 
-// cleanupProcess makes sure github data in DB stays not for long - but just for the time needed
+// cleanupDBProcess makes sure github data in DB stays not for long - but just for the time needed
 // It's a separated process to keep it for both webhooks & API.
 func (d *Driver) cleanupDBProcess() {
 	d.routinesMutex.Lock()
@@ -434,7 +434,10 @@ func (d *Driver) cleanupDB() error {
 				}
 
 				// The app seems allocated - but maybe it's time to cut the losses
-				appTimeout := appRes.Timeout
+				var appTimeout time.Time
+				if appRes.Timeout != nil {
+					appTimeout = *appRes.Timeout
+				}
 				if appTimeout.IsZero() {
 					// Seems resource have no timeout - so using default as last resort
 					appTimeout = appRes.CreatedAt.Add(time.Duration(d.cfg.DefaultJobMaxLifetime))
@@ -487,6 +490,11 @@ func (d *Driver) init() error {
 		// Receiving hooks from github - checking if the API connectivity works correctly
 		if err = d.updateHooks(); err != nil {
 			return log.Errorf("GITHUB: %s: Failed to update the repositories list: %v", d.name, err)
+		}
+
+		// Checking for the stale runners
+		if err := d.cleanupRunners(); err != nil {
+			return log.Errorf("GITHUB: %s: Failed to check stale runners: %v", d.name, err)
 		}
 
 		// Checking if there is new deliveries

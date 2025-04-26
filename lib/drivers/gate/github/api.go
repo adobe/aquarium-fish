@@ -15,10 +15,12 @@ package github
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"path"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
@@ -54,10 +56,26 @@ func (d *Driver) lockClient() {
 
 // createClient returns a client based on the provided gate configuration
 func (d *Driver) createClient() (client *github.Client, err error) {
+	log.Debugf("GITHUB: %s: Creating new client", d.name)
 	// App auth in priority as superior to token one
 	if d.cfg.isAppAuth() {
+		// Creating our own transport to recover on failure - DefaultTransport is quite hard to
+		// reset if the things goes sideways (like 403 due to connection error).
+		dialer := &net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}
+		tr := http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			DialContext:           dialer.DialContext,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		}
 		// Using GitHub App auth
-		itr, err := ghinstallation.New(d.tr, d.cfg.APIAppID, d.cfg.APIAppInstallID, []byte(d.cfg.APIAppKey))
+		itr, err := ghinstallation.New(&tr, d.cfg.APIAppID, d.cfg.APIAppInstallID, []byte(d.cfg.APIAppKey))
 		if err != nil {
 			return nil, err
 		}
@@ -287,4 +305,48 @@ func (d *Driver) apiCreateRunnerToken(owner, repo string) (*github.RegistrationT
 	}
 
 	return respRegToken, nil
+}
+
+// apiGetFishEphemeralRunnersList returns only fish and ephemeral runners attached to repository
+func (d *Driver) apiGetFishEphemeralRunnersList(owner, repo string) (runners []*github.Runner, err error) {
+	opts := github.ListRunnersOptions{
+		ListOptions: github.ListOptions{PerPage: d.cfg.APIPerPage},
+	}
+
+	for {
+		d.lockClient()
+		respRunners, resp, respErr := d.cl.Actions.ListRunners(context.Background(), owner, repo, &opts)
+		err = d.apiCheckResponse(resp, respErr)
+		d.clMutex.Unlock()
+		if err != nil || respRunners == nil {
+			break
+		}
+
+		for _, runner := range respRunners.Runners {
+			// We need only fish ephemeral (TODO: when api will support) nodes
+			if strings.HasPrefix(runner.GetName(), "fish-") /*&& runner.GetEphemeral()*/ {
+				runners = append(runners, runner)
+			}
+		}
+
+		opts.Page = resp.NextPage
+		if resp.NextPage == 0 {
+			break
+		}
+	}
+
+	return runners, err
+}
+
+// apiRemoveRunner removes runner from repository
+func (d *Driver) apiRemoveRunner(owner, repo string, runnerID int64) (err error) {
+	d.lockClient()
+	resp, respErr := d.cl.Actions.RemoveRunner(context.Background(), owner, repo, runnerID)
+	err = d.apiCheckResponse(resp, respErr)
+	d.clMutex.Unlock()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

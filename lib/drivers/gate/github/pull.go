@@ -194,8 +194,11 @@ func (d *Driver) updateHooks() error {
 			return log.Errorf("GITHUB: %s: Repo %q hooks request: %v", d.name, repoName, err)
 		}
 
+		// We need to have just one webhook per repo - all the other hooks will be skipped
 		for _, hook := range hooks {
+			log.Debugf("GITHUB: %s: Using only one first hook for repo %q: %d", d.name, repoName, hook.GetID())
 			updatedHooks = append(updatedHooks, hook)
+			break
 		}
 	}
 
@@ -239,6 +242,89 @@ func (d *Driver) updateHooks() error {
 	return nil
 }
 
+// cleanupRunners is called to make sure there is no stale not connected runners records in github
+// It's actually needed, because it's up to the image to register as runner, so alot could go wrong
+// with that (like restart of service) and we need to identify such issues as soon as possible.
+// Principle - it gets the list of fish runners and stores the offline ephemeral ones till the next
+// run. Then next time it checks if the same runners are offline and removes them.
+func (d *Driver) cleanupRunners() (outerr error) {
+	d.hooksMutex.RLock()
+	defer d.hooksMutex.RUnlock()
+
+	log.Debugf("GITHUB: %s: Cleanup runners...", d.name)
+	defer log.Debugf("GITHUB: %s: Cleanup runners done", d.name)
+
+	var foundRunners []string
+	for _, hook := range d.hooks {
+		log.Debugf("GITHUB: %s: cleanupRunners: Processing hook %s", d.name, hook.GetURL())
+		// Getting repo name from the webhook URL
+		spl := strings.Split(hook.GetURL(), "/")
+		if len(spl) < 8 {
+			outerr = log.Errorf("GITHUB: %s: cleanupRunners: Not enough parameters in webhook URL: %s", d.name, hook.GetURL())
+			continue
+		}
+		owner := spl[len(spl)-4]
+		repo := spl[len(spl)-3]
+		repoName := fmt.Sprintf("%s/%s", owner, repo)
+
+		runners, err := d.apiGetFishEphemeralRunnersList(owner, repo)
+		if err != nil {
+			outerr = log.Errorf("GITHUB: %s: Repo %q runners list request: %v", d.name, repoName, err)
+		}
+		if len(runners) == 0 {
+			log.Debugf("GITHUB: %s: cleanupRunners: No fish runners in repo %q", d.name, repoName)
+			continue
+		}
+
+		for _, runner := range runners {
+			// Skipping all non-offline runners
+			if runner.GetStatus() != "offline" {
+				continue
+			}
+
+			// Checking if the runner is in the naughty list
+			// Using unique name & ID, becouse just ID can be reused
+			runnerID := fmt.Sprintf("%s/%s/runner/%s ID:%d", owner, repo, runner.GetName(), runner.GetID())
+			found := -1
+			for index, id := range d.runnersNaughtyList {
+				if id != runnerID {
+					continue
+				}
+
+				found = index
+				break
+			}
+			if found < 0 {
+				// Since not found in the naughty list - adding there, so will be checked next time
+				log.Debugf("GITHUB: %s: cleanupRunners: Found offline fish node, adding to list: %q", d.name, runnerID)
+				foundRunners = append(foundRunners, runnerID)
+				continue
+			}
+
+			var labels []string
+			for _, lbl := range runner.Labels {
+				labels = append(labels, lbl.GetName())
+			}
+			log.Warnf("GITHUB: %s: cleanupRunners: Removing runner: %q, please check what's wrong with the used image: %s", d.name, runnerID, strings.Join(labels, ", "))
+
+			// Attempting removing of the runner
+			if err := d.apiRemoveRunner(owner, repo, runner.GetID()); err != nil {
+				// Ok will try the next time
+				foundRunners = append(foundRunners, runnerID)
+				outerr = log.Errorf("GITHUB: %s: cleanupRunners: Unable to remove runner %q", d.name, runnerID)
+				continue
+			}
+
+			// Removing runner from naughty list
+			d.runnersNaughtyList = append(d.runnersNaughtyList[:found], d.runnersNaughtyList[found+1:]...)
+		}
+	}
+
+	d.runnersNaughtyList = foundRunners
+
+	return outerr
+}
+
 // pullBackgroundProcess starts in background if API Pull is enabled to run tasks periodically
 func (d *Driver) pullBackgroundProcess() {
 	d.routinesMutex.Lock()
@@ -248,9 +334,20 @@ func (d *Driver) pullBackgroundProcess() {
 	defer log.Infof("GITHUB: %s: backgroundProcess stopped", d.name)
 
 	interval := time.Duration(d.cfg.APIUpdateHooksInterval)
-	updateHooksTicker := time.NewTicker(interval)
-	defer updateHooksTicker.Stop()
-	log.Infof("GITHUB: %s: backgroundProcess: Triggering updateHooks once per %s", d.name, interval)
+	var updateHooksTicker *time.Ticker
+	if interval > 0 {
+		updateHooksTicker = time.NewTicker(interval)
+		defer updateHooksTicker.Stop()
+		log.Infof("GITHUB: %s: backgroundProcess: Triggering updateHooks once per %s", d.name, interval)
+	}
+
+	interval = time.Duration(d.cfg.APICleanupRunnersInterval)
+	var cleanupRunnersTicker *time.Ticker
+	if interval > 0 {
+		cleanupRunnersTicker = time.NewTicker(interval)
+		defer cleanupRunnersTicker.Stop()
+		log.Infof("GITHUB: %s: backgroundProcess: Triggering cleanupRunners once per %s", d.name, interval)
+	}
 
 	interval = time.Duration(time.Duration(d.cfg.APIMinCheckInterval))
 	checkDeliveriesTicker := time.NewTicker(interval)
@@ -267,6 +364,8 @@ func (d *Driver) pullBackgroundProcess() {
 			d.checkDeliveries()
 			// TODO: recalculate the interval of checkDeliveriesTicker according to measured Rate
 			// TODO: Make sure the new update time is less then d.cfg.DeliveryValidInterval
+		case <-cleanupRunnersTicker.C:
+			d.cleanupRunners()
 		}
 	}
 }
