@@ -17,8 +17,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/adobe/aquarium-fish/lib/util"
 	"github.com/ghodss/yaml"
+
+	"github.com/adobe/aquarium-fish/lib/drivers"
+	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 const DefaultDBCleanupDelay = 10 * time.Minute
@@ -27,13 +29,11 @@ const DefaultDBCleanupDelay = 10 * time.Minute
 type Config struct {
 	Directory string `json:"directory"` // Where to store database and other useful data (if relative - to CWD)
 
-	APIAddress        string         `json:"api_address"`         // Where to serve Web UI, API & Meta API
-	ProxySocksAddress string         `json:"proxy_socks_address"` // Where to serve SOCKS5 proxy for the allocated resources
-	ProxySSHAddress   string         `json:"proxy_ssh_address"`   // Where to serve SSH proxy for the allocated resources
-	NodeAddress       string         `json:"node_address"`        // What is the external address of the node
-	CPULimit          uint16         `json:"cpu_limit"`           // How many CPU threads Node allowed to use (serve API, ...)
-	MemTarget         util.HumanSize `json:"mem_target"`          // What's the target memory utilization by the Node (GC target where it becomes more aggressive)
-	ClusterJoin       []string       `json:"cluster_join"`        // The node addresses to join the cluster
+	APIAddress  string         `json:"api_address"`  // Where to serve Web UI, API & Meta API
+	NodeAddress string         `json:"node_address"` // What is the external address of the node
+	CPULimit    uint16         `json:"cpu_limit"`    // How many CPU threads Node allowed to use (serve API, ...)
+	MemTarget   util.HumanSize `json:"mem_target"`   // What's the target memory utilization by the Node (GC target where it becomes more aggressive)
+	ClusterJoin []string       `json:"cluster_join"` // The node addresses to join the cluster
 
 	TLSKey   string `json:"tls_key"`    // TLS PEM private key (if relative - to directory)
 	TLSCrt   string `json:"tls_crt"`    // TLS PEM public certificate (if relative - to directory)
@@ -44,24 +44,16 @@ type Config struct {
 	NodeIdentifiers []string `json:"node_identifiers"` // The list of node identifiers which could be used to find the right Node for Resource
 	NodeSlotsLimit  uint     `json:"node_slots_limit"` // Limits the amount of Applications to be executed simultaneously on the node
 
-	NodeSSHKey string `json:"ssh_key"` // The SSH RSA identity private key for the fish node (if relative - to directory)
-
 	DefaultResourceLifetime string `json:"default_resource_lifetime"` // Sets the lifetime of the resource which will be used if label definition one is not set
 
 	DBCleanupDelay string `json:"db_cleanup_delay"` // Defines the database item cleanup delay when Applciation reached the end of life (by error or deallocated)
 
 	DisableAuth bool `json:"disable_auth"` // WARNING! For performance testing only
 
-	// Configuration for the node drivers, if defined - only the listed plugins will be loaded
+	// Configuration for the node drivers, if defined - only the listed ones will be available.
 	// Each configuration could instantinate the same driver multiple times by adding instance name
 	// separated from driver by slash symbol (like "<driver>/prod" - will create "prod" instance).
-	Drivers []ConfigDriver `json:"drivers"`
-}
-
-// ConfigDriver helper to store driver config without parsing it right away
-type ConfigDriver struct {
-	Name string            `json:"name"`
-	Cfg  util.UnparsedJSON `json:"cfg"`
+	Drivers drivers.ConfigDrivers `json:"drivers"`
 }
 
 // ReadConfigFile needed to read the config file
@@ -87,10 +79,6 @@ func (c *Config) ReadConfigFile(cfgPath string) error {
 		c.TLSCrt = c.NodeName + ".crt"
 	}
 
-	if c.NodeSSHKey == "" {
-		c.NodeSSHKey = c.NodeName + "_id_ecdsa"
-	}
-
 	_, err := time.ParseDuration(c.DefaultResourceLifetime)
 	if c.DefaultResourceLifetime != "" && err != nil {
 		return fmt.Errorf("Fish: Default Resource Lifetime parse error: %v", err)
@@ -106,8 +94,6 @@ func (c *Config) ReadConfigFile(cfgPath string) error {
 func (c *Config) initDefaults() {
 	c.Directory = "fish_data"
 	c.APIAddress = "0.0.0.0:8001"
-	c.ProxySocksAddress = "0.0.0.0:1080"
-	c.ProxySSHAddress = "0.0.0.0:2022"
 	c.NodeAddress = "127.0.0.1:8001"
 	c.TLSKey = "" // Will be set after read config file from NodeName
 	c.TLSCrt = "" // ...

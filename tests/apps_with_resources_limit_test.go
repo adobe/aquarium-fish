@@ -36,11 +36,11 @@ func Test_three_apps_with_limit(t *testing.T) {
 node_location: test_loc
 
 api_address: 127.0.0.1:0
-proxy_ssh_address: 127.0.0.1:0
 
 drivers:
-  - name: test
-    cfg:
+  gates:
+  providers:
+    test:
       cpu_limit: 4
       ram_limit: 8`)
 
@@ -209,15 +209,16 @@ node_location: test_loc
 node_slots_limit: 1
 
 api_address: 127.0.0.1:0
-proxy_ssh_address: 127.0.0.1:0
 
 drivers:
-  - name: test
-    cfg:
+  gates:
+  providers:
+    test:
       cpu_limit: 999
       ram_limit: 999
-  - name: test/another
-    cfg:
+  gates:
+  providers:
+    test/another:
       cpu_limit: 999
       ram_limit: 999`)
 

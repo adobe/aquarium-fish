@@ -60,12 +60,12 @@ func (e *Processor) BasicAuth(username, password string, c echo.Context) (bool, 
 	if e.fish.GetCfg().DisableAuth {
 		// This logic executed during performance tests only
 		var err error
-		user, err = e.fish.UserGet(username)
+		user, err = e.fish.DB().UserGet(username)
 		if err != nil {
 			return false, err
 		}
 	} else {
-		user = e.fish.UserAuth(username, password)
+		user = e.fish.DB().UserAuth(username, password)
 	}
 
 	// Clean Auth header and set the user
@@ -101,7 +101,7 @@ func (e *Processor) UserListGet(c echo.Context) error {
 		return fmt.Errorf("Only 'admin' user can list users")
 	}
 
-	out, err := e.fish.UserList()
+	out, err := e.fish.DB().UserList()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the user list: %v", err)})
 		return fmt.Errorf("Unable to get the user list: %w", err)
@@ -122,7 +122,7 @@ func (e *Processor) UserGet(c echo.Context, name string) error {
 		return fmt.Errorf("Only 'admin' user can get user")
 	}
 
-	out, err := e.fish.UserGet(name)
+	out, err := e.fish.DB().UserGet(name)
 	if err != nil {
 		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("User not found: %v", err)})
 		return fmt.Errorf("User not found: %w", err)
@@ -155,14 +155,14 @@ func (e *Processor) UserCreateUpdatePost(c echo.Context) error {
 		password = crypt.RandString(64)
 	}
 
-	modUser, err := e.fish.UserGet(data.Name)
+	modUser, err := e.fish.DB().UserGet(data.Name)
 	if err == nil {
 		// Updating existing user
 		modUser.Hash = crypt.NewHash(password, nil)
-		e.fish.UserSave(modUser)
+		e.fish.DB().UserSave(modUser)
 	} else {
 		// Creating new user
-		password, modUser, err = e.fish.UserNew(data.Name, password)
+		password, modUser, err = e.fish.DB().UserNew(data.Name, password)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to create user: %v", err)})
 			return fmt.Errorf("Unable to create user: %w", err)
@@ -194,7 +194,7 @@ func (e *Processor) UserDelete(c echo.Context, name string) error {
 		return fmt.Errorf("Only 'admin' user can delete user")
 	}
 
-	if err := e.fish.UserDelete(name); err != nil {
+	if err := e.fish.DB().UserDelete(name); err != nil {
 		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("User delete failed with error: %v", err)})
 		return fmt.Errorf("User delete failed with error: %w", err)
 	}
@@ -210,14 +210,14 @@ func (e *Processor) ApplicationResourceAccessPut(c echo.Context, uid types.Appli
 		return fmt.Errorf("Not authentified")
 	}
 
-	res, err := e.fish.ApplicationResourceGet(uid)
+	res, err := e.fish.DB().ApplicationResourceGet(uid)
 	if err != nil {
 		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("ApplicationResource not found: %v", err)})
 		return fmt.Errorf("ApplicationResource not found: %w", err)
 	}
 
 	// Only the owner and admin can create access for ApplicationResource
-	app, err := e.fish.ApplicationGet(res.ApplicationUID)
+	app, err := e.fish.DB().ApplicationGet(res.ApplicationUID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", res.ApplicationUID)})
 		return fmt.Errorf("Unable to find the Application: %s, %w", res.ApplicationUID, err)
@@ -246,14 +246,14 @@ func (e *Processor) ApplicationResourceAccessPut(c echo.Context, uid types.Appli
 		// Storing address of the proxy to give the user idea of where to connect to.
 		// Later when cluster will be here - it could contain a different node IP instead, because
 		// this particular one could not be able to serve the connection.
-		Address:  e.fish.GetCfg().ProxySSHAddress,
+		Address:  "TODO", //e.fish.GetCfg().ProxySSHAddress,
 		Username: user.Name,
 		// We should not store clear password, so convert it to salted hash
 		Password: fmt.Sprintf("%x", pwdHash),
 		// Key need to be stored as public key
 		Key: string(pubkey),
 	}
-	e.fish.ApplicationResourceAccessCreate(&rAccess)
+	e.fish.DB().ApplicationResourceAccessCreate(&rAccess)
 
 	// Now database has had the hashed credentials stored, we store the original
 	// values to return so user have access to the actual credentials.
@@ -265,7 +265,7 @@ func (e *Processor) ApplicationResourceAccessPut(c echo.Context, uid types.Appli
 
 // ApplicationListGet API call processor
 func (e *Processor) ApplicationListGet(c echo.Context) error {
-	out, err := e.fish.ApplicationList()
+	out, err := e.fish.DB().ApplicationList()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the application list: %v", err)})
 		return fmt.Errorf("Unable to get the application list: %w", err)
@@ -292,7 +292,7 @@ func (e *Processor) ApplicationListGet(c echo.Context) error {
 
 // ApplicationGet API call processor
 func (e *Processor) ApplicationGet(c echo.Context, uid types.ApplicationUID) error {
-	app, err := e.fish.ApplicationGet(uid)
+	app, err := e.fish.DB().ApplicationGet(uid)
 	if err != nil {
 		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Application not found: %v", err)})
 		return fmt.Errorf("Application not found: %w", err)
@@ -328,7 +328,7 @@ func (e *Processor) ApplicationCreatePost(c echo.Context) error {
 	}
 	data.OwnerName = user.Name
 
-	if err := e.fish.ApplicationCreate(&data); err != nil {
+	if err := e.fish.DB().ApplicationCreate(&data); err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to create application: %v", err)})
 		return fmt.Errorf("Unable to create application: %w", err)
 	}
@@ -340,7 +340,7 @@ func (e *Processor) ApplicationCreatePost(c echo.Context) error {
 
 // ApplicationResourceGet API call processor
 func (e *Processor) ApplicationResourceGet(c echo.Context, uid types.ApplicationUID) error {
-	app, err := e.fish.ApplicationGet(uid)
+	app, err := e.fish.DB().ApplicationGet(uid)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", uid)})
 		return fmt.Errorf("Unable to find the Application: %s, %w", uid, err)
@@ -357,7 +357,7 @@ func (e *Processor) ApplicationResourceGet(c echo.Context, uid types.Application
 		return fmt.Errorf("Only the owner and admin can request the Application resource")
 	}
 
-	out, err := e.fish.ApplicationResourceGetByApplication(uid)
+	out, err := e.fish.DB().ApplicationResourceGetByApplication(uid)
 	if err != nil {
 		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("ApplicationResource not found: %v", err)})
 		return fmt.Errorf("ApplictionResource not found: %w", err)
@@ -368,7 +368,7 @@ func (e *Processor) ApplicationResourceGet(c echo.Context, uid types.Application
 
 // ApplicationStateGet API call processor
 func (e *Processor) ApplicationStateGet(c echo.Context, uid types.ApplicationUID) error {
-	app, err := e.fish.ApplicationGet(uid)
+	app, err := e.fish.DB().ApplicationGet(uid)
 	if err != nil {
 		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Unable to find the Application: %s", uid)})
 		return fmt.Errorf("Unable to find the Application: %s, %w", uid, err)
@@ -385,7 +385,7 @@ func (e *Processor) ApplicationStateGet(c echo.Context, uid types.ApplicationUID
 		return fmt.Errorf("Only the owner and admin can request the Application status")
 	}
 
-	out, err := e.fish.ApplicationStateGetByApplication(uid)
+	out, err := e.fish.DB().ApplicationStateGetByApplication(uid)
 	if err != nil {
 		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Application status not found: %v", err)})
 		return fmt.Errorf("Application status not found: %w", err)
@@ -396,7 +396,7 @@ func (e *Processor) ApplicationStateGet(c echo.Context, uid types.ApplicationUID
 
 // ApplicationTaskListGet API call processor
 func (e *Processor) ApplicationTaskListGet(c echo.Context, appUID types.ApplicationUID) error {
-	app, err := e.fish.ApplicationGet(appUID)
+	app, err := e.fish.DB().ApplicationGet(appUID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", appUID)})
 		return fmt.Errorf("Unable to find the Application: %s, %w", appUID, err)
@@ -413,7 +413,7 @@ func (e *Processor) ApplicationTaskListGet(c echo.Context, appUID types.Applicat
 		return fmt.Errorf("Only the owner of Application & admin can get the Application Tasks")
 	}
 
-	out, err := e.fish.ApplicationTaskListByApplication(appUID)
+	out, err := e.fish.DB().ApplicationTaskListByApplication(appUID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the Application Tasks list: %v", err)})
 		return fmt.Errorf("Unable to get the Application Tasks list: %w", err)
@@ -424,7 +424,7 @@ func (e *Processor) ApplicationTaskListGet(c echo.Context, appUID types.Applicat
 
 // ApplicationTaskCreatePost API call processor
 func (e *Processor) ApplicationTaskCreatePost(c echo.Context, appUID types.ApplicationUID) error {
-	app, err := e.fish.ApplicationGet(appUID)
+	app, err := e.fish.DB().ApplicationGet(appUID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", appUID)})
 		return fmt.Errorf("Unable to find the Application: %s, %w", appUID, err)
@@ -450,7 +450,7 @@ func (e *Processor) ApplicationTaskCreatePost(c echo.Context, appUID types.Appli
 	// Set Application UID for the task forcefully to not allow creating tasks for the other Apps
 	data.ApplicationUID = appUID
 
-	if err := e.fish.ApplicationTaskCreate(&data); err != nil {
+	if err := e.fish.DB().ApplicationTaskCreate(&data); err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to create ApplicationTask: %v", err)})
 		return fmt.Errorf("Unable to create ApplicationTask: %w", err)
 	}
@@ -460,13 +460,13 @@ func (e *Processor) ApplicationTaskCreatePost(c echo.Context, appUID types.Appli
 
 // ApplicationTaskGet API call processor
 func (e *Processor) ApplicationTaskGet(c echo.Context, taskUID types.ApplicationTaskUID) error {
-	task, err := e.fish.ApplicationTaskGet(taskUID)
+	task, err := e.fish.DB().ApplicationTaskGet(taskUID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", taskUID)})
 		return fmt.Errorf("Unable to find the ApplicationTask: %s, %w", taskUID, err)
 	}
 
-	app, err := e.fish.ApplicationGet(task.ApplicationUID)
+	app, err := e.fish.DB().ApplicationGet(task.ApplicationUID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", task.ApplicationUID)})
 		return fmt.Errorf("Unable to find the Application: %s, %w", task.ApplicationUID, err)
@@ -488,7 +488,7 @@ func (e *Processor) ApplicationTaskGet(c echo.Context, taskUID types.Application
 
 // ApplicationDeallocateGet API call processor
 func (e *Processor) ApplicationDeallocateGet(c echo.Context, uid types.ApplicationUID) error {
-	app, err := e.fish.ApplicationGet(uid)
+	app, err := e.fish.DB().ApplicationGet(uid)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the application: %s", uid)})
 		return fmt.Errorf("Unable to find the Application: %s, %w", uid, err)
@@ -505,12 +505,12 @@ func (e *Processor) ApplicationDeallocateGet(c echo.Context, uid types.Applicati
 		return fmt.Errorf("Only the owner & admin can deallocate the Application resource")
 	}
 
-	out, err := e.fish.ApplicationStateGetByApplication(uid)
+	out, err := e.fish.DB().ApplicationStateGetByApplication(uid)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find status for the Application: %s", uid)})
 		return fmt.Errorf("Unable to find status for the Application: %s, %w", uid, err)
 	}
-	if !e.fish.ApplicationStateIsActive(out.Status) {
+	if !e.fish.DB().ApplicationStateIsActive(out.Status) {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to deallocate the Application with status: %s", out.Status)})
 		return fmt.Errorf("Unable to deallocate the Application with status: %s", out.Status)
 	}
@@ -523,7 +523,7 @@ func (e *Processor) ApplicationDeallocateGet(c echo.Context, uid types.Applicati
 	as := &types.ApplicationState{ApplicationUID: uid, Status: newStatus,
 		Description: fmt.Sprintf("Requested by user %s", user.Name),
 	}
-	err = e.fish.ApplicationStateCreate(as)
+	err = e.fish.DB().ApplicationStateCreate(as)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to deallocate the Application: %s", uid)})
 		return fmt.Errorf("Unable to deallocate the Application: %s, %w", uid, err)
@@ -553,7 +553,7 @@ func (e *Processor) LabelListGet(c echo.Context, params types.LabelListGetParams
 		}
 		params.Filter = nil
 	}
-	out, err := e.fish.LabelList(params)
+	out, err := e.fish.DB().LabelList(params)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the label list: %v", err)})
 		return fmt.Errorf("Unable to get the label list: %w", err)
@@ -564,7 +564,7 @@ func (e *Processor) LabelListGet(c echo.Context, params types.LabelListGetParams
 
 // LabelGet API call processor
 func (e *Processor) LabelGet(c echo.Context, uid types.LabelUID) error {
-	out, err := e.fish.LabelGet(uid)
+	out, err := e.fish.DB().LabelGet(uid)
 	if err != nil {
 		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Label not found: %v", err)})
 		return fmt.Errorf("Label not found: %w", err)
@@ -591,7 +591,7 @@ func (e *Processor) LabelCreatePost(c echo.Context) error {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Wrong request body: %v", err)})
 		return fmt.Errorf("Wrong request body: %w", err)
 	}
-	if err := e.fish.LabelCreate(&data); err != nil {
+	if err := e.fish.DB().LabelCreate(&data); err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to create label: %v", err)})
 		return fmt.Errorf("Unable to create label: %w", err)
 	}
@@ -612,7 +612,7 @@ func (e *Processor) LabelDelete(c echo.Context, uid types.LabelUID) error {
 		return fmt.Errorf("Only 'admin' user can delete label")
 	}
 
-	err := e.fish.LabelDelete(uid)
+	err := e.fish.DB().LabelDelete(uid)
 	if err != nil {
 		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Label delete failed with error: %v", err)})
 		return fmt.Errorf("Label delete failed with error: %w", err)
@@ -623,7 +623,7 @@ func (e *Processor) LabelDelete(c echo.Context, uid types.LabelUID) error {
 
 // NodeListGet API call processor
 func (e *Processor) NodeListGet(c echo.Context) error {
-	out, err := e.fish.NodeList()
+	out, err := e.fish.DB().NodeList()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the node list: %v", err)})
 		return fmt.Errorf("Unable to get the node list: %w", err)
@@ -634,7 +634,7 @@ func (e *Processor) NodeListGet(c echo.Context) error {
 
 // NodeThisGet API call processor
 func (e *Processor) NodeThisGet(c echo.Context) error {
-	node := e.fish.GetNode()
+	node := e.fish.DB().GetNode()
 
 	return c.JSON(http.StatusOK, node)
 }
@@ -745,7 +745,7 @@ func (e *Processor) ServiceMappingGet(c echo.Context, uid types.ServiceMappingUI
 		return fmt.Errorf("Only 'admin' user can get service mapping")
 	}
 
-	out, err := e.fish.ServiceMappingGet(uid)
+	out, err := e.fish.DB().ServiceMappingGet(uid)
 	if err != nil {
 		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("ServiceMapping not found: %v", err)})
 		return fmt.Errorf("ServiceMapping not found: %w", err)
@@ -766,7 +766,7 @@ func (e *Processor) ServiceMappingListGet(c echo.Context) error {
 		return fmt.Errorf("Only 'admin' user can get service mappings")
 	}
 
-	out, err := e.fish.ServiceMappingList()
+	out, err := e.fish.DB().ServiceMappingList()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the servicemappings list: %v", err)})
 		return fmt.Errorf("Unable to get the servicemappings list: %w", err)
@@ -790,7 +790,7 @@ func (e *Processor) ServiceMappingCreatePost(c echo.Context) error {
 	}
 	if data.ApplicationUID != uuid.Nil {
 		// Only the owner and admin can create servicemapping for his application
-		app, err := e.fish.ApplicationGet(data.ApplicationUID)
+		app, err := e.fish.DB().ApplicationGet(data.ApplicationUID)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", data.ApplicationUID)})
 			return fmt.Errorf("Unable to find the Application: %s, %w", data.ApplicationUID, err)
@@ -805,7 +805,7 @@ func (e *Processor) ServiceMappingCreatePost(c echo.Context) error {
 		return fmt.Errorf("Only 'admin' user can create service mapping with undefined Application")
 	}
 
-	if err := e.fish.ServiceMappingCreate(&data); err != nil {
+	if err := e.fish.DB().ServiceMappingCreate(&data); err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to create service mapping: %v", err)})
 		return fmt.Errorf("Unable to create service mapping: %w", err)
 	}
@@ -826,7 +826,7 @@ func (e *Processor) ServiceMappingDelete(c echo.Context, uid types.ServiceMappin
 		return fmt.Errorf("Only 'admin' user can delete service mapping")
 	}
 
-	if err := e.fish.ServiceMappingDelete(uid); err != nil {
+	if err := e.fish.DB().ServiceMappingDelete(uid); err != nil {
 		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("ServiceMapping %s delete failed with error: %v", uid, err)})
 		return fmt.Errorf("ServiceMapping %s delete failed with error: %w", uid, err)
 	}

@@ -33,11 +33,11 @@ func Test_allocate_multidefinition_label(t *testing.T) {
 node_location: test_loc
 
 api_address: 127.0.0.1:0
-proxy_ssh_address: 127.0.0.1:0
 
 drivers:
-  - name: test
-    cfg:
+  gates:
+  providers:
+    test:
       cpu_limit: 4
       ram_limit: 8`)
 

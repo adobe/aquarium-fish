@@ -23,15 +23,13 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"go.mills.io/bitcask/v2"
 
 	"github.com/adobe/aquarium-fish/lib/build"
 	"github.com/adobe/aquarium-fish/lib/crypt"
+	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi"
-	"github.com/adobe/aquarium-fish/lib/proxysocks"
-	"github.com/adobe/aquarium-fish/lib/proxyssh"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
@@ -39,8 +37,6 @@ func main() {
 	log.Infof("Aquarium Fish %s (%s)", build.Version, build.Time)
 
 	var apiAddress string
-	var proxySocksAddress string
-	var proxySSHAddress string
 	var nodeAddress string
 	var cfgPath string
 	var dir string
@@ -71,12 +67,6 @@ func main() {
 			if apiAddress != "" {
 				cfg.APIAddress = apiAddress
 			}
-			if proxySocksAddress != "" {
-				cfg.ProxySocksAddress = proxySocksAddress
-			}
-			if proxySSHAddress != "" {
-				cfg.ProxySSHAddress = proxySSHAddress
-			}
 			if nodeAddress != "" {
 				cfg.NodeAddress = nodeAddress
 			}
@@ -106,9 +96,10 @@ func main() {
 				debug.SetMemoryLimit(int64(cfg.MemTarget.Bytes()))
 			}
 
-			dir := filepath.Join(cfg.Directory, cfg.NodeAddress)
-			if err = os.MkdirAll(dir, 0o750); err != nil {
-				return log.Errorf("Fish: Can't create working directory %s: %v", dir, err)
+			log.Info("Fish init DB...")
+			db, err := database.New(filepath.Join(cfg.Directory, cfg.NodeAddress))
+			if err != nil {
+				return err
 			}
 
 			log.Info("Fish init TLS...")
@@ -128,30 +119,8 @@ func main() {
 				return err
 			}
 
-			log.Info("Fish starting DB...")
-			db, err := bitcask.Open(filepath.Join(dir, "bitcask.db"))
-			if err != nil {
-				return err
-			}
-
 			log.Info("Fish starting node...")
 			fish, err := fish.New(db, cfg)
-			if err != nil {
-				return err
-			}
-
-			log.Info("Fish starting socks5 proxy...")
-			err = proxysocks.Init(fish, cfg.ProxySocksAddress)
-			if err != nil {
-				return err
-			}
-
-			log.Info("Fish starting ssh proxy...")
-			idRsaPath := cfg.NodeSSHKey
-			if !filepath.IsAbs(idRsaPath) {
-				idRsaPath = filepath.Join(cfg.Directory, idRsaPath)
-			}
-			cfg.ProxySSHAddress, err = proxyssh.Init(fish, idRsaPath, cfg.ProxySSHAddress)
 			if err != nil {
 				return err
 			}
@@ -184,9 +153,7 @@ func main() {
 	}
 
 	flags := cmd.Flags()
-	flags.StringVarP(&apiAddress, "api", "a", "", "address used to expose the fish API")
-	flags.StringVar(&proxySocksAddress, "proxy_socks", "", "address used to expose the SOCKS5 proxy")
-	flags.StringVar(&proxySSHAddress, "proxy_ssh", "", "address used to expose the SSH proxy")
+	flags.StringVarP(&apiAddress, "api", "a", "", "address used to expose the Fish API")
 	flags.StringVarP(&nodeAddress, "node", "n", "", "node external endpoint to connect to tell the other nodes")
 	flags.StringVarP(&cfgPath, "cfg", "c", "", "yaml configuration file")
 	flags.StringVarP(&dir, "dir", "D", "", "database and other fish files directory")

@@ -33,11 +33,6 @@ find ./lib -name '*.gen.go' -delete
 
 # Run code generation
 PATH="$gopath/bin:$PATH" go generate -v ./lib/...
-# Making LabelDefinitions an actual type to attach GORM-needed Scanner/Valuer functions to it to
-# make the array a json document and store in the DB row as one item
-# TODO: https://github.com/deepmap/oapi-codegen/issues/859
-sed -i.bak 's/^type LabelDefinitions = /type LabelDefinitions /' lib/openapi/types/types.gen.go
-rm -f lib/openapi/types/types.gen.go.bak
 
 # If ONLYGEN is specified - skip the build
 [ -z "$ONLYGEN" ] || exit 0
@@ -80,7 +75,7 @@ pwait() {
     while jobs -p > /tmp/jobs_list.tmp; do
         # Cleanup jobs list, otherwise "jobs -p" will stay the same forever
         jobs > /dev/null 2>&1
-        [ $(cat /tmp/jobs_list.tmp | wc -l) -ge $1 ] || break
+        [ $(cat /tmp/jobs_list.tmp | wc -l) -ge "$MAXJOBS" ] || break
         sleep 1
     done
 }
