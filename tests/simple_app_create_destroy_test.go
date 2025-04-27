@@ -94,6 +94,22 @@ drivers:
 		}
 	})
 
+	var apps []types.Application
+	t.Run("Check there is just one Application in the list", func(t *testing.T) {
+		apitest.New().
+			EnableNetworking(cli).
+			Get(afi.APIAddress("api/v1/application/")).
+			BasicAuth("admin", afi.AdminToken()).
+			Expect(t).
+			Status(http.StatusOK).
+			End().
+			JSON(&apps)
+
+		if len(apps) != 1 {
+			t.Fatalf("Amount of Applications is incorrect: %d != 1, %v", len(apps), apps)
+		}
+	})
+
 	var appState types.ApplicationState
 	t.Run("Application should get ALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
