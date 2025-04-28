@@ -104,6 +104,9 @@ func (d *Driver) Prepare(config []byte) error {
 	if err != nil {
 		return fmt.Errorf("DOCKER: %s: Unable to parse CPU uint: %v (%q)", d.name, err, cpuMem[0])
 	}
+	if parsedCPU > uint64(^uint(0)) { // Check if parsedCPU exceeds the maximum value of uint
+		return fmt.Errorf("DOCKER: %s: Parsed CPU value exceeds maximum uint value: %v (%q)", d.name, parsedCPU, cpuMem[0])
+	}
 	d.totalCPU = uint(parsedCPU)
 	parsedRAM, err := strconv.ParseUint(cpuMem[1], 10, 64)
 	if err != nil {
