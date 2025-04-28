@@ -41,7 +41,7 @@ node_identifiers:
 api_address: 127.0.0.1:0
 
 drivers:
-  gates:
+  gates: {}
   providers:
     test:`)
 
@@ -132,7 +132,7 @@ node_identifiers:
 api_address: 127.0.0.1:0
 
 drivers:
-  gates:
+  gates: {}
   providers:
     test:`)
 
@@ -222,7 +222,7 @@ node_identifiers:
 api_address: 127.0.0.1:0
 
 drivers:
-  gates:
+  gates: {}
   providers:
     test:`)
 
@@ -311,7 +311,7 @@ node_identifiers:
 api_address: 127.0.0.1:0
 
 drivers:
-  gates:
+  gates: {}
   providers:
     test:`)
 
