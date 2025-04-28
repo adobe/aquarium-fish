@@ -49,7 +49,7 @@ func Init(db *database.Database, wd string, configs ConfigDrivers) error {
 		return log.Error("Drivers: Unable to load drivers:", err)
 	}
 	ok, errs := prepare(wd, configs)
-	if errs != nil && len(errs) > 0 {
+	if len(errs) > 0 {
 		log.Error("Drivers: Unable to prepare some provider drivers:", errs)
 	}
 	if !ok {

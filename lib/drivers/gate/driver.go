@@ -35,7 +35,7 @@ type Driver interface {
 	Name() string
 
 	// SetName of the gate
-	SetName(string)
+	SetName(name string)
 
 	// Gives gate configs and check if it's ok
 	// -> wd - fish working directory
