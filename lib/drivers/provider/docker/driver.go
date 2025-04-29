@@ -106,15 +106,9 @@ func (d *Driver) Prepare(config []byte) error {
 	if err != nil {
 		return fmt.Errorf("DOCKER: %s: Unable to parse CPU uint: %v (%q)", d.name, err, cpuMem[0])
 	}
-	// Determine the maximum value for uint based on the platform's bit size
-	var maxUint uint64
-	if strconv.IntSize == 32 { // 32-bit platform
-		maxUint = math.MaxUint32
-	} else { // 64-bit platform
-		maxUint = math.MaxUint64
-	}
-	if parsedCPU > maxUint {
-		return fmt.Errorf("DOCKER: %s: Parsed CPU value exceeds maximum uint value: %v (%q)", d.name, parsedCPU, cpuMem[0])
+	// Ensure parsedCPU fits within the uint range
+	if parsedCPU > uint64(math.MaxUint) {
+		return fmt.Errorf("DOCKER: %s: Parsed CPU value exceeds platform-specific uint range: %v (%q)", d.name, parsedCPU, cpuMem[0])
 	}
 	d.totalCPU = uint(parsedCPU)
 

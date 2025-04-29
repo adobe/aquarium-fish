@@ -47,7 +47,7 @@ node_location: test_loc
 api_address: 127.0.0.1:0
 
 drivers:
-  gates: {}
+  gates:
     proxyssh:
       bind_address: 127.0.0.1:0
   providers:
@@ -267,7 +267,7 @@ node_location: test_loc
 api_address: 127.0.0.1:0
 
 drivers:
-  gates: {}
+  gates:
     proxyssh:
       bind_address: 127.0.0.1:0
   providers:
@@ -565,7 +565,7 @@ node_location: test_loc
 api_address: 127.0.0.1:0
 
 drivers:
-  gates: {}
+  gates:
     proxyssh:
       bind_address: 127.0.0.1:0
   providers:
@@ -853,7 +853,7 @@ node_location: test_loc
 api_address: 127.0.0.1:0
 
 drivers:
-  gates: {}
+  gates:
     proxyssh:
       bind_address: 127.0.0.1:0
   providers:
