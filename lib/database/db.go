@@ -89,7 +89,7 @@ func (d *Database) GetNode() *types.Node {
 }
 
 // GetNodeUID returns node UID
-func (d *Database) GetNodeUID() types.ApplicationUID {
+func (d *Database) GetNodeUID() types.NodeUID {
 	return d.node.UID
 }
 

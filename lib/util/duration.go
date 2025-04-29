@@ -95,3 +95,7 @@ func (d *Duration) StoreStringDuration(s string) error {
 
 	return nil
 }
+
+func (d *Duration) String() string {
+	return time.Duration(*d).String()
+}

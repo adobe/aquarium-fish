@@ -548,7 +548,7 @@ func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 	w.activeHosts = currActiveHosts
 
 	// Printing list for debug purposes
-	if log.GetVerbosity() == 1 {
+	if log.GetVerbosity() == log.VerbosityDebug {
 		log.Debugf("AWS: %s: dedicated %q: Amount of active hosts in pool: %d", w.driver.name, w.name, len(w.activeHosts))
 		for hostID, host := range w.activeHosts {
 			log.Debugf("AWS: %s: dedicated %q: active_hosts item: host_id:%q, allocated:%q, state:%q, capacity:%d (%d)", w.driver.name, w.name, hostID, host.AllocationTime, host.State, getHostCapacity(&host), w.instancesPerHost)

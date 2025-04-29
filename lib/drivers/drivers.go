@@ -23,6 +23,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 
 	// Load all the available gate drivers
+	_ "github.com/adobe/aquarium-fish/lib/drivers/gate/github"
 	_ "github.com/adobe/aquarium-fish/lib/drivers/gate/proxysocks"
 	_ "github.com/adobe/aquarium-fish/lib/drivers/gate/proxyssh"
 
@@ -164,11 +165,11 @@ func prepare(wd string, configs ConfigDrivers) (ok bool, errs []error) {
 		}
 
 		if err := drv.Prepare(wd, jsonCfg); err != nil {
-			errs = append(errs, err)
 			log.Warn("Drivers: Gate driver prepare failed:", drv.Name(), err)
+			errs = append(errs, err, drv.Shutdown())
 		} else {
-			activatedGateInstances[name] = drv
 			log.Info("Drivers: Gate driver activated:", drv.Name())
+			activatedGateInstances[name] = drv
 		}
 	}
 
