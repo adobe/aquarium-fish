@@ -802,8 +802,10 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 					}
 				}
 
-				timeout := time.Now().Add(resourceLifetime)
-				res.Timeout = &timeout
+				if resourceLifetime > 0 {
+					timeout := time.Now().Add(resourceLifetime)
+					res.Timeout = &timeout
+				}
 
 				if err = f.db.ApplicationResourceCreate(res); err != nil {
 					log.Error("Fish: Unable to store Resource for Application:", app.UID, err)
@@ -818,7 +820,7 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 
 		if appState.Status == types.ApplicationStatusALLOCATED {
 			if res.Timeout != nil && !res.Timeout.IsZero() {
-				log.Infof("Fish: Resource of Application %s will be deallocated by timeout at %s", app.UID, res.Timeout)
+				log.Infof("Fish: Resource of Application %s will be deallocated by timeout in %s at %s", app.UID, time.Now().Sub(*res.Timeout), res.Timeout)
 			} else {
 				log.Warn("Fish: Resource have no lifetime set and will live until deallocated by user:", app.UID)
 			}
