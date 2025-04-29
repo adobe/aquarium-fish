@@ -15,6 +15,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -729,9 +730,12 @@ func (d *Driver) deleteImage(conn *ec2.Client, id string) (err error) {
 // of complicated logic which is unnecessary for the current usage
 func awsLastYearFilterValues(till time.Time) (out []string) {
 	date := till
-	// Iterating over months to cover the last year
-	for date.Year() == till.Year() || date.Month() > till.Month() {
-		out = append(out, date.Format("2006-01-*"))
+	// Iterating over 12 months to cover the last year
+	for len(out) < 12 {
+		val := date.Format("2006-01-*")
+		if !slices.Contains(out, val) {
+			out = append(out, val)
+		}
 		date = date.AddDate(0, -1, 0)
 	}
 
