@@ -299,11 +299,6 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 			return fmt.Errorf("Unable to create db entry for job %d-%d: %v", job.GetRunID(), job.GetID(), err)
 		}
 
-		// TODO: Check behavior of the runner - is there any leftovers if the host gets disconnected
-		// or something... Probably we need a proper cleanup mechanism of the residue runners records
-		// The issue with that - it will eat additional API requests, so maybe better to run cleanup
-		// via listing of the stale nodes on schedule (every hour?) instead of checking for each job
-
 		return nil
 	}
 
