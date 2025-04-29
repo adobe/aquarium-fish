@@ -28,8 +28,11 @@ func (*Factory) Name() string {
 }
 
 // New creates new gate driver
-func (*Factory) New(db *database.Database) gate.Driver {
-	return &Driver{db: db}
+func (f *Factory) New(db *database.Database) gate.Driver {
+	return &Driver{
+		db:   db,
+		name: f.Name(),
+	}
 }
 
 func init() {
@@ -38,13 +41,19 @@ func init() {
 
 // Driver implements drivers.ResourceDriver interface
 type Driver struct {
-	cfg Config
-	db  *database.Database
+	name string
+	cfg  Config
+	db   *database.Database
 }
 
 // Name returns name of the gate
-func (*Driver) Name() string {
-	return "proxysocks"
+func (d *Driver) Name() string {
+	return d.name
+}
+
+// SetName allows to receive the actual name of the driver
+func (d *Driver) SetName(name string) {
+	d.name = name
 }
 
 // Prepare initializes the driver
@@ -56,8 +65,8 @@ func (d *Driver) Prepare( /*wd*/ _ string, config []byte) error {
 		return err
 	}
 
-	if err := proxyInit(d.db, d.cfg.BindAddress); err != nil {
-		return log.Errorf("PROXYSOCKS: Unable to init proxysocks gate: %v", err)
+	if err := d.proxyInit(); err != nil {
+		return log.Errorf("PROXYSOCKS: %s: Unable to init proxysocks gate: %v", d.name, err)
 	}
 
 	return nil

@@ -13,7 +13,6 @@
 package fish
 
 import (
-	"fmt"
 	"os"
 	"time"
 
@@ -44,9 +43,9 @@ type Config struct {
 	NodeIdentifiers []string `json:"node_identifiers"` // The list of node identifiers which could be used to find the right Node for Resource
 	NodeSlotsLimit  uint     `json:"node_slots_limit"` // Limits the amount of Applications to be executed simultaneously on the node
 
-	DefaultResourceLifetime string `json:"default_resource_lifetime"` // Sets the lifetime of the resource which will be used if label definition one is not set
+	DefaultResourceLifetime util.Duration `json:"default_resource_lifetime"` // Sets the lifetime of the resource which will be used if label definition one is not set
 
-	DBCleanupDelay string `json:"db_cleanup_delay"` // Defines the database item cleanup delay when Applciation reached the end of life (by error or deallocated)
+	DBCleanupDelay util.Duration `json:"db_cleanup_delay"` // Defines the database item cleanup delay when Application reached the end of life (by error or deallocated)
 
 	DisableAuth bool `json:"disable_auth"` // WARNING! For performance testing only
 
@@ -79,15 +78,6 @@ func (c *Config) ReadConfigFile(cfgPath string) error {
 		c.TLSCrt = c.NodeName + ".crt"
 	}
 
-	_, err := time.ParseDuration(c.DefaultResourceLifetime)
-	if c.DefaultResourceLifetime != "" && err != nil {
-		return fmt.Errorf("Fish: Default Resource Lifetime parse error: %v", err)
-	}
-
-	if _, err = time.ParseDuration(c.DBCleanupDelay); err != nil {
-		return fmt.Errorf("Fish: DB Cleanup Delay parse error: %v", err)
-	}
-
 	return nil
 }
 
@@ -99,5 +89,5 @@ func (c *Config) initDefaults() {
 	c.TLSCrt = "" // ...
 	c.TLSCaCrt = "ca.crt"
 	c.NodeName, _ = os.Hostname()
-	c.DBCleanupDelay = DefaultDBCleanupDelay.String()
+	c.DBCleanupDelay = util.Duration(DefaultDBCleanupDelay)
 }

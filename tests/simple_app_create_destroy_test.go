@@ -38,7 +38,7 @@ node_location: test_loc
 api_address: 127.0.0.1:0
 
 drivers:
-  gates:
+  gates: {}
   providers:
     test:`)
 
@@ -91,6 +91,22 @@ drivers:
 
 		if app.UID == uuid.Nil {
 			t.Fatalf("Application UID is incorrect: %v", app.UID)
+		}
+	})
+
+	var apps []types.Application
+	t.Run("Check there is just one Application in the list", func(t *testing.T) {
+		apitest.New().
+			EnableNetworking(cli).
+			Get(afi.APIAddress("api/v1/application/")).
+			BasicAuth("admin", afi.AdminToken()).
+			Expect(t).
+			Status(http.StatusOK).
+			End().
+			JSON(&apps)
+
+		if len(apps) != 1 {
+			t.Fatalf("Amount of Applications is incorrect: %d != 1, %v", len(apps), apps)
 		}
 	})
 

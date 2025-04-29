@@ -39,8 +39,8 @@ func (*Factory) Name() string {
 }
 
 // New creates new provider driver
-func (*Factory) New() provider.Driver {
-	return &Driver{}
+func (f *Factory) New() provider.Driver {
+	return &Driver{name: f.Name()}
 }
 
 func init() {
@@ -49,7 +49,8 @@ func init() {
 
 // Driver implements provider.Driver interface
 type Driver struct {
-	cfg Config
+	name string
+	cfg  Config
 	// Contains the available tasks of the driver
 	tasksList []provider.DriverTask
 
@@ -58,8 +59,13 @@ type Driver struct {
 }
 
 // Name returns name of the driver
-func (*Driver) Name() string {
-	return "vmx"
+func (d *Driver) Name() string {
+	return d.name
+}
+
+// Name returns name of the gate
+func (d *Driver) SetName(name string) {
+	d.name = name
 }
 
 // IsRemote needed to detect the out-of-node resources managed by this driver
@@ -95,10 +101,10 @@ func (d *Driver) Prepare(config []byte) error {
 }
 
 // ValidateDefinition checks LabelDefinition is ok
-func (*Driver) ValidateDefinition(def types.LabelDefinition) error {
+func (d *Driver) ValidateDefinition(def types.LabelDefinition) error {
 	// Check resources
 	if err := def.Resources.Validate([]string{"hfs+", "exfat", "fat32"}, true); err != nil {
-		return log.Error("VMX: Resources validation failed:", err)
+		return log.Errorf("VMX: %s: Resources validation failed: %v", d.name, err)
 	}
 
 	// Check options
@@ -158,7 +164,7 @@ func (d *Driver) AvailableCapacity(nodeUsage types.Resources, req types.LabelDef
 func (d *Driver) Allocate(def types.LabelDefinition, _ /*metadata*/ map[string]any) (*types.ApplicationResource, error) {
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
-		return nil, log.Error("VMX: Unable to apply options:", err)
+		return nil, log.Errorf("VMX: %s: Unable to apply options: %v", d.name, err)
 	}
 
 	// Generate unique id from the hw address and required directories
@@ -179,7 +185,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, _ /*metadata*/ map[string]a
 	imgPath, err := d.loadImages(&opts, vmImagesDir)
 	if err != nil {
 		d.cleanupVM(vmDir)
-		return nil, log.Error("VMX: Unable to load the required images:", err)
+		return nil, log.Errorf("VMX: %s: Unable to load the required images: %v", d.name, err)
 	}
 
 	// Clone VM from the image
@@ -191,7 +197,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, _ /*metadata*/ map[string]a
 	}
 	if _, _, err := util.RunAndLog("VMX", 120*time.Second, nil, d.cfg.VmrunPath, args...); err != nil {
 		d.cleanupVM(vmDir)
-		return nil, log.Error("VMX: Unable to clone the target image:", imgPath, err)
+		return nil, log.Errorf("VMX: %s: Unable to clone the target image %q: %v", d.name, imgPath, err)
 	}
 
 	// Change cloned vm configuration
@@ -205,13 +211,13 @@ func (d *Driver) Allocate(def types.LabelDefinition, _ /*metadata*/ map[string]a
 		"memsize =", fmt.Sprintf(`memsize = "%d"`, def.Resources.Ram*1024),
 	); err != nil {
 		d.cleanupVM(vmDir)
-		return nil, log.Error("VMX: Unable to change cloned VM configuration:", vmxPath, err)
+		return nil, log.Errorf("VMX: %s: Unable to change cloned VM %q configuration: %v", d.name, vmxPath, err)
 	}
 
 	// Create and connect disks to vmx
 	if err := d.disksCreate(vmxPath, def.Resources.Disks); err != nil {
 		d.cleanupVM(vmDir)
-		return nil, log.Error("VMX: Unable create disks for VM:", vmxPath, err)
+		return nil, log.Errorf("VMX: %s: Unable create disks for VM %q: %v", d.name, vmxPath, err)
 	}
 
 	// Run the background monitoring of the vmware log
@@ -221,12 +227,12 @@ func (d *Driver) Allocate(def types.LabelDefinition, _ /*metadata*/ map[string]a
 
 	// Run the VM
 	if _, _, err := util.RunAndLog("VMX", 120*time.Second, nil, d.cfg.VmrunPath, "start", vmxPath, "nogui"); err != nil {
-		log.Error("VMX: Check logs in ~/Library/Logs/VMware/ or enable debug to see vmware.log")
+		log.Errorf("VMX: %s: Check logs in ~/Library/Logs/VMware/ or enable debug to see vmware.log", d.name)
 		d.cleanupVM(vmDir)
-		return nil, log.Error("VMX: Unable to run VM:", vmxPath, err)
+		return nil, log.Errorf("VMX: %s: Unable to run VM %q: %v", d.name, vmxPath, err)
 	}
 
-	log.Info("VMX: Allocate of VM completed:", vmxPath)
+	log.Infof("VMX: %s: Allocate of VM completed: %s", d.name, vmxPath)
 	return &types.ApplicationResource{
 		Identifier:     vmxPath,
 		HwAddr:         vmHwaddr,
@@ -237,7 +243,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, _ /*metadata*/ map[string]a
 // Status shows status of the resource
 func (d *Driver) Status(res *types.ApplicationResource) (string, error) {
 	if res == nil || res.Identifier == "" {
-		return "", fmt.Errorf("VMX: Invalid resource: %v", res)
+		return "", fmt.Errorf("VMX: %s: Invalid resource: %v", d.name, res)
 	}
 	if d.isAllocated(res.Identifier) {
 		return provider.StatusAllocated, nil
@@ -258,7 +264,7 @@ func (d *Driver) GetTask(name, options string) provider.DriverTask {
 	// Parse options json into task structure
 	if len(options) > 0 {
 		if err := json.Unmarshal([]byte(options), t); err != nil {
-			log.Error("VMX: Unable to apply the task options:", err)
+			log.Errorf("VMX: %s: Unable to apply the task options: %v", d.name, err)
 			return nil
 		}
 	}
@@ -269,31 +275,31 @@ func (d *Driver) GetTask(name, options string) provider.DriverTask {
 // Deallocate the resource
 func (d *Driver) Deallocate(res *types.ApplicationResource) error {
 	if res == nil || res.Identifier == "" {
-		return fmt.Errorf("VMX: Invalid resource: %v", res)
+		return fmt.Errorf("VMX: %s: Invalid resource: %v", d.name, res)
 	}
 	vmxPath := res.Identifier
 	if len(vmxPath) == 0 {
-		return log.Error("VMX: Unable to find VM:", vmxPath)
+		return log.Errorf("VMX: %s: Unable to find VM: %s", d.name, vmxPath)
 	}
 
 	// Sometimes it's stuck, so try to stop a bit more than usual
 	if _, _, err := util.RunAndLogRetry("VMX", 3, 60*time.Second, nil, d.cfg.VmrunPath, "stop", vmxPath); err != nil {
-		log.Warn("VMX: Unable to soft stop the VM:", vmxPath, err)
+		log.Warnf("VMX: %s: Unable to soft stop the VM %q: %v", d.name, vmxPath, err)
 		// Ok, it doesn't want to stop, so stopping it hard
 		if _, _, err := util.RunAndLogRetry("VMX", 3, 60*time.Second, nil, d.cfg.VmrunPath, "stop", vmxPath, "hard"); err != nil {
-			return log.Error("VMX: Unable to deallocate VM:", vmxPath, err)
+			return log.Errorf("VMX: %s: Unable to deallocate VM %q: %s", d.name, vmxPath, err)
 		}
 	}
 
 	// Delete VM
 	if _, _, err := util.RunAndLogRetry("VMX", 3, 30*time.Second, nil, d.cfg.VmrunPath, "deleteVM", vmxPath); err != nil {
-		return log.Error("VMX: Unable to delete VM:", vmxPath, err)
+		return log.Errorf("VMX: %s: Unable to delete VM %q: %v", d.name, vmxPath, err)
 	}
 
 	// Cleaning the VM images too
 	d.cleanupVM(filepath.Dir(vmxPath))
 
-	log.Info("VMX: Deallocate of VM completed:", vmxPath)
+	log.Infof("VMX: %s: Deallocate of VM completed: %s", d.name, vmxPath)
 
 	return nil
 }

@@ -332,11 +332,7 @@ func (f *Fish) dbCleanupCompactProcess() {
 	defer log.Info("Fish: dbCleanupCompactProcess stopped")
 
 	// Checking the completed/error applications and clean up if they've sit there for > 5 minutes
-	dbCleanupDelay, err := time.ParseDuration(f.cfg.DBCleanupDelay)
-	if err != nil {
-		dbCleanupDelay = DefaultDBCleanupDelay
-		log.Errorf("Fish: dbCleanupCompactProcess: Delay is set incorrectly in fish config, using default %s: %v", dbCleanupDelay, err)
-	}
+	dbCleanupDelay := time.Duration(f.cfg.DBCleanupDelay)
 	cleanupTicker := time.NewTicker(dbCleanupDelay / 2)
 	log.Infof("Fish: dbCleanupCompactProcess: Triggering CleanupDB once per %s", dbCleanupDelay/2)
 
@@ -361,12 +357,7 @@ func (f *Fish) CleanupDB() {
 	defer log.Debug("Fish: CleanupDB completed")
 
 	// Detecting the time we need to use as a cutting point
-	dbCleanupDelay, err := time.ParseDuration(f.cfg.DBCleanupDelay)
-	if err != nil {
-		dbCleanupDelay = DefaultDBCleanupDelay
-		log.Errorf("Fish: CleanupDB: Delay is set incorrectly in fish config, using default %s: %v", dbCleanupDelay, err)
-	}
-
+	dbCleanupDelay := time.Duration(f.cfg.DBCleanupDelay)
 	cutTime := time.Now().Add(-dbCleanupDelay)
 
 	// Look for the stale Applications
@@ -570,12 +561,14 @@ func (f *Fish) isNodeAvailableForDefinitions(defs []types.LabelDefinition) int {
 func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 	// When node is in maintenance mode - it should not accept any Applications
 	if f.maintenance {
+		log.Debug("Fish: Maintenance mode blocks node availability")
 		return false
 	}
 
 	// Is node supports the required label driver
 	driver := drivers.GetProvider(def.Driver)
 	if driver == nil {
+		log.Debugf("Fish: No driver found with name %q", def.Driver)
 		return false
 	}
 
@@ -592,7 +585,9 @@ func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 				var val uint = 1
 				def.Resources.Slots = &val
 			}
-			if (*f.nodeUsage.Slots)+(*def.Resources.Slots) > f.cfg.NodeSlotsLimit {
+			neededSlots := (*f.nodeUsage.Slots) + (*def.Resources.Slots)
+			if neededSlots > f.cfg.NodeSlotsLimit {
+				log.Debugf("Fish: Not enough slots to execute definition: %d > %d", neededSlots, f.cfg.NodeSlotsLimit)
 				return false
 			}
 		}
@@ -613,6 +608,7 @@ func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 			}
 			if !found {
 				// One of the required node identifiers did not matched the node ones
+				log.Debugf("Fish: NodeFilter prevents to run on this node: %q", needed)
 				return false
 			}
 		}
@@ -628,6 +624,7 @@ func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 		log.Warnf("Fish: AvailableCapacity of %s driver took %s", def.Driver, elapsed)
 	}
 	if capacity < 1 {
+		log.Debugf("Fish: Driver %q has not enough capacity: %d", driver.Name(), capacity)
 		return false
 	}
 
@@ -789,8 +786,28 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 				res.LabelUID = label.UID
 				res.DefinitionIndex = defIndex
 				res.Authentication = drvRes.Authentication
-				err := f.db.ApplicationResourceCreate(res)
+
+				// Getting the resource lifetime to know how much time it will live
+				resourceLifetime, err := time.ParseDuration(labelDef.Resources.Lifetime)
+				if labelDef.Resources.Lifetime != "" && err != nil {
+					log.Error("Fish: Can't parse the Lifetime from Label Definition:", label.UID, res.DefinitionIndex)
+				}
 				if err != nil {
+					// Try to get default value from fish config
+					resourceLifetime = time.Duration(f.cfg.DefaultResourceLifetime)
+					if resourceLifetime <= 0 {
+						// Not an error - in worst case the resource will just sit there but at least will
+						// not ruin the workload execution
+						log.Warn("Fish: Default Resource Lifetime is not set in fish config")
+					}
+				}
+
+				if resourceLifetime > 0 {
+					timeout := time.Now().Add(resourceLifetime)
+					res.Timeout = &timeout
+				}
+
+				if err = f.db.ApplicationResourceCreate(res); err != nil {
 					log.Error("Fish: Unable to store Resource for Application:", app.UID, err)
 				}
 				appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusALLOCATED,
@@ -801,24 +818,9 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 			f.db.ApplicationStateCreate(appState)
 		}
 
-		// Getting the resource lifetime to know how much time it will live
-		resourceLifetime, err := time.ParseDuration(labelDef.Resources.Lifetime)
-		if labelDef.Resources.Lifetime != "" && err != nil {
-			log.Error("Fish: Can't parse the Lifetime from Label Definition:", label.UID, res.DefinitionIndex)
-		}
-		if err != nil {
-			// Try to get default value from fish config
-			resourceLifetime, err = time.ParseDuration(f.cfg.DefaultResourceLifetime)
-			if err != nil {
-				// Not an error - in worst case the resource will just sit there but at least will
-				// not ruin the workload execution
-				log.Warn("Fish: Default Resource Lifetime is not set in fish config")
-			}
-		}
-		resourceTimeout := res.CreatedAt.Add(resourceLifetime)
 		if appState.Status == types.ApplicationStatusALLOCATED {
-			if resourceLifetime > 0 {
-				log.Infof("Fish: Resource of Application %s will be deallocated by timeout in %s (%s)", app.UID, resourceLifetime, resourceTimeout)
+			if res.Timeout != nil && !res.Timeout.IsZero() {
+				log.Infof("Fish: Resource of Application %s will be deallocated by timeout in %s at %s", app.UID, time.Since(*res.Timeout), res.Timeout)
 			} else {
 				log.Warn("Fish: Resource have no lifetime set and will live until deallocated by user:", app.UID)
 			}
@@ -840,12 +842,12 @@ func (f *Fish) executeApplication(appUID types.ApplicationUID, defIndex int) err
 				}
 
 				// Check if it's life timeout for the resource
-				if resourceLifetime > 0 {
+				if res.Timeout != nil && !res.Timeout.IsZero() {
 					// The time limit is set - so let's use resource create time and find out timeout
-					if resourceTimeout.Before(time.Now()) {
+					if res.Timeout.Before(time.Now()) {
 						// Seems the timeout has come, so fish asks for application deallocate
 						appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusDEALLOCATE,
-							Description: fmt.Sprint("Resource lifetime timeout reached:", resourceLifetime),
+							Description: fmt.Sprint("Lifetime timeout reached:", res.Timeout),
 						}
 						f.db.ApplicationStateCreate(appState)
 					}

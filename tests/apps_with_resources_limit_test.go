@@ -38,7 +38,7 @@ node_location: test_loc
 api_address: 127.0.0.1:0
 
 drivers:
-  gates:
+  gates: {}
   providers:
     test:
       cpu_limit: 4
@@ -211,13 +211,11 @@ node_slots_limit: 1
 api_address: 127.0.0.1:0
 
 drivers:
-  gates:
+  gates: {}
   providers:
     test:
       cpu_limit: 999
       ram_limit: 999
-  gates:
-  providers:
     test/another:
       cpu_limit: 999
       ram_limit: 999`)

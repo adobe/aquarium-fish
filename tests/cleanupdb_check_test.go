@@ -42,7 +42,7 @@ api_address: 127.0.0.1:0
 db_cleanup_delay: 10s
 
 drivers:
-  gates:
+  gates: {}
   providers:
     test:`)
 

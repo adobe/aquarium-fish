@@ -19,7 +19,6 @@ import (
 	"github.com/armon/go-socks5"
 	"golang.org/x/net/context"
 
-	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/log"
 )
 
@@ -33,19 +32,14 @@ func (resolverSkip) Resolve(ctx context.Context, _ /*name*/ string) (context.Con
 	return ctx, net.IP{}, nil
 }
 
-// proxyAccess configuration to store context while processing the proxy request
-type proxyAccess struct {
-	db *database.Database
-}
-
 // Allow will be executed to allow or deny proxy request
-func (p *proxyAccess) Allow(ctx context.Context, req *socks5.Request) (context.Context, bool) {
-	log.Debug("Proxy: Requested proxy from", req.RemoteAddr, "to", req.DestAddr)
+func (d *Driver) Allow(ctx context.Context, req *socks5.Request) (context.Context, bool) {
+	log.Debugf("PROXYSOCKS: %s: Requested proxy from %s to %s", d.name, req.RemoteAddr, req.DestAddr)
 
 	// Only the existing node resource can use the proxy
-	res, err := p.db.ApplicationResourceGetByIP(req.RemoteAddr.IP.String())
+	res, err := d.db.ApplicationResourceGetByIP(req.RemoteAddr.IP.String())
 	if err != nil {
-		log.Warn("Proxy: Denied proxy from the unauthorized client:", req.RemoteAddr, err)
+		log.Warnf("PROXYSOCKS: %s: Denied proxy from the unauthorized client %s: %v", d.name, req.RemoteAddr, err)
 		return ctx, false
 	}
 
@@ -54,9 +48,9 @@ func (p *proxyAccess) Allow(ctx context.Context, req *socks5.Request) (context.C
 	if dest == "" {
 		dest = req.DestAddr.IP.String()
 	}
-	overDest := p.db.ServiceMappingByApplicationAndDest(res.ApplicationUID, dest)
+	overDest := d.db.ServiceMappingByApplicationAndDest(res.ApplicationUID, dest)
 	if overDest == "" {
-		log.Warn("Proxy: Denied proxy from", req.RemoteAddr, "to", req.DestAddr)
+		log.Warnf("PROXYSOCKS: %s: Denied proxy from %s to %s", d.name, req.RemoteAddr, req.DestAddr)
 		return ctx, false
 	}
 
@@ -71,16 +65,16 @@ func (p *proxyAccess) Allow(ctx context.Context, req *socks5.Request) (context.C
 		req.DestAddr.IP = addr.IP
 	}
 
-	log.Debug("Proxy: Allowed proxy from", req.RemoteAddr, "to", req.DestAddr)
+	log.Debugf("PROXYSOCKS: %s: Allowed proxy from %s to %s", d.name, req.RemoteAddr, req.DestAddr)
 
 	return ctx, true
 }
 
 // Init will start the socks5 proxy server
-func proxyInit(db *database.Database, address string) error {
+func (d *Driver) proxyInit() error {
 	conf := &socks5.Config{
-		Resolver: &resolverSkip{},  // Skipping the resolver phase until access checked
-		Rules:    &proxyAccess{db}, // Allow only known resources to access proxy
+		Resolver: &resolverSkip{}, // Skipping the resolver phase until access checked
+		Rules:    d,               // Allow only known resources to access proxy
 	}
 
 	server, err := socks5.New(conf)
@@ -88,7 +82,7 @@ func proxyInit(db *database.Database, address string) error {
 		return err
 	}
 
-	go server.ListenAndServe("tcp", address)
+	go server.ListenAndServe("tcp", d.cfg.BindAddress)
 
 	return nil
 }

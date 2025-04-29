@@ -39,7 +39,7 @@ mem_target: "512MB"
 api_address: 127.0.0.1:0
 
 drivers:
-  gates:
+  gates: {}
   providers:
     test:
       cpu_limit: 1000
@@ -132,7 +132,7 @@ api_address: 127.0.0.1:0
 disable_auth: true
 
 drivers:
-  gates:
+  gates: {}
   providers:
     test:
       cpu_limit: 1000

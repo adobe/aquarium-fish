@@ -48,8 +48,12 @@ func Init(db *database.Database, wd string, configs ConfigDrivers) error {
 	if err := load(db, configs); err != nil {
 		return log.Error("Drivers: Unable to load drivers:", err)
 	}
-	if errs := prepare(wd, configs); errs != nil {
+	ok, errs := prepare(wd, configs)
+	if len(errs) > 0 {
 		log.Error("Drivers: Unable to prepare some provider drivers:", errs)
+	}
+	if !ok {
+		return fmt.Errorf("Drivers: Failed to prepare drivers")
 	}
 	return nil
 }
@@ -71,7 +75,8 @@ func load(db *database.Database, configs ConfigDrivers) error {
 			for name := range configs.Providers {
 				if name == fbr.Name() || strings.HasPrefix(name, fbr.Name()+"/") {
 					providerInstances[name] = fbr.New()
-					log.Info("Drivers: Provider driver loaded:", fbr.Name(), "as", name)
+					providerInstances[name].SetName(name)
+					log.Info("Drivers: Provider driver loaded:", fbr.Name(), "as", providerInstances[name].Name())
 				}
 			}
 		}
@@ -98,7 +103,8 @@ func load(db *database.Database, configs ConfigDrivers) error {
 			for name := range configs.Gates {
 				if name == fbr.Name() || strings.HasPrefix(name, fbr.Name()+"/") {
 					gateInstances[name] = fbr.New(db)
-					log.Info("Drivers: Gate driver loaded:", fbr.Name(), "as", name)
+					gateInstances[name].SetName(name)
+					log.Info("Drivers: Gate driver loaded:", fbr.Name(), "as", gateInstances[name].Name())
 				}
 			}
 		}
@@ -114,7 +120,9 @@ func load(db *database.Database, configs ConfigDrivers) error {
 }
 
 // prepare initializes the drivers with provided configs
-func prepare(wd string, configs ConfigDrivers) (errs []error) {
+func prepare(wd string, configs ConfigDrivers) (ok bool, errs []error) {
+	mandatoryDriversLoaded := true
+
 	// Activating providers
 	activatedProviderInstances := make(map[string]provider.Driver)
 
@@ -130,13 +138,16 @@ func prepare(wd string, configs ConfigDrivers) (errs []error) {
 
 		if err := drv.Prepare(jsonCfg); err != nil {
 			errs = append(errs, err)
-			log.Warn("Drivers: Provider driver prepare failed:", drv.Name(), err)
+			log.Error("Drivers: Provider driver prepare failed:", drv.Name(), err)
 		} else {
 			activatedProviderInstances[name] = drv
 			log.Info("Drivers: Provider driver activated:", drv.Name())
 		}
 	}
 
+	if configs.Providers != nil && len(providerDrivers) != len(activatedProviderInstances) {
+		mandatoryDriversLoaded = false
+	}
 	providerDrivers = activatedProviderInstances
 
 	// Activating gates
@@ -161,9 +172,12 @@ func prepare(wd string, configs ConfigDrivers) (errs []error) {
 		}
 	}
 
+	if configs.Gates != nil && len(gateDrivers) != len(activatedGateInstances) {
+		mandatoryDriversLoaded = false
+	}
 	gateDrivers = activatedGateInstances
 
-	return errs
+	return mandatoryDriversLoaded, errs
 }
 
 // GetProvider returns specific provider driver by name

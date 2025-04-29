@@ -1146,7 +1146,7 @@ components:
     LabelDefinition:
       type: object
       description: >
-        Describes Label's ways to provide aa ApplciationResource - it contains name of the driver,
+        Describes Label's ways to provide aa ApplicationResource - it contains name of the driver,
         it's resource and additional options.
       required:
         - driver
@@ -1462,6 +1462,9 @@ components:
         authentication:
           $ref: '#/components/schemas/Authentication'
           description: Authentication information to connect.
+        timeout:
+          x-go-type: time.Time
+          description: Calculated during allocation time of when the Resource have to die anyway
 
     ApplicationResourceAccessUID:
       type: string
