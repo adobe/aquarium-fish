@@ -17,6 +17,7 @@ package docker
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -100,14 +101,23 @@ func (d *Driver) Prepare(config []byte) error {
 	if len(cpuMem) < 2 {
 		return fmt.Errorf("DOCKER: %s: Not enough info values in return: %q", d.name, cpuMem)
 	}
+
 	parsedCPU, err := strconv.ParseUint(cpuMem[0], 10, 64)
 	if err != nil {
 		return fmt.Errorf("DOCKER: %s: Unable to parse CPU uint: %v (%q)", d.name, err, cpuMem[0])
 	}
-	if parsedCPU > uint64(^uint(0)) { // Check if parsedCPU exceeds the maximum value of uint
+	// Determine the maximum value for uint based on the platform's bit size
+	var maxUint uint64
+	if strconv.IntSize == 32 { // 32-bit platform
+		maxUint = math.MaxUint32
+	} else { // 64-bit platform
+		maxUint = math.MaxUint64
+	}
+	if parsedCPU > maxUint {
 		return fmt.Errorf("DOCKER: %s: Parsed CPU value exceeds maximum uint value: %v (%q)", d.name, parsedCPU, cpuMem[0])
 	}
 	d.totalCPU = uint(parsedCPU)
+
 	parsedRAM, err := strconv.ParseUint(cpuMem[1], 10, 64)
 	if err != nil {
 		return fmt.Errorf("DOCKER: %s: Unable to parse RAM uint: %v (%q)", d.name, err, cpuMem[1])
