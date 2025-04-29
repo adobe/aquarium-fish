@@ -95,7 +95,7 @@ func (d *Driver) SetName(name string) {
 }
 
 // Prepare initializes the driver
-func (d *Driver) Prepare(wd string, config []byte) error {
+func (d *Driver) Prepare(_ string, config []byte) error {
 	if err := d.cfg.Apply(config); err != nil {
 		return err
 	}

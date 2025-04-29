@@ -19,10 +19,10 @@ import (
 	"os"
 )
 
-type verbosityType int8
+type VerbosityType int8
 
 const (
-	VerbosityNone  verbosityType = iota // 0
+	VerbosityNone  VerbosityType = iota // 0
 	VerbosityDebug                      // 1
 	VerbosityInfo                       // 2
 	VerbosityWarn                       // 3
@@ -66,7 +66,7 @@ func SetVerbosity(level string) error {
 }
 
 // GetVerbosity returns current verbosity level
-func GetVerbosity() verbosityType {
+func GetVerbosity() VerbosityType {
 	return verbosity
 }
 

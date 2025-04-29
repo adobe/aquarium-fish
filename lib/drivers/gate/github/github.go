@@ -178,8 +178,9 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 	// Processing queued event
 	if err == database.ErrObjectNotFound && job.GetStatus() == jobQueued {
 		// Checking labels on the job to link the right one
-		if job.Labels == nil || len(job.Labels) < 2 || job.Labels[0] != "self-hosted" {
+		if len(job.Labels) < 2 || job.Labels[0] != "self-hosted" {
 			log.Infof("GITHUB: %s: Skipping the job %s in repo %s/%s due to incorrect labels provided: %q", d.name, runJobID, owner, repo, job.Labels)
+			// We returning nil here because it's not Fish fault someone made a mistake in workflow
 			return nil
 		}
 		name := job.Labels[1]
@@ -196,7 +197,8 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 		labels, err := d.db.LabelList(params)
 		if err != nil || len(labels) < 1 {
 			log.Infof("GITHUB: %s: Skipping the job %s on repo %s/%s: Unable to find the requested label %q", d.name, runJobID, owner, repo, job.Labels[1])
-			return nil
+			// We returning nil here because it's not Fish fault someone made a mistake in workflow
+			return nil //nolint:nilerr
 		}
 
 		// Unfortunately JIT runners has quite tight timeouts on connection (<5min) and has builtin
@@ -217,6 +219,9 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 			"GITHUB_RUNNER_LABELS":    strings.Join(job.Labels[:2], ","), // Using just first 2 validated labels
 			"GITHUB_RUNNER_REG_TOKEN": runnerToken.GetToken(),
 		})
+		if err != nil {
+			return fmt.Errorf("Unable to create application metadata: %v", err)
+		}
 		app := types.Application{
 			LabelUID:  labels[0].UID,
 			OwnerName: d.name,
@@ -253,7 +258,7 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 
 		log.Infof("GITHUB: %s: The runner %q (%d) was allocated and executing job: %s", d.name, job.GetRunnerName(), job.GetRunnerID(), runJobID)
 
-		// Updating the record in database to reflect the successfull allocation
+		// Updating the record in database to reflect the successful allocation
 		j := dbJob{
 			CreatedAt:   time.Now(),
 			Status:      job.GetStatus(),
@@ -280,7 +285,7 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 			return err
 		}
 
-		// Updating the record in database to reflect the successfull deallocation
+		// Updating the record in database to reflect the successful deallocation
 		j := dbJob{
 			CreatedAt:   time.Now(),
 			Status:      job.GetStatus(),
@@ -332,7 +337,7 @@ func (d *Driver) cleanupDBProcess() {
 }
 
 // cleanupDB cleans the outdated hooks & jobs
-func (d *Driver) cleanupDB() error {
+func (d *Driver) cleanupDB() {
 	// Counters to keep statistics
 	counterFound := 0
 	counterRemoved := 0
@@ -343,7 +348,7 @@ func (d *Driver) cleanupDB() error {
 	deliveryCutTime := time.Now().Add(-time.Duration(d.cfg.DeliveryValidInterval))
 	d.db.Scan(dbPrefixHook, func(key string) error {
 		counterMutex.Lock()
-		counterFound += 1
+		counterFound++
 		counterMutex.Unlock()
 		var hook dbWebhook
 		d.db.Get(dbPrefixHook, key, &hook)
@@ -351,7 +356,7 @@ func (d *Driver) cleanupDB() error {
 			log.Debugf("GITHUB: %s: cleanupDB: Cleaning webhook record: %s:%s", d.name, dbPrefixHook, key)
 			d.db.Del(dbPrefixHook, key)
 			counterMutex.Lock()
-			counterRemoved += 1
+			counterRemoved++
 			counterMutex.Unlock()
 		}
 		return nil
@@ -362,7 +367,7 @@ func (d *Driver) cleanupDB() error {
 	defaultStaleCutTime := time.Now().Add(-time.Duration(d.cfg.DefaultJobMaxLifetime))
 	d.db.Scan(dbPrefixJob, func(key string) error {
 		counterMutex.Lock()
-		counterFound += 1
+		counterFound++
 		counterMutex.Unlock()
 		var job dbJob
 		d.db.Get(dbPrefixJob, key, &job)
@@ -376,7 +381,7 @@ func (d *Driver) cleanupDB() error {
 					log.Errorf("GITHUB: %s: cleanupDB: Cleaning job %s record: %s:%s failed: %v", d.name, job.Status, dbPrefixJob, key, err)
 				} else {
 					counterMutex.Lock()
-					counterRemoved += 1
+					counterRemoved++
 					counterMutex.Unlock()
 				}
 			case jobQueued:
@@ -396,7 +401,7 @@ func (d *Driver) cleanupDB() error {
 						log.Errorf("GITHUB: %s: cleanupDB: Cleaning job %s record: %s:%s failed: %v", d.name, job.Status, dbPrefixJob, key, err)
 					} else {
 						counterMutex.Lock()
-						counterRemoved += 1
+						counterRemoved++
 						counterMutex.Unlock()
 					}
 				}
@@ -413,7 +418,7 @@ func (d *Driver) cleanupDB() error {
 						log.Errorf("GITHUB: %s: cleanupDB: Cleaning job %s record: %s:%s failed: %v", d.name, job.Status, dbPrefixJob, key, err)
 					} else {
 						counterMutex.Lock()
-						counterRemoved += 1
+						counterRemoved++
 						counterMutex.Unlock()
 					}
 					return nil
@@ -427,7 +432,7 @@ func (d *Driver) cleanupDB() error {
 						log.Errorf("GITHUB: %s: cleanupDB: Cleaning job %s record: %s:%s failed: %v", d.name, job.Status, dbPrefixJob, key, err)
 					} else {
 						counterMutex.Lock()
-						counterRemoved += 1
+						counterRemoved++
 						counterMutex.Unlock()
 					}
 					return nil
@@ -456,7 +461,7 @@ func (d *Driver) cleanupDB() error {
 						log.Errorf("GITHUB: %s: cleanupDB: Cleaning job %s record: %s:%s failed: %v", d.name, job.Status, dbPrefixJob, key, err)
 					} else {
 						counterMutex.Lock()
-						counterRemoved += 1
+						counterRemoved++
 						counterMutex.Unlock()
 					}
 				}
@@ -466,8 +471,6 @@ func (d *Driver) cleanupDB() error {
 	})
 
 	log.Debugf("GITHUB: %s: cleanupDB: found %d records and cleaned %d", d.name, counterFound, counterRemoved)
-
-	return nil
 }
 
 // Init for token
@@ -477,6 +480,7 @@ func (d *Driver) init() error {
 		// TODO: Listen for webhook
 		// It's easy to do - just listen for post requests on BindAddress from config and send to
 		// existing procesing function d.extractJob and then to d.executeJob
+		log.Warnf("GITHUB: %s: WebHook listener not yet implemented", d.name)
 	}
 
 	// Now running relatively slow API repo updater to ensure the creds are working correctly

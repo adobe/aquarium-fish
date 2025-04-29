@@ -43,7 +43,7 @@ func (d *Driver) validateDelivery(delivery *github.HookDelivery) bool {
 // checkDeliveries verifies happened deliveries
 // It will be skipped if Pull by API is not configured
 // It will run on schedule if gate is configured only for Pull by API
-// It will run on schedule if gate is configured configured for both Push and Pull
+// It will run on schedule if gate is configured for both Push and Pull
 func (d *Driver) checkDeliveries() (outerr error) {
 	d.hooksMutex.RLock()
 	defer d.hooksMutex.RUnlock()
@@ -283,7 +283,7 @@ func (d *Driver) cleanupRunners() (outerr error) {
 			}
 
 			// Checking if the runner is in the naughty list
-			// Using unique name & ID, becouse just ID can be reused
+			// Using unique name & ID, because just ID can be reused
 			runnerID := fmt.Sprintf("%s/%s/runner/%s ID:%d", owner, repo, runner.GetName(), runner.GetID())
 			found := -1
 			for index, id := range d.runnersNaughtyList {
@@ -349,7 +349,7 @@ func (d *Driver) pullBackgroundProcess() {
 		log.Infof("GITHUB: %s: backgroundProcess: Triggering cleanupRunners once per %s", d.name, interval)
 	}
 
-	interval = time.Duration(time.Duration(d.cfg.APIMinCheckInterval))
+	interval = time.Duration(d.cfg.APIMinCheckInterval)
 	checkDeliveriesTicker := time.NewTicker(interval)
 	defer checkDeliveriesTicker.Stop()
 	log.Infof("GITHUB: %s: backgroundProcess: Triggering checkDeliveries once per %s", d.name, interval)

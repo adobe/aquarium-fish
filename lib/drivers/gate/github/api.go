@@ -36,7 +36,7 @@ func (d *Driver) lockClient() {
 
 	// In case REST API requested to back off for a bit
 	for time.Now().Before(d.clDelayTill) {
-		toSleep := d.clDelayTill.Sub(time.Now())
+		toSleep := time.Until(d.clDelayTill)
 		log.Warnf("GITHUB: %s: REST API operations suspended for the next %s", toSleep)
 		if toSleep > 31*time.Second {
 			toSleep = 30 * time.Second
@@ -125,7 +125,7 @@ func (d *Driver) apiCheckResponse(resp *github.Response, err error) error {
 		if _, ok := err.(*github.RateLimitError); ok {
 			// Since we hit the rate limit - waiting until the next reset + 30 seconds in case time is off
 			d.clDelayTill = resp.Rate.Reset.Add(30 * time.Second)
-			log.Errorf("GITHUB: %s: Hit REST API rate limit, delay next request till next reset: %v", d.name, d.clDelayTill.Sub(time.Now()))
+			log.Errorf("GITHUB: %s: Hit REST API rate limit, delay next request till next reset: %v", d.name, time.Until(d.clDelayTill))
 		}
 
 		log.Debugf("GITHUB: %s: Resetting client", d.name)
