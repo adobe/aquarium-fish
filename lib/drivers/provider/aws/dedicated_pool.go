@@ -385,17 +385,18 @@ func (w *dedicatedPoolWorker) isHostTooOld(host *ec2types.Host) bool {
 
 // Check if the host is ready to be released - if it's mac then it should be older then 24h
 func (w *dedicatedPoolWorker) isHostReadyForRelease(host *ec2types.Host) bool {
+	// Not ready for release if is not old enough
+	if !w.isHostTooOld(host) {
+		return false
+	}
+
 	// Host not used - for sure ready for release
 	if !isHostUsed(host) {
-		// If mac is not old enough - it's not ready for release
-		if !w.isHostTooOld(host) {
-			return false
-		}
 		return true
 	}
 
-	// Host in scrubbing process (pending) can be released but should be old enough
-	if host.State == ec2types.AllocationStatePending && w.isHostTooOld(host) {
+	// Host in scrubbing process (pending) can be released
+	if host.State == ec2types.AllocationStatePending {
 		return true
 	}
 

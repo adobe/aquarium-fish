@@ -458,8 +458,22 @@ func (f *Fish) CleanupDB() {
 	}
 }
 
-// electionProcess performs & monitors the election process for the new Application until the exec
-// node will be elected.
+// CompactDB runs stale Applications and data removing
+func (f *Fish) CompactDB() {
+	log.Debug("Fish: CompactDB running...")
+	defer log.Debug("Fish: CompactDB done")
+
+	s, _ := f.db.Stats()
+	log.Debugf("Fish: CompactDB: Before compaction: Datafiles: %d, Keys: %d, Size: %d, Reclaimable: %d", s.Datafiles, s.Keys, s.Size, s.Reclaimable)
+
+	f.db.Merge()
+
+	s, _ = f.db.Stats()
+	log.Debugf("Fish: CompactDB: After compaction: Datafiles: %d, Keys: %d, Size: %d, Reclaimable: %d", s.Datafiles, s.Keys, s.Size, s.Reclaimable)
+}
+
+// electionProcess performs & monitors the election process for the NEW Application until it's in
+// ALLOCATED state.
 func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 	vote, err := f.activeVotesGet(appUID)
 	if err != nil {
