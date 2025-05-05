@@ -52,10 +52,6 @@ func New(path string) (*Database, error) {
 	return &Database{be: be}, nil
 }
 
-func (d *Database) Subscribe(ch chan any) {
-	log.Debug("DB: Subscribe to", ch)
-}
-
 // CompactDB runs stale Applications and data removing
 func (d *Database) CompactDB() error {
 	log.Debug("DB: CompactDB running...")

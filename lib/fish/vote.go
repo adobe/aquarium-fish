@@ -124,7 +124,7 @@ func (f *Fish) wonVotesGetRemove(appUID types.ApplicationUID) *types.Vote {
 }
 
 // wonVotesAdd will add won Vote to the list
-func (f *Fish) wonVotesAdd(vote types.Vote, appCreatedAt time.Time) {
+func (f *Fish) wonVotesAdd(vote types.Vote) {
 	f.wonVotesMutex.Lock()
 	defer f.wonVotesMutex.Unlock()
 

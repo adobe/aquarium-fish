@@ -149,7 +149,7 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 						return log.Error("Fish: Unable to set Application state:", app.UID, err)
 					}
 
-					f.wonVotesAdd(bestVote, app.CreatedAt)
+					f.wonVotesAdd(bestVote)
 				} else {
 					log.Infof("Fish: Election %q: I lost the election to Node %s", appUID, vote.NodeUID)
 				}
@@ -170,6 +170,7 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 					// The Application become elected, so wait for 10 rounds while in ELECTED to
 					// give the node some time to actually allocate the application. When those 10
 					// rounds ended
+					// TODO
 				} else if s.Status != types.ApplicationStatusNEW {
 					// The Application state was changed by some node, so we can drop the election process
 					f.activeVotesRemove(vote.UID)

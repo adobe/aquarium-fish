@@ -197,7 +197,7 @@ func (f *Fish) Init() error {
 		if f.db.ApplicationIsAllocated(res.ApplicationUID) == nil {
 			log.Info("Fish: Found allocated resource to serve:", res.UID)
 			// We will not retry here, because the mentioned Applications should be already running
-			if err, _ := f.executeApplicationStart(res.ApplicationUID, res.DefinitionIndex); err != nil {
+			if _, err := f.executeApplicationStart(res.ApplicationUID, res.DefinitionIndex); err != nil {
 				f.applicationsMutex.Lock()
 				f.removeFromExecutingApplications(res.ApplicationUID)
 				f.applicationsMutex.Unlock()

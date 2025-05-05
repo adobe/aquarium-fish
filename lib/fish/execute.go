@@ -42,7 +42,7 @@ func (f *Fish) maybeRunExecuteApplicationStart(appState *types.ApplicationState)
 
 	log.Info("Fish: Running execution of Application:", appState.ApplicationUID, appState.CreatedAt)
 
-	err, retry := f.executeApplicationStart(vote.ApplicationUID, vote.Available)
+	retry, err := f.executeApplicationStart(vote.ApplicationUID, vote.Available)
 	if err == nil {
 		return
 	}
@@ -104,7 +104,7 @@ func (f *Fish) maybeRunExecuteApplicationStop(appState *types.ApplicationState) 
 // First stage should execute relatively quickly (to not get over ping delay), otherwise
 // that will cause the cluster to start another round of election. Second stage is executed
 // on background and watches the Application till it's deallocated.
-func (f *Fish) executeApplicationStart(appUID types.ApplicationUID, defIndex int) (error, bool) {
+func (f *Fish) executeApplicationStart(appUID types.ApplicationUID, defIndex int) (bool, error) {
 	log.Debug("Fish: Start executing Application:", appUID.String())
 	// Check the application is executed already
 	f.applicationsMutex.Lock()
@@ -112,7 +112,7 @@ func (f *Fish) executeApplicationStart(appUID types.ApplicationUID, defIndex int
 		if uid == appUID {
 			// Seems the application is already executing
 			f.applicationsMutex.Unlock()
-			return nil, false
+			return false, nil
 		}
 	}
 	// Adding the application to list
@@ -121,36 +121,36 @@ func (f *Fish) executeApplicationStart(appUID types.ApplicationUID, defIndex int
 
 	// Make sure definition is >= 0 which means it was chosen by the node
 	if defIndex < 0 {
-		return fmt.Errorf("The definition index for Application %s is not chosen: %v", appUID, defIndex), false
+		return false, fmt.Errorf("The definition index for Application %s is not chosen: %v", appUID, defIndex)
 	}
 
 	app, err := f.db.ApplicationGet(appUID)
 	if err != nil {
-		return fmt.Errorf("Unable to get the Application: %v", err), true
+		return true, fmt.Errorf("Unable to get the Application: %v", err)
 	}
 
 	// Check current Application state
 	appState, err := f.db.ApplicationStateGetByApplication(app.UID)
 	if err != nil {
-		return fmt.Errorf("Unable to get the Application state: %v", err), true
+		return true, fmt.Errorf("Unable to get the Application state: %v", err)
 	}
 
 	// Get label with the definitions
 	label, err := f.db.LabelGet(app.LabelUID)
 	if err != nil {
-		return fmt.Errorf("Unable to find Label %s: %v", app.LabelUID, err), true
+		return true, fmt.Errorf("Unable to find Label %s: %v", app.LabelUID, err)
 	}
 
 	// Extract the Label Definition by the provided index
 	if len(label.Definitions) <= defIndex {
-		return fmt.Errorf("The chosen Definition does not exist in the Label %s: %v (App: %s)", app.LabelUID, defIndex, app.UID), false
+		return false, fmt.Errorf("The chosen Definition does not exist in the Label %s: %v (App: %s)", app.LabelUID, defIndex, app.UID)
 	}
 	labelDef := label.Definitions[defIndex]
 
 	// Locate the required driver
 	driver := drivers.GetProvider(labelDef.Driver)
 	if driver == nil {
-		return fmt.Errorf("Unable to locate driver for the Application %s: %s", app.UID, labelDef.Driver), true
+		return true, fmt.Errorf("Unable to locate driver for the Application %s: %s", app.UID, labelDef.Driver)
 	}
 
 	// The already running applications will not consume the additional resources
@@ -158,7 +158,7 @@ func (f *Fish) executeApplicationStart(appUID types.ApplicationUID, defIndex int
 		// In case there are multiple Applications won the election process on the same node it
 		// could just have not enough resources, so skip it to allow the other Nodes to try again.
 		if !f.isNodeAvailableForDefinition(labelDef) {
-			return fmt.Errorf("Not enough resources to execute the Application %s", app.UID), true
+			return true, fmt.Errorf("Not enough resources to execute the Application %s", app.UID)
 		}
 	}
 
@@ -323,7 +323,7 @@ func (f *Fish) executeApplicationStart(appUID types.ApplicationUID, defIndex int
 		f.removeFromExecutingApplications(app.UID)
 	}()
 
-	return nil, false
+	return false, nil
 }
 
 func (f *Fish) executeApplicationStop(appUID types.ApplicationUID) error {
@@ -365,7 +365,7 @@ func (f *Fish) executeApplicationStop(appUID types.ApplicationUID) error {
 		log.Infof("Fish: Application Stop %s: Running Deallocate of the ApplicationResource:", appUID, res.Identifier)
 
 		// Deallocating and destroy the resource
-		for retry := 0; retry < 20; retry++ {
+		for retry := range 20 {
 			if err := driver.Deallocate(res); err != nil {
 				log.Errorf("Fish: Application Stop %s: Unable to deallocate the ApplicationResource (try: %d): %v", appUID, retry, err)
 				appState = &types.ApplicationState{ApplicationUID: appUID, Status: types.ApplicationStatusERROR,
@@ -513,9 +513,9 @@ func (f *Fish) applicationTimeoutNext() (uid types.ApplicationUID, to <-chan tim
 
 	var minTime = time.Now().Add(time.Hour)
 
-	for appUid, timeout := range f.applicationsTimeouts {
+	for appUID, timeout := range f.applicationsTimeouts {
 		if minTime.After(timeout) {
-			uid = appUid
+			uid = appUID
 			minTime = timeout
 		}
 	}
