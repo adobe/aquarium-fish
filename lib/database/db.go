@@ -33,6 +33,9 @@ type Database struct {
 
 	// Memory storage for current node - we using it to generate new UIDs
 	node types.Node
+
+	// Subscriptions to notify subscribers about changes in DB, contains key prefix and channel
+	subsApplicationState []chan *types.ApplicationState
 }
 
 // Init creates the database object by provided path
@@ -47,6 +50,10 @@ func New(path string) (*Database, error) {
 	}
 
 	return &Database{be: be}, nil
+}
+
+func (d *Database) Subscribe(ch chan any) {
+	log.Debug("DB: Subscribe to", ch)
 }
 
 // CompactDB runs stale Applications and data removing

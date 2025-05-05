@@ -22,7 +22,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
-const DefaultDBCleanupDelay = 10 * time.Minute
+const DefaultDBCleanupInterval = 10 * time.Minute
 
 // Config defines Fish node configuration
 type Config struct {
@@ -45,7 +45,9 @@ type Config struct {
 
 	DefaultResourceLifetime util.Duration `json:"default_resource_lifetime"` // Sets the lifetime of the resource which will be used if label definition one is not set
 
-	DBCleanupDelay util.Duration `json:"db_cleanup_delay"` // Defines the database item cleanup delay when Application reached the end of life (by error or deallocated)
+	AllocationRetry uint `json:"allocation_retry"` // How many times to retry the allocation in case error happened, default: 3
+
+	DBCleanupInterval util.Duration `json:"db_cleanup_interval"` // Defines the database item cleanup interval when Application reached the end of life (by error or deallocated)
 
 	DisableAuth bool `json:"disable_auth"` // WARNING! For performance testing only
 
@@ -89,5 +91,6 @@ func (c *Config) initDefaults() {
 	c.TLSCrt = "" // ...
 	c.TLSCaCrt = "ca.crt"
 	c.NodeName, _ = os.Hostname()
-	c.DBCleanupDelay = util.Duration(DefaultDBCleanupDelay)
+	c.AllocationRetry = 3
+	c.DBCleanupInterval = util.Duration(DefaultDBCleanupInterval)
 }

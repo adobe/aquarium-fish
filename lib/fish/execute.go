@@ -1,0 +1,535 @@
+/**
+ * Copyright 2025 Adobe. All rights reserved.
+ * This file is licensed to you under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License. You may obtain a copy
+ * of the License at http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under
+ * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR REPRESENTATIONS
+ * OF ANY KIND, either express or implied. See the License for the specific language
+ * governing permissions and limitations under the License.
+ */
+
+package fish
+
+import (
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"github.com/google/uuid"
+
+	"github.com/adobe/aquarium-fish/lib/drivers"
+	"github.com/adobe/aquarium-fish/lib/drivers/provider"
+	"github.com/adobe/aquarium-fish/lib/log"
+	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	"github.com/adobe/aquarium-fish/lib/util"
+)
+
+// maybeRunExecuteApplicationStart will run executeApplication if it was not already started
+func (f *Fish) maybeRunExecuteApplicationStart(appState *types.ApplicationState) {
+	if appState.Status != types.ApplicationStatusELECTED {
+		// Applications are going to execution only when they are ELECTED.
+		// ALLOCATED ones are running while the node startup so we need strictly ELECTED ones here
+		return
+	}
+
+	// Check if this node won the election process
+	vote := f.wonVotesGetRemove(appState.ApplicationUID)
+	if vote == nil {
+		return
+	}
+
+	log.Info("Fish: Running execution of Application:", appState.ApplicationUID, appState.CreatedAt)
+
+	err, retry := f.executeApplicationStart(vote.ApplicationUID, vote.Available)
+	if err == nil {
+		return
+	}
+
+	// The application execution failed from here
+
+	// Cleanup for executed application
+	f.applicationsMutex.Lock()
+	f.removeFromExecutingApplications(appState.ApplicationUID)
+	f.applicationsMutex.Unlock()
+
+	// If we have retries left for Application - trying to elect the node again
+	if retry && f.db.ApplicationStateNewCount(appState.ApplicationUID) < f.cfg.AllocationRetry {
+		log.Warnf("Fish: Can't allocate Application %s, will retry: %v", appState.ApplicationUID, err)
+
+		// Returning Application to the original NEW state
+		// to allow the other nodes to try out their luck
+		appState = &types.ApplicationState{
+			ApplicationUID: appState.ApplicationUID,
+			Status:         types.ApplicationStatusNEW,
+			Description:    fmt.Sprintf("Failed to run execution on node %s, retry: %v", f.db.GetNodeName(), err),
+		}
+	} else {
+		log.Errorf("Fish: Can't allocate Application %s: %v", appState.ApplicationUID, err)
+		appState = &types.ApplicationState{ApplicationUID: appState.ApplicationUID, Status: types.ApplicationStatusERROR,
+			Description: fmt.Sprint("Driver allocate resource error:", err),
+		}
+	}
+	if err := f.db.ApplicationStateCreate(appState); err != nil {
+		log.Errorf("Fish: Unable to create ApplicationState for Application %s: %v", appState.ApplicationUID, err)
+	}
+}
+
+func (f *Fish) maybeRunExecuteApplicationStop(appState *types.ApplicationState) {
+	if appState.Status != types.ApplicationStatusDEALLOCATE && appState.Status != types.ApplicationStatusRECALLED {
+		// Applications are going to execution only when they are ELECTED.
+		// ALLOCATED ones are running while the node startup so we need strictly ELECTED ones here
+		return
+	}
+
+	found := false
+	f.applicationsMutex.Lock()
+	for _, uid := range f.applications {
+		if uid == appState.ApplicationUID {
+			found = true
+			break
+		}
+	}
+	f.applicationsMutex.Unlock()
+	if !found {
+		// Application is not running by this node
+		return
+	}
+
+	go f.executeApplicationStop(appState.ApplicationUID)
+}
+
+// executeApplication runs the initial and continuous process of the Application allocation.
+// First stage should execute relatively quickly (to not get over ping delay), otherwise
+// that will cause the cluster to start another round of election. Second stage is executed
+// on background and watches the Application till it's deallocated.
+func (f *Fish) executeApplicationStart(appUID types.ApplicationUID, defIndex int) (error, bool) {
+	log.Debug("Fish: Start executing Application:", appUID.String())
+	// Check the application is executed already
+	f.applicationsMutex.Lock()
+	for _, uid := range f.applications {
+		if uid == appUID {
+			// Seems the application is already executing
+			f.applicationsMutex.Unlock()
+			return nil, false
+		}
+	}
+	// Adding the application to list
+	f.applications = append(f.applications, appUID)
+	f.applicationsMutex.Unlock()
+
+	// Make sure definition is >= 0 which means it was chosen by the node
+	if defIndex < 0 {
+		return fmt.Errorf("The definition index for Application %s is not chosen: %v", appUID, defIndex), false
+	}
+
+	app, err := f.db.ApplicationGet(appUID)
+	if err != nil {
+		return fmt.Errorf("Unable to get the Application: %v", err), true
+	}
+
+	// Check current Application state
+	appState, err := f.db.ApplicationStateGetByApplication(app.UID)
+	if err != nil {
+		return fmt.Errorf("Unable to get the Application state: %v", err), true
+	}
+
+	// Get label with the definitions
+	label, err := f.db.LabelGet(app.LabelUID)
+	if err != nil {
+		return fmt.Errorf("Unable to find Label %s: %v", app.LabelUID, err), true
+	}
+
+	// Extract the Label Definition by the provided index
+	if len(label.Definitions) <= defIndex {
+		return fmt.Errorf("The chosen Definition does not exist in the Label %s: %v (App: %s)", app.LabelUID, defIndex, app.UID), false
+	}
+	labelDef := label.Definitions[defIndex]
+
+	// Locate the required driver
+	driver := drivers.GetProvider(labelDef.Driver)
+	if driver == nil {
+		return fmt.Errorf("Unable to locate driver for the Application %s: %s", app.UID, labelDef.Driver), true
+	}
+
+	// The already running applications will not consume the additional resources
+	if appState.Status == types.ApplicationStatusELECTED {
+		// In case there are multiple Applications won the election process on the same node it
+		// could just have not enough resources, so skip it to allow the other Nodes to try again.
+		if !f.isNodeAvailableForDefinition(labelDef) {
+			return fmt.Errorf("Not enough resources to execute the Application %s", app.UID), true
+		}
+	}
+
+	// If the driver is not using the remote resources - we need to increase the counter
+	if !driver.IsRemote() {
+		f.nodeUsageMutex.Lock()
+		f.nodeUsage.Add(labelDef.Resources)
+		f.nodeUsageMutex.Unlock()
+	}
+
+	// The main application processing is executed on background because allocation could take a
+	// while, after that the bg process will wait for application state change. We do not separate
+	// it into method because effectively it could not be running without the logic above.
+	go func() {
+		f.routinesMutex.Lock()
+		f.routines.Add(1)
+		f.routinesMutex.Unlock()
+		defer f.routines.Done()
+		defer log.Info("Fish: Exiting executing Application", app.UID, appState.Status)
+
+		log.Info("Fish: Continuing executing Application", app.UID, appState.Status)
+
+		// Get or create the new resource object
+		var res *types.ApplicationResource
+		if appState.Status == types.ApplicationStatusELECTED {
+			// Merge application and label metadata, in this exact order
+			var mergedMetadata []byte
+			var metadata map[string]any
+			if err := json.Unmarshal([]byte(app.Metadata), &metadata); err != nil {
+				log.Error("Fish: Unable to parse the Application metadata:", app.UID, err)
+				appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
+					Description: fmt.Sprint("Unable to parse the app metadata:", err),
+				}
+				f.db.ApplicationStateCreate(appState)
+			} else if err := json.Unmarshal([]byte(label.Metadata), &metadata); err != nil {
+				log.Error("Fish: Unable to parse the Label metadata:", label.UID, err)
+				appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
+					Description: fmt.Sprint("Unable to parse the label metadata:", err),
+				}
+				f.db.ApplicationStateCreate(appState)
+			} else if mergedMetadata, err = json.Marshal(metadata); err != nil {
+				log.Error("Fish: Unable to merge metadata:", label.UID, err)
+				appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
+					Description: fmt.Sprint("Unable to merge metadata:", err),
+				}
+				f.db.ApplicationStateCreate(appState)
+			}
+			res = &types.ApplicationResource{
+				ApplicationUID: app.UID,
+				NodeUID:        f.db.GetNodeUID(),
+				Metadata:       util.UnparsedJSON(mergedMetadata),
+			}
+		} else if appState.Status == types.ApplicationStatusALLOCATED {
+			res, err = f.db.ApplicationResourceGetByApplication(app.UID)
+			if err != nil {
+				log.Error("Fish: Unable to get the allocated Resource for Application:", app.UID, err)
+				appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
+					Description: fmt.Sprint("Unable to find the allocated resource:", err),
+				}
+				f.db.ApplicationStateCreate(appState)
+			}
+		}
+
+		var metadata map[string]any
+		if appState.Status == types.ApplicationStatusELECTED {
+			if err := json.Unmarshal([]byte(res.Metadata), &metadata); err != nil {
+				log.Error("Fish: Unable to parse the ApplicationResource metadata:", app.UID, err)
+				appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
+					Description: fmt.Sprint("Unable to parse the res metadata:", err),
+				}
+				f.db.ApplicationStateCreate(appState)
+			}
+		}
+
+		// Allocate the resource
+		if appState.Status == types.ApplicationStatusELECTED {
+			// Run the allocation
+			log.Infof("Fish: Allocate the Application %s with label %q definition %d resource using driver: %s", app.UID, label.Name, defIndex, driver.Name())
+			drvRes, err := driver.Allocate(labelDef, metadata)
+			if err != nil {
+				// If we have retries left for Application - trying to elect the node again
+				if f.db.ApplicationStateNewCount(app.UID) < f.cfg.AllocationRetry {
+					log.Warnf("Fish: Can't allocate Application %s, will retry: %v", app.UID, err)
+
+					// Returning Application to the original NEW state
+					// to allow the other nodes to try out their luck
+					appState = &types.ApplicationState{
+						ApplicationUID: app.UID,
+						Status:         types.ApplicationStatusNEW,
+						Description:    fmt.Sprintf("Failed to allocate resource on node %s, retry: %v", f.db.GetNodeName(), err),
+					}
+				} else {
+					log.Errorf("Fish: Unable to allocate resource for the Application %s: %v", app.UID, err)
+					appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
+						Description: fmt.Sprint("Driver allocate resource error:", err),
+					}
+				}
+			} else {
+				res.Identifier = drvRes.Identifier
+				res.HwAddr = drvRes.HwAddr
+				res.IpAddr = drvRes.IpAddr
+				res.LabelUID = label.UID
+				res.DefinitionIndex = defIndex
+				res.Authentication = drvRes.Authentication
+
+				// Getting the resource lifetime to know how much time it will live
+				resourceLifetime, err := time.ParseDuration(labelDef.Resources.Lifetime)
+				if labelDef.Resources.Lifetime != "" && err != nil {
+					log.Error("Fish: Can't parse the Lifetime from Label Definition:", label.UID, res.DefinitionIndex)
+				}
+				if err != nil {
+					// Try to get default value from fish config
+					resourceLifetime = time.Duration(f.cfg.DefaultResourceLifetime)
+					if resourceLifetime <= 0 {
+						// Not an error - in worst case the resource will just sit there but at least will
+						// not ruin the workload execution
+						log.Warn("Fish: Default Resource Lifetime is not set in fish config")
+					}
+				}
+
+				if resourceLifetime > 0 {
+					timeout := time.Now().Add(resourceLifetime).Round(time.Second)
+					res.Timeout = &timeout
+				}
+
+				if err = f.db.ApplicationResourceCreate(res); err != nil {
+					log.Error("Fish: Unable to store Resource for Application:", app.UID, err)
+				}
+				appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusALLOCATED,
+					Description: "Driver allocated the resource",
+				}
+				log.Infof("Fish: Allocated Resource for the Application %s: %s", app.UID, res.Identifier)
+			}
+			if err := f.db.ApplicationStateCreate(appState); err != nil {
+				log.Errorf("Fish: Unable to create ApplicationState for Application %s: %v", app.UID, err)
+			}
+		}
+
+		if appState.Status == types.ApplicationStatusALLOCATED {
+			if res.Timeout != nil && !res.Timeout.IsZero() {
+				f.applicationTimeoutSet(app.UID, *res.Timeout)
+			} else {
+				log.Warn("Fish: Resource have no lifetime set and will live until deallocated by user:", app.UID)
+			}
+		}
+
+		// In case the status was incorrect - cleaning the Application execution
+		f.applicationsMutex.Lock()
+		{
+			// Decrease the amout of running local apps
+			if !driver.IsRemote() {
+				f.nodeUsageMutex.Lock()
+				f.nodeUsage.Subtract(labelDef.Resources)
+				f.nodeUsageMutex.Unlock()
+			}
+
+			// Clean the executing application
+			f.removeFromExecutingApplications(app.UID)
+		}
+		f.applicationsMutex.Unlock()
+
+		log.Warn("Fish: Failed to start to execute Application", app.UID, appState.Status)
+	}()
+
+	return nil, false
+}
+
+func (f *Fish) executeApplicationStop(appUID types.ApplicationUID) error {
+	// Check current Application state
+	appState, err := f.db.ApplicationStateGetByApplication(appUID)
+	if err != nil {
+		return log.Errorf("Fish: Application Stop %s: Unable to get ApplicationState: %v", appUID, err)
+	}
+
+	// Getting ApplicationResource for deallocation
+	res, err := f.db.ApplicationResourceGetByApplication(appUID)
+	if err != nil {
+		return log.Errorf("Fish: Application Stop %s: Unable to find ApplicationResource: %v", appUID, err)
+	}
+
+	// Get label with the definitions
+	label, err := f.db.LabelGet(res.LabelUID)
+	if err != nil {
+		return log.Errorf("Fish: Application Stop %s: Unable to find Label %s: %v", appUID, res.LabelUID, err)
+	}
+
+	// Extract the Label Definition by the provided index
+	if len(label.Definitions) <= res.DefinitionIndex {
+		return log.Errorf("Fish: Application Stop %s: The Definition does not exist in the Label %s: %v", appUID, res.LabelUID, res.DefinitionIndex)
+	}
+	labelDef := label.Definitions[res.DefinitionIndex]
+
+	// Locate the required driver
+	driver := drivers.GetProvider(labelDef.Driver)
+	if driver == nil {
+		return log.Errorf("Fish: Application Stop %s: Unable to locate driver: %s", appUID, labelDef.Driver)
+	}
+
+	go func() {
+		// Execute the existing ApplicationTasks. It will be executed prior to executing
+		// deallocation by DEALLOCATE & RECALLED which is useful for `snapshot` and `image` tasks.
+		f.executeApplicationTasks(driver, &labelDef, res, appState.Status)
+
+		log.Infof("Fish: Application Stop %s: Running Deallocate of the ApplicationResource:", appUID, res.Identifier)
+
+		// Deallocating and destroy the resource
+		for retry := 0; retry < 20; retry++ {
+			if err := driver.Deallocate(res); err != nil {
+				log.Errorf("Fish: Application Stop %s: Unable to deallocate the ApplicationResource (try: %d): %v", appUID, retry, err)
+				appState = &types.ApplicationState{ApplicationUID: appUID, Status: types.ApplicationStatusERROR,
+					Description: fmt.Sprint("Driver deallocate resource error:", err),
+				}
+				time.Sleep(10 * time.Second)
+				continue
+			}
+
+			log.Infof("Fish: Application Stop %s: Successful deallocation of the Application:", appUID)
+			appState = &types.ApplicationState{ApplicationUID: appUID, Status: types.ApplicationStatusDEALLOCATED,
+				Description: "Driver deallocated the resource",
+			}
+			break
+		}
+		// Destroying the resource anyway to not bloat the table - otherwise it will stuck there and
+		// will block the access to IP of the other VM's that will reuse this IP
+		if err := f.db.ApplicationResourceDelete(res.UID); err != nil {
+			log.Errorf("Fish: Application Stop %s: Unable to delete ApplicationResource: %v", appUID, err)
+		}
+		if err := f.db.ApplicationStateCreate(appState); err != nil {
+			log.Errorf("Fish: Application Stop %s: Unable to create ApplicationState: %v", appUID, err)
+		}
+
+		f.applicationsMutex.Lock()
+		defer f.applicationsMutex.Unlock()
+
+		// Decrease the amout of running local apps
+		if !driver.IsRemote() {
+			f.nodeUsageMutex.Lock()
+			f.nodeUsage.Subtract(labelDef.Resources)
+			f.nodeUsageMutex.Unlock()
+		}
+
+		// Clean the executing application
+		f.removeFromExecutingApplications(appUID)
+
+		log.Infof("Fish: Application Stop %s: Completed executing of Application: %s", appUID, appState.Status)
+	}()
+
+	return nil
+}
+
+func (f *Fish) executeApplicationTasks(drv provider.Driver, def *types.LabelDefinition, res *types.ApplicationResource, appStatus types.ApplicationStatus) error {
+	// Execute the associated ApplicationTasks if there is some
+	tasks, err := f.db.ApplicationTaskListByApplicationAndWhen(res.ApplicationUID, appStatus)
+	if err != nil {
+		return log.Error("Fish: Unable to get ApplicationTasks:", res.ApplicationUID, err)
+	}
+	for _, task := range tasks {
+		// Skipping already executed task
+		if task.Result != "{}" {
+			continue
+		}
+		t := drv.GetTask(task.Task, string(task.Options))
+		if t == nil {
+			log.Error("Fish: Unable to get associated driver task type for Application:", res.ApplicationUID, task.Task)
+			task.Result = util.UnparsedJSON(`{"error":"task not available in driver"}`)
+		} else {
+			// Executing the task
+			t.SetInfo(&task, def, res)
+			result, err := t.Execute()
+			if err != nil {
+				// We're not crashing here because even with error task could have a result
+				log.Error("Fish: Error happened during executing the task:", task.UID, err)
+			}
+			task.Result = util.UnparsedJSON(result)
+		}
+		if err := f.db.ApplicationTaskSave(&task); err != nil {
+			log.Error("Fish: Error during update the task with result:", task.UID, err)
+		}
+	}
+
+	return nil
+}
+
+// applicationTimeoutAdd creates another record in Fish list of timeouts to be handled
+func (f *Fish) applicationTimeoutSet(uid types.ApplicationUID, to time.Time) {
+	f.applicationsTimeoutsMutex.Lock()
+	defer f.applicationsTimeoutsMutex.Unlock()
+
+	log.Infof("Fish: Application %s will be deallocated by timeout in %s at %s", uid, time.Until(to).Round(time.Second), to)
+
+	// Checking if the provided timeout is prior to everything else in the timeouts list
+	// If one of the timeouts in the list is lower then the new timeout - no need to send update
+	needUpdate := true
+	for _, appTimeout := range f.applicationsTimeouts {
+		if to.After(appTimeout) {
+			needUpdate = false
+			break
+		}
+	}
+
+	f.applicationsTimeouts[uid] = to
+
+	if needUpdate {
+		// Notifying the process on updated
+		f.applicationsTimeoutsUpdated <- struct{}{}
+	}
+}
+
+// applicationTimeoutProcess watches for the ApplicationResources to make sure they are deallocated
+// in time after their lifetime ended. It saves us alot of memory - because we dont need to keep
+// alot of goroutines to watch all running Applications with huge context anymore.
+func (f *Fish) applicationTimeoutProcess() {
+	f.routinesMutex.Lock()
+	f.routines.Add(1)
+	f.routinesMutex.Unlock()
+	defer f.routines.Done()
+	defer log.Info("Fish: applicationTimeoutProcess stopped")
+
+	nextApp, nextTimeout := f.applicationTimeoutNext()
+
+	for {
+		select {
+		case <-f.running.Done():
+			return
+		case <-f.applicationsTimeoutsUpdated:
+			nextApp, nextTimeout = f.applicationTimeoutNext()
+		case timeout := <-nextTimeout:
+			if nextApp != uuid.Nil {
+				log.Warnf("Fish: Application %s reached deadline, sending timeout deallocate", nextApp)
+				appState := &types.ApplicationState{
+					ApplicationUID: nextApp,
+					Status:         types.ApplicationStatusDEALLOCATE,
+					Description:    fmt.Sprint("ApplicationResource reached it's timeout:", timeout),
+				}
+				if err := f.db.ApplicationStateCreate(appState); err != nil {
+					log.Errorf("Fish: Unable to create ApplicationState for Application %s: %v", nextApp, err)
+				}
+				f.applicationsTimeoutsMutex.Lock()
+				delete(f.applicationsTimeouts, nextApp)
+				f.applicationsTimeoutsMutex.Unlock()
+			}
+			// Calling for the next patient
+			nextApp, nextTimeout = f.applicationTimeoutNext()
+		}
+	}
+}
+
+// applicationTimeoutNext returns next closest timeout from the list or 1h
+func (f *Fish) applicationTimeoutNext() (uid types.ApplicationUID, to <-chan time.Time) {
+	f.applicationsTimeoutsMutex.Lock()
+	defer f.applicationsTimeoutsMutex.Unlock()
+
+	var minTime = time.Now().Add(time.Hour)
+
+	for appUid, timeout := range f.applicationsTimeouts {
+		if minTime.After(timeout) {
+			uid = appUid
+			minTime = timeout
+		}
+	}
+
+	return uid, time.After(time.Until(minTime))
+}
+
+func (f *Fish) removeFromExecutingApplications(appUID types.ApplicationUID) {
+	for i, uid := range f.applications {
+		if uid != appUID {
+			continue
+		}
+		f.applications[i] = f.applications[len(f.applications)-1]
+		f.applications = f.applications[:len(f.applications)-1]
+		break
+	}
+}
