@@ -34,7 +34,7 @@ node_location: test_loc
 
 api_address: 127.0.0.1:0
 
-db_cleanup_delay: 10s
+db_cleanup_interval: 10s
 
 drivers:
   gates: {}

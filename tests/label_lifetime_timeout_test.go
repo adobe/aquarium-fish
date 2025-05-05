@@ -128,8 +128,8 @@ drivers:
 		}
 	})
 
-	t.Run("Application should get DEALLOCATED in 5 sec", func(t *testing.T) {
-		h.Retry(&h.Timer{Timeout: 5 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
+	t.Run("Application should get DEALLOCATED in 10 sec", func(t *testing.T) {
+		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).

@@ -139,17 +139,18 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 				} else if bestVote.NodeUID == f.db.GetNodeUID() {
 					log.Infof("Fish: Election %q: I won the election", appUID)
 
+					// Adding the vote to won ones - it should be present before state is passed
+					f.wonVotesAdd(bestVote)
+
 					// Set Application state as ELECTED
-					err := f.db.ApplicationStateCreate(&types.ApplicationState{
+					appState := types.ApplicationState{
 						ApplicationUID: app.UID,
 						Status:         types.ApplicationStatusELECTED,
 						Description:    "Elected node: " + f.db.GetNodeName(),
-					})
-					if err != nil {
+					}
+					if err := f.db.ApplicationStateCreate(&appState); err != nil {
 						return log.Error("Fish: Unable to set Application state:", app.UID, err)
 					}
-
-					f.wonVotesAdd(bestVote)
 				} else {
 					log.Infof("Fish: Election %q: I lost the election to Node %s", appUID, vote.NodeUID)
 				}

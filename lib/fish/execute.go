@@ -177,7 +177,6 @@ func (f *Fish) executeApplicationStart(appUID types.ApplicationUID, defIndex int
 		f.routines.Add(1)
 		f.routinesMutex.Unlock()
 		defer f.routines.Done()
-		defer log.Info("Fish: Exiting executing Application", app.UID, appState.Status)
 
 		log.Info("Fish: Continuing executing Application", app.UID, appState.Status)
 
@@ -304,6 +303,7 @@ func (f *Fish) executeApplicationStart(appUID types.ApplicationUID, defIndex int
 				log.Warn("Fish: Resource have no lifetime set and will live until deallocated by user:", app.UID)
 			}
 			// Everything went just fine, so returning here
+			log.Info("Fish: Completed execute Application start:", app.UID, appState.Status)
 			return
 		}
 
@@ -486,6 +486,7 @@ func (f *Fish) applicationTimeoutProcess() {
 		case <-f.applicationsTimeoutsUpdated:
 			nextApp, nextTimeout = f.applicationTimeoutNext()
 		case timeout := <-nextTimeout:
+			log.Debugf("Fish: applicationTimeoutProcess: Reached timeout for Application %s", nextApp)
 			if nextApp != uuid.Nil {
 				log.Warnf("Fish: Application %s reached deadline, sending timeout deallocate", nextApp)
 				appState := &types.ApplicationState{
@@ -519,6 +520,8 @@ func (f *Fish) applicationTimeoutNext() (uid types.ApplicationUID, to <-chan tim
 			minTime = timeout
 		}
 	}
+
+	log.Debugf("Fish: applicationTimeoutProcess: Next timeout for Application %s at %s", uid, minTime)
 
 	return uid, time.After(time.Until(minTime))
 }
