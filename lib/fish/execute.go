@@ -44,6 +44,7 @@ func (f *Fish) maybeRunExecuteApplicationStart(appState *types.ApplicationState)
 
 	retry, err := f.executeApplicationStart(vote.ApplicationUID, vote.Available)
 	if err == nil {
+		// Started successfully, so nothing to worry about
 		return
 	}
 
@@ -55,7 +56,7 @@ func (f *Fish) maybeRunExecuteApplicationStart(appState *types.ApplicationState)
 	f.applicationsMutex.Unlock()
 
 	// If we have retries left for Application - trying to elect the node again
-	if retry && f.db.ApplicationStateNewCount(appState.ApplicationUID) < f.cfg.AllocationRetry {
+	if retry && f.db.ApplicationStateNewCount(appState.ApplicationUID) <= f.cfg.AllocationRetry {
 		log.Warnf("Fish: Can't allocate Application %s, will retry: %v", appState.ApplicationUID, err)
 
 		// Returning Application to the original NEW state
@@ -239,8 +240,9 @@ func (f *Fish) executeApplicationStart(appUID types.ApplicationUID, defIndex int
 			drvRes, err := driver.Allocate(labelDef, metadata)
 			if err != nil {
 				// If we have retries left for Application - trying to elect the node again
-				if f.db.ApplicationStateNewCount(app.UID) < f.cfg.AllocationRetry {
-					log.Warnf("Fish: Can't allocate Application %s, will retry: %v", app.UID, err)
+				retries := f.db.ApplicationStateNewCount(app.UID)
+				if retries <= f.cfg.AllocationRetry {
+					log.Warnf("Fish: Can't allocate Application %s, will retry (%d): %v", app.UID, retries, err)
 
 					// Returning Application to the original NEW state
 					// to allow the other nodes to try out their luck
@@ -250,7 +252,7 @@ func (f *Fish) executeApplicationStart(appUID types.ApplicationUID, defIndex int
 						Description:    fmt.Sprintf("Failed to allocate resource on node %s, retry: %v", f.db.GetNodeName(), err),
 					}
 				} else {
-					log.Errorf("Fish: Unable to allocate resource for the Application %s: %v", app.UID, err)
+					log.Errorf("Fish: Unable to allocate resource for the Application %s, (tryed: %d): %v", app.UID, retries, err)
 					appState = &types.ApplicationState{ApplicationUID: app.UID, Status: types.ApplicationStatusERROR,
 						Description: fmt.Sprint("Driver allocate resource error:", err),
 					}
