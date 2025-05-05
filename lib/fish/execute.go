@@ -303,24 +303,24 @@ func (f *Fish) executeApplicationStart(appUID types.ApplicationUID, defIndex int
 			} else {
 				log.Warn("Fish: Resource have no lifetime set and will live until deallocated by user:", app.UID)
 			}
+			// Everything went just fine, so returning here
+			return
 		}
 
 		// In case the status was incorrect - cleaning the Application execution
-		f.applicationsMutex.Lock()
-		{
-			// Decrease the amout of running local apps
-			if !driver.IsRemote() {
-				f.nodeUsageMutex.Lock()
-				f.nodeUsage.Subtract(labelDef.Resources)
-				f.nodeUsageMutex.Unlock()
-			}
-
-			// Clean the executing application
-			f.removeFromExecutingApplications(app.UID)
-		}
-		f.applicationsMutex.Unlock()
-
 		log.Warn("Fish: Failed to start to execute Application", app.UID, appState.Status)
+
+		f.applicationsMutex.Lock()
+		defer f.applicationsMutex.Unlock()
+		// Decrease the amout of running local apps
+		if !driver.IsRemote() {
+			f.nodeUsageMutex.Lock()
+			f.nodeUsage.Subtract(labelDef.Resources)
+			f.nodeUsageMutex.Unlock()
+		}
+
+		// Clean the executing application
+		f.removeFromExecutingApplications(app.UID)
 	}()
 
 	return nil, false
