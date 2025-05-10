@@ -72,17 +72,18 @@ type Fish struct {
 	storageVotesMutex sync.RWMutex
 	storageVotes      map[types.VoteUID]types.Vote
 
-	// Stores the currently executing Applications
+	// Stores the currently executing Applications and their locks
 	applicationsMutex sync.Mutex
-	applications      []types.ApplicationUID
+	applications      map[types.ApplicationUID]*sync.Mutex
 
 	// Keeps Applications timeouts Fish watching for
 	applicationsTimeoutsMutex   sync.Mutex
 	applicationsTimeouts        map[types.ApplicationUID]time.Time
 	applicationsTimeoutsUpdated chan struct{} // Notifies about the earlier timeout then exists
 
-	// When Application changes state - fish figures that out through this channel
+	// When Application changes - fish figures that out through those channels
 	applicationStateChannel chan *types.ApplicationState
+	applicationTaskChannel  chan *types.ApplicationTask
 
 	// Stores the current usage of the node resources
 	nodeUsageMutex sync.Mutex // Is needed to protect node resources from concurrent allocations
@@ -106,14 +107,19 @@ func (f *Fish) Init() error {
 	f.Quit = make(chan os.Signal, 1)
 	signal.Notify(f.Quit, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 
-	// Init channel for applicationState changes
+	// Init channel for ApplicationState changes
 	f.applicationStateChannel = make(chan *types.ApplicationState)
 	f.db.SubscribeApplicationState(f.applicationStateChannel)
+
+	// Init channel for ApplicationTask changes
+	f.applicationTaskChannel = make(chan *types.ApplicationTask)
+	f.db.SubscribeApplicationTask(f.applicationTaskChannel)
 
 	// Init variables
 	f.activeVotes = make(map[types.ApplicationUID]*types.Vote)
 	f.wonVotes = make(map[types.ApplicationUID]*types.Vote)
 	f.storageVotes = make(map[types.VoteUID]types.Vote)
+	f.applications = make(map[types.ApplicationUID]*sync.Mutex)
 	f.applicationsTimeouts = make(map[types.ApplicationUID]time.Time)
 	f.applicationsTimeoutsUpdated = make(chan struct{})
 
@@ -199,7 +205,7 @@ func (f *Fish) Init() error {
 			// We will not retry here, because the mentioned Applications should be already running
 			if _, err := f.executeApplicationStart(res.ApplicationUID, res.DefinitionIndex); err != nil {
 				f.applicationsMutex.Lock()
-				f.removeFromExecutingApplications(res.ApplicationUID)
+				delete(f.applications, res.ApplicationUID)
 				f.applicationsMutex.Unlock()
 				log.Errorf("Fish: Can't execute Application %s: %v", res.ApplicationUID, err)
 			}
@@ -305,8 +311,6 @@ func (f *Fish) applicationProcess() {
 		select {
 		case <-f.running.Done():
 			return
-		//case TODO: Check for application tasks to handle other then DEALLOCATE states:
-		//	f.maybeRunExecuteApplicationTasks(driver, &labelDef, res, appState.Status)
 		case appState := <-f.applicationStateChannel:
 			switch appState.Status {
 			case types.ApplicationStatusNEW:
@@ -315,10 +319,18 @@ func (f *Fish) applicationProcess() {
 			case types.ApplicationStatusELECTED:
 				// Starting Application execution if we are winners of the election
 				f.maybeRunExecuteApplicationStart(appState)
+			case types.ApplicationStatusALLOCATED:
+				// Executing deallocation procedures for the Application
+				f.maybeRunApplicationTask(appState.ApplicationUID, nil)
 			case types.ApplicationStatusDEALLOCATE, types.ApplicationStatusRECALLED:
 				// Executing deallocation procedures for the Application
 				f.maybeRunExecuteApplicationStop(appState)
 			}
+		case appTask := <-f.applicationTaskChannel:
+			// Runs check for Application state and decides if need to execute or drop
+			// If the Application state doesn't fit the task - then it will be skipped to be
+			// started later by the ApplicationState change event
+			f.maybeRunApplicationTask(appTask.ApplicationUID, appTask)
 		}
 	}
 }

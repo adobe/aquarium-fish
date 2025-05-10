@@ -45,7 +45,7 @@ func (d *Database) ApplicationStateCreate(as *types.ApplicationState) error {
 	as.CreatedAt = time.Now()
 	err := d.be.Collection("application_state").Add(as.UID.String(), as)
 
-	/// Notifying the subscribers on change
+	// Notifying the subscribers on change
 	for _, ch := range d.subsApplicationState {
 		ch <- as
 	}

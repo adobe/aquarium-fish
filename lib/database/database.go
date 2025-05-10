@@ -36,6 +36,7 @@ type Database struct {
 
 	// Subscriptions to notify subscribers about changes in DB, contains key prefix and channel
 	subsApplicationState []chan *types.ApplicationState
+	subsApplicationTask  []chan *types.ApplicationTask
 }
 
 // Init creates the database object by provided path
