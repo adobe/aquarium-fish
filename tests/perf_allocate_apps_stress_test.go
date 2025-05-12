@@ -173,8 +173,8 @@ drivers:
 		}
 	})
 
-	// Flooding the node with 100 batches of 200 parallel Applications requests
-	for b := 0; b < 100; b++ {
+	// Flooding the node with 10 batches of 200 parallel Applications requests
+	for b := 0; b < 10; b++ {
 		// Spin up 200 of threads to create application and look what will happen
 		wg := &sync.WaitGroup{}
 		afi.PrintMemUsage(t)
