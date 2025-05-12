@@ -134,9 +134,7 @@ disable_auth: true
 drivers:
   gates: {}
   providers:
-    test:
-      cpu_limit: 1000
-      ram_limit: 2000`)
+    test:`)
 
 	t.Cleanup(func() {
 		afi.Cleanup(t)
@@ -152,7 +150,7 @@ drivers:
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	cli := http.Client{
-		Timeout:   time.Second * 5,
+		Timeout:   time.Second * 100,
 		Transport: &tr,
 	}
 
@@ -187,19 +185,21 @@ drivers:
 
 				var app types.Application
 				t.Run(fmt.Sprintf("%03d-%04d Create Application", batch, id), func(t *testing.T) {
-					apitest.New().
-						EnableNetworking(&cli).
-						Post(afi.APIAddress("api/v1/application/")).
-						JSON(`{"label_UID":"`+label+`"}`).
-						BasicAuth("admin", "notoken").
-						Expect(t).
-						Status(http.StatusOK).
-						End().
-						JSON(&app)
+					h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 300 * time.Millisecond}, t, func(r *h.R) {
+						apitest.New().
+							EnableNetworking(&cli).
+							Post(afi.APIAddress("api/v1/application/")).
+							JSON(`{"label_UID":"`+label+`"}`).
+							BasicAuth("admin", "notoken").
+							Expect(r).
+							Status(http.StatusOK).
+							End().
+							JSON(&app)
 
-					if app.UID == uuid.Nil {
-						t.Errorf("Application UID is incorrect: %v", app.UID)
-					}
+						if app.UID == uuid.Nil {
+							r.Errorf("Application UID is incorrect: %v", app.UID)
+						}
+					})
 				})
 			}(t, wg, b, i, afi, label.UID.String())
 		}

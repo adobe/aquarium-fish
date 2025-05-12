@@ -106,19 +106,20 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 					log.Debugf("Fish: Election %s: No luck in recovering from old ELECTED, trying again in round %d...", appUID, electedRoundsToWait)
 				}
 			}
-			if electedRoundsToWait <= 0 {
-				// Cluster wait long enough and the Application is still in ELECTED state - looking
-				// for the new executor now to run the Application. We can't change the state,
-				// of the Application (since no primary executor is here), so just continue to
-				// use ELECTED state.
-				log.Warnf("Fish: Election %s: Elected node did not allocated the Applciation, reruning election on round %d", appUID, myvote.Round)
-				electedRoundsToWait = -1
-			} else {
+
+			if electedRoundsToWait > 0 {
 				log.Debugf("Fish: Election %s: Wait in ELECTED state (left: %d)...", appUID, electedRoundsToWait)
 				electedRoundsToWait--
 				time.Sleep(time.Until(roundEndsAt))
 				continue
 			}
+
+			// Cluster wait long enough and the Application is still in ELECTED state - looking
+			// for the new executor now to run the Application. We can't change the state,
+			// of the Application (since no primary executor is here), so just continue to
+			// use ELECTED state.
+			log.Warnf("Fish: Election %s: Elected node did not allocated the Applciation, reruning election on round %d", appUID, myvote.Round)
+			electedRoundsToWait = -1
 		} else if appState.Status != types.ApplicationStatusNEW {
 			log.Debugf("Fish: Election %s: Completed with status: %s", appUID, appState.Status)
 			// The Application state went after
@@ -191,7 +192,7 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 }
 
 // electionBestVote picks the best vote out of the list of cluster votes
-func (f *Fish) electionBestVote(votes []types.Vote) (bestVote types.Vote) {
+func (*Fish) electionBestVote(votes []types.Vote) (bestVote types.Vote) {
 	for _, v := range votes {
 		// Available must be >= 0, otherwise the node is not available to execute this Application
 		if v.Available < 0 {
