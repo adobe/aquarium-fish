@@ -108,7 +108,7 @@ drivers:
 
 	var appState types.ApplicationState
 	t.Run("Application should stay NEW for 20 sec", func(t *testing.T) {
-		time.Sleep(20)
+		time.Sleep(20 * time.Second)
 
 		apitest.New().
 			EnableNetworking(cli).

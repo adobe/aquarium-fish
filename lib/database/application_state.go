@@ -18,8 +18,13 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
+
+func (d *Database) SubscribeApplicationState(ch chan *types.ApplicationState) {
+	d.subsApplicationState = append(d.subsApplicationState, ch)
+}
 
 // ApplicationStateList returns list of ApplicationStates
 func (d *Database) ApplicationStateList() (ass []types.ApplicationState, err error) {
@@ -38,7 +43,14 @@ func (d *Database) ApplicationStateCreate(as *types.ApplicationState) error {
 
 	as.UID = d.NewUID()
 	as.CreatedAt = time.Now()
-	return d.be.Collection("application_state").Add(as.UID.String(), as)
+	err := d.be.Collection("application_state").Add(as.UID.String(), as)
+
+	// Notifying the subscribers on change
+	for _, ch := range d.subsApplicationState {
+		ch <- as
+	}
+
+	return err
 }
 
 // Intentionally disabled, application state can't be updated
@@ -71,6 +83,21 @@ func (d *Database) ApplicationStateListByApplication(appUID types.ApplicationUID
 	return states, err
 }
 
+// ApplicationStateNewCount returns amount of NEW states of the Application, to get amount of tries
+func (d *Database) ApplicationStateNewCount(appUID types.ApplicationUID) (count uint) {
+	all, err := d.ApplicationStateList()
+	if err != nil {
+		log.Errorf("Unable to get ApplicationState list: %v", err)
+		return count
+	}
+	for _, as := range all {
+		if as.ApplicationUID == appUID && as.Status == types.ApplicationStatusNEW {
+			count++
+		}
+	}
+	return count
+}
+
 // ApplicationStateListLatest returns list of latest ApplicationState per Application
 func (d *Database) ApplicationStateListLatest() (out []types.ApplicationState, err error) {
 	states := make(map[types.ApplicationUID]types.ApplicationState)
@@ -87,6 +114,20 @@ func (d *Database) ApplicationStateListLatest() (out []types.ApplicationState, e
 		out = append(out, as)
 	}
 	return out, nil
+}
+
+// ApplicationStateListNewElected returns new and elected Applications
+func (d *Database) ApplicationStateListNewElected() (ass []types.ApplicationState, err error) {
+	states, err := d.ApplicationStateListLatest()
+	if err != nil {
+		return ass, err
+	}
+	for _, stat := range states {
+		if stat.Status == types.ApplicationStatusNEW || stat.Status == types.ApplicationStatusELECTED {
+			ass = append(ass, stat)
+		}
+	}
+	return ass, err
 }
 
 // ApplicationStateGetByApplication returns latest ApplicationState of requested ApplicationUID

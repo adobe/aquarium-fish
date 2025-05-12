@@ -22,6 +22,10 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
+func (d *Database) SubscribeApplicationTask(ch chan *types.ApplicationTask) {
+	d.subsApplicationTask = append(d.subsApplicationTask, ch)
+}
+
 // ApplicationTaskList returns all known ApplicationTasks
 func (d *Database) ApplicationTaskList() (at []types.ApplicationTask, err error) {
 	err = d.be.Collection("application_task").List(&at)
@@ -59,7 +63,15 @@ func (d *Database) ApplicationTaskCreate(at *types.ApplicationTask) error {
 	at.UID = d.NewUID()
 	at.CreatedAt = time.Now()
 	at.UpdatedAt = at.CreatedAt
-	return d.be.Collection("application_task").Add(at.UID.String(), at)
+
+	err := d.be.Collection("application_task").Add(at.UID.String(), at)
+
+	// Notifying the subscribers on change
+	for _, ch := range d.subsApplicationTask {
+		ch <- at
+	}
+
+	return err
 }
 
 // ApplicationTaskSave stores the ApplicationTask

@@ -26,22 +26,19 @@ import (
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
-// Allocates application, restarts fish and makes sure cleanup will not happen too early and not too late
-func Test_cleanupdb_fish_restart(t *testing.T) {
+// Here we simulating how the long allocating application will behave to
+// test that special election routine is working correctly.
+func Test_long_allocating_app(t *testing.T) {
 	t.Parallel()
 	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0
 
-db_cleanup_interval: 10s
-
 drivers:
   gates: {}
   providers:
-    test:
-      cpu_limit: 4
-      ram_limit: 8`)
+    test:`)
 
 	t.Cleanup(func() {
 		afi.Cleanup(t)
@@ -66,7 +63,9 @@ drivers:
 		apitest.New().
 			EnableNetworking(cli).
 			Post(afi.APIAddress("api/v1/label/")).
-			JSON(`{"name":"test-label", "version":1, "definitions": [{"driver":"test", "resources":{"cpu":1,"ram":2}}]}`).
+			JSON(`{"name":"test-label", "version":1, "definitions": [
+				{"driver":"test", "resources":{"cpu":1,"ram":2}, "options":{"delay_allocate":35.0}}
+			]}`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
@@ -95,9 +94,26 @@ drivers:
 		}
 	})
 
+	time.Sleep(30 * time.Second)
+
 	var appState types.ApplicationState
+	t.Run("Application should not be allocated yet", func(t *testing.T) {
+		apitest.New().
+			EnableNetworking(cli).
+			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
+			BasicAuth("admin", afi.AdminToken()).
+			Expect(t).
+			Status(http.StatusOK).
+			End().
+			JSON(&appState)
+
+		if appState.Status != types.ApplicationStatusELECTED {
+			t.Fatalf("Application Status is incorrect: %v", appState.Status)
+		}
+	})
+
 	t.Run("Application should get ALLOCATED in 10 sec", func(t *testing.T) {
-		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
+		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
@@ -139,8 +155,8 @@ drivers:
 			End()
 	})
 
-	t.Run("Application should get DEALLOCATED in 10 sec", func(t *testing.T) {
-		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
+	t.Run("Application should get DEALLOCATED in 1 sec", func(t *testing.T) {
+		h.Retry(&h.Timer{Timeout: time.Second, Wait: 300 * time.Millisecond}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
 				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
@@ -153,43 +169,6 @@ drivers:
 			if appState.Status != types.ApplicationStatusDEALLOCATED {
 				r.Fatalf("Application Status is incorrect: %v", appState.Status)
 			}
-		})
-	})
-
-	// Restart the fish node with delay
-	afi.Stop(t)
-	// Wait for 10 seconds to test app after-startup delay
-	time.Sleep(10 * time.Second)
-	afi.Start(t)
-
-	// Wait for 8 seconds to check if app will be still available
-	time.Sleep(8 * time.Second)
-
-	t.Run("Application should be available after 8 sec after start", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&appState)
-
-		if appState.Status != types.ApplicationStatusDEALLOCATED {
-			t.Fatalf("Application Status is incorrect: %v", appState.Status)
-		}
-	})
-
-	t.Run("Application should be cleaned in 5 sec", func(t *testing.T) {
-		h.Retry(&h.Timer{Timeout: 5 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(r).
-				Status(http.StatusNotFound).
-				End().
-				JSON(&appState)
 		})
 	})
 }

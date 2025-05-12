@@ -65,22 +65,6 @@ func (d *Database) ApplicationDelete(uid types.ApplicationUID) (err error) {
 	return d.be.Collection("application").Delete(uid.String())
 }
 
-// ApplicationListGetStatusNew returns new Applications
-func (d *Database) ApplicationListGetStatusNew() (as []types.Application, err error) {
-	states, err := d.ApplicationStateListLatest()
-	if err != nil {
-		return as, err
-	}
-	for _, stat := range states {
-		if stat.Status == types.ApplicationStatusNEW {
-			if app, err := d.ApplicationGet(stat.ApplicationUID); err == nil && app != nil {
-				as = append(as, *app)
-			}
-		}
-	}
-	return as, err
-}
-
 // ApplicationIsAllocated returns if specific Application is allocated
 func (d *Database) ApplicationIsAllocated(appUID types.ApplicationUID) (err error) {
 	state, err := d.ApplicationStateGetByApplication(appUID)

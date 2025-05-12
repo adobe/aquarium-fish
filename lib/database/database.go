@@ -33,6 +33,10 @@ type Database struct {
 
 	// Memory storage for current node - we using it to generate new UIDs
 	node types.Node
+
+	// Subscriptions to notify subscribers about changes in DB, contains key prefix and channel
+	subsApplicationState []chan *types.ApplicationState
+	subsApplicationTask  []chan *types.ApplicationTask
 }
 
 // Init creates the database object by provided path
