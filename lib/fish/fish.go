@@ -325,6 +325,9 @@ func (f *Fish) applicationProcess() {
 			case types.ApplicationStatusDEALLOCATE, types.ApplicationStatusRECALLED:
 				// Executing deallocation procedures for the Application
 				f.maybeRunExecuteApplicationStop(appState)
+			case types.ApplicationStatusDEALLOCATED, types.ApplicationStatusERROR:
+				// Not much to do here, but maybe later in the future?
+				f.maybeRunApplicationTask(appState.ApplicationUID, nil)
 			}
 		case appTask := <-f.applicationTaskChannel:
 			// Runs check for Application state and decides if need to execute or drop

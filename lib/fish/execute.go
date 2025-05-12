@@ -132,6 +132,7 @@ func (f *Fish) maybeRunApplicationTask(appUID types.ApplicationUID, appTask *typ
 		f.routines.Add(1)
 		f.routinesMutex.Unlock()
 		defer f.routines.Done()
+		defer log.Infof("Fish: executeApplicationTasks for Application %s stopped", appUID)
 
 		// Execute the existing ApplicationTasks on the change
 		f.executeApplicationTasks(driver, &labelDef, res, appState.Status)
@@ -216,6 +217,7 @@ func (f *Fish) executeApplicationStart(appUID types.ApplicationUID, defIndex int
 		f.routines.Add(1)
 		f.routinesMutex.Unlock()
 		defer f.routines.Done()
+		defer log.Infof("Fish: executeApplicationStart for Application %s stopped", app.UID)
 
 		log.Infof("Fish: Application %s: Start: Continuing executing: %s", app.UID, appState.Status)
 
@@ -412,6 +414,7 @@ func (f *Fish) executeApplicationStop(appUID types.ApplicationUID) error {
 		f.routines.Add(1)
 		f.routinesMutex.Unlock()
 		defer f.routines.Done()
+		defer log.Infof("Fish: executeApplicationStop of Application %s stopped", appUID)
 
 		// Execute the existing ApplicationTasks. It will be executed prior to executing
 		// deallocation by DEALLOCATE & RECALLED which is useful for `snapshot` and `image` tasks.

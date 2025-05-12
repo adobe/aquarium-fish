@@ -45,7 +45,8 @@ type Config struct {
 
 	DefaultResourceLifetime util.Duration `json:"default_resource_lifetime"` // Sets the lifetime of the resource which will be used if label definition one is not set
 
-	AllocationRetry uint `json:"allocation_retry"` // How many times to retry the allocation in case error happened, default: 3
+	AllocationRetry     uint  `json:"allocation_retry"`       // How many times to retry the allocation in case error happened, default: 3
+	ElectedRoundsToWait uint8 `json:"elected_rounds_to_wait"` // Preventive measure for Node failure on ELECTED state, recovers election after this amount of rounds, default: 10
 
 	DBCleanupInterval util.Duration `json:"db_cleanup_interval"` // Defines the database item cleanup interval when Application reached the end of life (by error or deallocated)
 
@@ -92,5 +93,6 @@ func (c *Config) initDefaults() {
 	c.TLSCaCrt = "ca.crt"
 	c.NodeName, _ = os.Hostname()
 	c.AllocationRetry = 3
+	c.ElectedRoundsToWait = 10
 	c.DBCleanupInterval = util.Duration(DefaultDBCleanupInterval)
 }

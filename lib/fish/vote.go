@@ -21,7 +21,7 @@ import (
 )
 
 // VoteCreate makes new Vote
-func (*Fish) VoteCreate(appUID types.ApplicationUID) *types.Vote {
+func (*Fish) voteNew(appUID types.ApplicationUID) *types.Vote {
 	return &types.Vote{
 		CreatedAt:      time.Now(),
 		ApplicationUID: appUID,
@@ -29,7 +29,7 @@ func (*Fish) VoteCreate(appUID types.ApplicationUID) *types.Vote {
 }
 
 // clusterVoteSend sends signal to cluster to spread node vote
-func (f *Fish) clusterVoteSend(v *types.Vote) error {
+func (f *Fish) voteCreate(v *types.Vote) error {
 	// Generating new UID
 	v.UID = f.db.NewUID()
 	// Update create time for the vote
@@ -92,14 +92,12 @@ func (f *Fish) VoteActiveList() (votes []types.Vote) {
 	return votes
 }
 
+// activeVotesGet will return Vote by Application UID or nil
 func (f *Fish) activeVotesGet(appUID types.ApplicationUID) *types.Vote {
 	f.activeVotesMutex.RLock()
 	defer f.activeVotesMutex.RUnlock()
 
-	if vote, ok := f.activeVotes[appUID]; ok {
-		return vote
-	}
-	return nil
+	return f.activeVotes[appUID]
 }
 
 // activeVotesRemove completes the voting process by removing active Vote from the list
