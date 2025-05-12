@@ -34,7 +34,7 @@ const ATTEMPTS = 10
 
 // Benchmark to run multiple persistent vote processes and measure the allocation time for
 // It also checks that the amount of pickups is equal the amount of application requests
-func Test_jenkins_agents_check_pickups(t *testing.T) {
+func Test_jenkins_agents_check_pickups_stress(t *testing.T) {
 	//t.Parallel()  - nope just one at a time
 	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc

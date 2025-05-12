@@ -28,7 +28,7 @@ import (
 )
 
 // Benchmark to check how many nodes could wait for Application
-func Test_jenkins_agents_awaiting(t *testing.T) {
+func Test_jenkins_agents_awaiting_stress(t *testing.T) {
 	//t.Parallel()  - nope just one at a time
 	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
@@ -128,7 +128,7 @@ drivers:
 			counter += 1
 		}
 		t.Logf("Client threads: %d", counter)
-		time.Sleep(10 * time.Second)
+		time.Sleep(time.Second)
 	}
 	t.Logf("Completed, waiting for stop: %d", counter)
 	wg.Wait()
