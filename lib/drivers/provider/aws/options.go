@@ -30,12 +30,13 @@ import (
 //	tags:
 //	  somekey: somevalue
 type Options struct {
-	Image         string            `json:"image"`          // ID/Name of the image you want to use (name that contains * is usually a bad idea for reproducibility)
-	InstanceType  string            `json:"instance_type"`  // Type of the instance from aws available list
-	SecurityGroup string            `json:"security_group"` // ID/Name of the security group to use for the instance
-	Tags          map[string]string `json:"tags"`           // Tags to add during instance creation
-	EncryptKey    string            `json:"encrypt_key"`    // Use specific encryption key for the new disks
-	Pool          string            `json:"pool"`           // Use machine from dedicated pool, otherwise will try to use one with auto-placement
+	Image          string            `json:"image"`           // ID/Name of the image you want to use (name that contains * is usually a bad idea for reproducibility)
+	InstanceType   string            `json:"instance_type"`   // Type of the instance from aws available list
+	SecurityGroups []string          `json:"security_groups"` // IDs/Names of the security groups to use for the instance
+	SecurityGroup  string            `json:"security_group"`  // ID/Name of the security group to use for the instance (DEPRECATED)
+	Tags           map[string]string `json:"tags"`            // Tags to add during instance creation
+	EncryptKey     string            `json:"encrypt_key"`     // Use specific encryption key for the new disks
+	Pool           string            `json:"pool"`            // Use machine from dedicated pool, otherwise will try to use one with auto-placement
 
 	UserDataFormat string `json:"userdata_format"` // If not empty - will store the resource metadata to userdata in defined format
 	UserDataPrefix string `json:"userdata_prefix"` // Optional if need to add custom prefix to the metadata key during formatting

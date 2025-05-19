@@ -33,9 +33,10 @@ type Config struct {
 	SecretKey string `json:"secret_key"` // AWS AMI Secret Key
 
 	// Optional
-	AccountIDs   []string          `json:"account_ids"`   // AWS Trusted account IDs to filter vpc, subnet, sg, images, snapshots...
-	InstanceTags map[string]string `json:"instance_tags"` // AWS Instance tags to use when this node provision them
-	InstanceKey  string            `json:"instance_key"`  // AWS Instance Key Pair name to use while creating of the instance
+	AccountIDs        []string          `json:"account_ids"`         // AWS Trusted account IDs to filter vpc, subnet, sg, images, snapshots...
+	InstanceTags      map[string]string `json:"instance_tags"`       // AWS Instance tags to use when this node provision them
+	InstanceKey       string            `json:"instance_key"`        // AWS Instance Key Pair name to use while creating of the instance
+	InstanceKeyPrefix string            `json:"instance_key_prefix"` // AWS prefix for auto-generated Instance Key
 
 	// Manage the AWS dedicated hosts to keep them busy and deallocate when not needed
 	// Key of the map is name of the pool - will be used for identification of the pool
@@ -173,6 +174,9 @@ func (c *Config) Validate() (err error) {
 	// Init empty instance tags in case its not set
 	if c.InstanceTags == nil {
 		c.InstanceTags = make(map[string]string)
+	}
+	if c.InstanceKeyPrefix == "" {
+		c.InstanceKeyPrefix = "fish_ssh_instance_key_"
 	}
 	// Init empty dedicated pool in case its not set
 	if c.DedicatedPool == nil {

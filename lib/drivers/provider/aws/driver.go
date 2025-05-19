@@ -327,6 +327,26 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 	}
 	log.Infof("AWS: %s: Selected image: %q", iName, vmImage)
 
+	// Preparing common tags used for instance resources
+	commonTags := []ec2types.Tag{}
+	if len(d.cfg.InstanceTags) > 0 || len(opts.Tags) > 0 {
+		tagsIn := map[string]string{}
+		// Append tags to the map - from opts (low priority) and from cfg (high priority)
+		for k, v := range opts.Tags {
+			tagsIn[k] = v
+		}
+		for k, v := range d.cfg.InstanceTags {
+			tagsIn[k] = v
+		}
+
+		for k, v := range tagsIn {
+			commonTags = append(commonTags, ec2types.Tag{
+				Key:   aws.String(k),
+				Value: aws.String(v),
+			})
+		}
+	}
+
 	// Prepare Instance request information
 	input := ec2.RunInstancesInput{
 		ImageId:      aws.String(vmImage),
@@ -334,9 +354,52 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 
 		MinCount: aws.Int32(1),
 		MaxCount: aws.Int32(1),
+
+		TagSpecifications: []ec2types.TagSpecification{
+			{
+				ResourceType: ec2types.ResourceTypeInstance,
+				Tags:         []ec2types.Tag{
+					ec2types.Tag{
+						Key:   aws.String('Name'),
+						Value: aws.String(iName),
+					},
+				},
+			},
+		}
 	}
 
-	if d.cfg.InstanceKey != "" {
+	if len(commonTags) > 0 {
+		input.TagSpecifications.Tags = append(input.TagSpecifications.Tags, commonTags)
+	}
+
+	keyPem := ""
+	if d.cfg.InstanceKey == "generate" && def.Authentication != nil {
+		// Generating new key for this specific instance
+		keypairInput := ec2.CreateKeyPairInput{
+			KeyName: fmt.Sprintf("%s%s", c.InstanceKeyPrefix, iName),
+			TagSpecifications: []ec2types.TagSpecification{
+				ResourceType: ec2types.ResourceTypeKeyPair,
+				Tags:         []ec2types.Tag{
+					ec2types.Tag{
+						Key:   aws.String('Description'),
+						Value: aws.String(fmt.Sprintf("Fish created key for instance %s"), iName),
+					},
+				},
+			},
+		}
+
+		if len(commonTags) > 0 {
+			keypair.TagSpecifications.Tags = append(keypair.TagSpecifications.Tags, commonTags)
+		}
+
+		result, err := conn.CreateKeyPair(context.TODO(), &keypairInput)
+		if err != nil {
+			return nil, log.Errorf("AWS: %s: Unable to create keypair: %v", iName, err)
+		}
+
+		input.KeyName = aws.String(fmt.Sprintf("%s%s", c.InstanceKeyPrefix, iName))
+		keyPem = aws.ToString(result.KeyMaterial)
+	} else if d.cfg.InstanceKey != "" {
 		input.KeyName = aws.String(d.cfg.InstanceKey)
 		log.Debugf("AWS: %s: Using keypair: %q", iName, d.cfg.InstanceKey)
 	}
@@ -391,43 +454,16 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 	}
 
 	if opts.SecurityGroup != "" {
-		vmSecgroup := opts.SecurityGroup
+		log.Warnf("AWS: %s: security_group option is DEPRECATED, please use security_groups instead", iName)
+		opts.SecurityGroups = append(opts.SecurityGroups, opts.SecurityGroup)
+	}
+	for _, grp := range opts.SecurityGroups {
+		vmSecgroup := grp
 		if vmSecgroup, err = d.getSecGroupID(conn, vmSecgroup); err != nil {
 			return nil, fmt.Errorf("AWS: %s: Unable to get security group: %v", iName, err)
 		}
 		log.Infof("AWS: %s: Selected security group: %q", iName, vmSecgroup)
-		input.NetworkInterfaces[0].Groups = []string{vmSecgroup}
-	}
-
-	if len(d.cfg.InstanceTags) > 0 || len(opts.Tags) > 0 {
-		tagsIn := map[string]string{}
-		// Append tags to the map - from opts (low priority) and from cfg (high priority)
-		for k, v := range opts.Tags {
-			tagsIn[k] = v
-		}
-		for k, v := range d.cfg.InstanceTags {
-			tagsIn[k] = v
-		}
-
-		tagsOut := []ec2types.Tag{}
-		for k, v := range tagsIn {
-			tagsOut = append(tagsOut, ec2types.Tag{
-				Key:   aws.String(k),
-				Value: aws.String(v),
-			})
-		}
-		// Apply name for the instance
-		tagsOut = append(tagsOut, ec2types.Tag{
-			Key:   aws.String("Name"),
-			Value: aws.String(iName),
-		})
-
-		input.TagSpecifications = []ec2types.TagSpecification{
-			{
-				ResourceType: ec2types.ResourceTypeInstance,
-				Tags:         tagsOut,
-			},
-		}
+		input.NetworkInterfaces[0].Groups = append(input.NetworkInterfaces[0].Groups, vmSecgroup)
 	}
 
 	// Prepare the device mapping
@@ -547,6 +583,18 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 
 	res := &types.ApplicationResource{}
 
+	if keyPem != "" && def.Authentication != nil && def.Authentication.Username != "" {
+		port := 22
+		if def.Authentication.Port != 0 {
+			port = def.Authentication.Port
+		}
+		res.Authentication = types.Authentication{
+			Key:      keyPem,
+			Port:     port,
+			Username: def.Authentication.Username,
+		}
+	}
+
 	// Wait for IP address to be assigned to the instance
 	timeout := 60
 	for {
@@ -632,6 +680,8 @@ func (d *Driver) Deallocate(res *types.ApplicationResource) error {
 	if aws.ToString(inst.InstanceId) != res.Identifier {
 		return fmt.Errorf("AWS: %s: Wrong instance id result %s during terminating of %s", d.name, aws.ToString(inst.InstanceId), res.Identifier)
 	}
+
+	TODO: remove generated key
 
 	log.Infof("AWS: %s: Deallocate of instance completed: %s", res.Identifier, inst.CurrentState.Name)
 
