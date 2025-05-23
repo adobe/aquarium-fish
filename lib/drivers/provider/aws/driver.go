@@ -355,41 +355,40 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 		MinCount: aws.Int32(1),
 		MaxCount: aws.Int32(1),
 
-		TagSpecifications: []ec2types.TagSpecification{
-			{
-				ResourceType: ec2types.ResourceTypeInstance,
-				Tags:         []ec2types.Tag{
-					ec2types.Tag{
-						Key:   aws.String('Name'),
-						Value: aws.String(iName),
-					},
+		TagSpecifications: []ec2types.TagSpecification{{
+			ResourceType: ec2types.ResourceTypeInstance,
+			Tags: []ec2types.Tag{
+				{
+					Key:   aws.String("Name"),
+					Value: aws.String(iName),
 				},
 			},
-		}
+		}},
 	}
 
 	if len(commonTags) > 0 {
-		input.TagSpecifications.Tags = append(input.TagSpecifications.Tags, commonTags)
+		input.TagSpecifications[0].Tags = append(input.TagSpecifications[0].Tags, commonTags...)
 	}
 
 	keyPem := ""
 	if d.cfg.InstanceKey == "generate" && def.Authentication != nil {
 		// Generating new key for this specific instance
+		keyName := fmt.Sprintf("%s%s", d.cfg.InstanceKeyPrefix, iName)
 		keypairInput := ec2.CreateKeyPairInput{
-			KeyName: fmt.Sprintf("%s%s", c.InstanceKeyPrefix, iName),
-			TagSpecifications: []ec2types.TagSpecification{
+			KeyName: aws.String(keyName),
+			TagSpecifications: []ec2types.TagSpecification{{
 				ResourceType: ec2types.ResourceTypeKeyPair,
-				Tags:         []ec2types.Tag{
-					ec2types.Tag{
-						Key:   aws.String('Description'),
-						Value: aws.String(fmt.Sprintf("Fish created key for instance %s"), iName),
+				Tags: []ec2types.Tag{
+					{
+						Key:   aws.String("Description"),
+						Value: aws.String(fmt.Sprintf("Fish created key for instance %s", iName)),
 					},
 				},
-			},
+			}},
 		}
 
 		if len(commonTags) > 0 {
-			keypair.TagSpecifications.Tags = append(keypair.TagSpecifications.Tags, commonTags)
+			keypairInput.TagSpecifications[0].Tags = append(keypairInput.TagSpecifications[0].Tags, commonTags...)
 		}
 
 		result, err := conn.CreateKeyPair(context.TODO(), &keypairInput)
@@ -397,7 +396,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 			return nil, log.Errorf("AWS: %s: Unable to create keypair: %v", iName, err)
 		}
 
-		input.KeyName = aws.String(fmt.Sprintf("%s%s", c.InstanceKeyPrefix, iName))
+		input.KeyName = aws.String(keyName)
 		keyPem = aws.ToString(result.KeyMaterial)
 	} else if d.cfg.InstanceKey != "" {
 		input.KeyName = aws.String(d.cfg.InstanceKey)
@@ -588,7 +587,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 		if def.Authentication.Port != 0 {
 			port = def.Authentication.Port
 		}
-		res.Authentication = types.Authentication{
+		res.Authentication = &types.Authentication{
 			Key:      keyPem,
 			Port:     port,
 			Username: def.Authentication.Username,
@@ -681,7 +680,20 @@ func (d *Driver) Deallocate(res *types.ApplicationResource) error {
 		return fmt.Errorf("AWS: %s: Wrong instance id result %s during terminating of %s", d.name, aws.ToString(inst.InstanceId), res.Identifier)
 	}
 
-	TODO: remove generated key
+	// Removing the generated instance key
+	if d.cfg.InstanceKey == "generate" && res.Authentication != nil {
+		// Generating new key for this specific instance
+		keyName := fmt.Sprintf("%s%s", d.cfg.InstanceKeyPrefix, res.Identifier)
+		keypairInput := ec2.DeleteKeyPairInput{
+			KeyName: aws.String(keyName),
+		}
+
+		result, err := conn.DeleteKeyPair(context.TODO(), &keypairInput)
+		if err != nil || result == nil || !aws.ToBool(result.Return) {
+			// It's not critical, but could leave some additional work for cleanup
+			log.Errorf("AWS: %s: Unable to delete keypair %q: %v", res.Identifier, keyName, err)
+		}
+	}
 
 	log.Infof("AWS: %s: Deallocate of instance completed: %s", res.Identifier, inst.CurrentState.Name)
 
