@@ -73,9 +73,9 @@ func (d *Database) ApplicationTaskCreate(at *types.ApplicationTask) error {
 	err := d.be.Collection("application_task").Add(at.UID.String(), at)
 
 	// Notifying the subscribers on change, doing that in goroutine to not block execution
-	go func(appState *types.ApplicationTask) {
+	go func(appTask *types.ApplicationTask) {
 		for _, ch := range d.subsApplicationTask {
-			ch <- at
+			ch <- appTask
 		}
 	}(at)
 

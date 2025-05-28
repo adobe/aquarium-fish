@@ -54,7 +54,7 @@ func (d *Database) ApplicationStateCreate(as *types.ApplicationState) error {
 	// Notifying the subscribers on change, doing that in goroutine to not block execution
 	go func(appState *types.ApplicationState) {
 		for _, ch := range d.subsApplicationState {
-			ch <- as
+			ch <- appState
 		}
 	}(as)
 
