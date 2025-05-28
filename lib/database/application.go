@@ -24,6 +24,9 @@ import (
 
 // ApplicationFind lists Applications by filter
 func (d *Database) ApplicationList() (as []types.Application, err error) {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	err = d.be.Collection("application").List(&as)
 	return as, err
 }
@@ -36,6 +39,9 @@ func (d *Database) ApplicationCreate(a *types.Application) error {
 	if a.Metadata == "" {
 		a.Metadata = "{}"
 	}
+
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
 
 	a.UID = d.NewUID()
 	a.CreatedAt = time.Now()
@@ -56,12 +62,18 @@ func (d *Database) ApplicationCreate(a *types.Application) error {
 
 // ApplicationGet returns Application by UID
 func (d *Database) ApplicationGet(uid types.ApplicationUID) (a *types.Application, err error) {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	err = d.be.Collection("application").Get(uid.String(), &a)
 	return a, err
 }
 
 // ApplicationDelete removes the Application
 func (d *Database) ApplicationDelete(uid types.ApplicationUID) (err error) {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	return d.be.Collection("application").Delete(uid.String())
 }
 

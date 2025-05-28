@@ -16,6 +16,7 @@ package database
 import (
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/google/uuid"
 	"go.mills.io/bitcask/v2"
@@ -30,6 +31,11 @@ var ErrObjectNotFound = bitcask.ErrObjectNotFound
 type Database struct {
 	// Backend used to store the data
 	be *bitcask.Bitcask
+
+	// TODO: This mutex is needed until the issue with Merge will be resolved: https://git.mills.io/prologic/bitcask/issues/276
+	// I use this mutex to write-lock the database when merge is happening, the other operations just
+	// uses RLock to not interfere with the merge operation.
+	beMu sync.RWMutex
 
 	// Memory storage for current node - we using it to generate new UIDs
 	node types.Node
@@ -55,8 +61,13 @@ func New(path string) (*Database, error) {
 
 // CompactDB runs stale Applications and data removing
 func (d *Database) CompactDB() error {
-	log.Debug("DB: CompactDB running...")
+	log.Debug("DB: CompactDB locking...")
 	defer log.Debug("Fish: CompactDB done")
+
+	// Locking entire database
+	d.beMu.Lock()
+	defer d.beMu.Unlock()
+	log.Debug("DB: CompactDB running...")
 
 	s, _ := d.be.Stats()
 	log.Debugf("DB: CompactDB: Before compaction: Datafiles: %d, Keys: %d, Size: %d, Reclaimable: %d", s.Datafiles, s.Keys, s.Size, s.Reclaimable)
@@ -74,6 +85,9 @@ func (d *Database) CompactDB() error {
 // Shutdown compacts database backend and closes it
 func (d *Database) Shutdown() error {
 	d.CompactDB()
+
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
 
 	if err := d.be.Close(); err != nil {
 		return log.Errorf("DB: Unable to compact backend: %v", err)

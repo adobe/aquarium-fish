@@ -24,6 +24,9 @@ import (
 
 // ApplicationResourceAccessList returns a list of all known ApplicationResourceAccess objects
 func (d *Database) ApplicationResourceAccessList() (ra []types.ApplicationResourceAccess, err error) {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	err = d.be.Collection("application_resource_access").List(&ra)
 	return ra, err
 }
@@ -40,6 +43,9 @@ func (d *Database) ApplicationResourceAccessCreate(ra *types.ApplicationResource
 		return fmt.Errorf("Fish: Password can't be empty")
 	}
 
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	ra.UID = d.NewUID()
 	ra.CreatedAt = time.Now()
 	return d.be.Collection("application_resource_access").Add(ra.UID.String(), ra)
@@ -47,6 +53,9 @@ func (d *Database) ApplicationResourceAccessCreate(ra *types.ApplicationResource
 
 // ApplicationResourceAccessDelete removes ResourceAccess by UID
 func (d *Database) ApplicationResourceAccessDelete(uid types.ApplicationResourceAccessUID) error {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	return d.be.Collection("application_resource_access").Delete(uid.String())
 }
 

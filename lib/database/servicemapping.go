@@ -21,6 +21,9 @@ import (
 
 // ServiceMappingFind returns list of ServiceMappings that fits the filter
 func (d *Database) ServiceMappingList() (sms []types.ServiceMapping, err error) {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	err = d.be.Collection("service_mapping").List(&sms)
 	return sms, err
 }
@@ -34,6 +37,9 @@ func (d *Database) ServiceMappingCreate(sm *types.ServiceMapping) error {
 		return fmt.Errorf("Fish: Redirect can't be empty")
 	}
 
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	sm.UID = d.NewUID()
 	sm.CreatedAt = time.Now()
 	return d.be.Collection("service_mapping").Add(sm.UID.String(), sm)
@@ -41,17 +47,26 @@ func (d *Database) ServiceMappingCreate(sm *types.ServiceMapping) error {
 
 // ServiceMappingSave stores ServiceMapping
 func (d *Database) ServiceMappingSave(sm *types.ServiceMapping) error {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	return d.be.Collection("service_mapping").Add(sm.UID.String(), sm)
 }
 
 // ServiceMappingGet returns ServiceMapping by UID
 func (d *Database) ServiceMappingGet(uid types.ServiceMappingUID) (sm *types.ServiceMapping, err error) {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	err = d.be.Collection("service_mapping").Get(uid.String(), &sm)
 	return sm, err
 }
 
 // ServiceMappingDelete removes ServiceMapping
 func (d *Database) ServiceMappingDelete(uid types.ServiceMappingUID) error {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	return d.be.Collection("service_mapping").Delete(uid.String())
 }
 

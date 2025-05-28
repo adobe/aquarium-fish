@@ -24,12 +24,18 @@ import (
 
 // NodeFind returns list of Nodes that fits filter
 func (d *Database) NodeList() (ns []types.Node, err error) {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	err = d.be.Collection("node").List(&ns)
 	return ns, err
 }
 
 // NodeGet returns Node by it's unique name
 func (d *Database) NodeGet(name string) (node *types.Node, err error) {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	err = d.be.Collection("node").Get(name, &node)
 	return node, err
 }
@@ -59,6 +65,9 @@ func (d *Database) NodeCreate(n *types.Node) error {
 		return fmt.Errorf("Fish: Node should be initialized before create")
 	}
 
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	// Create node UUID based on the public key
 	hash := sha256.New()
 	hash.Write(*n.Pubkey)
@@ -70,6 +79,9 @@ func (d *Database) NodeCreate(n *types.Node) error {
 
 // NodeSave stores Node
 func (d *Database) NodeSave(node *types.Node) error {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	node.UpdatedAt = time.Now()
 	return d.be.Collection("node").Add(node.Name, node)
 }

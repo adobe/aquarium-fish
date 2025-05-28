@@ -28,6 +28,9 @@ import (
 
 // ApplicationResourceList returns a list of all known ApplicationResource objects
 func (d *Database) ApplicationResourceList() (rs []types.ApplicationResource, err error) {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	err = d.be.Collection("application_resource").List(&rs)
 	return rs, err
 }
@@ -64,6 +67,9 @@ func (d *Database) ApplicationResourceCreate(r *types.ApplicationResource) error
 		return fmt.Errorf("Fish: Metadata can't be empty")
 	}
 
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	r.UID = d.NewUID()
 	r.CreatedAt = time.Now()
 	r.UpdatedAt = r.CreatedAt
@@ -78,18 +84,28 @@ func (d *Database) ApplicationResourceDelete(uid types.ApplicationResourceUID) e
 		// This issue is not a big deal, because most of the time there is no access to delete
 		log.Debugf("Unable to delete ApplicationResourceAccess associated with ApplicationResourceUID %s: %v", uid, err)
 	}
+
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	// Now purge the resource.
 	return d.be.Collection("application_resource").Delete(uid.String())
 }
 
 // ApplicationResourceSave stores ApplicationResource
 func (d *Database) ApplicationResourceSave(res *types.ApplicationResource) error {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	res.UpdatedAt = time.Now()
 	return d.be.Collection("application_resource").Add(res.UID.String(), res)
 }
 
 // ApplicationResourceGet returns Resource by it's UID
 func (d *Database) ApplicationResourceGet(uid types.ApplicationResourceUID) (res *types.ApplicationResource, err error) {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	err = d.be.Collection("application_resource").Get(uid.String(), &res)
 	return res, err
 }
