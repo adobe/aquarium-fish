@@ -84,8 +84,10 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 
 		// Check if the Application is good to go or maybe we need to wait until the change
 		if appState, err := f.db.ApplicationStateGetByApplication(appUID); err != nil {
-			log.Errorf("Fish: Election %s: Unable to get the Application state: %v", appUID, err)
-			// The Application state is not found, so we can drop the election process
+			// If the cleanup is set to very tight limit (< ElectionRoundTime) - the Application
+			// can actually complete it's journey before election process confirms it's state, so
+			// not existing Application can't be elected anymore and we can safely drop here
+			log.Infof("Fish: Election %s: Application state is missing, dropping the election: %v", appUID, err)
 			f.activeVotesRemove(myvote.UID)
 			f.storageVotesCleanup()
 			return nil

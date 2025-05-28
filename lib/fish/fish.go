@@ -331,7 +331,9 @@ func (f *Fish) applicationProcess() {
 				f.maybeRunExecuteApplicationStop(appState)
 			case types.ApplicationStatusDEALLOCATED, types.ApplicationStatusERROR:
 				// Not much to do here, but maybe later in the future?
-				f.maybeRunApplicationTask(appState.ApplicationUID, nil)
+				// In this state the Application has no Resource to deal with, so no luck for now
+				//f.maybeRunApplicationTask(appState.ApplicationUID, nil)
+				log.Debugf("Fish: Application %s reached end state %s", appState.ApplicationUID, appState.Status)
 			}
 		case appTask := <-f.applicationTaskChannel:
 			// Runs check for Application state and decides if need to execute or drop
@@ -356,8 +358,9 @@ func (f *Fish) dbCleanupCompactProcess() {
 	defer cleanupTicker.Stop()
 	log.Infof("Fish: dbCleanupCompactProcess: Triggering CleanupDB once per %s", dbCleanupDelay/2)
 
-	compactionTicker := time.NewTicker(time.Hour)
-	log.Infof("Fish: dbCleanupCompactProcess: Triggering CompactDB once per %s", time.Hour)
+	dbCompactDelay := time.Duration(f.cfg.DBCompactInterval)
+	compactionTicker := time.NewTicker(dbCompactDelay)
+	log.Infof("Fish: dbCleanupCompactProcess: Triggering CompactDB once per %s", dbCompactDelay)
 	defer compactionTicker.Stop()
 
 	for {

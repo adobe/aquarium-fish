@@ -420,7 +420,7 @@ func (f *Fish) executeApplicationStop(appUID types.ApplicationUID) error {
 		// deallocation by DEALLOCATE & RECALLED which is useful for `snapshot` and `image` tasks.
 		f.executeApplicationTasks(driver, &labelDef, res, appState.Status)
 
-		log.Infof("Fish: Application %s: Stop: Running Deallocate of the ApplicationResource:", appUID, res.Identifier)
+		log.Infof("Fish: Application %s: Stop: Running Deallocate of the ApplicationResource: %s", appUID, res.Identifier)
 
 		// Deallocating and destroy the resource
 		for retry := range 20 {

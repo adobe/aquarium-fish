@@ -23,6 +23,7 @@ import (
 )
 
 const DefaultDBCleanupInterval = 10 * time.Minute
+const DefaultDBCompactInterval = time.Hour
 
 // Config defines Fish node configuration
 type Config struct {
@@ -49,6 +50,7 @@ type Config struct {
 	ElectedRoundsToWait uint8 `json:"elected_rounds_to_wait"` // Preventive measure for Node failure on ELECTED state, recovers election after this amount of rounds, default: 10
 
 	DBCleanupInterval util.Duration `json:"db_cleanup_interval"` // Defines the database item cleanup interval when Application reached the end of life (by error or deallocated)
+	DBCompactInterval util.Duration `json:"db_compact_interval"` // Defines the database compaction interval to get rid of old data on disk periodically
 
 	DisableAuth bool `json:"disable_auth"` // WARNING! For performance testing only
 
@@ -95,4 +97,5 @@ func (c *Config) initDefaults() {
 	c.AllocationRetry = 3
 	c.ElectedRoundsToWait = 10
 	c.DBCleanupInterval = util.Duration(DefaultDBCleanupInterval)
+	c.DBCompactInterval = util.Duration(DefaultDBCompactInterval)
 }
