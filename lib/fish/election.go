@@ -84,8 +84,10 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 
 		// Check if the Application is good to go or maybe we need to wait until the change
 		if appState, err := f.db.ApplicationStateGetByApplication(appUID); err != nil {
-			log.Errorf("Fish: Election %s: Unable to get the Application state: %v", appUID, err)
-			// The Application state is not found, so we can drop the election process
+			// If the cleanup is set to very tight limit (< ElectionRoundTime) - the Application
+			// can actually complete it's journey before election process confirms it's state, so
+			// not existing Application can't be elected anymore and we can safely drop here
+			log.Infof("Fish: Election %s: Application state is missing, dropping the election: %v", appUID, err)
 			f.activeVotesRemove(myvote.UID)
 			f.storageVotesCleanup()
 			return nil
@@ -118,7 +120,7 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 			// for the new executor now to run the Application. We can't change the state,
 			// of the Application (since no primary executor is here), so just continue to
 			// use ELECTED state.
-			log.Warnf("Fish: Election %s: Elected node did not allocated the Applciation, reruning election on round %d", appUID, myvote.Round)
+			log.Warnf("Fish: Election %s: Elected node did not allocated the Application, reruning election on round %d", appUID, myvote.Round)
 			electedRoundsToWait = -1
 		} else if appState.Status != types.ApplicationStatusNEW {
 			log.Debugf("Fish: Election %s: Completed with status: %s", appUID, appState.Status)
@@ -151,6 +153,20 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 			}
 			if len(votes) < len(nodes) {
 				log.Debugf("Fish: Election %s: Some nodes didn't vote in round %d (%d < %d), waiting till %v...", appUID, myvote.Round, len(votes), len(nodes), roundEndsAt)
+				if len(votes) == 0 {
+					log.Warnf("Fish: Election %q: Something weird happened (votes len can't be 0), here is additional info:", appUID)
+					log.Warnf("Fish: Election %q:   Vote UID:", appUID, myvote.UID)
+					f.activeVotesMutex.Lock()
+					log.Warnf("Fish: Election %q:   List of active votes: %+v", appUID, f.activeVotes)
+					f.activeVotesMutex.Unlock()
+					f.storageVotesMutex.Lock()
+					log.Warnf("Fish: Election %q:   List of storage votes: %+v", appUID, f.storageVotes)
+					f.storageVotesMutex.Unlock()
+
+					// Recovering
+					myvote.UID = uuid.Nil
+					break
+				}
 
 				// Wait 5 sec and repeat
 				time.Sleep(5 * time.Second)

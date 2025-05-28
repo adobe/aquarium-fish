@@ -28,6 +28,9 @@ func (d *Database) SubscribeApplicationTask(ch chan *types.ApplicationTask) {
 
 // ApplicationTaskList returns all known ApplicationTasks
 func (d *Database) ApplicationTaskList() (at []types.ApplicationTask, err error) {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	err = d.be.Collection("application_task").List(&at)
 	return at, err
 }
@@ -60,16 +63,21 @@ func (d *Database) ApplicationTaskCreate(at *types.ApplicationTask) error {
 		at.Result = util.UnparsedJSON("{}")
 	}
 
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	at.UID = d.NewUID()
 	at.CreatedAt = time.Now()
 	at.UpdatedAt = at.CreatedAt
 
 	err := d.be.Collection("application_task").Add(at.UID.String(), at)
 
-	// Notifying the subscribers on change
-	for _, ch := range d.subsApplicationTask {
-		ch <- at
-	}
+	// Notifying the subscribers on change, doing that in goroutine to not block execution
+	go func(appTask *types.ApplicationTask) {
+		for _, ch := range d.subsApplicationTask {
+			ch <- appTask
+		}
+	}(at)
 
 	return err
 }
@@ -79,17 +87,27 @@ func (d *Database) ApplicationTaskSave(at *types.ApplicationTask) error {
 	if at.UID == uuid.Nil {
 		return fmt.Errorf("Fish: UID can't be unset")
 	}
+
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	return d.be.Collection("application_task").Add(at.UID.String(), at)
 }
 
 // ApplicationTaskGet returns the ApplicationTask by ApplicationTaskUID
 func (d *Database) ApplicationTaskGet(uid types.ApplicationTaskUID) (at *types.ApplicationTask, err error) {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	err = d.be.Collection("application_task").Get(uid.String(), &at)
 	return at, err
 }
 
 // ApplicationTaskDelete removes the ApplicationTask
 func (d *Database) ApplicationTaskDelete(uid types.ApplicationTaskUID) (err error) {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	return d.be.Collection("application_task").Delete(uid.String())
 }
 

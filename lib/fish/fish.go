@@ -194,12 +194,16 @@ func (f *Fish) Init() error {
 		return log.Error("Fish: Unable to init drivers:", err)
 	}
 
-	// Resume to execute the assigned Applications
+	// Run application state processing before resuming the assigned Applications
+	go f.applicationProcess()
+
+	log.Debug("Fish: Resuming to execute the assigned Applications...")
 	resources, err := f.db.ApplicationResourceListNode(f.db.GetNodeUID())
 	if err != nil {
 		return log.Error("Fish: Unable to get the node resources:", err)
 	}
 	for _, res := range resources {
+		log.Debugf("Fish: Resuming Resource execution for Application: %q", res.ApplicationUID)
 		if f.db.ApplicationIsAllocated(res.ApplicationUID) == nil {
 			log.Info("Fish: Found allocated resource to serve:", res.UID)
 			// We will not retry here, because the mentioned Applications should be already running
@@ -214,14 +218,15 @@ func (f *Fish) Init() error {
 			if err := f.db.ApplicationResourceDelete(res.UID); err != nil {
 				log.Error("Fish: Unable to delete Resource of Application:", res.ApplicationUID, err)
 			}
-			appState := &types.ApplicationState{ApplicationUID: res.ApplicationUID, Status: types.ApplicationStatusERROR,
+			appState := types.ApplicationState{
+				ApplicationUID: res.ApplicationUID, Status: types.ApplicationStatusERROR,
 				Description: "Found not cleaned up resource",
 			}
-			f.db.ApplicationStateCreate(appState)
+			f.db.ApplicationStateCreate(&appState)
 		}
 	}
 
-	// Resume electionProcess for the NEW and ELECTED Applications
+	log.Debug("Fish: Resuming electionProcess for the NEW and ELECTED Applications...")
 	electionAppStates, err := f.db.ApplicationStateListNewElected()
 	if err != nil {
 		return log.Error("Fish: Unable to get NEW and ELECTED ApplicationState list:", err)
@@ -231,11 +236,10 @@ func (f *Fish) Init() error {
 		f.maybeRunElectionProcess(&appState)
 	}
 
+	log.Debug("Fish: Running background processes...")
+
 	// Run node ping timer
 	go f.pingProcess()
-
-	// Run application vote process
-	go f.applicationProcess()
 
 	// Run ARP autoupdate process to ensure the addresses will be ok
 	arp.AutoRefresh(30 * time.Second)
@@ -327,7 +331,9 @@ func (f *Fish) applicationProcess() {
 				f.maybeRunExecuteApplicationStop(appState)
 			case types.ApplicationStatusDEALLOCATED, types.ApplicationStatusERROR:
 				// Not much to do here, but maybe later in the future?
-				f.maybeRunApplicationTask(appState.ApplicationUID, nil)
+				// In this state the Application has no Resource to deal with, so no luck for now
+				//f.maybeRunApplicationTask(appState.ApplicationUID, nil)
+				log.Debugf("Fish: Application %s reached end state %s", appState.ApplicationUID, appState.Status)
 			}
 		case appTask := <-f.applicationTaskChannel:
 			// Runs check for Application state and decides if need to execute or drop
@@ -352,8 +358,9 @@ func (f *Fish) dbCleanupCompactProcess() {
 	defer cleanupTicker.Stop()
 	log.Infof("Fish: dbCleanupCompactProcess: Triggering CleanupDB once per %s", dbCleanupDelay/2)
 
-	compactionTicker := time.NewTicker(time.Hour)
-	log.Infof("Fish: dbCleanupCompactProcess: Triggering CompactDB once per %s", time.Hour)
+	dbCompactDelay := time.Duration(f.cfg.DBCompactInterval)
+	compactionTicker := time.NewTicker(dbCompactDelay)
+	log.Infof("Fish: dbCleanupCompactProcess: Triggering CompactDB once per %s", dbCompactDelay)
 	defer compactionTicker.Stop()
 
 	for {
@@ -384,7 +391,7 @@ func (f *Fish) CleanupDB() {
 		return
 	}
 	for _, state := range states {
-		if state.Status != types.ApplicationStatusERROR && state.Status != types.ApplicationStatusDEALLOCATED {
+		if !f.db.ApplicationStateIsDead(state.Status) {
 			continue
 		}
 		log.Debugf("Fish: CleanupDB: Checking Application %s (%s): %v", state.ApplicationUID, state.Status, state.CreatedAt)

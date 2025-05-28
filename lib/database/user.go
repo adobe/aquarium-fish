@@ -23,6 +23,9 @@ import (
 
 // UserList returns list of users
 func (d *Database) UserList() (us []types.User, err error) {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	err = d.be.Collection("user").List(&us)
 	return us, err
 }
@@ -36,6 +39,9 @@ func (d *Database) UserCreate(u *types.User) error {
 		return fmt.Errorf("Fish: Hash can't be empty")
 	}
 
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	u.CreatedAt = time.Now()
 	u.UpdatedAt = u.CreatedAt
 	return d.be.Collection("user").Add(u.Name, u)
@@ -43,18 +49,27 @@ func (d *Database) UserCreate(u *types.User) error {
 
 // UserSave stores User
 func (d *Database) UserSave(u *types.User) error {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	u.UpdatedAt = time.Now()
 	return d.be.Collection("user").Add(u.Name, &u)
 }
 
 // UserGet returns User by unique name
 func (d *Database) UserGet(name string) (u *types.User, err error) {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	err = d.be.Collection("user").Get(name, &u)
 	return u, err
 }
 
 // UserDelete removes User
 func (d *Database) UserDelete(name string) error {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	return d.be.Collection("user").Delete(name)
 }
 

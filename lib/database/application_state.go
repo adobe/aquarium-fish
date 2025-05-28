@@ -28,6 +28,9 @@ func (d *Database) SubscribeApplicationState(ch chan *types.ApplicationState) {
 
 // ApplicationStateList returns list of ApplicationStates
 func (d *Database) ApplicationStateList() (ass []types.ApplicationState, err error) {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	err = d.be.Collection("application_state").List(&ass)
 	return ass, err
 }
@@ -41,31 +44,45 @@ func (d *Database) ApplicationStateCreate(as *types.ApplicationState) error {
 		return fmt.Errorf("Fish: Status can't be empty")
 	}
 
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	as.UID = d.NewUID()
 	as.CreatedAt = time.Now()
 	err := d.be.Collection("application_state").Add(as.UID.String(), as)
 
-	// Notifying the subscribers on change
-	for _, ch := range d.subsApplicationState {
-		ch <- as
-	}
+	// Notifying the subscribers on change, doing that in goroutine to not block execution
+	go func(appState *types.ApplicationState) {
+		for _, ch := range d.subsApplicationState {
+			ch <- appState
+		}
+	}(as)
 
 	return err
 }
 
 // Intentionally disabled, application state can't be updated
 /*func (d *Database) ApplicationStateSave(as *types.ApplicationState) error {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	return d.be.Save(as).Error
 }*/
 
 // ApplicationStateGet returns specific ApplicationState
 func (d *Database) ApplicationStateGet(uid types.ApplicationStateUID) (as *types.ApplicationState, err error) {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	err = d.be.Collection("application_state").Get(uid.String(), &as)
 	return as, err
 }
 
 // ApplicationStateDelete removes the ApplicationState
 func (d *Database) ApplicationStateDelete(uid types.ApplicationStateUID) (err error) {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	return d.be.Collection("application_state").Delete(uid.String())
 }
 
@@ -147,19 +164,24 @@ func (d *Database) ApplicationStateGetByApplication(appUID types.ApplicationUID)
 	return state, err
 }
 
-// ApplicationStateIsActive returns false if Status in ERROR, DEALLOCATE or DEALLOCATED state
-func (*Database) ApplicationStateIsActive(status types.ApplicationStatus) bool {
-	if status == types.ApplicationStatusERROR {
-		return false
-	}
+// ApplicationStateIsActive returns false if Status in ERROR, RECALLED, DEALLOCATE or DEALLOCATED state
+func (d *Database) ApplicationStateIsActive(status types.ApplicationStatus) bool {
 	if status == types.ApplicationStatusDEALLOCATE {
 		return false
 	}
+	return !d.ApplicationStateIsDead(status)
+}
+
+// ApplicationStateIsDead returns false if Status in ERROR, RECALLED or DEALLOCATED state
+func (*Database) ApplicationStateIsDead(status types.ApplicationStatus) bool {
+	if status == types.ApplicationStatusERROR {
+		return true
+	}
 	if status == types.ApplicationStatusRECALLED {
-		return false
+		return true
 	}
 	if status == types.ApplicationStatusDEALLOCATED {
-		return false
+		return true
 	}
-	return true
+	return false
 }

@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -27,12 +28,8 @@ import (
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
-// Ensure the database is cleaned after the application deallocate
-// * Allocate Application
-// * Get Application information
-// * Destroy Application
-// * Check all the related db objects are removed
-func Test_cleanupdb_check(t *testing.T) {
+// Check the database compaction works correctly in constant flow of applications
+func Test_compactdb_check(t *testing.T) {
 	t.Parallel()
 	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
@@ -40,6 +37,7 @@ node_location: test_loc
 api_address: 127.0.0.1:0
 
 db_cleanup_interval: 10s
+db_compact_interval: 5s
 
 drivers:
   gates: {}
@@ -64,6 +62,12 @@ drivers:
 		Transport: tr,
 	}
 
+	// No ERROR could happen during execution of this test
+	afi.WaitForLog("ERROR:", func(substring, line string) bool {
+		t.Errorf("Error located in the Fish log: %q", line)
+		return true
+	})
+
 	var label types.Label
 	t.Run("Create Label", func(t *testing.T) {
 		apitest.New().
@@ -81,90 +85,89 @@ drivers:
 		}
 	})
 
-	var app types.Application
-	t.Run("Create Application", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/application/")).
-			JSON(`{"label_UID":"`+label.UID.String()+`"}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&app)
+	completed := false
+	workerFunc := func(t *testing.T, wg *sync.WaitGroup, id int, afi *h.AFInstance, cli *http.Client) {
+		t.Logf("Worker %d: Started", id)
+		defer t.Logf("Worker %d: Ended", id)
+		defer wg.Done()
 
-		if app.UID == uuid.Nil {
-			t.Fatalf("Application UID is incorrect: %v", app.UID)
-		}
-	})
+		for !completed {
+			var app types.Application
+			var appState types.ApplicationState
 
-	var appState types.ApplicationState
-	t.Run("Application should get ALLOCATED in 10 sec", func(t *testing.T) {
-		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
+				Post(afi.APIAddress("api/v1/application/")).
+				JSON(`{"label_UID":"`+label.UID.String()+`"}`).
 				BasicAuth("admin", afi.AdminToken()).
-				Expect(r).
+				Expect(t).
 				Status(http.StatusOK).
 				End().
-				JSON(&appState)
+				JSON(&app)
 
-			if appState.Status != types.ApplicationStatusALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", appState.Status)
+			if app.UID == uuid.Nil {
+				t.Errorf("Worker %d: Application UID is incorrect: %v", id, app.UID)
+				return
 			}
-		})
-	})
 
-	var res types.ApplicationResource
-	t.Run("Resource should be created", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/resource")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&res)
+			// Checking state until it's allocated
+			for appState.Status != types.ApplicationStatusALLOCATED {
+				apitest.New().
+					EnableNetworking(cli).
+					Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
+					BasicAuth("admin", afi.AdminToken()).
+					Expect(t).
+					Status(http.StatusOK).
+					End().
+					JSON(&appState)
 
-		if res.Identifier == "" {
-			t.Fatalf("Resource identifier is incorrect: %v", res.Identifier)
-		}
-	})
+				if appState.UID == uuid.Nil {
+					t.Errorf("Worker %d: ApplicationStatus UID is incorrect: %v", id, appState.UID)
+					return
+				}
+				if appState.Status == types.ApplicationStatusERROR {
+					t.Errorf("Worker %d: ApplicationStatus is incorrect: %v", id, appState.Status)
+					return
+				}
 
-	t.Run("Deallocate the Application", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/deallocate")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
-	})
+				time.Sleep(time.Second)
+			}
 
-	t.Run("Application should get DEALLOCATED in 10 sec", func(t *testing.T) {
-		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
+			// Time to deallocate
 			apitest.New().
 				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
+				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/deallocate")).
 				BasicAuth("admin", afi.AdminToken()).
-				Expect(r).
+				Expect(t).
 				Status(http.StatusOK).
-				End().
-				JSON(&appState)
+				End()
+		}
+	}
 
-			if appState.Status != types.ApplicationStatusDEALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", appState.Status)
-			}
-		})
-	})
+	// Run multiple application create/terminate routines to keep DB busy during the processes
+	wg := &sync.WaitGroup{}
+	for id := range 10 {
+		wg.Add(1)
+		go workerFunc(t, wg, id, afi, cli)
+		time.Sleep(50 * time.Millisecond)
+	}
 
-	t.Run("Application should be cleaned from DB and compacted", func(t *testing.T) {
-		// Wait for the next 3 cleanupdb completed which should cleanup the deallocated application
-		cleaned := make(chan any)
+	t.Run("Applications should be cleaned from DB and compacted", func(t *testing.T) {
+		// Wait for the next 20 cleanupdb completed to have enough time to fill the DB
+		cleaned := make(chan struct{})
+		for range 20 {
+			afi.WaitForLog("Fish: CleanupDB completed", func(substring, line string) bool {
+				cleaned <- struct{}{}
+				return true
+			})
+			<-cleaned
+		}
+
+		// Now stopping the workers to calm down a bit and wait for a few more cleanups
+		completed = true
 		for range 3 {
 			afi.WaitForLog("Fish: CleanupDB completed", func(substring, line string) bool {
-				cleaned <- nil
+				cleaned <- struct{}{}
 				return true
 			})
 			<-cleaned
@@ -191,7 +194,7 @@ drivers:
 			compacted <- nil
 			return true
 		})
-		// Stopping the node to trigger CompactDB process
+		// Stopping the node to trigger CompactDB process the last time
 		afi.Stop(t)
 
 		<-compacted

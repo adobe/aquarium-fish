@@ -46,6 +46,9 @@ var providerDrivers map[string]provider.Driver
 
 // Init loads and prepares all kind of available drivers
 func Init(db *database.Database, wd string, configs ConfigDrivers) error {
+	log.Debug("Drivers: Running init...")
+	defer log.Debug("Drivers: Init completed")
+
 	if err := load(db, configs); err != nil {
 		return log.Error("Drivers: Unable to load drivers:", err)
 	}
@@ -61,6 +64,9 @@ func Init(db *database.Database, wd string, configs ConfigDrivers) error {
 
 // load making the drivers instances map with specified names
 func load(db *database.Database, configs ConfigDrivers) error {
+	log.Debug("Drivers: Running load...")
+	defer log.Debug("Drivers: Load completed")
+
 	// Loading providers
 	providerInstances := make(map[string]provider.Driver)
 
@@ -122,6 +128,8 @@ func load(db *database.Database, configs ConfigDrivers) error {
 
 // prepare initializes the drivers with provided configs
 func prepare(wd string, configs ConfigDrivers) (ok bool, errs []error) {
+	log.Debug("Drivers: Running prepare...")
+	defer log.Debug("Drivers: Prepare completed")
 	mandatoryDriversLoaded := true
 
 	// Activating providers

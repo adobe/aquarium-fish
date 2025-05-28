@@ -29,6 +29,10 @@ func (d *Database) Has(prefix, key string) (bool, error) {
 	if strings.Contains(fullkey, "/") {
 		return false, fmt.Errorf("DB: Has can't use '/' in key: %s", fullkey)
 	}
+
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	return d.be.Has(bitcask.Key(fullkey)), nil
 }
 
@@ -38,6 +42,10 @@ func (d *Database) Get(prefix, key string, obj any) error {
 	if strings.Contains(fullkey, "/") {
 		return fmt.Errorf("DB: Get can't use '/' in key: %s", fullkey)
 	}
+
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	data, err := d.be.Get(bitcask.Key(fullkey))
 	if err != nil {
 		if err == bitcask.ErrKeyNotFound {
@@ -59,6 +67,10 @@ func (d *Database) Set(prefix, key string, obj any) error {
 	if err != nil {
 		return fmt.Errorf("DB: Set can't serialize value to json: %v", err)
 	}
+
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	return d.be.Put(bitcask.Key(fullkey), v)
 }
 
@@ -68,6 +80,10 @@ func (d *Database) Del(prefix, key string) error {
 	if strings.Contains(fullkey, "/") {
 		return fmt.Errorf("DB: Del can't use '/' in key: %s", fullkey)
 	}
+
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	return d.be.Delete(bitcask.Key(fullkey))
 }
 
@@ -76,6 +92,10 @@ func (d *Database) Scan(prefix string, f func(string) error) error {
 	if strings.Contains(prefix, "/") {
 		return fmt.Errorf("DB: Scan can't use '/' in prefix: %s", prefix)
 	}
+
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	return d.be.Scan(bitcask.Key(prefix+":"), func(bkey bitcask.Key) error {
 		key := strings.SplitN(string(bkey), ":", 2)[1]
 		// Skipping keys with "/"

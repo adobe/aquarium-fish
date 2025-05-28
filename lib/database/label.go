@@ -22,7 +22,10 @@ import (
 
 // LabelFind returns list of Labels that fits filters
 func (d *Database) LabelList(filters types.LabelListGetParams) (labels []types.Label, err error) {
+	d.beMu.RLock()
 	err = d.be.Collection("label").List(&labels)
+	d.beMu.RUnlock()
+
 	filterVersion := 0
 	if filters.Version != nil && *filters.Version != "last" {
 		// Try to convert to int and if fails
@@ -64,7 +67,12 @@ func (d *Database) LabelList(filters types.LabelListGetParams) (labels []types.L
 
 func (d *Database) LabelListName(name string) (labels []types.Label, err error) {
 	allLabels := []types.Label{}
-	if err = d.be.Collection("label").List(&allLabels); err == nil {
+
+	d.beMu.RLock()
+	err = d.be.Collection("label").List(&allLabels)
+	d.beMu.RUnlock()
+
+	if err == nil {
 		for _, l := range allLabels {
 			if l.Name == name {
 				labels = append(labels, l)
@@ -105,6 +113,9 @@ func (d *Database) LabelCreate(l *types.Label) error {
 		return fmt.Errorf("Fish: Label name + version is not unique: %v", err)
 	}
 
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	l.UID = d.NewUID()
 	l.CreatedAt = time.Now()
 	return d.be.Collection("label").Add(l.UID.String(), l)
@@ -113,16 +124,25 @@ func (d *Database) LabelCreate(l *types.Label) error {
 // Intentionally disabled - labels can be created once and can't be updated
 // Create label with incremented version instead
 /*func (d *Database) LabelSave(label *types.Label) error {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	return d.be.Save(label).Error
 }*/
 
 // LabelGet returns Label by UID
 func (d *Database) LabelGet(uid types.LabelUID) (label *types.Label, err error) {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	err = d.be.Collection("label").Get(uid.String(), &label)
 	return label, err
 }
 
 // LabelDelete deletes the Label by UID
 func (d *Database) LabelDelete(uid types.LabelUID) error {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
 	return d.be.Collection("label").Delete(uid.String())
 }
