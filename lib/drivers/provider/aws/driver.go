@@ -371,33 +371,39 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 	}
 
 	keyPem := ""
-	if d.cfg.InstanceKey == "generate" && def.Authentication != nil {
-		// Generating new key for this specific instance
-		keyName := fmt.Sprintf("%s%s", d.cfg.InstanceKeyPrefix, iName)
-		keypairInput := ec2.CreateKeyPairInput{
-			KeyName: aws.String(keyName),
-			TagSpecifications: []ec2types.TagSpecification{{
-				ResourceType: ec2types.ResourceTypeKeyPair,
-				Tags: []ec2types.Tag{
-					{
-						Key:   aws.String("Description"),
-						Value: aws.String(fmt.Sprintf("Fish created key for instance %s", iName)),
+	if d.cfg.InstanceKey == "generate" {
+		// There is no much need to generate key for the instance with no Authentication set,
+		// because will only cause the additional API calls to remove the key on deallocation.
+		if def.Authentication != nil {
+			// Generating new key for this specific instance
+			keyName := fmt.Sprintf("%s%s", d.cfg.InstanceKeyPrefix, iName)
+			keypairInput := ec2.CreateKeyPairInput{
+				KeyName: aws.String(keyName),
+				TagSpecifications: []ec2types.TagSpecification{{
+					ResourceType: ec2types.ResourceTypeKeyPair,
+					Tags: []ec2types.Tag{
+						{
+							Key:   aws.String("Description"),
+							Value: aws.String(fmt.Sprintf("Fish created key for instance %s", iName)),
+						},
 					},
-				},
-			}},
-		}
+				}},
+			}
 
-		if len(commonTags) > 0 {
-			keypairInput.TagSpecifications[0].Tags = append(keypairInput.TagSpecifications[0].Tags, commonTags...)
-		}
+			if len(commonTags) > 0 {
+				keypairInput.TagSpecifications[0].Tags = append(keypairInput.TagSpecifications[0].Tags, commonTags...)
+			}
 
-		result, err := conn.CreateKeyPair(context.TODO(), &keypairInput)
-		if err != nil {
-			return nil, log.Errorf("AWS: %s: Unable to create keypair: %v", iName, err)
-		}
+			result, err := conn.CreateKeyPair(context.TODO(), &keypairInput)
+			if err != nil {
+				return nil, log.Errorf("AWS: %s: Unable to create keypair: %v", iName, err)
+			}
 
-		input.KeyName = aws.String(keyName)
-		keyPem = aws.ToString(result.KeyMaterial)
+			input.KeyName = aws.String(keyName)
+			keyPem = aws.ToString(result.KeyMaterial)
+		} else {
+			log.Debugf("AWS: %s: Skipping key generation since no Authentication provided", iName)
+		}
 	} else if d.cfg.InstanceKey != "" {
 		input.KeyName = aws.String(d.cfg.InstanceKey)
 		log.Debugf("AWS: %s: Using keypair: %q", iName, d.cfg.InstanceKey)
@@ -682,7 +688,6 @@ func (d *Driver) Deallocate(res *types.ApplicationResource) error {
 
 	// Removing the generated instance key
 	if d.cfg.InstanceKey == "generate" && res.Authentication != nil {
-		// Generating new key for this specific instance
 		keyName := fmt.Sprintf("%s%s", d.cfg.InstanceKeyPrefix, res.Identifier)
 		keypairInput := ec2.DeleteKeyPairInput{
 			KeyName: aws.String(keyName),
