@@ -33,6 +33,7 @@ func Test_compactdb_check(t *testing.T) {
 	t.Parallel()
 	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
+default_resource_lifetime: 20s
 
 api_address: 127.0.0.1:0
 

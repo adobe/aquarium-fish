@@ -437,6 +437,8 @@ func (f *Fish) executeApplicationStop(appUID types.ApplicationUID) error {
 			appState = &types.ApplicationState{ApplicationUID: appUID, Status: types.ApplicationStatusDEALLOCATED,
 				Description: "Driver deallocated the resource",
 			}
+			// We don't need timeout anymore
+			f.applicationTimeoutRemove(appUID)
 			break
 		}
 		// Destroying the resource anyway to not bloat the table - otherwise it will stuck there and
@@ -515,7 +517,7 @@ func (f *Fish) executeApplicationTasks(drv provider.Driver, def *types.LabelDefi
 	return nil
 }
 
-// applicationTimeoutAdd creates another record in Fish list of timeouts to be handled
+// applicationTimeoutSet creates another record in Fish list of timeouts to be handled
 func (f *Fish) applicationTimeoutSet(uid types.ApplicationUID, to time.Time) {
 	f.applicationsTimeoutsMutex.Lock()
 	defer f.applicationsTimeoutsMutex.Unlock()
@@ -523,7 +525,7 @@ func (f *Fish) applicationTimeoutSet(uid types.ApplicationUID, to time.Time) {
 	log.Infof("Fish: Application %s will be deallocated by timeout in %s at %s", uid, time.Until(to).Round(time.Second), to)
 
 	// Checking if the provided timeout is prior to everything else in the timeouts list
-	// If one of the timeouts in the list is lower then the new timeout - no need to send update
+	// If one of the timeouts in the list is earlier then the new timeout - no need to send update
 	needUpdate := true
 	for _, appTimeout := range f.applicationsTimeouts {
 		if to.After(appTimeout) {
@@ -533,6 +535,35 @@ func (f *Fish) applicationTimeoutSet(uid types.ApplicationUID, to time.Time) {
 	}
 
 	f.applicationsTimeouts[uid] = to
+
+	if needUpdate {
+		// Notifying the process on updated
+		f.applicationsTimeoutsUpdated <- struct{}{}
+	}
+}
+
+// applicationTimeoutRemove clears the timeout event for provided Application from the map
+func (f *Fish) applicationTimeoutRemove(uid types.ApplicationUID) {
+	f.applicationsTimeoutsMutex.Lock()
+	defer f.applicationsTimeoutsMutex.Unlock()
+
+	to, ok := f.applicationsTimeouts[uid]
+	if !ok {
+		// Apparently timeout is not here, so nothing to worry about
+		return
+	}
+
+	delete(f.applicationsTimeouts, uid)
+
+	// Checking if the known timeout is prior to everything else in the timeouts list
+	// If one of the timeouts in the list is earlier then the new timeout - no need to send update
+	needUpdate := true
+	for _, appTimeout := range f.applicationsTimeouts {
+		if to.After(appTimeout) {
+			needUpdate = false
+			break
+		}
+	}
 
 	if needUpdate {
 		// Notifying the process on updated
@@ -550,32 +581,40 @@ func (f *Fish) applicationTimeoutProcess() {
 	defer f.routines.Done()
 	defer log.Info("Fish: applicationTimeoutProcess stopped")
 
-	nextApp, nextTimeout := f.applicationTimeoutNext()
+	appUID, appTimeout := f.applicationTimeoutNext()
 
 	for {
 		select {
 		case <-f.running.Done():
 			return
 		case <-f.applicationsTimeoutsUpdated:
-			nextApp, nextTimeout = f.applicationTimeoutNext()
-		case timeout := <-nextTimeout:
-			log.Debugf("Fish: applicationTimeoutProcess: Reached timeout for Application %s", nextApp)
-			if nextApp != uuid.Nil {
-				log.Warnf("Fish: Application %s reached deadline, sending timeout deallocate", nextApp)
-				appState := &types.ApplicationState{
-					ApplicationUID: nextApp,
-					Status:         types.ApplicationStatusDEALLOCATE,
-					Description:    fmt.Sprint("ApplicationResource reached it's timeout:", timeout),
-				}
-				if err := f.db.ApplicationStateCreate(appState); err != nil {
-					log.Errorf("Fish: Unable to create ApplicationState for Application %s: %v", nextApp, err)
+			appUID, appTimeout = f.applicationTimeoutNext()
+		case timeout := <-appTimeout:
+			log.Debugf("Fish: applicationTimeoutProcess: Reached timeout for Application %s", appUID)
+			if appUID != uuid.Nil {
+				// We need to check Application is still allocated before deallocation
+				appState, err := f.db.ApplicationStateGetByApplication(appUID)
+				if err != nil {
+					log.Debugf("Fish: applicationTimeoutProcess: Can't find Application %s to timeout: %v", appUID, err)
+				} else if !f.db.ApplicationStateIsActive(appState.Status) {
+					log.Debugf("Fish: applicationTimeoutProcess: Application %s is not active to timeout: %v", appUID)
+				} else {
+					log.Warnf("Fish: applicationTimeoutProcess: Application %s reached deadline, sending timeout deallocate", appUID)
+					appState = &types.ApplicationState{
+						ApplicationUID: appUID,
+						Status:         types.ApplicationStatusDEALLOCATE,
+						Description:    fmt.Sprint("ApplicationResource reached it's timeout:", timeout),
+					}
+					if err := f.db.ApplicationStateCreate(appState); err != nil {
+						log.Errorf("Fish: applicationTimeoutProcess: Unable to create ApplicationState for Application %s: %v", appUID, err)
+					}
 				}
 				f.applicationsTimeoutsMutex.Lock()
-				delete(f.applicationsTimeouts, nextApp)
+				delete(f.applicationsTimeouts, appUID)
 				f.applicationsTimeoutsMutex.Unlock()
 			}
 			// Calling for the next patient
-			nextApp, nextTimeout = f.applicationTimeoutNext()
+			appUID, appTimeout = f.applicationTimeoutNext()
 		}
 	}
 }
