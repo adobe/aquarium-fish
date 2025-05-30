@@ -433,7 +433,7 @@ func (f *Fish) executeApplicationStop(appUID types.ApplicationUID) error {
 				continue
 			}
 
-			log.Infof("Fish: Application %s: Stop: Successful deallocation of the Application:", appUID)
+			log.Infof("Fish: Application %s: Stop: Application deallocated successfully", appUID)
 			appState = &types.ApplicationState{ApplicationUID: appUID, Status: types.ApplicationStatusDEALLOCATED,
 				Description: "Driver deallocated the resource",
 			}
@@ -537,8 +537,10 @@ func (f *Fish) applicationTimeoutSet(uid types.ApplicationUID, to time.Time) {
 	f.applicationsTimeouts[uid] = to
 
 	if needUpdate {
-		// Notifying the process on updated
-		f.applicationsTimeoutsUpdated <- struct{}{}
+		// Notifying the process on updated in background to not block the process execution
+		go func() {
+			f.applicationsTimeoutsUpdated <- struct{}{}
+		}()
 	}
 }
 
@@ -566,8 +568,10 @@ func (f *Fish) applicationTimeoutRemove(uid types.ApplicationUID) {
 	}
 
 	if needUpdate {
-		// Notifying the process on updated
-		f.applicationsTimeoutsUpdated <- struct{}{}
+		// Notifying the process on updated in background to not block the process execution
+		go func() {
+			f.applicationsTimeoutsUpdated <- struct{}{}
+		}()
 	}
 }
 
