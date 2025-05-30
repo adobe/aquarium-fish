@@ -65,7 +65,12 @@ func NewAfInstance(tb testing.TB, name, cfg string) *AFInstance {
 		waitForLog: make(map[string]func(string, string) bool),
 	}
 
-	afi.workspace = tb.TempDir()
+	// Not using here tb.TempDir to have an ability to save on cleanup for investigation
+	var err error
+	if afi.workspace, err = os.MkdirTemp("", "fish"); err != nil {
+		tb.Fatal("INFO: Unable to create workspace:", afi.nodeName, err)
+		return nil
+	}
 	tb.Log("INFO: Created workspace:", afi.nodeName, afi.workspace)
 
 	cfg += fmt.Sprintf("\nnode_name: %q", afi.nodeName)
@@ -146,6 +151,11 @@ func (afi *AFInstance) Cleanup(tb testing.TB) {
 	tb.Helper()
 	tb.Log("INFO: Cleaning up:", afi.nodeName, afi.workspace)
 	afi.Stop(tb)
+
+	if tb.Failed() {
+		tb.Log("INFO: Keeping workspace for checking:", afi.workspace)
+		return
+	}
 	os.RemoveAll(afi.workspace)
 }
 

@@ -210,100 +210,111 @@ func (d *Driver) disksCreate(vmxPath string, disks map[string]types.ResourcesDis
 		// TODO: Ensure failures doesn't leave the changes behind (like mounted disks or files)
 
 		// Create virtual disk
-		dmgPath := diskPath + ".dmg"
 		var diskType string
 		switch disk.Type {
 		case "hfs+":
 			diskType = "HFS+"
 		case "fat32":
 			diskType = "FAT32"
-		default:
+		case "exfat":
 			diskType = "ExFAT"
-		}
-		label := dName
-		if disk.Label != "" {
-			label = disk.Label
-		}
-		args := []string{"create", dmgPath,
-			"-fs", diskType,
-			"-layout", "NONE",
-			"-volname", label,
-			"-size", fmt.Sprintf("%dm", disk.Size*1024),
-		}
-		if _, _, err := util.RunAndLog("VMX", 10*time.Minute, nil, "/usr/bin/hdiutil", args...); err != nil {
-			return log.Errorf("VMX: %s: Unable to create dmg disk %q: %v", d.name, dmgPath, err)
+		default:
+			diskType = "raw"
 		}
 
-		vmName := strings.TrimSuffix(filepath.Base(vmxPath), ".vmx")
-		mountPoint := filepath.Join("/Volumes", fmt.Sprintf("%s-%s", vmName, dName))
+		if diskType == "raw" {
+			// Create a simple raw vmdk so it could be used by the image to format & mount properly
+			_, _, err := util.RunAndLog("VMX", 10*time.Minute, nil, d.cfg.VdiskmanagerPath, "-c", "-s", fmt.Sprintf("%dGB", disk.Size), "-t", "0", diskPath+".vmdk")
+			if err != nil {
+				return log.Errorf("VMX: %s: Unable to create %s vmdk disk %q: %v", d.name, diskType, diskPath+".vmdk", err)
+			}
+		} else {
+			label := dName
+			if disk.Label != "" {
+				label = disk.Label
+			}
+			dmgPath := diskPath + ".dmg"
+			args := []string{"create", dmgPath,
+				"-fs", diskType,
+				"-layout", "NONE",
+				"-volname", label,
+				"-size", fmt.Sprintf("%dm", disk.Size*1024),
+			}
+			if _, _, err := util.RunAndLog("VMX", 10*time.Minute, nil, "/usr/bin/hdiutil", args...); err != nil {
+				return log.Errorf("VMX: %s: Unable to create dmg disk %q: %v", d.name, dmgPath, err)
+			}
 
-		// Attach & mount disk
-		stdout, _, err := util.RunAndLog("VMX", 10*time.Second, nil, "/usr/bin/hdiutil", "attach", dmgPath, "-mountpoint", mountPoint)
-		if err != nil {
-			return log.Errorf("VMX: %s: Unable to attach dmg disk %q to %q: %v", d.name, dmgPath, mountPoint, err)
-		}
+			vmName := strings.TrimSuffix(filepath.Base(vmxPath), ".vmx")
+			mountPoint := filepath.Join("/Volumes", fmt.Sprintf("%s-%s", vmName, dName))
 
-		// Get attached disk device
-		devPath := strings.SplitN(stdout, " ", 2)[0]
+			// Attach & mount disk
+			stdout, _, err := util.RunAndLog("VMX", 10*time.Second, nil, "/usr/bin/hdiutil", "attach", dmgPath, "-mountpoint", mountPoint)
+			if err != nil {
+				return log.Errorf("VMX: %s: Unable to attach dmg disk %q to %q: %v", d.name, dmgPath, mountPoint, err)
+			}
 
-		// Allow anyone to modify the disk content
-		if err := os.Chmod(mountPoint, 0o777); err != nil {
-			return log.Errorf("VMX: %s: Unable to change the volume %q access rights: %v", d.name, mountPoint, err)
-		}
+			// Get attached disk device
+			devPath := strings.SplitN(stdout, " ", 2)[0]
 
-		// Umount disk (use diskutil to umount for sure)
-		_, _, err = util.RunAndLog("VMX", 10*time.Second, nil, "/usr/sbin/diskutil", "umount", mountPoint)
-		if err != nil {
-			return log.Errorf("VMX: %s: Unable to umount dmg disk %q: %v", d.name, mountPoint, err)
-		}
+			// Allow anyone to modify the disk content
+			if err := os.Chmod(mountPoint, 0o777); err != nil {
+				return log.Errorf("VMX: %s: Unable to change the volume %q access rights: %v", d.name, mountPoint, err)
+			}
 
-		// Detach disk
-		if _, _, err := util.RunAndLog("VMX", 10*time.Second, nil, "/usr/bin/hdiutil", "detach", devPath); err != nil {
-			return log.Errorf("VMX: %s: Unable to detach dmg disk %q: %v", d.name, devPath, err)
-		}
+			// Umount disk (use diskutil to umount for sure)
+			_, _, err = util.RunAndLog("VMX", 10*time.Second, nil, "/usr/sbin/diskutil", "umount", mountPoint)
+			if err != nil {
+				return log.Errorf("VMX: %s: Unable to umount dmg disk %q: %v", d.name, mountPoint, err)
+			}
 
-		// Create vmdk by using the pregenerated vmdk template
+			// Detach disk
+			if _, _, err := util.RunAndLog("VMX", 10*time.Second, nil, "/usr/bin/hdiutil", "detach", devPath); err != nil {
+				return log.Errorf("VMX: %s: Unable to detach dmg disk %q: %v", d.name, devPath, err)
+			}
 
-		// The rawdiskcreator have an issue on MacOS if 2 image disks are
-		// mounted at the same time, so avoiding to use it by using template:
-		// `Unable to create the source raw disk: Resource deadlock avoided`
-		// To generate template: vmware-rawdiskCreator create /dev/disk2 1 ./disk_name lsilogic
-		vmdkTemplate := strings.Join([]string{
-			`# Disk DescriptorFile`,
-			`version=1`,
-			`encoding="UTF-8"`,
-			`CID=fffffffe`,
-			`parentCID=ffffffff`,
-			`createType="monolithicFlat"`,
-			``,
-			`# Extent description`,
-			// Format: http://sanbarrow.com/vmdk/disktypes.html
-			// <access type> <size> <vmdk-type> <path to datachunk> <offset>
-			// size, offset - number in amount of sectors
-			fmt.Sprintf(`RW %d FLAT %q 0`, disk.Size*1024*1024*2, dmgPath),
-			``,
-			`# The Disk Data Base`,
-			`#DDB`,
-			``,
-			`ddb.adapterType = "lsilogic"`,
-			// The ddb here was cut because it's not needed - it will
-			// be generated by converting later by vdiskmanager
-			`ddb.virtualHWVersion = "14"`,
-		}, "\n")
+			// Create vmdk by using the pregenerated vmdk template
 
-		if err := os.WriteFile(diskPath+"_tmp.vmdk", []byte(vmdkTemplate), 0o640); err != nil { //nolint:gosec // G306
-			return log.Errorf("VMX: %s: Unable to place the template vmdk file %q: %v", d.name, diskPath+"_tmp.vmdk", err)
-		}
+			// The rawdiskcreator have an issue on MacOS if 2 image disks are
+			// mounted at the same time, so avoiding to use it by using template:
+			// `Unable to create the source raw disk: Resource deadlock avoided`
+			// To generate template: vmware-rawdiskCreator create /dev/disk2 1 ./disk_name lsilogic
+			vmdkTemplate := strings.Join([]string{
+				`# Disk DescriptorFile`,
+				`version=1`,
+				`encoding="UTF-8"`,
+				`CID=fffffffe`,
+				`parentCID=ffffffff`,
+				`createType="monolithicFlat"`,
+				``,
+				`# Extent description`,
+				// Format: http://sanbarrow.com/vmdk/disktypes.html
+				// <access type> <size> <vmdk-type> <path to datachunk> <offset>
+				// size, offset - number in amount of sectors
+				fmt.Sprintf(`RW %d FLAT %q 0`, disk.Size*1024*1024*2, dmgPath),
+				``,
+				`# The Disk Data Base`,
+				`#DDB`,
+				``,
+				`ddb.adapterType = "lsilogic"`,
+				// The ddb here was cut because it's not needed - it will
+				// be generated by converting later by vdiskmanager
+				`ddb.virtualHWVersion = "14"`,
+			}, "\n")
 
-		// Convert linked vmdk to standalone vmdk
-		if _, _, err := util.RunAndLog("VMX", 10*time.Minute, nil, d.cfg.VdiskmanagerPath, "-r", diskPath+"_tmp.vmdk", "-t", "0", diskPath+".vmdk"); err != nil {
-			return log.Errorf("VMX: %s: Unable to create vmdk disk %q: %v", d.name, diskPath+".vmdk", err)
-		}
+			if err := os.WriteFile(diskPath+"_tmp.vmdk", []byte(vmdkTemplate), 0o640); err != nil { //nolint:gosec // G306
+				return log.Errorf("VMX: %s: Unable to place the template vmdk file %q: %v", d.name, diskPath+"_tmp.vmdk", err)
+			}
 
-		// Remove temp files
-		for _, path := range []string{dmgPath, diskPath + "_tmp.vmdk"} {
-			if err := os.Remove(path); err != nil {
-				return log.Errorf("VMX: %s: Unable to remove tmp disk file %q: %v", d.name, path, err)
+			// Convert linked vmdk to standalone vmdk
+			if _, _, err := util.RunAndLog("VMX", 10*time.Minute, nil, d.cfg.VdiskmanagerPath, "-r", diskPath+"_tmp.vmdk", "-t", "0", diskPath+".vmdk"); err != nil {
+				return log.Errorf("VMX: %s: Unable to create %s vmdk disk %q: %v", d.name, diskType, diskPath+".vmdk", err)
+			}
+
+			// Remove temp files
+			for _, path := range []string{dmgPath, diskPath + "_tmp.vmdk"} {
+				if err := os.Remove(path); err != nil {
+					return log.Errorf("VMX: %s: Unable to remove tmp disk file %q: %v", d.name, path, err)
+				}
 			}
 		}
 	}
