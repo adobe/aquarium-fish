@@ -401,6 +401,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 
 			input.KeyName = aws.String(keyName)
 			keyPem = aws.ToString(result.KeyMaterial)
+			log.Debugf("AWS: %s: Generated keypair: %q", iName, keyName)
 		} else {
 			log.Debugf("AWS: %s: Skipping key generation since no Authentication provided", iName)
 		}
@@ -697,6 +698,8 @@ func (d *Driver) Deallocate(res *types.ApplicationResource) error {
 		if err != nil || result == nil || !aws.ToBool(result.Return) {
 			// It's not critical, but could leave some additional work for cleanup
 			log.Errorf("AWS: %s: Unable to delete keypair %q: %v", res.Identifier, keyName, err)
+		} else {
+			log.Debugf("AWS: %s: Removed generated keypair: %q", iName, keyName)
 		}
 	}
 
