@@ -365,6 +365,8 @@ func (e *Processor) ApplicationResourceGet(c echo.Context, uid types.Application
 
 	// TODO: Implement better way to ignore new fields in java jenkins side of things
 	out.Timeout = nil
+	// It's not a good idea to show the resource authentication params, internal use only
+	out.Authentication = nil
 
 	return c.JSON(http.StatusOK, out)
 }

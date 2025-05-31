@@ -37,7 +37,7 @@ func (c *Config) Apply(config []byte, db *database.Database) error {
 	}
 
 	if c.BindAddress == "" {
-		c.BindAddress = "0.0.0.0:1022"
+		c.BindAddress = "0.0.0.0:1222"
 	}
 
 	if c.SSHKey == "" {
