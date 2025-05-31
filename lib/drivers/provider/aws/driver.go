@@ -699,7 +699,7 @@ func (d *Driver) Deallocate(res *types.ApplicationResource) error {
 			// It's not critical, but could leave some additional work for cleanup
 			log.Errorf("AWS: %s: Unable to delete keypair %q: %v", res.Identifier, keyName, err)
 		} else {
-			log.Debugf("AWS: %s: Removed generated keypair: %q", iName, keyName)
+			log.Debugf("AWS: %s: Removed generated keypair: %q", res.Identifier, keyName)
 		}
 	}
 
