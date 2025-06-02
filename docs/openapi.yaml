@@ -153,12 +153,6 @@ paths:
       tags:
         - Label
       parameters:
-        - name: filter  # Deprecated: keeping it for backward-compatibility till the release
-          in: query
-          description: DEPRECATED, supports only name='<value>' and version=<version> request
-          required: false
-          schema:
-            type: string
         - name: name
           in: query
           description: Filter the list by name of the label

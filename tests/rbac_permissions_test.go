@@ -86,12 +86,48 @@ drivers:
 			End()
 	})
 
+	t.Run("Regular user without role: Can access small subset of API", func(t *testing.T) {
+		var user types.User
+		// Try to list labels
+		apitest.New().
+			EnableNetworking(cli).
+			Get(afi.APIAddress("api/v1/user/me/")).
+			BasicAuth(regularUser.Name, regularUser.Password).
+			Expect(t).
+			Status(http.StatusOK).
+			End().
+			JSON(&user)
+
+		if user.Name != regularUser.Name {
+			t.Error("Expected to see myself:", user.Name, "!=", regularUser.Name)
+		}
+	})
+
 	// Test regular user without any role
 	t.Run("Regular user without role: Access denied", func(t *testing.T) {
 		// Try to list labels
 		apitest.New().
 			EnableNetworking(cli).
 			Get(afi.APIAddress("api/v1/label/")).
+			BasicAuth(regularUser.Name, regularUser.Password).
+			Expect(t).
+			Status(http.StatusForbidden).
+			End()
+
+		// Try to create label
+		apitest.New().
+			EnableNetworking(cli).
+			Post(afi.APIAddress("api/v1/label/")).
+			JSON(map[string]string{"UID": uuid.New().String()}).
+			BasicAuth(regularUser.Name, regularUser.Password).
+			Expect(t).
+			Status(http.StatusForbidden).
+			End()
+
+		// Try to list applications
+		apitest.New().
+			EnableNetworking(cli).
+			Get(afi.APIAddress("api/v1/application/")).
 			BasicAuth(regularUser.Name, regularUser.Password).
 			Expect(t).
 			Status(http.StatusForbidden).
@@ -230,7 +266,26 @@ drivers:
 		apitest.New().
 			EnableNetworking(cli).
 			Post(afi.APIAddress("api/v1/label/")).
-			JSON(`{"name":"test-label-2", "version":1, "definitions": [{"driver":"test"}]}`).
+			JSON(`{"name":"test-label-2", "version":1, "definitions": [{"driver":"test", "resources":{"cpu":1,"ram":2}}]}`).
+			BasicAuth(regularUser.Name, regularUser.Password).
+			Expect(t).
+			Status(http.StatusForbidden).
+			End()
+
+		// Should NOT be able to get tasks
+		apitest.New().
+			EnableNetworking(cli).
+			Get(afi.APIAddress("api/v1/application/"+regularUserApp.UID.String()+"/task/")).
+			BasicAuth(regularUser.Name, regularUser.Password).
+			Expect(t).
+			Status(http.StatusForbidden).
+			End()
+
+		// Should NOT be able to create tasks
+		apitest.New().
+			EnableNetworking(cli).
+			Post(afi.APIAddress("api/v1/application/"+regularUserApp.UID.String()+"/task/")).
+			JSON(`{}`).
 			BasicAuth(regularUser.Name, regularUser.Password).
 			Expect(t).
 			Status(http.StatusForbidden).
@@ -258,7 +313,7 @@ drivers:
 			Get(afi.APIAddress("api/v1/application/"+adminApp.UID.String())).
 			BasicAuth(regularUser.Name, regularUser.Password).
 			Expect(t).
-			Status(http.StatusBadRequest). // Returns 400 because the app is not found for this user
+			Status(http.StatusBadRequest).
 			End()
 
 		// Should NOT be able to deallocate admin's application
@@ -297,7 +352,7 @@ drivers:
 		apitest.New().
 			EnableNetworking(cli).
 			Post(afi.APIAddress("api/v1/label/")).
-			JSON(`{"name":"admin-label", "version":1, "definitions": [{"driver":"test"}]}`).
+			JSON(`{"name":"admin-label", "version":1, "definitions": [{"driver":"test", "resources":{"cpu":1,"ram":2}}]}`).
 			BasicAuth(powerUser.Name, powerUser.Password).
 			Expect(t).
 			Status(http.StatusOK).

@@ -128,21 +128,6 @@ func (d *Driver) loadImages(opts *Options, vmImagesDir string) (string, error) {
 					os.RemoveAll(outDir)
 					return log.Errorf("VMX: %s: Unable to copy the image file %q to %q: %v", d.name, inPath, outPath, err)
 				}
-
-				// Deprecated functionality
-				// Since aquarium-bait tag `20220118` the images are using only relative paths
-				// TODO: Remove it on release v1.0
-				//
-				// Modify the vmsd file cloneOf0 to replace token - it requires absolute path
-				if strings.HasSuffix(entry.Name(), ".vmsd") {
-					if err := util.FileReplaceToken(outPath,
-						false, false, false,
-						"<REPLACE_PARENT_VM_FULL_PATH>", vmImagesDir,
-					); err != nil {
-						os.RemoveAll(outDir)
-						return log.Errorf("VMX: %s: Unable to replace full path token in vmsd %q: %v", d.name, image.Name, err)
-					}
-				}
 			}
 			return nil
 		}(image, imageIndex)

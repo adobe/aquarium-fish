@@ -11,6 +11,8 @@ output-options:
     - Node
     - ServiceMapping
     - User
+    - Role
+    - Vote
 generate:
   echo-server: true
 additional-imports:
