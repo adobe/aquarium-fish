@@ -39,7 +39,7 @@ PATH="$gopath/bin:$PATH" go generate -v ./lib/...
 
 # Prepare version number as overrides during link
 mod_name=$(grep '^module' "${root_dir}/go.mod" | cut -d' ' -f 2)
-git_version="$(git describe --tags --match 'v*')$([ "$(git diff)" = '' ] || echo '-dirty')"
+git_version="$(git describe --tags --match 'v*')$([ "$(git diff HEAD)" = '' ] || echo '-dirty')"
 version_flags="-X '$mod_name/lib/build.Version=${git_version}' -X '$mod_name/lib/build.Time=$(date -u +%y%m%d.%H%M%S)'"
 BINARY_NAME="aquarium-fish-$git_version"
 

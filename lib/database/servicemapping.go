@@ -10,6 +10,8 @@
  * governing permissions and limitations under the License.
  */
 
+// TODO: Move to Raw and Gate rails, remove from Fish core since it's a part of ProxySocks gate
+
 package database
 
 import (

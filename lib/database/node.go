@@ -27,7 +27,7 @@ func (d *Database) NodeList() (ns []types.Node, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	err = d.be.Collection("node").List(&ns)
+	err = d.be.Collection(types.ObjectNode).List(&ns)
 	return ns, err
 }
 
@@ -36,7 +36,7 @@ func (d *Database) NodeGet(name string) (node *types.Node, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	err = d.be.Collection("node").Get(name, &node)
+	err = d.be.Collection(types.ObjectNode).Get(name, &node)
 	return node, err
 }
 
@@ -74,7 +74,7 @@ func (d *Database) NodeCreate(n *types.Node) error {
 	n.UID = uuid.NewHash(hash, uuid.UUID{}, *n.Pubkey, 0)
 	n.CreatedAt = time.Now()
 	n.UpdatedAt = n.CreatedAt
-	return d.be.Collection("node").Add(n.Name, n)
+	return d.be.Collection(types.ObjectNode).Add(n.Name, n)
 }
 
 // NodeSave stores Node
@@ -83,7 +83,7 @@ func (d *Database) NodeSave(node *types.Node) error {
 	defer d.beMu.RUnlock()
 
 	node.UpdatedAt = time.Now()
-	return d.be.Collection("node").Add(node.Name, node)
+	return d.be.Collection(types.ObjectNode).Add(node.Name, node)
 }
 
 // NodePing updates Node and shows that it's active

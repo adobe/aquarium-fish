@@ -31,7 +31,7 @@ func (d *Database) ApplicationTaskList() (at []types.ApplicationTask, err error)
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	err = d.be.Collection("application_task").List(&at)
+	err = d.be.Collection(types.ObjectApplicationTask).List(&at)
 	return at, err
 }
 
@@ -70,7 +70,7 @@ func (d *Database) ApplicationTaskCreate(at *types.ApplicationTask) error {
 	at.CreatedAt = time.Now()
 	at.UpdatedAt = at.CreatedAt
 
-	err := d.be.Collection("application_task").Add(at.UID.String(), at)
+	err := d.be.Collection(types.ObjectApplicationTask).Add(at.UID.String(), at)
 
 	// Notifying the subscribers on change, doing that in goroutine to not block execution
 	go func(appTask *types.ApplicationTask) {
@@ -91,7 +91,7 @@ func (d *Database) ApplicationTaskSave(at *types.ApplicationTask) error {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	return d.be.Collection("application_task").Add(at.UID.String(), at)
+	return d.be.Collection(types.ObjectApplicationTask).Add(at.UID.String(), at)
 }
 
 // ApplicationTaskGet returns the ApplicationTask by ApplicationTaskUID
@@ -99,7 +99,7 @@ func (d *Database) ApplicationTaskGet(uid types.ApplicationTaskUID) (at *types.A
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	err = d.be.Collection("application_task").Get(uid.String(), &at)
+	err = d.be.Collection(types.ObjectApplicationTask).Get(uid.String(), &at)
 	return at, err
 }
 
@@ -108,7 +108,7 @@ func (d *Database) ApplicationTaskDelete(uid types.ApplicationTaskUID) (err erro
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	return d.be.Collection("application_task").Delete(uid.String())
+	return d.be.Collection(types.ObjectApplicationTask).Delete(uid.String())
 }
 
 // ApplicationTaskListByApplicationAndWhen returns list of ApplicationTasks by ApplicationUID and When it need to be executed
