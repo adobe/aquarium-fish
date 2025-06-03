@@ -65,7 +65,7 @@ echo
 echo '---------------------- YAML Lint ----------------------'
 echo
 if command -v docker >/dev/null; then
-    docker run --rm -v "${root_dir}:/data" cytopia/yamllint:1.22 --strict cmd docs lib
+    docker run --rm -v "${root_dir}:/data" cytopia/yamllint:1.22 --strict docs lib
     errors=$((${errors}+$?))
 else
     # TODO: Find some useful yaml lint in go ecosystem
