@@ -92,6 +92,10 @@ func GetUserPermissions() []types.Permission {
 		{Resource: types.ObjectApplication, Action: ActionList},
 		{Resource: types.ObjectApplication, Action: ActionRead},
 
+		{Resource: types.ObjectApplicationResource, Action: ActionRead},
+
+		{Resource: types.ObjectApplicationState, Action: ActionRead},
+
 		{Resource: types.ObjectLabel, Action: ActionList},
 	}
 }

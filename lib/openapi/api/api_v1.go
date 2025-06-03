@@ -41,9 +41,9 @@ type Processor struct {
 
 // NewV1Router creates router for APIv1
 func NewV1Router(e *echo.Echo, f *fish.Fish) error {
-	enforcer, err := auth.NewEnforcer(f.DB())
-	if err != nil {
-		return fmt.Errorf("failed to create enforcer: %w", err)
+	enforcer := auth.GetEnforcer()
+	if enforcer == nil {
+		return fmt.Errorf("enforcer not initialized")
 	}
 
 	proc := &Processor{fish: f, enforcer: enforcer}

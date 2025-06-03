@@ -94,7 +94,7 @@ for GOOS in $os_list; do
 
         echo "Building: $name ..."
         rm -f "$name" "$name.log" "$name.zip" "$name.tar.xz"
-        GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-s -w $version_flags" -o "$name" ./cmd/fish > "$name.log" 2>&1 &
+        GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-s -w $version_flags" -o "$name" . > "$name.log" 2>&1 &
         pwait $MAXJOBS
     done
 done

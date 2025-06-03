@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/casbin/casbin/v2"
 	"github.com/casbin/casbin/v2/model"
@@ -22,8 +21,27 @@ type Enforcer struct {
 	mu       sync.RWMutex
 }
 
-// NewEnforcer creates a new Casbin enforcer with the embedded model and database adapter
-func NewEnforcer(db *database.Database) (*Enforcer, error) {
+var (
+	// Global enforcer instance
+	globalEnforcer *Enforcer
+	// Mutex to protect enforcer initialization
+	enforcerMutex sync.Mutex
+)
+
+// GetEnforcer returns the global enforcer instance
+func GetEnforcer() *Enforcer {
+	return globalEnforcer
+}
+
+// SetEnforcer sets the global enforcer instance
+func SetEnforcer(e *Enforcer) {
+	enforcerMutex.Lock()
+	defer enforcerMutex.Unlock()
+	globalEnforcer = e
+}
+
+// NewEnforcer creates a new Casbin enforcer with the embedded model and memory adapter
+func NewEnforcer() (*Enforcer, error) {
 	// Load model from embedded file
 	modelText, err := modelFS.ReadFile("model.conf")
 	if err != nil {
@@ -35,8 +53,8 @@ func NewEnforcer(db *database.Database) (*Enforcer, error) {
 		return nil, fmt.Errorf("failed to create model: %w", err)
 	}
 
-	// Create adapter
-	adapter := NewDatabaseAdapter(db)
+	// Create memory adapter
+	adapter := NewMemoryAdapter()
 
 	// Create enforcer
 	enforcer, err := casbin.NewEnforcer(m, adapter)
@@ -49,11 +67,18 @@ func NewEnforcer(db *database.Database) (*Enforcer, error) {
 		return nil, fmt.Errorf("failed to load policy: %w", err)
 	}
 
-	return &Enforcer{
+	e := &Enforcer{
 		enforcer: enforcer,
 		adapter:  adapter,
 		mu:       sync.RWMutex{},
-	}, nil
+	}
+
+	// Set as global enforcer if not already set
+	if globalEnforcer == nil {
+		SetEnforcer(e)
+	}
+
+	return e, nil
 }
 
 // CheckPermission checks if the roles has permission to perform the action on the object

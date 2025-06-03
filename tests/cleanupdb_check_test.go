@@ -179,7 +179,8 @@ drivers:
 					continue
 				}
 				spl = strings.Split(val, ": ")
-				// Database should have just 6 keys left: user/admin, label/UID and node/node-1, casbin:owner, casbin:policy, casbin:role
+				// Database should have just 6 keys left: user/admin, label/UID and node/node-1,
+				// role/Administrator, role/User, role/Power
 				if spl[1] != "6" {
 					t.Errorf("Wrong amount of keys left in the database: %s != 6", spl[1])
 					break

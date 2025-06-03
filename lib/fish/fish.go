@@ -274,7 +274,12 @@ func (f *Fish) Init() error {
 
 // initDefaultRoles is needed to initialize DB with Administrator & User roles and fill-up policies
 func (f *Fish) initDefaultRoles() error {
-	// TODO: Maybe automatically update Administrator role with new permissions available?
+	// TODO: Improve role creation and implement enforcer update on role change
+	// Create enforcer first since we'll need it for setting up permissions
+	enforcer, err := auth.NewEnforcer()
+	if err != nil {
+		return log.Error("Fish: Failed to create enforcer:", err)
+	}
 
 	// Check if Administrator role exists
 	adminNewRole := types.Role{
@@ -324,34 +329,25 @@ func (f *Fish) initDefaultRoles() error {
 		return log.Error("Fish: Unable to get Role Power:", err)
 	}
 
-	// Create enforcer to set up permissions
-	if enforcer, err := auth.NewEnforcer(f.db); err == nil {
-		// Add Administrator role permissions
-		for _, p := range adminRole.Permissions {
-			if err := enforcer.AddPolicy(adminRole.Name, p.Resource, p.Action); err != nil {
-				return log.Errorf("Fish: Failed to add permission %v: %v", p, err)
-			}
+	// Add Administrator role permissions
+	for _, p := range adminRole.Permissions {
+		if err := enforcer.AddPolicy(adminRole.Name, p.Resource, p.Action); err != nil {
+			return log.Errorf("Fish: Failed to add permission %v: %v", p, err)
 		}
+	}
 
-		// Add User role permissions
-		for _, p := range userRole.Permissions {
-			if err := enforcer.AddPolicy(userRole.Name, p.Resource, p.Action); err != nil {
-				return log.Errorf("Fish: Failed to add permission %v: %v", p, err)
-			}
+	// Add User role permissions
+	for _, p := range userRole.Permissions {
+		if err := enforcer.AddPolicy(userRole.Name, p.Resource, p.Action); err != nil {
+			return log.Errorf("Fish: Failed to add permission %v: %v", p, err)
 		}
+	}
 
-		// Add Power role permissions
-		for _, p := range powerRole.Permissions {
-			if err := enforcer.AddPolicy(powerRole.Name, p.Resource, p.Action); err != nil {
-				return log.Errorf("Fish: Failed to add permission %v: %v", p, err)
-			}
+	// Add Power role permissions
+	for _, p := range powerRole.Permissions {
+		if err := enforcer.AddPolicy(powerRole.Name, p.Resource, p.Action); err != nil {
+			return log.Errorf("Fish: Failed to add permission %v: %v", p, err)
 		}
-
-		if err := enforcer.SavePolicy(); err != nil {
-			return log.Error("Fish: Failed to save permissions:", err)
-		}
-	} else {
-		return log.Error("Fish: Failed to create enforcer:", err)
 	}
 
 	return nil

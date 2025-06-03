@@ -1,124 +1,140 @@
 package auth
 
 import (
-	"fmt"
-
-	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/casbin/casbin/v2/model"
 )
 
-const (
-	dbCasbinPrefix = "casbin"
-	dbPolicyKey    = "policy"
-	dbRoleKey      = "role"
-	dbOwnerPrefix  = "owner"
-)
-
-// DatabaseAdapter implements Casbin's persist.Adapter interface
-type DatabaseAdapter struct {
-	db    *database.Database
-	model model.Model // Store model reference
+// MemoryAdapter implements Casbin's persist.Adapter interface using in-memory storage
+type MemoryAdapter struct {
+	policies   [][]string
+	roles      [][]string
+	ownerships [][]string
 }
 
-// NewDatabaseAdapter creates a new adapter instance
-func NewDatabaseAdapter(db *database.Database) *DatabaseAdapter {
-	return &DatabaseAdapter{db: db}
-}
-
-// LoadPolicy loads policy rules from database
-func (a *DatabaseAdapter) LoadPolicy(m model.Model) error {
-	// Store the model reference
-	a.model = m
-
-	// Load policy rules
-	var policies [][]string
-	if err := a.db.Get(dbCasbinPrefix, dbPolicyKey, &policies); err != nil && err != database.ErrObjectNotFound {
-		return fmt.Errorf("failed to load policy: %w", err)
+// NewMemoryAdapter creates a new adapter instance
+func NewMemoryAdapter() *MemoryAdapter {
+	return &MemoryAdapter{
+		policies:   make([][]string, 0),
+		roles:      make([][]string, 0),
+		ownerships: make([][]string, 0),
 	}
-	if policies != nil {
-		for _, policy := range policies {
-			if len(policy) == 3 {
-				m.AddPolicy("p", "p", policy)
-			}
+}
+
+// LoadPolicy loads policy rules from memory
+func (a *MemoryAdapter) LoadPolicy(m model.Model) error {
+	// Load policy rules
+	for _, policy := range a.policies {
+		if len(policy) == 3 {
+			m.AddPolicy("p", "p", policy)
 		}
 	}
 
 	// Load role assignments
-	var roles [][]string
-	if err := a.db.Get(dbCasbinPrefix, dbRoleKey, &roles); err != nil && err != database.ErrObjectNotFound {
-		return fmt.Errorf("failed to load roles: %w", err)
-	}
-	if roles != nil {
-		for _, role := range roles {
-			if len(role) == 2 {
-				m.AddPolicy("g", "g", role)
-			}
+	for _, role := range a.roles {
+		if len(role) == 2 {
+			m.AddPolicy("g", "g", role)
 		}
 	}
 
 	// Load resource ownership
-	var ownerships [][]string
-	if err := a.db.Get(dbCasbinPrefix, dbOwnerPrefix, &ownerships); err != nil && err != database.ErrObjectNotFound {
-		return fmt.Errorf("failed to load ownership: %w", err)
-	}
-	if ownerships != nil {
-		for _, ownership := range ownerships {
-			if len(ownership) == 2 {
-				m.AddPolicy("g", "g2", ownership)
-			}
+	for _, ownership := range a.ownerships {
+		if len(ownership) == 2 {
+			m.AddPolicy("g", "g2", ownership)
 		}
 	}
 
 	return nil
 }
 
-// SavePolicy saves policy rules to database
-func (a *DatabaseAdapter) SavePolicy(m model.Model) error {
-	if m == nil {
-		m = a.model
-	}
-
+// SavePolicy saves policy rules to memory
+func (a *MemoryAdapter) SavePolicy(m model.Model) error {
 	// Save policy rules
-	policies := m.GetPolicy("p", "p")
-	if err := a.db.Set(dbCasbinPrefix, dbPolicyKey, policies); err != nil {
-		return fmt.Errorf("failed to save policy: %w", err)
-	}
+	a.policies = m.GetPolicy("p", "p")
 
 	// Save role assignments
-	roles := m.GetPolicy("g", "g")
-	if err := a.db.Set(dbCasbinPrefix, dbRoleKey, roles); err != nil {
-		return fmt.Errorf("failed to save roles: %w", err)
-	}
+	a.roles = m.GetPolicy("g", "g")
 
 	// Save resource ownership
-	ownerships := m.GetPolicy("g", "g2")
-	if err := a.db.Set(dbCasbinPrefix, dbOwnerPrefix, ownerships); err != nil {
-		return fmt.Errorf("failed to save ownership: %w", err)
-	}
+	a.ownerships = m.GetPolicy("g", "g2")
 
 	return nil
 }
 
-// AddPolicy adds a policy rule to the storage
-func (a *DatabaseAdapter) AddPolicy(sec string, ptype string, rule []string) error {
-	if a.model != nil {
-		a.model.AddPolicy(sec, ptype, rule)
+// AddPolicy adds a policy rule to memory
+func (a *MemoryAdapter) AddPolicy(sec string, ptype string, rule []string) error {
+	switch {
+	case sec == "p" && ptype == "p":
+		a.policies = append(a.policies, rule)
+	case sec == "g" && ptype == "g":
+		a.roles = append(a.roles, rule)
+	case sec == "g" && ptype == "g2":
+		a.ownerships = append(a.ownerships, rule)
 	}
-	return a.SavePolicy(nil)
+	return nil
 }
 
-// RemovePolicy removes a policy rule from the storage
-func (a *DatabaseAdapter) RemovePolicy(sec string, ptype string, rule []string) error {
-	if a.model != nil {
-		a.model.RemovePolicy(sec, ptype, rule)
+// RemovePolicy removes a policy rule from memory
+func (a *MemoryAdapter) RemovePolicy(sec string, ptype string, rule []string) error {
+	switch {
+	case sec == "p" && ptype == "p":
+		a.policies = removeRule(a.policies, rule)
+	case sec == "g" && ptype == "g":
+		a.roles = removeRule(a.roles, rule)
+	case sec == "g" && ptype == "g2":
+		a.ownerships = removeRule(a.ownerships, rule)
 	}
-	return a.SavePolicy(nil)
+	return nil
 }
 
-// RemoveFilteredPolicy removes policy rules that match the filter from the storage
-func (a *DatabaseAdapter) RemoveFilteredPolicy(sec string, ptype string, fieldIndex int, fieldValues ...string) error {
-	if a.model != nil {
-		a.model.RemoveFilteredPolicy(sec, ptype, fieldIndex, fieldValues...)
+// RemoveFilteredPolicy removes policy rules that match the filter from memory
+func (a *MemoryAdapter) RemoveFilteredPolicy(sec string, ptype string, fieldIndex int, fieldValues ...string) error {
+	switch {
+	case sec == "p" && ptype == "p":
+		a.policies = removeFilteredRule(a.policies, fieldIndex, fieldValues)
+	case sec == "g" && ptype == "g":
+		a.roles = removeFilteredRule(a.roles, fieldIndex, fieldValues)
+	case sec == "g" && ptype == "g2":
+		a.ownerships = removeFilteredRule(a.ownerships, fieldIndex, fieldValues)
 	}
-	return a.SavePolicy(nil)
+	return nil
+}
+
+// Helper functions to remove rules
+func removeRule(rules [][]string, rule []string) [][]string {
+	var result [][]string
+	for _, r := range rules {
+		if !stringSliceEqual(r, rule) {
+			result = append(result, r)
+		}
+	}
+	return result
+}
+
+func removeFilteredRule(rules [][]string, fieldIndex int, fieldValues []string) [][]string {
+	var result [][]string
+	for _, rule := range rules {
+		matched := true
+		for i, v := range fieldValues {
+			if v != "" && rule[fieldIndex+i] != v {
+				matched = false
+				break
+			}
+		}
+		if !matched {
+			result = append(result, rule)
+		}
+	}
+	return result
+}
+
+func stringSliceEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

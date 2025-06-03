@@ -187,6 +187,28 @@ drivers:
 		}
 	})
 
+	t.Run("User: Create ApplicationTask Snapshot should not be allowed by Auth", func(t *testing.T) {
+		apitest.New().
+			EnableNetworking(cli).
+			Post(afi.APIAddress("api/v1/application/"+app.UID.String()+"/task/")).
+			JSON(map[string]any{"task": "snapshot", "when": types.ApplicationStatusALLOCATED}).
+			BasicAuth("test-user", "test-user-password").
+			Expect(t).
+			Status(http.StatusForbidden).
+			End()
+	})
+
+	t.Run("Admin: Put Power & User role in place", func(t *testing.T) {
+		apitest.New().
+			EnableNetworking(cli).
+			Post(afi.APIAddress("api/v1/user/test-user/roles")).
+			JSON(`["Power", "User"]`).
+			BasicAuth("admin", afi.AdminToken()).
+			Expect(t).
+			Status(http.StatusOK).
+			End()
+	})
+
 	var appTask1 types.ApplicationTask
 	t.Run("User: Create ApplicationTask 1 Snapshot on ALLOCATE", func(t *testing.T) {
 		apitest.New().
