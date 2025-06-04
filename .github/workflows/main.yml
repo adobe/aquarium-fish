@@ -84,11 +84,45 @@ jobs:
       - name: Build
         run: RELEASE=1 ./build.sh
 
+      - name: Checking no files in git were changed during the build
+        run: |
+          if [ "x$(git status -s)" != 'x' ]; then
+            echo 'Build modified the workspace, please fix or add to gitignore list:'
+            git status
+            exit 1
+          fi
+
       - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
           name: binaries
           path: aquarium-fish*.tar.xz
+  
+  Tests:
+    needs: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # To get all the tags for versioning
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: binaries
+
+      - name: Unpack built binaries
+        run: tar xf binaries/aquarium-fish*.linux_amd64.tar.xz
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Integration Tests
+        run: |
+          go install github.com/jstemmer/go-junit-report/v2@85bf471  # Oct 18, 2023
+          name="$(ls aquarium-fish-*.linux_amd64)"
+          FISH_PATH="$PWD/$name" go test -v -parallel 4 -count=1 -skip '_stress$' ./tests/... 2>&1 | go-junit-report -iocopy -set-exit-code -out report.xml
 
       - name: Benchmarks main
         run: go run go.bobheadxi.dev/gobenchdata@v1 action
@@ -110,12 +144,6 @@ jobs:
           INPUT_PRUNE_COUNT: 30
           INPUT_GO_TEST_FLAGS: "-run=^# -cpu 1,2 -benchmem"
           INPUT_CHECKS_CONFIG: gobenchdata-checks.yml
-
-      - name: Integration Tests
-        run: |
-          go install github.com/jstemmer/go-junit-report/v2@85bf471  # Oct 18, 2023
-          name="$(ls aquarium-fish-*.linux_amd64)"
-          FISH_PATH="$PWD/$name" go test -v -parallel 4 -count=1 -skip '_stress$' ./tests/... 2>&1 | go-junit-report -iocopy -set-exit-code -out report.xml
 
       - name: Upload test results
         uses: actions/upload-artifact@v4

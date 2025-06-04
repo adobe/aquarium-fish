@@ -37,6 +37,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/api"
 	"github.com/adobe/aquarium-fish/lib/openapi/meta"
+	"github.com/adobe/aquarium-fish/lib/rpc"
 )
 
 // YamlBinder is used to decode yaml requests
@@ -97,16 +98,31 @@ func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*http.Ser
 		caPool.AppendCertsFromPEM(caBytes)
 	}
 
-	s := router.TLSServer
-	s.Addr = apiAddress
-	s.TLSConfig = &tls.Config{ // #nosec G402 , keep the compatibility high since not public access
-		ClientAuth: tls.RequestClientCert, // Need for the client certificate auth
-		ClientCAs:  caPool,                // Verify client certificate with the cluster CA
+	// Create a RPC server
+	rpcServer := rpc.NewServer(f)
+
+	// Create a multiplexer to handle both HTTP and gRPC traffic
+	mux := http.NewServeMux()
+
+	// Handle gRPC/Connect-Web traffic on /grpc/*
+	mux.Handle("/grpc/", http.StripPrefix("/grpc", rpcServer.Handler()))
+
+	// Handle HTTP traffic on all other paths
+	mux.Handle("/", router)
+
+	s := &http.Server{
+		Addr:    apiAddress,
+		Handler: mux,
+		TLSConfig: &tls.Config{ // #nosec G402 , keep the compatibility high since not public access
+			ClientAuth: tls.RequestClientCert, // Need for the client certificate auth
+			ClientCAs:  caPool,                // Verify client certificate with the cluster CA
+		},
 	}
+
 	errChan := make(chan error)
 
 	if router.TLSListener, err = net.Listen("tcp", s.Addr); err != nil {
-		return router.TLSServer, log.Error("API: Unable to start listener:", err)
+		return s, log.Error("API: Unable to start listener:", err)
 	}
 
 	// There is a bit of chance that API server will not startup properly,
@@ -123,5 +139,5 @@ func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*http.Ser
 
 	log.Info("API listening on:", router.TLSListener.Addr())
 
-	return router.TLSServer, nil
+	return s, nil
 }

@@ -1,0 +1,39 @@
+// Copyright 2025 Adobe. All rights reserved.
+// This file is licensed to you under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may obtain a copy
+// of the License at http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software distributed under
+// the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR REPRESENTATIONS
+// OF ANY KIND, either express or implied. See the License for the specific language
+// governing permissions and limitations under the License.
+
+syntax = "proto3";
+
+package aquarium.v2;
+
+option go_package = "github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2;aquariumv2";
+
+// Authentication information to enable connecting to the machine.
+message Authentication {
+  // The username to login into the ApplicationResource.
+  string username = 1;
+  
+  // The password to login into the ApplicationResource.
+  string password = 2;
+  
+  // SSH private key to use instead of password to login into the ApplicationResource.
+  string key = 3;
+  
+  // TCP port to connect with SSH client.
+  int32 port = 4;
+}
+
+// Common response wrapper for all API responses
+message Response {
+  // Operation status (true = success, false = failure)
+  bool status = 1;
+  
+  // Human readable message about the operation result
+  string message = 2;
+} 

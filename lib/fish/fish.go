@@ -732,3 +732,8 @@ func (f *Fish) activateShutdown() {
 		waitApps <- true
 	}
 }
+
+// GetEnforcer returns the auth enforcer instance
+func (f *Fish) GetEnforcer() *auth.Enforcer {
+	return auth.GetEnforcer()
+}

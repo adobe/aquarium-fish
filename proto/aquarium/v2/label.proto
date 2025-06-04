@@ -1,0 +1,113 @@
+// Copyright 2025 Adobe. All rights reserved.
+// This file is licensed to you under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may obtain a copy
+// of the License at http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software distributed under
+// the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR REPRESENTATIONS
+// OF ANY KIND, either express or implied. See the License for the specific language
+// governing permissions and limitations under the License.
+
+syntax = "proto3";
+
+package aquarium.v2;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+import "aquarium/v2/common.proto";
+
+option go_package = "github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2;aquariumv2";
+
+// LabelService handles label management operations
+service LabelService {
+  // Get list of labels
+  rpc List(LabelServiceListRequest) returns (LabelServiceListResponse) {}
+  
+  // Get label by name
+  rpc Get(LabelServiceGetRequest) returns (LabelServiceGetResponse) {}
+  
+  // Create new label
+  rpc Create(LabelServiceCreateRequest) returns (LabelServiceCreateResponse) {}
+  
+  // Delete label
+  rpc Delete(LabelServiceDeleteRequest) returns (LabelServiceDeleteResponse) {}
+}
+
+// Label represents a reproducible environment configuration
+message Label {
+  string uid = 1;
+  google.protobuf.Timestamp created_at = 2;
+  string name = 3;
+  int32 version = 4;
+  repeated LabelDefinition definitions = 5;
+  google.protobuf.Struct metadata = 6;
+}
+
+// LabelDefinition describes how to provide resources
+message LabelDefinition {
+  string driver = 1;
+  Resources resources = 2;
+  google.protobuf.Struct options = 3;
+  Authentication authentication = 4;
+}
+
+// Resources defines required compute resources for a label
+message Resources {
+  optional uint32 slots = 1;
+  uint32 cpu = 2;
+  uint32 ram = 3;
+  map<string, ResourcesDisk> disks = 4;
+  string network = 5;
+  repeated string node_filter = 6;
+  bool multitenancy = 7;
+  bool cpu_overbook = 8;
+  bool ram_overbook = 9;
+  string lifetime = 10;
+}
+
+// ResourcesDisk defines disk configuration
+message ResourcesDisk {
+  string type = 1;
+  string label = 2;
+  uint32 size = 3;
+  bool reuse = 4;
+  string clone = 5;
+}
+
+message LabelServiceListRequest {}
+
+message LabelServiceListResponse {
+  bool status = 1;
+  string message = 2;
+  repeated Label data = 3;
+}
+
+message LabelServiceGetRequest {
+  string name = 1;
+}
+
+message LabelServiceGetResponse {
+  bool status = 1;
+  string message = 2;
+  Label data = 3;
+}
+
+message LabelServiceCreateRequest {
+  string name = 1;
+  map<string, string> metadata = 2;
+}
+
+message LabelServiceCreateResponse {
+  bool status = 1;
+  string message = 2;
+  Label data = 3;
+}
+
+message LabelServiceDeleteRequest {
+  string name = 1;
+}
+
+message LabelServiceDeleteResponse {
+  bool status = 1;
+  string message = 2;
+} 
