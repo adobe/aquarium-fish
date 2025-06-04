@@ -28,7 +28,6 @@ import (
 
 // This is a test which makes sure we can send yaml input to create a Label
 // * Create Label
-// * Find Label by deprecated Filter
 // * Find Label by new filter
 func Test_label_create_and_filter(t *testing.T) {
 	t.Parallel()
@@ -228,68 +227,6 @@ definitions:
 		}
 		if labels[0].Version != 2 {
 			t.Fatalf("Label version is incorrect: %v != 2", labels[0].Version)
-		}
-	})
-
-	// Perform deprecated filter label list tests
-	t.Run("Listing labels with name test-label with deprecated filter", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/label/")).
-			Query("filter", "name='test-label'").
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&labels)
-
-		if len(labels) != 2 {
-			t.Fatalf("Labels count is incorrect: %v != 2", len(labels))
-		}
-	})
-	t.Run("Listing labels with name test-label and version 2 with deprecated filter", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/label/")).
-			Query("filter", "name='test-label' AND version=2").
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&labels)
-
-		if len(labels) != 1 {
-			t.Fatalf("Labels count is incorrect: %v != 1", len(labels))
-		}
-	})
-	t.Run("Listing labels with version 2 and name test-label with deprecated filter", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/label/")).
-			Query("filter", "version=2 AND name='test-label'").
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&labels)
-
-		if len(labels) != 1 {
-			t.Fatalf("Labels count is incorrect: %v != 1", len(labels))
-		}
-	})
-	t.Run("Listing labels with version 1 with deprecated filter", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/label/")).
-			Query("filter", "version=1").
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&labels)
-
-		if len(labels) != 2 {
-			t.Fatalf("Labels count is incorrect: %v != 2", len(labels))
 		}
 	})
 }

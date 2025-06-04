@@ -18,7 +18,13 @@ token=$1
 hostport=$2
 [ "$hostport" ] || hostport=localhost:8001
 
+# Create user
 curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/json' -d '{
     "name":"test-user",
     "password":"test-user-password"
 }' "https://$hostport/api/v1/user/"
+
+# Assign roles
+curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/json' -d '[
+    "Power", "User"
+]' "https://$hostport/api/v1/user/test-user/roles"

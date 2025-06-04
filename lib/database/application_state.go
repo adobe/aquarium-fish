@@ -31,7 +31,7 @@ func (d *Database) ApplicationStateList() (ass []types.ApplicationState, err err
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	err = d.be.Collection("application_state").List(&ass)
+	err = d.be.Collection(types.ObjectApplicationState).List(&ass)
 	return ass, err
 }
 
@@ -49,7 +49,7 @@ func (d *Database) ApplicationStateCreate(as *types.ApplicationState) error {
 
 	as.UID = d.NewUID()
 	as.CreatedAt = time.Now()
-	err := d.be.Collection("application_state").Add(as.UID.String(), as)
+	err := d.be.Collection(types.ObjectApplicationState).Add(as.UID.String(), as)
 
 	// Notifying the subscribers on change, doing that in goroutine to not block execution
 	go func(appState *types.ApplicationState) {
@@ -74,7 +74,7 @@ func (d *Database) ApplicationStateGet(uid types.ApplicationStateUID) (as *types
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	err = d.be.Collection("application_state").Get(uid.String(), &as)
+	err = d.be.Collection(types.ObjectApplicationState).Get(uid.String(), &as)
 	return as, err
 }
 
@@ -83,7 +83,7 @@ func (d *Database) ApplicationStateDelete(uid types.ApplicationStateUID) (err er
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	return d.be.Collection("application_state").Delete(uid.String())
+	return d.be.Collection(types.ObjectApplicationState).Delete(uid.String())
 }
 
 // ApplicationStateListByApplication returns all ApplicationStates with ApplicationUID

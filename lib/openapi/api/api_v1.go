@@ -17,13 +17,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/pprof"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
 
+	"github.com/adobe/aquarium-fish/lib/auth"
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
@@ -35,12 +35,18 @@ type H map[string]any
 
 // Processor doing processing of the API request
 type Processor struct {
-	fish *fish.Fish
+	fish     *fish.Fish
+	enforcer *auth.Enforcer
 }
 
 // NewV1Router creates router for APIv1
-func NewV1Router(e *echo.Echo, f *fish.Fish) {
-	proc := &Processor{fish: f}
+func NewV1Router(e *echo.Echo, f *fish.Fish) error {
+	enforcer := auth.GetEnforcer()
+	if enforcer == nil {
+		return fmt.Errorf("enforcer not initialized")
+	}
+
+	proc := &Processor{fish: f, enforcer: enforcer}
 	router := e.Group("")
 	router.Use(
 		// Regular basic auth
@@ -49,6 +55,7 @@ func NewV1Router(e *echo.Echo, f *fish.Fish) {
 		echomw.BodyLimit("64KB"),
 	)
 	RegisterHandlers(router, proc)
+	return nil
 }
 
 // BasicAuth middleware to ensure API will not be used by crocodile
@@ -76,6 +83,16 @@ func (e *Processor) BasicAuth(username, password string, c echo.Context) (bool, 
 	return user != nil, nil
 }
 
+// checkPermission checks if the user has permission to perform the action on the object
+func (e *Processor) checkPermission(c echo.Context, obj string, act string) bool {
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		return false
+	}
+
+	return e.enforcer.CheckPermission(user.Roles, obj, act)
+}
+
 // UserMeGet API call processor
 func (*Processor) UserMeGet(c echo.Context) error {
 	user, ok := c.Get("user").(*types.User)
@@ -90,15 +107,9 @@ func (*Processor) UserMeGet(c echo.Context) error {
 
 // UserListGet API call processor
 func (e *Processor) UserListGet(c echo.Context) error {
-	// Only admin can list users
-	user, ok := c.Get("user").(*types.User)
-	if !ok {
-		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
-		return fmt.Errorf("Not authentified")
-	}
-	if user.Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can list users"})
-		return fmt.Errorf("Only 'admin' user can list users")
+	if !e.checkPermission(c, types.ObjectUser, auth.ActionList) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
 	}
 
 	out, err := e.fish.DB().UserList()
@@ -117,9 +128,10 @@ func (e *Processor) UserGet(c echo.Context, name string) error {
 		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
 		return fmt.Errorf("Not authentified")
 	}
-	if user.Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can get user"})
-		return fmt.Errorf("Only 'admin' user can get user")
+
+	if !e.checkPermission(c, types.ObjectUser, auth.ActionReadAll) || (name == user.Name && !e.checkPermission(c, types.ObjectUser, auth.ActionRead)) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
 	}
 
 	out, err := e.fish.DB().UserGet(name)
@@ -133,21 +145,31 @@ func (e *Processor) UserGet(c echo.Context, name string) error {
 
 // UserCreateUpdatePost API call processor
 func (e *Processor) UserCreateUpdatePost(c echo.Context) error {
-	// Only admin can create user, or user can update itself
+	canCreate := e.checkPermission(c, types.ObjectUser, auth.ActionCreate)
+	canUpdate := e.checkPermission(c, types.ObjectUser, auth.ActionUpdate) || e.checkPermission(c, types.ObjectUser, auth.ActionUpdateAll)
+	if !canCreate && !canUpdate {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
+	}
+
 	var data types.UserAPIPassword
 	if err := c.Bind(&data); err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Wrong request body: %v", err)})
 		return fmt.Errorf("Wrong request body: %w", err)
 	}
 
-	user, ok := c.Get("user").(*types.User)
-	if !ok {
-		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
-		return fmt.Errorf("Not authentified")
+	// Check if user exists to determine if this is create or update
+	_, err := e.fish.DB().UserGet(data.Name)
+	isCreate := err != nil
+
+	// Check permissions
+	if isCreate && !canCreate {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions to create user"})
+		return fmt.Errorf("Insufficient permissions to create user")
 	}
-	if user.Name != "admin" && user.Name != data.Name {
-		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can create user and user can update itself"})
-		return fmt.Errorf("Only 'admin' user can create user and user can update itself")
+	if !isCreate && !canUpdate {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions to update user"})
+		return fmt.Errorf("Insufficient permissions to update user")
 	}
 
 	password := data.Password
@@ -158,6 +180,7 @@ func (e *Processor) UserCreateUpdatePost(c echo.Context) error {
 	modUser, err := e.fish.DB().UserGet(data.Name)
 	if err == nil {
 		// Updating existing user
+		// No user parameters except for password could be modified here for security reasons
 		modUser.Hash = crypt.NewHash(password, nil)
 		e.fish.DB().UserSave(modUser)
 	} else {
@@ -183,15 +206,9 @@ func (e *Processor) UserCreateUpdatePost(c echo.Context) error {
 
 // UserDelete API call processor
 func (e *Processor) UserDelete(c echo.Context, name string) error {
-	// Only admin can delete user
-	user, ok := c.Get("user").(*types.User)
-	if !ok {
-		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
-		return fmt.Errorf("Not authentified")
-	}
-	if user.Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can delete user"})
-		return fmt.Errorf("Only 'admin' user can delete user")
+	if !e.checkPermission(c, types.ObjectUser, auth.ActionDelete) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
 	}
 
 	if err := e.fish.DB().UserDelete(name); err != nil {
@@ -199,11 +216,139 @@ func (e *Processor) UserDelete(c echo.Context, name string) error {
 		return fmt.Errorf("User delete failed with error: %w", err)
 	}
 
-	return c.JSON(http.StatusOK, H{"message": "User removed"})
+	return c.JSON(http.StatusOK, H{"message": "User deleted successfully"})
+}
+
+// RoleListGet API call processor
+func (e *Processor) RoleListGet(c echo.Context) error {
+	if !e.checkPermission(c, types.ObjectRole, auth.ActionList) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
+	}
+
+	roles, err := e.fish.DB().RoleList()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get role list: %v", err)})
+		return fmt.Errorf("Unable to get role list: %w", err)
+	}
+
+	return c.JSON(http.StatusOK, roles)
+}
+
+// RoleGet API call processor
+func (e *Processor) RoleGet(c echo.Context, name string) error {
+	if !e.checkPermission(c, types.ObjectRole, auth.ActionRead) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
+	}
+
+	role, err := e.fish.DB().RoleGet(name)
+	if err != nil {
+		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Role not found: %v", err)})
+		return fmt.Errorf("Role not found: %w", err)
+	}
+
+	return c.JSON(http.StatusOK, role)
+}
+
+// RoleCreateUpdatePost API call processor
+func (e *Processor) RoleCreateUpdatePost(c echo.Context) error {
+	canCreate := e.checkPermission(c, types.ObjectRole, auth.ActionCreate)
+	canUpdate := e.checkPermission(c, types.ObjectRole, auth.ActionUpdate)
+	if !canCreate && !canUpdate {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
+	}
+
+	var role types.Role
+	if err := c.Bind(&role); err != nil {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Wrong request body: %v", err)})
+		return fmt.Errorf("Wrong request body: %w", err)
+	}
+
+	// Check if role exists to determine if this is create or update
+	_, err := e.fish.DB().RoleGet(role.Name)
+	isCreate := err != nil
+
+	if isCreate {
+		if !canCreate {
+			c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions to create role"})
+			return fmt.Errorf("Insufficient permissions to create Role")
+		}
+		// Create role
+		if err := e.fish.DB().RoleCreate(&role); err != nil {
+			c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Failed to create Role: %v", err)})
+			return fmt.Errorf("Failed to cave Role: %w", err)
+		}
+	} else {
+		if !canUpdate {
+			c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions to update role"})
+			return fmt.Errorf("Insufficient permissions to update Role")
+		}
+		// Save role
+		if err := e.fish.DB().RoleSave(&role); err != nil {
+			c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Failed to save Role: %v", err)})
+			return fmt.Errorf("Failed to save Role: %w", err)
+		}
+	}
+
+	return c.JSON(http.StatusOK, role)
+}
+
+// RoleDelete API call processor
+func (e *Processor) RoleDelete(c echo.Context, name string) error {
+	if !e.checkPermission(c, types.ObjectRole, auth.ActionDelete) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
+	}
+
+	if err := e.fish.DB().RoleDelete(name); err != nil {
+		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Role delete failed with error: %v", err)})
+		return fmt.Errorf("Role delete failed with error: %w", err)
+	}
+
+	return c.JSON(http.StatusOK, H{"message": "Role deleted successfully"})
+}
+
+// UserRolesPost API call processor
+func (e *Processor) UserRolesPost(c echo.Context, name string) error {
+	// We using special auth.ActionAssignRole here to prevent User self-chaning it's own roles
+	if !e.checkPermission(c, types.ObjectUser, auth.ActionAssignRole) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
+	}
+
+	var roles []string
+	if err := c.Bind(&roles); err != nil {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Wrong request body: %v", err)})
+		return fmt.Errorf("Wrong request body: %w", err)
+	}
+
+	// Get user
+	user, err := e.fish.DB().UserGet(name)
+	if err != nil {
+		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("User not found: %v", err)})
+		return fmt.Errorf("User not found: %w", err)
+	}
+
+	// Update user roles
+	user.Roles = roles
+	if err := e.fish.DB().UserSave(user); err != nil {
+		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Failed to update user roles: %v", err)})
+		return fmt.Errorf("Failed to update user roles: %w", err)
+	}
+
+	return c.JSON(http.StatusOK, H{"message": "User roles updated successfully"})
 }
 
 // ApplicationResourceAccessPut API call processor
 func (e *Processor) ApplicationResourceAccessPut(c echo.Context, uid types.ApplicationResourceUID) error {
+	// TODO: Move to Gate since it's a part of ProxySSH gate logic
+	if !e.checkPermission(c, types.ObjectApplicationResource, auth.ActionAccess) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
+	}
+
 	user, ok := c.Get("user").(*types.User)
 	if !ok {
 		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
@@ -216,15 +361,15 @@ func (e *Processor) ApplicationResourceAccessPut(c echo.Context, uid types.Appli
 		return fmt.Errorf("ApplicationResource not found: %w", err)
 	}
 
-	// Only the owner and admin can create access for ApplicationResource
+	// Only the owner and users with resource access permission can create access for ApplicationResource
 	app, err := e.fish.DB().ApplicationGet(res.ApplicationUID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", res.ApplicationUID)})
 		return fmt.Errorf("Unable to find the Application: %s, %w", res.ApplicationUID, err)
 	}
-	if app.OwnerName != user.Name && user.Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": "Only the owner & admin can assign service mapping to the Application"})
-		return fmt.Errorf("Only the owner & admin can assign service mapping to the Application")
+	if app.OwnerName != user.Name {
+		c.JSON(http.StatusBadRequest, H{"message": "Only authorized owner can request access to an ApplicationResource"})
+		return fmt.Errorf("Only authorized owner can request access to an ApplicationResource")
 	}
 
 	pwd := crypt.RandString(64)
@@ -244,8 +389,10 @@ func (e *Processor) ApplicationResourceAccessPut(c echo.Context, uid types.Appli
 	rAccess := types.ApplicationResourceAccess{
 		ApplicationResourceUID: res.UID,
 		// Storing address of the proxy to give the user idea of where to connect to.
-		// Later when cluster will be here - it could contain a different node IP instead, because
-		// this particular one could not be able to serve the connection.
+		// TODO: Later when cluster will be here - it could contain a different node IP instead,
+		// because this particular one could not be able to serve the connection. Probably need to
+		// get node from the ApplicationResource and put it's address in place, but also need to
+		// find it's ProxySSH gate config and port, so becomes quite a bit complicated...
 		Address:  "TODO", //e.fish.GetCfg().ProxySSHAddress,
 		Username: user.Name,
 		// We should not store clear password, so convert it to salted hash
@@ -265,19 +412,25 @@ func (e *Processor) ApplicationResourceAccessPut(c echo.Context, uid types.Appli
 
 // ApplicationListGet API call processor
 func (e *Processor) ApplicationListGet(c echo.Context) error {
+	if !e.checkPermission(c, types.ObjectApplication, auth.ActionList) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
+	}
+
 	out, err := e.fish.DB().ApplicationList()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the application list: %v", err)})
 		return fmt.Errorf("Unable to get the application list: %w", err)
 	}
 
-	// Filter the output by owner
-	user, ok := c.Get("user").(*types.User)
-	if !ok {
-		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
-		return fmt.Errorf("Not authentified")
-	}
-	if user.Name != "admin" {
+	// Filter the output by owner unless user has permission to view all applications
+	if !e.checkPermission(c, types.ObjectApplication, auth.ActionListAll) {
+		user, ok := c.Get("user").(*types.User)
+		if !ok {
+			c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+			return fmt.Errorf("Not authentified")
+		}
+
 		var ownerOut []types.Application
 		for _, app := range out {
 			if app.OwnerName == user.Name {
@@ -292,21 +445,29 @@ func (e *Processor) ApplicationListGet(c echo.Context) error {
 
 // ApplicationGet API call processor
 func (e *Processor) ApplicationGet(c echo.Context, uid types.ApplicationUID) error {
-	app, err := e.fish.DB().ApplicationGet(uid)
-	if err != nil {
-		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Application not found: %v", err)})
-		return fmt.Errorf("Application not found: %w", err)
+	if !e.checkPermission(c, types.ObjectApplication, auth.ActionRead) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
 	}
 
-	// Only the owner of the application (or admin) can request it
 	user, ok := c.Get("user").(*types.User)
 	if !ok {
 		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
 		return fmt.Errorf("Not authentified")
 	}
-	if app.OwnerName != user.Name && user.Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": "Only the owner and admin can request the Application"})
-		return fmt.Errorf("Only the owner and admin can request the Application")
+
+	app, err := e.fish.DB().ApplicationGet(uid)
+
+	// Only the owner of the application or users with view permission can request it
+	if app == nil || app.OwnerName != user.Name {
+		if !e.checkPermission(c, types.ObjectApplication, auth.ActionReadAll) {
+			c.JSON(http.StatusBadRequest, H{"message": "Only the owner and authorized users can request the Application"})
+			return fmt.Errorf("Only the owner and authorized users can request the Application")
+		}
+	}
+	if err != nil {
+		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Application not found: %v", err)})
+		return fmt.Errorf("Application not found: %w", err)
 	}
 
 	return c.JSON(http.StatusOK, app)
@@ -314,6 +475,11 @@ func (e *Processor) ApplicationGet(c echo.Context, uid types.ApplicationUID) err
 
 // ApplicationCreatePost API call processor
 func (e *Processor) ApplicationCreatePost(c echo.Context) error {
+	if !e.checkPermission(c, types.ObjectApplication, auth.ActionCreate) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
+	}
+
 	var data types.Application
 	if err := c.Bind(&data); err != nil {
 		c.JSON(http.StatusBadRequest, H{"error": fmt.Sprintf("Wrong request body: %v", err)})
@@ -340,21 +506,29 @@ func (e *Processor) ApplicationCreatePost(c echo.Context) error {
 
 // ApplicationResourceGet API call processor
 func (e *Processor) ApplicationResourceGet(c echo.Context, uid types.ApplicationUID) error {
-	app, err := e.fish.DB().ApplicationGet(uid)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", uid)})
-		return fmt.Errorf("Unable to find the Application: %s, %w", uid, err)
+	if !e.checkPermission(c, types.ObjectApplicationResource, auth.ActionRead) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
 	}
 
-	// Only the owner of the application (or admin) can request the resource
+	// Only the owner of the application or users with resource view permission can request the resource
 	user, ok := c.Get("user").(*types.User)
 	if !ok {
 		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
 		return fmt.Errorf("Not authentified")
 	}
-	if app.OwnerName != user.Name && user.Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": "Only the owner and admin can request the Application resource"})
-		return fmt.Errorf("Only the owner and admin can request the Application resource")
+
+	app, err := e.fish.DB().ApplicationGet(uid)
+
+	if app == nil || app.OwnerName != user.Name {
+		if !e.checkPermission(c, types.ObjectApplicationResource, auth.ActionReadAll) {
+			c.JSON(http.StatusBadRequest, H{"message": "Only the owner and authorized users can request the Application resource"})
+			return fmt.Errorf("Only the owner and authorized users can request the Application resource")
+		}
+	}
+	if err != nil {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", uid)})
+		return fmt.Errorf("Unable to find the Application: %s, %w", uid, err)
 	}
 
 	out, err := e.fish.DB().ApplicationResourceGetByApplication(uid)
@@ -363,8 +537,6 @@ func (e *Processor) ApplicationResourceGet(c echo.Context, uid types.Application
 		return fmt.Errorf("ApplictionResource not found: %w", err)
 	}
 
-	// TODO: Implement better way to ignore new fields in java jenkins side of things
-	out.Timeout = nil
 	// It's not a good idea to show the resource authentication params, internal use only
 	out.Authentication = nil
 
@@ -373,21 +545,29 @@ func (e *Processor) ApplicationResourceGet(c echo.Context, uid types.Application
 
 // ApplicationStateGet API call processor
 func (e *Processor) ApplicationStateGet(c echo.Context, uid types.ApplicationUID) error {
-	app, err := e.fish.DB().ApplicationGet(uid)
-	if err != nil {
-		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Unable to find the Application: %s", uid)})
-		return fmt.Errorf("Unable to find the Application: %s, %w", uid, err)
+	if !e.checkPermission(c, types.ObjectApplicationState, auth.ActionRead) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
 	}
 
-	// Only the owner of the application (or admin) can request the status
+	// Only the owner of the application or users with state view permission can request the status
 	user, ok := c.Get("user").(*types.User)
 	if !ok {
 		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
 		return fmt.Errorf("Not authentified")
 	}
-	if app.OwnerName != user.Name && user.Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": "Only the owner and admin can request the Application status"})
-		return fmt.Errorf("Only the owner and admin can request the Application status")
+
+	app, err := e.fish.DB().ApplicationGet(uid)
+
+	if app == nil || app.OwnerName != user.Name {
+		if !e.checkPermission(c, types.ObjectApplicationState, auth.ActionReadAll) {
+			c.JSON(http.StatusBadRequest, H{"message": "Only the owner and authorized users can request the Application status"})
+			return fmt.Errorf("Only the owner and authorized users can request the Application status")
+		}
+	}
+	if err != nil {
+		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Unable to find the Application: %s", uid)})
+		return fmt.Errorf("Unable to find the Application: %s, %w", uid, err)
 	}
 
 	out, err := e.fish.DB().ApplicationStateGetByApplication(uid)
@@ -401,21 +581,28 @@ func (e *Processor) ApplicationStateGet(c echo.Context, uid types.ApplicationUID
 
 // ApplicationTaskListGet API call processor
 func (e *Processor) ApplicationTaskListGet(c echo.Context, appUID types.ApplicationUID) error {
-	app, err := e.fish.DB().ApplicationGet(appUID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", appUID)})
-		return fmt.Errorf("Unable to find the Application: %s, %w", appUID, err)
+	if !e.checkPermission(c, types.ObjectApplicationTask, auth.ActionList) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
 	}
 
-	// Only the owner of the application (or admin) could get the tasks
+	// Only the owner of the application or users with task view permission can get the tasks
 	user, ok := c.Get("user").(*types.User)
 	if !ok {
 		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
 		return fmt.Errorf("Not authentified")
 	}
-	if app.OwnerName != user.Name && user.Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": "Only the owner of Application & admin can get the Application Tasks"})
-		return fmt.Errorf("Only the owner of Application & admin can get the Application Tasks")
+	app, err := e.fish.DB().ApplicationGet(appUID)
+
+	if app == nil || app.OwnerName != user.Name {
+		if !e.checkPermission(c, types.ObjectApplicationTask, auth.ActionListAll) {
+			c.JSON(http.StatusBadRequest, H{"message": "Only the owner of Application & authorized users can get the Application Tasks"})
+			return fmt.Errorf("Only the owner of Application & authorized users can get the Application Tasks")
+		}
+	}
+	if err != nil {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", appUID)})
+		return fmt.Errorf("Unable to find the Application: %s, %w", appUID, err)
 	}
 
 	out, err := e.fish.DB().ApplicationTaskListByApplication(appUID)
@@ -429,21 +616,27 @@ func (e *Processor) ApplicationTaskListGet(c echo.Context, appUID types.Applicat
 
 // ApplicationTaskCreatePost API call processor
 func (e *Processor) ApplicationTaskCreatePost(c echo.Context, appUID types.ApplicationUID) error {
-	app, err := e.fish.DB().ApplicationGet(appUID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", appUID)})
-		return fmt.Errorf("Unable to find the Application: %s, %w", appUID, err)
+	if !e.checkPermission(c, types.ObjectApplicationTask, auth.ActionCreate) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
 	}
 
-	// Only the owner of the application (or admin) could create the tasks
+	// Only the owner of the application or users with task create permission can create tasks
 	user, ok := c.Get("user").(*types.User)
 	if !ok {
 		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
 		return fmt.Errorf("Not authentified")
 	}
-	if app.OwnerName != user.Name && user.Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": "Only the owner of Application & admin can create the Application Tasks"})
-		return fmt.Errorf("Only the owner of Application & admin can create the Application Tasks")
+
+	app, err := e.fish.DB().ApplicationGet(appUID)
+
+	if app == nil || app.OwnerName != user.Name {
+		c.JSON(http.StatusBadRequest, H{"message": "Only the owner of Application & authorized users can create the Application Tasks"})
+		return fmt.Errorf("Only the owner of Application & authorized users can create the Application Tasks")
+	}
+	if err != nil {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", appUID)})
+		return fmt.Errorf("Unable to find the Application: %s, %w", appUID, err)
 	}
 
 	var data types.ApplicationTask
@@ -465,27 +658,35 @@ func (e *Processor) ApplicationTaskCreatePost(c echo.Context, appUID types.Appli
 
 // ApplicationTaskGet API call processor
 func (e *Processor) ApplicationTaskGet(c echo.Context, taskUID types.ApplicationTaskUID) error {
-	task, err := e.fish.DB().ApplicationTaskGet(taskUID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", taskUID)})
-		return fmt.Errorf("Unable to find the ApplicationTask: %s, %w", taskUID, err)
+	if !e.checkPermission(c, types.ObjectApplicationTask, auth.ActionRead) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
 	}
 
-	app, err := e.fish.DB().ApplicationGet(task.ApplicationUID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", task.ApplicationUID)})
-		return fmt.Errorf("Unable to find the Application: %s, %w", task.ApplicationUID, err)
-	}
-
-	// Only the owner of the application (or admin) could get the attached task
+	// Only the owner of the application or users with task view permission can get the task
 	user, ok := c.Get("user").(*types.User)
 	if !ok {
 		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
 		return fmt.Errorf("Not authentified")
 	}
-	if app.OwnerName != user.Name && user.Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": "Only the owner of Application & admin can get the ApplicationTask"})
-		return fmt.Errorf("Only the owner of Application & admin can get the ApplicationTask")
+
+	task, err := e.fish.DB().ApplicationTaskGet(taskUID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the ApplicationTask: %s", taskUID)})
+		return fmt.Errorf("Unable to find the ApplicationTask: %s, %w", taskUID, err)
+	}
+
+	app, err := e.fish.DB().ApplicationGet(task.ApplicationUID)
+
+	if app == nil || app.OwnerName != user.Name {
+		if !e.checkPermission(c, types.ObjectApplicationTask, auth.ActionReadAll) {
+			c.JSON(http.StatusBadRequest, H{"message": "Only the owner of Application & authorized users can get the ApplicationTask"})
+			return fmt.Errorf("Only the owner of Application & authorized users can get the ApplicationTask")
+		}
+	}
+	if err != nil {
+		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", task.ApplicationUID)})
+		return fmt.Errorf("Unable to find the Application: %s, %w", task.ApplicationUID, err)
 	}
 
 	return c.JSON(http.StatusOK, task)
@@ -493,21 +694,29 @@ func (e *Processor) ApplicationTaskGet(c echo.Context, taskUID types.Application
 
 // ApplicationDeallocateGet API call processor
 func (e *Processor) ApplicationDeallocateGet(c echo.Context, uid types.ApplicationUID) error {
+	if !e.checkPermission(c, types.ObjectApplication, auth.ActionDeallocate) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
+	}
+
+	// Only the owner of the application or users with deallocate permission can deallocate it
+	user, ok := c.Get("user").(*types.User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
+		return fmt.Errorf("Not authentified")
+	}
+
 	app, err := e.fish.DB().ApplicationGet(uid)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the application: %s", uid)})
 		return fmt.Errorf("Unable to find the Application: %s, %w", uid, err)
 	}
 
-	// Only the owner of the application (or admin) could deallocate it
-	user, ok := c.Get("user").(*types.User)
-	if !ok {
-		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
-		return fmt.Errorf("Not authentified")
-	}
-	if app.OwnerName != user.Name && user.Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": "Only the owner & admin can deallocate the Application resource"})
-		return fmt.Errorf("Only the owner & admin can deallocate the Application resource")
+	if app.OwnerName != user.Name {
+		if !e.checkPermission(c, types.ObjectApplication, auth.ActionDeallocateAll) {
+			c.JSON(http.StatusBadRequest, H{"message": "Only the owner & authorized users can deallocate the Application resource"})
+			return fmt.Errorf("Only the owner & authorized users can deallocate the Application resource")
+		}
 	}
 
 	as, err := e.fish.DB().ApplicationDeallocate(uid, user.Name)
@@ -521,25 +730,11 @@ func (e *Processor) ApplicationDeallocateGet(c echo.Context, uid types.Applicati
 
 // LabelListGet API call processor
 func (e *Processor) LabelListGet(c echo.Context, params types.LabelListGetParams) error {
-	// Deprecated functionality:
-	// For backward compatibility and easier migration support "name=" and "version=" filter
-	// It's dirty, so no doubt it will fail for complicated cases - so migrate to proper filters
-	if params.Filter != nil {
-		// Name label usually doesn't contain spaces, so using as separator
-		filterSplit := strings.Split(*params.Filter, " ")
-		for _, item := range filterSplit {
-			log.Debug("DEPRECATED: Processing filter item:", item)
-			if params.Name == nil && strings.HasPrefix(item, "name=") {
-				val := strings.Trim(strings.SplitN(item, "=", 2)[1], "\"'")
-				params.Name = &val
-			}
-			if params.Version == nil && strings.HasPrefix(item, "version=") {
-				val := strings.Trim(strings.SplitN(item, "=", 2)[1], "\"'")
-				params.Version = &val
-			}
-		}
-		params.Filter = nil
+	if !e.checkPermission(c, types.ObjectLabel, auth.ActionList) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
 	}
+
 	out, err := e.fish.DB().LabelList(params)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the label list: %v", err)})
@@ -551,6 +746,11 @@ func (e *Processor) LabelListGet(c echo.Context, params types.LabelListGetParams
 
 // LabelGet API call processor
 func (e *Processor) LabelGet(c echo.Context, uid types.LabelUID) error {
+	if !e.checkPermission(c, types.ObjectLabel, auth.ActionRead) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
+	}
+
 	out, err := e.fish.DB().LabelGet(uid)
 	if err != nil {
 		c.JSON(http.StatusNotFound, H{"message": fmt.Sprintf("Label not found: %v", err)})
@@ -562,15 +762,9 @@ func (e *Processor) LabelGet(c echo.Context, uid types.LabelUID) error {
 
 // LabelCreatePost API call processor
 func (e *Processor) LabelCreatePost(c echo.Context) error {
-	// Only admin can create label
-	user, ok := c.Get("user").(*types.User)
-	if !ok {
-		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
-		return fmt.Errorf("Not authentified")
-	}
-	if user.Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can create label"})
-		return fmt.Errorf("Only 'admin' user can create label")
+	if !e.checkPermission(c, types.ObjectLabel, auth.ActionCreate) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
 	}
 
 	var data types.Label
@@ -588,15 +782,9 @@ func (e *Processor) LabelCreatePost(c echo.Context) error {
 
 // LabelDelete API call processor
 func (e *Processor) LabelDelete(c echo.Context, uid types.LabelUID) error {
-	// Only admin can delete label
-	user, ok := c.Get("user").(*types.User)
-	if !ok {
-		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
-		return fmt.Errorf("Not authentified")
-	}
-	if user.Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can delete Label"})
-		return fmt.Errorf("Only 'admin' user can delete label")
+	if !e.checkPermission(c, types.ObjectLabel, auth.ActionDelete) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
 	}
 
 	err := e.fish.DB().LabelDelete(uid)
@@ -610,6 +798,11 @@ func (e *Processor) LabelDelete(c echo.Context, uid types.LabelUID) error {
 
 // NodeListGet API call processor
 func (e *Processor) NodeListGet(c echo.Context) error {
+	if !e.checkPermission(c, types.ObjectNode, auth.ActionList) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
+	}
+
 	out, err := e.fish.DB().NodeList()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, H{"message": fmt.Sprintf("Unable to get the node list: %v", err)})
@@ -621,6 +814,11 @@ func (e *Processor) NodeListGet(c echo.Context) error {
 
 // NodeThisGet API call processor
 func (e *Processor) NodeThisGet(c echo.Context) error {
+	if !e.checkPermission(c, types.ObjectNode, auth.ActionRead) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
+	}
+
 	node := e.fish.DB().GetNode()
 
 	return c.JSON(http.StatusOK, node)
@@ -628,14 +826,9 @@ func (e *Processor) NodeThisGet(c echo.Context) error {
 
 // NodeThisMaintenanceGet API call processor
 func (e *Processor) NodeThisMaintenanceGet(c echo.Context, params types.NodeThisMaintenanceGetParams) error {
-	user, ok := c.Get("user").(*types.User)
-	if !ok {
-		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
-		return fmt.Errorf("Not authentified")
-	}
-	if user.Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' can set node maintenance"})
-		return fmt.Errorf("Only 'admin' user can set node maintenance")
+	if !e.checkPermission(c, types.ObjectNode, auth.ActionMaintainance) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
 	}
 
 	// Set shutdown delay first
@@ -669,15 +862,10 @@ func (e *Processor) NodeThisProfilingIndexGet(c echo.Context) error {
 }
 
 // NodeThisProfilingGet API call processor
-func (*Processor) NodeThisProfilingGet(c echo.Context, handler string) error {
-	user, ok := c.Get("user").(*types.User)
-	if !ok {
-		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
-		return fmt.Errorf("Not authentified")
-	}
-	if user.Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' can see profiling info"})
-		return fmt.Errorf("Only 'admin' can see profiling info")
+func (e *Processor) NodeThisProfilingGet(c echo.Context, handler string) error {
+	if !e.checkPermission(c, types.ObjectNode, auth.ActionProfiling) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
 	}
 
 	switch handler {
@@ -705,14 +893,9 @@ func (*Processor) NodeThisProfilingGet(c echo.Context, handler string) error {
 
 // VoteListGet API call processor
 func (e *Processor) VoteListGet(c echo.Context) error {
-	user, ok := c.Get("user").(*types.User)
-	if !ok {
-		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
-		return fmt.Errorf("Not authentified")
-	}
-	if user.Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can get votes"})
-		return fmt.Errorf("Only 'admin' user can get votes")
+	if !e.checkPermission(c, types.ObjectNode, auth.ActionList) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
 	}
 
 	out := e.fish.VoteActiveList()
@@ -722,14 +905,10 @@ func (e *Processor) VoteListGet(c echo.Context) error {
 
 // ServiceMappingGet API call processor
 func (e *Processor) ServiceMappingGet(c echo.Context, uid types.ServiceMappingUID) error {
-	user, ok := c.Get("user").(*types.User)
-	if !ok {
-		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
-		return fmt.Errorf("Not authentified")
-	}
-	if user.Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can get service mapping"})
-		return fmt.Errorf("Only 'admin' user can get service mapping")
+	// TODO: move to Gate since part of ProxySocks gate
+	if !e.checkPermission(c, "servicemappings", auth.ActionRead) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
 	}
 
 	out, err := e.fish.DB().ServiceMappingGet(uid)
@@ -743,14 +922,10 @@ func (e *Processor) ServiceMappingGet(c echo.Context, uid types.ServiceMappingUI
 
 // ServiceMappingListGet API call processor
 func (e *Processor) ServiceMappingListGet(c echo.Context) error {
-	user, ok := c.Get("user").(*types.User)
-	if !ok {
-		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
-		return fmt.Errorf("Not authentified")
-	}
-	if user.Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can get service mappings"})
-		return fmt.Errorf("Only 'admin' user can get service mappings")
+	// TODO: move to Gate since part of ProxySocks gate
+	if !e.checkPermission(c, "servicemappings", auth.ActionList) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
 	}
 
 	out, err := e.fish.DB().ServiceMappingList()
@@ -764,10 +939,10 @@ func (e *Processor) ServiceMappingListGet(c echo.Context) error {
 
 // ServiceMappingCreatePost API call processor
 func (e *Processor) ServiceMappingCreatePost(c echo.Context) error {
-	var data types.ServiceMapping
-	if err := c.Bind(&data); err != nil {
-		c.JSON(http.StatusBadRequest, H{"error": fmt.Sprintf("Wrong request body: %v", err)})
-		return fmt.Errorf("Wrong request body: %w", err)
+	// TODO: move to Gate since part of ProxySocks gate
+	if !e.checkPermission(c, "servicemappings", auth.ActionCreate) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
 	}
 
 	user, ok := c.Get("user").(*types.User)
@@ -775,21 +950,26 @@ func (e *Processor) ServiceMappingCreatePost(c echo.Context) error {
 		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
 		return fmt.Errorf("Not authentified")
 	}
+
+	var data types.ServiceMapping
+	if err := c.Bind(&data); err != nil {
+		c.JSON(http.StatusBadRequest, H{"error": fmt.Sprintf("Wrong request body: %v", err)})
+		return fmt.Errorf("Wrong request body: %w", err)
+	}
+
 	if data.ApplicationUID != uuid.Nil {
-		// Only the owner and admin can create servicemapping for his application
+		// Check if user has permission to manage service mappings for this application
 		app, err := e.fish.DB().ApplicationGet(data.ApplicationUID)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, H{"message": fmt.Sprintf("Unable to find the Application: %s", data.ApplicationUID)})
 			return fmt.Errorf("Unable to find the Application: %s, %w", data.ApplicationUID, err)
 		}
 
-		if app.OwnerName != user.Name && user.Name != "admin" {
-			c.JSON(http.StatusBadRequest, H{"message": "Only the owner & admin can assign service mapping to the Application"})
-			return fmt.Errorf("Only the owner & admin can assign service mapping to the Application")
+		// User needs either application ownership or special permission
+		if app.OwnerName != user.Name {
+			c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+			return fmt.Errorf("Insufficient permissions")
 		}
-	} else if user.Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can create service mapping with undefined Application"})
-		return fmt.Errorf("Only 'admin' user can create service mapping with undefined Application")
 	}
 
 	if err := e.fish.DB().ServiceMappingCreate(&data); err != nil {
@@ -802,15 +982,10 @@ func (e *Processor) ServiceMappingCreatePost(c echo.Context) error {
 
 // ServiceMappingDelete API call processor
 func (e *Processor) ServiceMappingDelete(c echo.Context, uid types.ServiceMappingUID) error {
-	// Only admin can delete ServiceMapping
-	user, ok := c.Get("user").(*types.User)
-	if !ok {
-		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
-		return fmt.Errorf("Not authentified")
-	}
-	if user.Name != "admin" {
-		c.JSON(http.StatusBadRequest, H{"message": "Only 'admin' user can delete service mapping"})
-		return fmt.Errorf("Only 'admin' user can delete service mapping")
+	// TODO: move to Gate since part of ProxySocks gate
+	if !e.checkPermission(c, "servicemappings", auth.ActionDelete) {
+		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
+		return fmt.Errorf("Insufficient permissions")
 	}
 
 	if err := e.fish.DB().ServiceMappingDelete(uid); err != nil {

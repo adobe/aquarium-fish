@@ -13,6 +13,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/servicequotas v1.21.10
 	github.com/aws/aws-sdk-go-v2/service/sts v1.28.12
 	github.com/bradleyfalzon/ghinstallation/v2 v2.14.0
+	github.com/casbin/casbin/v2 v2.85.0
 	github.com/creack/pty v1.1.24
 	github.com/getkin/kin-openapi v0.124.0
 	github.com/ghodss/yaml v1.0.0
@@ -44,6 +45,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.11.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.11.11 // indirect
 	github.com/aws/smithy-go v1.20.2 // indirect
+	github.com/casbin/govaluate v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/ebitengine/purego v0.8.2 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect

@@ -58,7 +58,7 @@ drivers:
 	}
 
 	var label types.Label
-	t.Run("Create Label", func(t *testing.T) {
+	t.Run("Admin: Create Label", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
 			Post(afi.APIAddress("api/v1/label/")).
@@ -74,7 +74,7 @@ drivers:
 		}
 	})
 
-	t.Run("Create User", func(t *testing.T) {
+	t.Run("Admin: Create User", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
 			Post(afi.APIAddress("api/v1/user/")).
@@ -82,16 +82,62 @@ drivers:
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
-			End().
-			JSON(&label)
+			End()
+	})
 
-		if label.UID == uuid.Nil {
-			t.Fatalf("Label UID is incorrect: %v", label.UID)
+	// User-side of requests
+	t.Run("User: List Label with name test-label should not be allowed by Auth", func(t *testing.T) {
+		apitest.New().
+			EnableNetworking(cli).
+			Get(afi.APIAddress("api/v1/label/")).
+			Query("name", "test-label").
+			BasicAuth("test-user", "test-user-password").
+			Expect(t).
+			Status(http.StatusForbidden).
+			End()
+	})
+
+	t.Run("User: Create Application should not be allowed by Auth", func(t *testing.T) {
+		apitest.New().
+			EnableNetworking(cli).
+			Post(afi.APIAddress("api/v1/application/")).
+			JSON(`{"label_UID":"`+label.UID.String()+`"}`).
+			BasicAuth("test-user", "test-user-password").
+			Expect(t).
+			Status(http.StatusForbidden).
+			End()
+	})
+
+	t.Run("Admin: Put User role in place", func(t *testing.T) {
+		apitest.New().
+			EnableNetworking(cli).
+			Post(afi.APIAddress("api/v1/user/test-user/roles")).
+			JSON(`["User"]`).
+			BasicAuth("admin", afi.AdminToken()).
+			Expect(t).
+			Status(http.StatusOK).
+			End()
+	})
+
+	var labels []types.Label
+	t.Run("User: List Label with name test-label", func(t *testing.T) {
+		apitest.New().
+			EnableNetworking(cli).
+			Get(afi.APIAddress("api/v1/label/")).
+			Query("name", "test-label").
+			BasicAuth("test-user", "test-user-password").
+			Expect(t).
+			Status(http.StatusOK).
+			End().
+			JSON(&labels)
+
+		if len(labels) != 1 || labels[0].UID == uuid.Nil {
+			t.Fatalf("Label is incorrect")
 		}
 	})
 
 	var app types.Application
-	t.Run("Create Application", func(t *testing.T) {
+	t.Run("User: Create Application", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
 			Post(afi.APIAddress("api/v1/application/")).
@@ -108,7 +154,7 @@ drivers:
 	})
 
 	var appState types.ApplicationState
-	t.Run("Application should get ALLOCATED in 10 sec", func(t *testing.T) {
+	t.Run("User: Application should get ALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
@@ -126,7 +172,7 @@ drivers:
 	})
 
 	var res types.ApplicationResource
-	t.Run("Resource should be created", func(t *testing.T) {
+	t.Run("User: Resource should be created", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
 			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/resource")).
@@ -141,8 +187,30 @@ drivers:
 		}
 	})
 
+	t.Run("User: Create ApplicationTask Snapshot should not be allowed by Auth", func(t *testing.T) {
+		apitest.New().
+			EnableNetworking(cli).
+			Post(afi.APIAddress("api/v1/application/"+app.UID.String()+"/task/")).
+			JSON(map[string]any{"task": "snapshot", "when": types.ApplicationStatusALLOCATED}).
+			BasicAuth("test-user", "test-user-password").
+			Expect(t).
+			Status(http.StatusForbidden).
+			End()
+	})
+
+	t.Run("Admin: Put Power & User role in place", func(t *testing.T) {
+		apitest.New().
+			EnableNetworking(cli).
+			Post(afi.APIAddress("api/v1/user/test-user/roles")).
+			JSON(`["Power", "User"]`).
+			BasicAuth("admin", afi.AdminToken()).
+			Expect(t).
+			Status(http.StatusOK).
+			End()
+	})
+
 	var appTask1 types.ApplicationTask
-	t.Run("Create ApplicationTask 1 Snapshot on ALLOCATE", func(t *testing.T) {
+	t.Run("User: Create ApplicationTask 1 Snapshot on ALLOCATE", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
 			Post(afi.APIAddress("api/v1/application/"+app.UID.String()+"/task/")).
@@ -159,7 +227,7 @@ drivers:
 	})
 
 	var appTask2 types.ApplicationTask
-	t.Run("Create ApplicationTask 2 Snapshot on DEALLOCATE", func(t *testing.T) {
+	t.Run("User: Create ApplicationTask 2 Snapshot on DEALLOCATE", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
 			Post(afi.APIAddress("api/v1/application/"+app.UID.String()+"/task/")).
@@ -176,7 +244,7 @@ drivers:
 	})
 
 	var appTasks []types.ApplicationTask
-	t.Run("ApplicationTask 1 should be executed in 10 sec and 2 should not be executed", func(t *testing.T) {
+	t.Run("User: ApplicationTask 1 should be executed in 10 sec and 2 should not be executed", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
@@ -211,7 +279,7 @@ drivers:
 		})
 	})
 
-	t.Run("Deallocate the Application", func(t *testing.T) {
+	t.Run("User: Deallocate the Application", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
 			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/deallocate")).
@@ -221,7 +289,7 @@ drivers:
 			End()
 	})
 
-	t.Run("ApplicationTask 2 should be executed in 10 sec", func(t *testing.T) {
+	t.Run("User: ApplicationTask 2 should be executed in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
@@ -250,7 +318,7 @@ drivers:
 		})
 	})
 
-	t.Run("Application should get DEALLOCATED in 10 sec", func(t *testing.T) {
+	t.Run("User: Application should get DEALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).

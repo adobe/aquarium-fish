@@ -23,7 +23,7 @@ import (
 // LabelFind returns list of Labels that fits filters
 func (d *Database) LabelList(filters types.LabelListGetParams) (labels []types.Label, err error) {
 	d.beMu.RLock()
-	err = d.be.Collection("label").List(&labels)
+	err = d.be.Collection(types.ObjectLabel).List(&labels)
 	d.beMu.RUnlock()
 
 	filterVersion := 0
@@ -69,7 +69,7 @@ func (d *Database) LabelListName(name string) (labels []types.Label, err error) 
 	allLabels := []types.Label{}
 
 	d.beMu.RLock()
-	err = d.be.Collection("label").List(&allLabels)
+	err = d.be.Collection(types.ObjectLabel).List(&allLabels)
 	d.beMu.RUnlock()
 
 	if err == nil {
@@ -118,7 +118,7 @@ func (d *Database) LabelCreate(l *types.Label) error {
 
 	l.UID = d.NewUID()
 	l.CreatedAt = time.Now()
-	return d.be.Collection("label").Add(l.UID.String(), l)
+	return d.be.Collection(types.ObjectLabel).Add(l.UID.String(), l)
 }
 
 // Intentionally disabled - labels can be created once and can't be updated
@@ -135,7 +135,7 @@ func (d *Database) LabelGet(uid types.LabelUID) (label *types.Label, err error) 
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	err = d.be.Collection("label").Get(uid.String(), &label)
+	err = d.be.Collection(types.ObjectLabel).Get(uid.String(), &label)
 	return label, err
 }
 
@@ -144,5 +144,5 @@ func (d *Database) LabelDelete(uid types.LabelUID) error {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	return d.be.Collection("label").Delete(uid.String())
+	return d.be.Collection(types.ObjectLabel).Delete(uid.String())
 }
