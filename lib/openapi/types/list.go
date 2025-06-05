@@ -12,6 +12,8 @@
 
 package types
 
+// DEPRECATED: As a part of OpenAPI RBAC it will be removed in the future
+
 // Objects list
 const (
 	ObjectApplication         = "application"

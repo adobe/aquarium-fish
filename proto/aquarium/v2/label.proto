@@ -15,13 +15,18 @@ package aquarium.v2;
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 import "aquarium/v2/common.proto";
+import "aquarium/v2/rbac.proto";
 
 option go_package = "github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2;aquariumv2";
 
 // LabelService handles label management operations
 service LabelService {
   // Get list of labels
-  rpc List(LabelServiceListRequest) returns (LabelServiceListResponse) {}
+  rpc List(LabelServiceListRequest) returns (LabelServiceListResponse) {
+   option (access_control) = {
+     allowed_roles: ["User"]
+   };
+  }
   
   // Get label by name
   rpc Get(LabelServiceGetRequest) returns (LabelServiceGetResponse) {}

@@ -12,7 +12,8 @@
 // Example:
 // rpc GetMe(UserServiceGetMeRequest) returns (UserServiceGetMeResponse) {
 //   option (access_control) = {
-//     allow_unauthenticated: false
+//     allow_unauthenticated: false,
+//     allowed_roles: ["User", "Administrator"]
 //   };
 // }
 
@@ -28,7 +29,10 @@ option go_package = "github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v
 // RoleBasedAccessControl defines the RBAC policy for a method
 message RoleBasedAccessControl {
   // Whether unauthenticated access is allowed
-  bool allow_unauthenticated = 1;
+  optional bool allow_unauthenticated = 1;
+  // List of roles that are allowed to access this method
+  // If empty, only Administrator role is allowed
+  repeated string allowed_roles = 2;
 }
 
 extend google.protobuf.MethodOptions {

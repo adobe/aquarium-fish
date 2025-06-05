@@ -1,12 +1,18 @@
 ---
 version: v2
 
+# WARNING: We should not use remote plugins here - they tend to exhause buf.build rate limits
 plugins:
-  - remote: buf.build/protocolbuffers/go
-    out: gen/proto
+  - local: protoc-gen-go
+    out: lib/rpc/gen/proto
     opt:
       - paths=source_relative
-  - remote: buf.build/connectrpc/go
-    out: gen/proto
+  - local: protoc-gen-connect-go
+    out: lib/rpc/gen/proto
     opt:
       - paths=source_relative
+  - local:
+      - go
+      - run
+      - ./tools/buf-gen-permissions.go
+    out: lib/auth

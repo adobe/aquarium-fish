@@ -28,23 +28,25 @@ for f in `git ls-files`; do
 
         # Logic files: go, proto, sh
         if echo "$f" | grep -q '\.\(go\|proto\|sh\)$'; then
-            # Should contain copyright
-            if !(head -20 "$f" | grep -q 'Copyright 20.. Adobe. All rights reserved'); then
-                echo "ERROR: Should contain Adobe copyright header: $f"
-                errors=$((${errors}+1))
-            fi
+            if ! echo "$f" | fgrep -q '.gen.'; then
+                # Should contain copyright
+                if !(head -20 "$f" | grep -q 'Copyright 20.. Adobe. All rights reserved'); then
+                    echo "ERROR: Should contain Adobe copyright header: $f"
+                    errors=$((${errors}+1))
+                fi
 
-            # Should contain license
-            if !(head -20 "$f" | grep -q 'Apache License, Version 2.0'); then
-                echo "ERROR: Should contain license name and version: $f"
-                errors=$((${errors}+1))
-            fi
+                # Should contain license
+                if !(head -20 "$f" | grep -q 'Apache License, Version 2.0'); then
+                    echo "ERROR: Should contain license name and version: $f"
+                    errors=$((${errors}+1))
+                fi
 
-            #  Should contain Author
-            #if !(head -20 "$f" | grep -q 'Author: .\+'); then
-            #    echo "ERROR: Should contain Author: $f"
-            #    errors=$((${errors}+1))
-            #fi
+                #  Should contain Author
+                #if !(head -20 "$f" | grep -q 'Author: .\+'); then
+                #    echo "ERROR: Should contain Author: $f"
+                #    errors=$((${errors}+1))
+                #fi
+            fi
         fi
     fi
 done
@@ -85,7 +87,7 @@ fi
 echo
 echo '---------------------- Proto verify ----------------------'
 echo
-buf=$(cd proto; buf lint --config ../buf.yaml 2>&1)
+buf=$(buf lint 2>&1)
 if [ "${buf}" ]; then
     echo "ERROR: Please fix the issues: \n${buf}"
     errors=$(( ${errors}+$(echo "${buf}" | wc -l) ))

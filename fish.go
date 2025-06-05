@@ -13,6 +13,8 @@
 // Starting point for fish cmd
 package main
 
+//go:generate buf generate
+
 import (
 	"context"
 	"os"

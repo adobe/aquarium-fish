@@ -32,12 +32,6 @@ import (
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
-const (
-	defaultAdministratorRole = "Administrator"
-	defaultUserRole          = "User"
-	defaultPowerRole         = "Power"
-)
-
 // ClusterInterface defines required functions for Fish to run on the cluster
 type ClusterInterface interface {
 	// Requesting send of Vote to cluster, since it's not a part of DB
@@ -149,7 +143,7 @@ func (f *Fish) Init() error {
 		}
 
 		// Assigning admin role
-		adminUser.Roles = []string{defaultAdministratorRole}
+		adminUser.Roles = []string{auth.AdminRoleName}
 		if err := f.db.UserSave(adminUser); err != nil {
 			return log.Error("Fish: Failed to assign Administrator Role to admin user:", err)
 		}
@@ -274,80 +268,38 @@ func (f *Fish) Init() error {
 
 // initDefaultRoles is needed to initialize DB with Administrator & User roles and fill-up policies
 func (f *Fish) initDefaultRoles() error {
-	// TODO: Improve role creation and implement enforcer update on role change
+	// TODO: Implement enforcer update on role change
 	// Create enforcer first since we'll need it for setting up permissions
 	enforcer, err := auth.NewEnforcer()
 	if err != nil {
 		return log.Error("Fish: Failed to create enforcer:", err)
 	}
 
-	// Check if Administrator role exists
-	adminNewRole := types.Role{
-		Name:        defaultAdministratorRole,
-		Permissions: auth.GetAllPermissions(),
-	}
-	adminRole, err := f.db.RoleGet(adminNewRole.Name)
-	if err == database.ErrObjectNotFound {
-		log.Debug("Fish: Create Administrator Role and assigning permissions")
-		adminRole = &adminNewRole
-		if err := f.db.RoleCreate(adminRole); err != nil {
-			return log.Error("Fish: Failed to create admin role:", err)
+	// Create all roles described in the proto specs
+	for role, perms := range auth.GetRolePermissions() {
+		newRole := types.Role{
+			Name:        role,
+			Permissions: perms,
 		}
-	} else if err != nil {
-		return log.Error("Fish: Unable to get Role Administrator:", err)
-	}
 
-	// Check if User role exists
-	userNewRole := types.Role{
-		Name:        defaultUserRole,
-		Permissions: auth.GetUserPermissions(),
-	}
-	userRole, err := f.db.RoleGet(userNewRole.Name)
-	if err == database.ErrObjectNotFound {
-		log.Debug("Fish: Create User Role and assigning permissions")
-		userRole = &userNewRole
-		if err := f.db.RoleCreate(userRole); err != nil {
-			return log.Error("Fish: Failed to create user role:", err)
+		r, err := f.db.RoleGet(role)
+		if err == database.ErrObjectNotFound {
+			log.Debugf("Fish: Create %q role and assigning permissions", role)
+			r = &newRole
+			if err := f.db.RoleCreate(r); err != nil {
+				return log.Errorf("Fish: Failed to create %q role: %v", role, err)
+			}
+		} else if err != nil {
+			return log.Errorf("Fish: Unable to get %q role: %v", role, err)
 		}
-	} else if err != nil {
-		return log.Error("Fish: Unable to get Role User:", err)
-	}
 
-	// Check if Power role exists
-	powerNewRole := types.Role{
-		Name:        defaultPowerRole,
-		Permissions: auth.GetPowerPermissions(),
-	}
-	powerRole, err := f.db.RoleGet(powerNewRole.Name)
-	if err == database.ErrObjectNotFound {
-		log.Debug("Fish: Create Power Role and assigning permissions")
-		powerRole = &powerNewRole
-		if err := f.db.RoleCreate(powerRole); err != nil {
-			return log.Error("Fish: Failed to create power role:", err)
+		// Add role permissions to the enforcer
+		for _, p := range r.Permissions {
+			if err := enforcer.AddPolicy(r.Name, p.Resource, p.Action); err != nil {
+				return log.Errorf("Fish: Failed to add %q role permission %v: %v", role, p, err)
+			}
 		}
-	} else if err != nil {
-		return log.Error("Fish: Unable to get Role Power:", err)
-	}
 
-	// Add Administrator role permissions
-	for _, p := range adminRole.Permissions {
-		if err := enforcer.AddPolicy(adminRole.Name, p.Resource, p.Action); err != nil {
-			return log.Errorf("Fish: Failed to add permission %v: %v", p, err)
-		}
-	}
-
-	// Add User role permissions
-	for _, p := range userRole.Permissions {
-		if err := enforcer.AddPolicy(userRole.Name, p.Resource, p.Action); err != nil {
-			return log.Errorf("Fish: Failed to add permission %v: %v", p, err)
-		}
-	}
-
-	// Add Power role permissions
-	for _, p := range powerRole.Permissions {
-		if err := enforcer.AddPolicy(powerRole.Name, p.Resource, p.Action); err != nil {
-			return log.Errorf("Fish: Failed to add permission %v: %v", p, err)
-		}
 	}
 
 	return nil

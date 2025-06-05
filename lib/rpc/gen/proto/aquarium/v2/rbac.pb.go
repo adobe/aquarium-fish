@@ -12,7 +12,8 @@
 // Example:
 // rpc GetMe(UserServiceGetMeRequest) returns (UserServiceGetMeResponse) {
 //   option (access_control) = {
-//     allow_unauthenticated: false
+//     allow_unauthenticated: false,
+//     allowed_roles: ["User", "Administrator"]
 //   };
 // }
 
@@ -44,9 +45,12 @@ const (
 type RoleBasedAccessControl struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Whether unauthenticated access is allowed
-	AllowUnauthenticated bool `protobuf:"varint,1,opt,name=allow_unauthenticated,json=allowUnauthenticated,proto3" json:"allow_unauthenticated,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	AllowUnauthenticated *bool `protobuf:"varint,1,opt,name=allow_unauthenticated,json=allowUnauthenticated,proto3,oneof" json:"allow_unauthenticated,omitempty"`
+	// List of roles that are allowed to access this method
+	// If empty, only Administrator role is allowed
+	AllowedRoles  []string `protobuf:"bytes,2,rep,name=allowed_roles,json=allowedRoles,proto3" json:"allowed_roles,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RoleBasedAccessControl) Reset() {
@@ -80,10 +84,17 @@ func (*RoleBasedAccessControl) Descriptor() ([]byte, []int) {
 }
 
 func (x *RoleBasedAccessControl) GetAllowUnauthenticated() bool {
-	if x != nil {
-		return x.AllowUnauthenticated
+	if x != nil && x.AllowUnauthenticated != nil {
+		return *x.AllowUnauthenticated
 	}
 	return false
+}
+
+func (x *RoleBasedAccessControl) GetAllowedRoles() []string {
+	if x != nil {
+		return x.AllowedRoles
+	}
+	return nil
 }
 
 var file_aquarium_v2_rbac_proto_extTypes = []protoimpl.ExtensionInfo{
@@ -109,9 +120,11 @@ var File_aquarium_v2_rbac_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_rbac_proto_rawDesc = "" +
 	"\n" +
-	"\x16aquarium/v2/rbac.proto\x12\vaquarium.v2\x1a google/protobuf/descriptor.proto\"M\n" +
-	"\x16RoleBasedAccessControl\x123\n" +
-	"\x15allow_unauthenticated\x18\x01 \x01(\bR\x14allowUnauthenticated:o\n" +
+	"\x16aquarium/v2/rbac.proto\x12\vaquarium.v2\x1a google/protobuf/descriptor.proto\"\x91\x01\n" +
+	"\x16RoleBasedAccessControl\x128\n" +
+	"\x15allow_unauthenticated\x18\x01 \x01(\bH\x00R\x14allowUnauthenticated\x88\x01\x01\x12#\n" +
+	"\rallowed_roles\x18\x02 \x03(\tR\fallowedRolesB\x18\n" +
+	"\x16_allow_unauthenticated:o\n" +
 	"\x0eaccess_control\x12\x1e.google.protobuf.MethodOptions\x18І\x03 \x01(\v2#.aquarium.v2.RoleBasedAccessControlR\raccessControl\x88\x01\x01BIZGgithub.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2;aquariumv2b\x06proto3"
 
 var (
@@ -146,6 +159,7 @@ func file_aquarium_v2_rbac_proto_init() {
 	if File_aquarium_v2_rbac_proto != nil {
 		return
 	}
+	file_aquarium_v2_rbac_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

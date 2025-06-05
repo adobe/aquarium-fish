@@ -918,7 +918,7 @@ var File_aquarium_v2_user_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_user_proto_rawDesc = "" +
 	"\n" +
-	"\x16aquarium/v2/user.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa6\x01\n" +
+	"\x16aquarium/v2/user.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16aquarium/v2/rbac.proto\"\xa6\x01\n" +
 	"\x04User\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x129\n" +
 	"\n" +
@@ -978,10 +978,11 @@ const file_aquarium_v2_user_proto_rawDesc = "" +
 	"\x05roles\x18\x02 \x03(\tR\x05roles\"R\n" +
 	"\x1eUserServiceAssignRolesResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage2\x87\x05\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage2\x91\x05\n" +
 	"\vUserService\x12V\n" +
-	"\x05GetMe\x12$.aquarium.v2.UserServiceGetMeRequest\x1a%.aquarium.v2.UserServiceGetMeResponse\"\x00\x12S\n" +
-	"\x04List\x12#.aquarium.v2.UserServiceListRequest\x1a$.aquarium.v2.UserServiceListResponse\"\x00\x12P\n" +
+	"\x05GetMe\x12$.aquarium.v2.UserServiceGetMeRequest\x1a%.aquarium.v2.UserServiceGetMeResponse\"\x00\x12]\n" +
+	"\x04List\x12#.aquarium.v2.UserServiceListRequest\x1a$.aquarium.v2.UserServiceListResponse\"\n" +
+	"\x82\xb5\x18\x06\x12\x04User\x12P\n" +
 	"\x03Get\x12\".aquarium.v2.UserServiceGetRequest\x1a#.aquarium.v2.UserServiceGetResponse\"\x00\x12Y\n" +
 	"\x06Create\x12%.aquarium.v2.UserServiceCreateRequest\x1a&.aquarium.v2.UserServiceCreateResponse\"\x00\x12Y\n" +
 	"\x06Update\x12%.aquarium.v2.UserServiceUpdateRequest\x1a&.aquarium.v2.UserServiceUpdateResponse\"\x00\x12Y\n" +
@@ -1056,6 +1057,7 @@ func file_aquarium_v2_user_proto_init() {
 	if File_aquarium_v2_user_proto != nil {
 		return
 	}
+	file_aquarium_v2_rbac_proto_init()
 	file_aquarium_v2_user_proto_msgTypes[8].OneofWrappers = []any{}
 	file_aquarium_v2_user_proto_msgTypes[10].OneofWrappers = []any{}
 	type x struct{}

@@ -31,6 +31,16 @@ if ! command -v buf >/dev/null 2>&1; then
     go install github.com/bufbuild/buf/cmd/buf@1.54.0
 fi
 
+if ! command -v protoc-gen-go >/dev/null 2>&1; then
+    # Version is from go.mod
+    go install google.golang.org/protobuf/cmd/protoc-gen-go
+fi
+
+if ! command -v protoc-gen-connect-go >/dev/null 2>&1; then
+    # Version is from go.mod
+    go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.18.1
+fi
+
 # Install oapi-codegen if it's not available or version is not the same with go.mod
 req_ver=$(grep -F 'github.com/oapi-codegen/oapi-codegen/v2' go.mod | cut -d' ' -f 2)
 curr_ver="$(oapi-codegen --version 2>/dev/null | tail -1 || true)"
@@ -38,11 +48,8 @@ if [ "$curr_ver" != "$req_ver" ]; then
     go install "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@$req_ver"
 fi
 
-# Cleanup the old generated files
-find ./lib -name '*.gen.go' -delete
-
 # Run code generation
-go generate -v ./lib/...
+go generate -v . ./lib/...
 
 # If ONLYGEN is specified - skip the build
 [ -z "$ONLYGEN" ] || exit 0

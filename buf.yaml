@@ -1,11 +1,11 @@
 ---
 version: v2
 
-name: buf.build/adobe/aquarium-fish
+#name: buf.build/adobe/aquarium-fish
 
-#modules:
-#  - path: proto
-#    name: buf.build/adobe/aquarium-fish
+modules:
+  - path: proto
+    name: buf.build/adobe/aquarium-fish
 
 breaking:
   use:

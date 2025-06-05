@@ -10,6 +10,8 @@
  * governing permissions and limitations under the License.
  */
 
-package rpc
+package auth
 
-//go:generate buf generate ../../proto --config ../../buf.yaml --template ../../buf.gen.yaml --clean
+const (
+	AdminRoleName = "Administrator"
+)

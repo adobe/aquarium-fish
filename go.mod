@@ -34,7 +34,7 @@ require (
 	go.mills.io/bitcask/v2 v2.1.3
 	golang.org/x/crypto v0.26.0
 	golang.org/x/net v0.23.0
-	google.golang.org/protobuf v1.34.2
+	google.golang.org/protobuf v1.36.6
 	gopkg.in/yaml.v3 v3.0.1
 )
 
