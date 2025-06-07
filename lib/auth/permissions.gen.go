@@ -21,8 +21,8 @@ import (
 // All available permissions per role
 var rolePermissions = map[string][]types.Permission{
 	"Administrator": {
-		// ApplicationResourceAccessService
-		{Resource: ApplicationResourceAccessService, Action: ApplicationResourceAccessServiceAccess}, // OpenAPI
+		// ApplicationResourceService
+		{Resource: ApplicationResourceService, Action: ApplicationResourceServiceAccess}, // OpenAPI
 
 		// ApplicationService
 		{Resource: ApplicationService, Action: ApplicationServiceCreate},         // gRPC, OpenAPI
@@ -39,6 +39,7 @@ var rolePermissions = map[string][]types.Permission{
 		{Resource: ApplicationService, Action: ApplicationServiceList},           // gRPC, OpenAPI
 		{Resource: ApplicationService, Action: ApplicationServiceListAll},        // OpenAPI
 		{Resource: ApplicationService, Action: ApplicationServiceListTask},       // gRPC, OpenAPI
+		{Resource: ApplicationService, Action: ApplicationServiceListTaskAll},    // OpenAPI
 
 		// ApplicationTaskService
 		{Resource: ApplicationTaskService, Action: ApplicationTaskServiceGet},    // OpenAPI
@@ -85,8 +86,8 @@ var rolePermissions = map[string][]types.Permission{
 		{Resource: VoteService, Action: VoteServiceListAll}, // OpenAPI
 	},
 	"Power": {
-		// ApplicationResourceAccessService
-		{Resource: ApplicationResourceAccessService, Action: ApplicationResourceAccessServiceAccess}, // OpenAPI
+		// ApplicationResourceService
+		{Resource: ApplicationResourceService, Action: ApplicationResourceServiceAccess}, // OpenAPI
 
 		// ApplicationService
 		{Resource: ApplicationService, Action: ApplicationServiceCreateTask}, // gRPC, OpenAPI

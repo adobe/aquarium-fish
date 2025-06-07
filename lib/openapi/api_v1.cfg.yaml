@@ -2,6 +2,8 @@
 package: api
 output: api/server_v1.gen.go
 output-options:
+  user-templates:
+    echo/echo-wrappers.tmpl: ./custom-echo-wrappers.tmpl
   include-tags:
     - Application
     - ApplicationState

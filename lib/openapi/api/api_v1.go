@@ -107,7 +107,7 @@ func (*Processor) UserMeGet(c echo.Context) error {
 
 // UserListGet API call processor
 func (e *Processor) UserListGet(c echo.Context) error {
-	if !e.checkPermission(c, types.ObjectUser, auth.ActionList) {
+	if !e.checkPermission(c, auth.UserService, auth.UserServiceList) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -129,7 +129,7 @@ func (e *Processor) UserGet(c echo.Context, name string) error {
 		return fmt.Errorf("Not authentified")
 	}
 
-	if !e.checkPermission(c, types.ObjectUser, auth.ActionReadAll) || (name == user.Name && !e.checkPermission(c, types.ObjectUser, auth.ActionRead)) {
+	if !e.checkPermission(c, auth.UserService, auth.UserServiceGetAll) || (name == user.Name && !e.checkPermission(c, auth.UserService, auth.UserServiceGet)) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -145,8 +145,8 @@ func (e *Processor) UserGet(c echo.Context, name string) error {
 
 // UserCreateUpdatePost API call processor
 func (e *Processor) UserCreateUpdatePost(c echo.Context) error {
-	canCreate := e.checkPermission(c, types.ObjectUser, auth.ActionCreate)
-	canUpdate := e.checkPermission(c, types.ObjectUser, auth.ActionUpdate) || e.checkPermission(c, types.ObjectUser, auth.ActionUpdateAll)
+	canCreate := e.checkPermission(c, auth.UserService, auth.UserServiceCreate)
+	canUpdate := e.checkPermission(c, auth.UserService, auth.UserServiceUpdate) || e.checkPermission(c, auth.UserService, auth.UserServiceUpdateAll)
 	if !canCreate && !canUpdate {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
@@ -206,7 +206,7 @@ func (e *Processor) UserCreateUpdatePost(c echo.Context) error {
 
 // UserDelete API call processor
 func (e *Processor) UserDelete(c echo.Context, name string) error {
-	if !e.checkPermission(c, types.ObjectUser, auth.ActionDelete) {
+	if !e.checkPermission(c, auth.UserService, auth.UserServiceDelete) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -221,7 +221,7 @@ func (e *Processor) UserDelete(c echo.Context, name string) error {
 
 // RoleListGet API call processor
 func (e *Processor) RoleListGet(c echo.Context) error {
-	if !e.checkPermission(c, types.ObjectRole, auth.ActionList) {
+	if !e.checkPermission(c, auth.RoleService, auth.RoleServiceList) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -237,7 +237,7 @@ func (e *Processor) RoleListGet(c echo.Context) error {
 
 // RoleGet API call processor
 func (e *Processor) RoleGet(c echo.Context, name string) error {
-	if !e.checkPermission(c, types.ObjectRole, auth.ActionRead) {
+	if !e.checkPermission(c, auth.RoleService, auth.RoleServiceGet) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -253,8 +253,8 @@ func (e *Processor) RoleGet(c echo.Context, name string) error {
 
 // RoleCreateUpdatePost API call processor
 func (e *Processor) RoleCreateUpdatePost(c echo.Context) error {
-	canCreate := e.checkPermission(c, types.ObjectRole, auth.ActionCreate)
-	canUpdate := e.checkPermission(c, types.ObjectRole, auth.ActionUpdate)
+	canCreate := e.checkPermission(c, auth.RoleService, auth.RoleServiceCreate)
+	canUpdate := e.checkPermission(c, auth.RoleService, auth.RoleServiceUpdate)
 	if !canCreate && !canUpdate {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
@@ -297,7 +297,7 @@ func (e *Processor) RoleCreateUpdatePost(c echo.Context) error {
 
 // RoleDelete API call processor
 func (e *Processor) RoleDelete(c echo.Context, name string) error {
-	if !e.checkPermission(c, types.ObjectRole, auth.ActionDelete) {
+	if !e.checkPermission(c, auth.RoleService, auth.RoleServiceDelete) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -313,7 +313,7 @@ func (e *Processor) RoleDelete(c echo.Context, name string) error {
 // UserRolesPost API call processor
 func (e *Processor) UserRolesPost(c echo.Context, name string) error {
 	// We using special auth.ActionAssignRole here to prevent User self-chaning it's own roles
-	if !e.checkPermission(c, types.ObjectUser, auth.ActionAssignRole) {
+	if !e.checkPermission(c, auth.UserService, auth.UserServiceAssignRoles) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -344,7 +344,7 @@ func (e *Processor) UserRolesPost(c echo.Context, name string) error {
 // ApplicationResourceAccessPut API call processor
 func (e *Processor) ApplicationResourceAccessPut(c echo.Context, uid types.ApplicationResourceUID) error {
 	// TODO: Move to Gate since it's a part of ProxySSH gate logic
-	if !e.checkPermission(c, types.ObjectApplicationResource, auth.ActionAccess) {
+	if !e.checkPermission(c, auth.ApplicationResourceService, auth.ApplicationResourceServiceAccess) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -412,7 +412,7 @@ func (e *Processor) ApplicationResourceAccessPut(c echo.Context, uid types.Appli
 
 // ApplicationListGet API call processor
 func (e *Processor) ApplicationListGet(c echo.Context) error {
-	if !e.checkPermission(c, types.ObjectApplication, auth.ActionList) {
+	if !e.checkPermission(c, auth.ApplicationService, auth.ApplicationServiceList) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -424,7 +424,7 @@ func (e *Processor) ApplicationListGet(c echo.Context) error {
 	}
 
 	// Filter the output by owner unless user has permission to view all applications
-	if !e.checkPermission(c, types.ObjectApplication, auth.ActionListAll) {
+	if !e.checkPermission(c, auth.ApplicationService, auth.ApplicationServiceListAll) {
 		user, ok := c.Get("user").(*types.User)
 		if !ok {
 			c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
@@ -445,7 +445,7 @@ func (e *Processor) ApplicationListGet(c echo.Context) error {
 
 // ApplicationGet API call processor
 func (e *Processor) ApplicationGet(c echo.Context, uid types.ApplicationUID) error {
-	if !e.checkPermission(c, types.ObjectApplication, auth.ActionRead) {
+	if !e.checkPermission(c, auth.ApplicationService, auth.ApplicationServiceGet) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -460,7 +460,7 @@ func (e *Processor) ApplicationGet(c echo.Context, uid types.ApplicationUID) err
 
 	// Only the owner of the application or users with view permission can request it
 	if app == nil || app.OwnerName != user.Name {
-		if !e.checkPermission(c, types.ObjectApplication, auth.ActionReadAll) {
+		if !e.checkPermission(c, auth.ApplicationService, auth.ApplicationServiceGetAll) {
 			c.JSON(http.StatusBadRequest, H{"message": "Only the owner and authorized users can request the Application"})
 			return fmt.Errorf("Only the owner and authorized users can request the Application")
 		}
@@ -475,7 +475,7 @@ func (e *Processor) ApplicationGet(c echo.Context, uid types.ApplicationUID) err
 
 // ApplicationCreatePost API call processor
 func (e *Processor) ApplicationCreatePost(c echo.Context) error {
-	if !e.checkPermission(c, types.ObjectApplication, auth.ActionCreate) {
+	if !e.checkPermission(c, auth.ApplicationService, auth.ApplicationServiceCreate) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -506,7 +506,7 @@ func (e *Processor) ApplicationCreatePost(c echo.Context) error {
 
 // ApplicationResourceGet API call processor
 func (e *Processor) ApplicationResourceGet(c echo.Context, uid types.ApplicationUID) error {
-	if !e.checkPermission(c, types.ObjectApplicationResource, auth.ActionRead) {
+	if !e.checkPermission(c, auth.ApplicationService, auth.ApplicationServiceGetResource) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -521,7 +521,7 @@ func (e *Processor) ApplicationResourceGet(c echo.Context, uid types.Application
 	app, err := e.fish.DB().ApplicationGet(uid)
 
 	if app == nil || app.OwnerName != user.Name {
-		if !e.checkPermission(c, types.ObjectApplicationResource, auth.ActionReadAll) {
+		if !e.checkPermission(c, auth.ApplicationService, auth.ApplicationServiceGetResourceAll) {
 			c.JSON(http.StatusBadRequest, H{"message": "Only the owner and authorized users can request the Application resource"})
 			return fmt.Errorf("Only the owner and authorized users can request the Application resource")
 		}
@@ -545,7 +545,7 @@ func (e *Processor) ApplicationResourceGet(c echo.Context, uid types.Application
 
 // ApplicationStateGet API call processor
 func (e *Processor) ApplicationStateGet(c echo.Context, uid types.ApplicationUID) error {
-	if !e.checkPermission(c, types.ObjectApplicationState, auth.ActionRead) {
+	if !e.checkPermission(c, auth.ApplicationService, auth.ApplicationServiceGetState) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -560,7 +560,7 @@ func (e *Processor) ApplicationStateGet(c echo.Context, uid types.ApplicationUID
 	app, err := e.fish.DB().ApplicationGet(uid)
 
 	if app == nil || app.OwnerName != user.Name {
-		if !e.checkPermission(c, types.ObjectApplicationState, auth.ActionReadAll) {
+		if !e.checkPermission(c, auth.ApplicationService, auth.ApplicationServiceGetStateAll) {
 			c.JSON(http.StatusBadRequest, H{"message": "Only the owner and authorized users can request the Application status"})
 			return fmt.Errorf("Only the owner and authorized users can request the Application status")
 		}
@@ -581,7 +581,7 @@ func (e *Processor) ApplicationStateGet(c echo.Context, uid types.ApplicationUID
 
 // ApplicationTaskListGet API call processor
 func (e *Processor) ApplicationTaskListGet(c echo.Context, appUID types.ApplicationUID) error {
-	if !e.checkPermission(c, types.ObjectApplicationTask, auth.ActionList) {
+	if !e.checkPermission(c, auth.ApplicationService, auth.ApplicationServiceListTask) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -595,7 +595,7 @@ func (e *Processor) ApplicationTaskListGet(c echo.Context, appUID types.Applicat
 	app, err := e.fish.DB().ApplicationGet(appUID)
 
 	if app == nil || app.OwnerName != user.Name {
-		if !e.checkPermission(c, types.ObjectApplicationTask, auth.ActionListAll) {
+		if !e.checkPermission(c, auth.ApplicationService, auth.ApplicationServiceListTaskAll) {
 			c.JSON(http.StatusBadRequest, H{"message": "Only the owner of Application & authorized users can get the Application Tasks"})
 			return fmt.Errorf("Only the owner of Application & authorized users can get the Application Tasks")
 		}
@@ -616,7 +616,7 @@ func (e *Processor) ApplicationTaskListGet(c echo.Context, appUID types.Applicat
 
 // ApplicationTaskCreatePost API call processor
 func (e *Processor) ApplicationTaskCreatePost(c echo.Context, appUID types.ApplicationUID) error {
-	if !e.checkPermission(c, types.ObjectApplicationTask, auth.ActionCreate) {
+	if !e.checkPermission(c, auth.ApplicationService, auth.ApplicationServiceCreateTask) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -658,7 +658,7 @@ func (e *Processor) ApplicationTaskCreatePost(c echo.Context, appUID types.Appli
 
 // ApplicationTaskGet API call processor
 func (e *Processor) ApplicationTaskGet(c echo.Context, taskUID types.ApplicationTaskUID) error {
-	if !e.checkPermission(c, types.ObjectApplicationTask, auth.ActionRead) {
+	if !e.checkPermission(c, auth.ApplicationTaskService, auth.ApplicationTaskServiceGet) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -679,7 +679,7 @@ func (e *Processor) ApplicationTaskGet(c echo.Context, taskUID types.Application
 	app, err := e.fish.DB().ApplicationGet(task.ApplicationUID)
 
 	if app == nil || app.OwnerName != user.Name {
-		if !e.checkPermission(c, types.ObjectApplicationTask, auth.ActionReadAll) {
+		if !e.checkPermission(c, auth.ApplicationTaskService, auth.ApplicationTaskServiceGetAll) {
 			c.JSON(http.StatusBadRequest, H{"message": "Only the owner of Application & authorized users can get the ApplicationTask"})
 			return fmt.Errorf("Only the owner of Application & authorized users can get the ApplicationTask")
 		}
@@ -694,7 +694,7 @@ func (e *Processor) ApplicationTaskGet(c echo.Context, taskUID types.Application
 
 // ApplicationDeallocateGet API call processor
 func (e *Processor) ApplicationDeallocateGet(c echo.Context, uid types.ApplicationUID) error {
-	if !e.checkPermission(c, types.ObjectApplication, auth.ActionDeallocate) {
+	if !e.checkPermission(c, auth.ApplicationService, auth.ApplicationServiceDeallocate) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -713,7 +713,7 @@ func (e *Processor) ApplicationDeallocateGet(c echo.Context, uid types.Applicati
 	}
 
 	if app.OwnerName != user.Name {
-		if !e.checkPermission(c, types.ObjectApplication, auth.ActionDeallocateAll) {
+		if !e.checkPermission(c, auth.ApplicationService, auth.ApplicationServiceDeallocateAll) {
 			c.JSON(http.StatusBadRequest, H{"message": "Only the owner & authorized users can deallocate the Application resource"})
 			return fmt.Errorf("Only the owner & authorized users can deallocate the Application resource")
 		}
@@ -730,7 +730,7 @@ func (e *Processor) ApplicationDeallocateGet(c echo.Context, uid types.Applicati
 
 // LabelListGet API call processor
 func (e *Processor) LabelListGet(c echo.Context, params types.LabelListGetParams) error {
-	if !e.checkPermission(c, types.ObjectLabel, auth.ActionList) {
+	if !e.checkPermission(c, auth.LabelService, auth.LabelServiceList) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -746,7 +746,7 @@ func (e *Processor) LabelListGet(c echo.Context, params types.LabelListGetParams
 
 // LabelGet API call processor
 func (e *Processor) LabelGet(c echo.Context, uid types.LabelUID) error {
-	if !e.checkPermission(c, types.ObjectLabel, auth.ActionRead) {
+	if !e.checkPermission(c, auth.LabelService, auth.LabelServiceGet) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -762,7 +762,7 @@ func (e *Processor) LabelGet(c echo.Context, uid types.LabelUID) error {
 
 // LabelCreatePost API call processor
 func (e *Processor) LabelCreatePost(c echo.Context) error {
-	if !e.checkPermission(c, types.ObjectLabel, auth.ActionCreate) {
+	if !e.checkPermission(c, auth.LabelService, auth.LabelServiceCreate) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -782,7 +782,7 @@ func (e *Processor) LabelCreatePost(c echo.Context) error {
 
 // LabelDelete API call processor
 func (e *Processor) LabelDelete(c echo.Context, uid types.LabelUID) error {
-	if !e.checkPermission(c, types.ObjectLabel, auth.ActionDelete) {
+	if !e.checkPermission(c, auth.LabelService, auth.LabelServiceDelete) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -798,7 +798,7 @@ func (e *Processor) LabelDelete(c echo.Context, uid types.LabelUID) error {
 
 // NodeListGet API call processor
 func (e *Processor) NodeListGet(c echo.Context) error {
-	if !e.checkPermission(c, types.ObjectNode, auth.ActionList) {
+	if !e.checkPermission(c, auth.NodeService, auth.NodeServiceList) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -814,7 +814,7 @@ func (e *Processor) NodeListGet(c echo.Context) error {
 
 // NodeThisGet API call processor
 func (e *Processor) NodeThisGet(c echo.Context) error {
-	if !e.checkPermission(c, types.ObjectNode, auth.ActionRead) {
+	if !e.checkPermission(c, auth.NodeService, auth.NodeServiceGetThis) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -826,7 +826,7 @@ func (e *Processor) NodeThisGet(c echo.Context) error {
 
 // NodeThisMaintenanceGet API call processor
 func (e *Processor) NodeThisMaintenanceGet(c echo.Context, params types.NodeThisMaintenanceGetParams) error {
-	if !e.checkPermission(c, types.ObjectNode, auth.ActionMaintainance) {
+	if !e.checkPermission(c, auth.NodeService, auth.NodeServiceSetMaintenance) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -863,7 +863,7 @@ func (e *Processor) NodeThisProfilingIndexGet(c echo.Context) error {
 
 // NodeThisProfilingGet API call processor
 func (e *Processor) NodeThisProfilingGet(c echo.Context, handler string) error {
-	if !e.checkPermission(c, types.ObjectNode, auth.ActionProfiling) {
+	if !e.checkPermission(c, auth.NodeService, auth.NodeServiceGetProfiling) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -893,7 +893,7 @@ func (e *Processor) NodeThisProfilingGet(c echo.Context, handler string) error {
 
 // VoteListGet API call processor
 func (e *Processor) VoteListGet(c echo.Context) error {
-	if !e.checkPermission(c, types.ObjectNode, auth.ActionList) {
+	if !e.checkPermission(c, auth.NodeService, auth.NodeServiceList) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -906,7 +906,7 @@ func (e *Processor) VoteListGet(c echo.Context) error {
 // ServiceMappingGet API call processor
 func (e *Processor) ServiceMappingGet(c echo.Context, uid types.ServiceMappingUID) error {
 	// TODO: move to Gate since part of ProxySocks gate
-	if !e.checkPermission(c, "servicemappings", auth.ActionRead) {
+	if !e.checkPermission(c, auth.ServiceMappingService, auth.ServiceMappingServiceGet) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -923,7 +923,7 @@ func (e *Processor) ServiceMappingGet(c echo.Context, uid types.ServiceMappingUI
 // ServiceMappingListGet API call processor
 func (e *Processor) ServiceMappingListGet(c echo.Context) error {
 	// TODO: move to Gate since part of ProxySocks gate
-	if !e.checkPermission(c, "servicemappings", auth.ActionList) {
+	if !e.checkPermission(c, auth.ServiceMappingService, auth.ServiceMappingServiceList) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -940,7 +940,7 @@ func (e *Processor) ServiceMappingListGet(c echo.Context) error {
 // ServiceMappingCreatePost API call processor
 func (e *Processor) ServiceMappingCreatePost(c echo.Context) error {
 	// TODO: move to Gate since part of ProxySocks gate
-	if !e.checkPermission(c, "servicemappings", auth.ActionCreate) {
+	if !e.checkPermission(c, auth.ServiceMappingService, auth.ServiceMappingServiceCreate) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}
@@ -983,7 +983,7 @@ func (e *Processor) ServiceMappingCreatePost(c echo.Context) error {
 // ServiceMappingDelete API call processor
 func (e *Processor) ServiceMappingDelete(c echo.Context, uid types.ServiceMappingUID) error {
 	// TODO: move to Gate since part of ProxySocks gate
-	if !e.checkPermission(c, "servicemappings", auth.ActionDelete) {
+	if !e.checkPermission(c, auth.ServiceMappingService, auth.ServiceMappingServiceDelete) {
 		c.JSON(http.StatusForbidden, H{"message": "Insufficient permissions"})
 		return fmt.Errorf("Insufficient permissions")
 	}

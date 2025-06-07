@@ -198,6 +198,8 @@ func processGrpcPermissions(plugin *protogen.Plugin) (map[string][]string, map[s
 				}
 			}
 
+			// Sort methods to ensure they will be in order
+			sort.Strings(svcMethods)
 			serviceMethods[svcName] = svcMethods
 		}
 	}
@@ -308,6 +310,11 @@ func processOpenAPIPermissions(plugin *protogen.Plugin, knownServiceMethods map[
 		processOperation("Create", pathItem.Post)
 		processOperation("Update", pathItem.Put)
 		processOperation("Delete", pathItem.Delete)
+	}
+
+	// Sort methods to ensure they will be in order
+	for role := range serviceMethods {
+		sort.Strings(serviceMethods[role])
 	}
 
 	return serviceMethods, rolePermissions

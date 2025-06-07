@@ -451,7 +451,7 @@ paths:
       description: Display any known SSH access information for the ApplicationResource
       operationId: ApplicationResourceAccessPut
       tags:
-        - ApplicationResourceAccess
+        - ApplicationResource
       x-rbac:
         Administrator:
           - Access
@@ -655,6 +655,7 @@ paths:
       x-rbac:
         Administrator:
           - ListTask
+          - ListTaskAll
         Power:
           - ListTask
       parameters:

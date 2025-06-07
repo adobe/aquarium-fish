@@ -16,16 +16,17 @@ package auth
 
 // Service and Method constants
 const (
-	// ApplicationResourceAccessService service constants
-	ApplicationResourceAccessService       = "ApplicationResourceAccessService"
-	ApplicationResourceAccessServiceAccess = "ApplicationResourceAccessServiceAccess"
+	// ApplicationResourceService service constants
+	ApplicationResourceService       = "ApplicationResourceService"
+	ApplicationResourceServiceAccess = "ApplicationResourceServiceAccess"
 
 	// ApplicationService service constants
 	ApplicationServiceDeallocateAll  = "ApplicationServiceDeallocateAll"
+	ApplicationServiceGetAll         = "ApplicationServiceGetAll"
 	ApplicationServiceGetResourceAll = "ApplicationServiceGetResourceAll"
 	ApplicationServiceGetStateAll    = "ApplicationServiceGetStateAll"
-	ApplicationServiceGetAll         = "ApplicationServiceGetAll"
 	ApplicationServiceListAll        = "ApplicationServiceListAll"
+	ApplicationServiceListTaskAll    = "ApplicationServiceListTaskAll"
 
 	// ApplicationTaskService service constants
 	ApplicationTaskService       = "ApplicationTaskService"
@@ -40,15 +41,15 @@ const (
 
 	// ServiceMappingService service constants
 	ServiceMappingService       = "ServiceMappingService"
-	ServiceMappingServiceGet    = "ServiceMappingServiceGet"
-	ServiceMappingServiceDelete = "ServiceMappingServiceDelete"
-	ServiceMappingServiceList   = "ServiceMappingServiceList"
 	ServiceMappingServiceCreate = "ServiceMappingServiceCreate"
+	ServiceMappingServiceDelete = "ServiceMappingServiceDelete"
+	ServiceMappingServiceGet    = "ServiceMappingServiceGet"
+	ServiceMappingServiceList   = "ServiceMappingServiceList"
 
 	// UserService service constants
+	UserServiceGetAll    = "UserServiceGetAll"
 	UserServiceListAll   = "UserServiceListAll"
 	UserServiceUpdateAll = "UserServiceUpdateAll"
-	UserServiceGetAll    = "UserServiceGetAll"
 
 	// VoteService service constants
 	VoteService        = "VoteService"

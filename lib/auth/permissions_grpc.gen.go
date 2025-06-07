@@ -18,45 +18,45 @@ package auth
 const (
 	// ApplicationService service constants
 	ApplicationService            = "ApplicationService"
-	ApplicationServiceList        = "ApplicationServiceList"
-	ApplicationServiceGet         = "ApplicationServiceGet"
 	ApplicationServiceCreate      = "ApplicationServiceCreate"
-	ApplicationServiceGetState    = "ApplicationServiceGetState"
-	ApplicationServiceGetResource = "ApplicationServiceGetResource"
-	ApplicationServiceListTask    = "ApplicationServiceListTask"
 	ApplicationServiceCreateTask  = "ApplicationServiceCreateTask"
-	ApplicationServiceGetTask     = "ApplicationServiceGetTask"
 	ApplicationServiceDeallocate  = "ApplicationServiceDeallocate"
+	ApplicationServiceGet         = "ApplicationServiceGet"
+	ApplicationServiceGetResource = "ApplicationServiceGetResource"
+	ApplicationServiceGetState    = "ApplicationServiceGetState"
+	ApplicationServiceGetTask     = "ApplicationServiceGetTask"
+	ApplicationServiceList        = "ApplicationServiceList"
+	ApplicationServiceListTask    = "ApplicationServiceListTask"
 
 	// LabelService service constants
 	LabelService       = "LabelService"
-	LabelServiceList   = "LabelServiceList"
-	LabelServiceGet    = "LabelServiceGet"
 	LabelServiceCreate = "LabelServiceCreate"
 	LabelServiceDelete = "LabelServiceDelete"
+	LabelServiceGet    = "LabelServiceGet"
+	LabelServiceList   = "LabelServiceList"
 
 	// NodeService service constants
 	NodeService               = "NodeService"
-	NodeServiceList           = "NodeServiceList"
-	NodeServiceGetThis        = "NodeServiceGetThis"
-	NodeServiceSetMaintenance = "NodeServiceSetMaintenance"
 	NodeServiceGetProfiling   = "NodeServiceGetProfiling"
+	NodeServiceGetThis        = "NodeServiceGetThis"
+	NodeServiceList           = "NodeServiceList"
+	NodeServiceSetMaintenance = "NodeServiceSetMaintenance"
 
 	// RoleService service constants
 	RoleService       = "RoleService"
-	RoleServiceList   = "RoleServiceList"
-	RoleServiceGet    = "RoleServiceGet"
 	RoleServiceCreate = "RoleServiceCreate"
-	RoleServiceUpdate = "RoleServiceUpdate"
 	RoleServiceDelete = "RoleServiceDelete"
+	RoleServiceGet    = "RoleServiceGet"
+	RoleServiceList   = "RoleServiceList"
+	RoleServiceUpdate = "RoleServiceUpdate"
 
 	// UserService service constants
 	UserService            = "UserService"
+	UserServiceAssignRoles = "UserServiceAssignRoles"
+	UserServiceCreate      = "UserServiceCreate"
+	UserServiceDelete      = "UserServiceDelete"
+	UserServiceGet         = "UserServiceGet"
 	UserServiceGetMe       = "UserServiceGetMe"
 	UserServiceList        = "UserServiceList"
-	UserServiceGet         = "UserServiceGet"
-	UserServiceCreate      = "UserServiceCreate"
 	UserServiceUpdate      = "UserServiceUpdate"
-	UserServiceDelete      = "UserServiceDelete"
-	UserServiceAssignRoles = "UserServiceAssignRoles"
 )
