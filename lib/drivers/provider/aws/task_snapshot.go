@@ -89,15 +89,16 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 
 		// Wait for instance stopped before going forward with snapshot
 		sw := ec2.NewInstanceStoppedWaiter(conn)
-		maxWait := 10 * time.Minute
+		maxWait := 30 * time.Minute
 		waitInput := ec2.DescribeInstancesInput{
 			InstanceIds: []string{
 				t.ApplicationResource.Identifier,
 			},
 		}
 		if err := sw.Wait(context.TODO(), &waitInput, maxWait); err != nil {
-			// Do not fail hard here - it's still possible to take snapshot of the instance
-			log.Errorf("AWS: %s: TaskSnapshot %s: Error during wait for instance %s stop: %v", t.driver.name, t.ApplicationTask.UID, t.ApplicationResource.Identifier, err)
+			// We have to fail here - not stopped instance means potential silent failure in snapshot capturing
+			return []byte(`{"error":"AWS: timeout stoping the instance"}`),
+				log.Errorf("AWS: %s: TaskSnapshot %s: Timeout during wait for instance %s stop: %v", t.driver.name, t.ApplicationTask.UID, t.ApplicationResource.Identifier, err)
 		}
 	}
 
@@ -127,10 +128,12 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 	log.Debugf("AWS: %s: TaskSnapshot %s: Creating snapshot for %q...", t.driver.name, t.ApplicationTask.UID, t.ApplicationResource.Identifier)
 	resp, err := conn.CreateSnapshots(context.TODO(), &input)
 	if err != nil {
-		return []byte(`{"error":"internal: failed to create snapshots for instance"}`), log.Errorf("AWS: %s: Unable to create snapshots for instance %s: %v", t.driver.name, t.ApplicationResource.Identifier, err)
+		return []byte(`{"error":"internal: failed to create snapshots for instance"}`),
+			log.Errorf("AWS: %s: Unable to create snapshots for instance %s: %v", t.driver.name, t.ApplicationResource.Identifier, err)
 	}
 	if len(resp.Snapshots) < 1 {
-		return []byte(`{"error":"internal: no snapshots was created for instance"}`), log.Errorf("AWS: %s: No snapshots was created for instance %s", t.driver.name, t.ApplicationResource.Identifier)
+		return []byte(`{"error":"internal: no snapshots was created for instance"}`),
+			log.Errorf("AWS: %s: No snapshots was created for instance %s", t.driver.name, t.ApplicationResource.Identifier)
 	}
 
 	snapshots := []string{}
