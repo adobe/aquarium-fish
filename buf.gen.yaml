@@ -14,5 +14,5 @@ plugins:
   - local:
       - go
       - run
-      - ./tools/buf-gen-permissions.go
+      - ./tools/buf-gen-permissions/buf-gen-permissions.go
     out: lib/auth

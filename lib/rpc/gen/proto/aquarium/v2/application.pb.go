@@ -1361,7 +1361,7 @@ var File_aquarium_v2_application_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_application_proto_rawDesc = "" +
 	"\n" +
-	"\x1daquarium/v2/application.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x18aquarium/v2/common.proto\"\xcb\x01\n" +
+	"\x1daquarium/v2/application.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x18aquarium/v2/common.proto\x1a\x16aquarium/v2/rbac.proto\"\xcb\x01\n" +
 	"\vApplication\x12\x10\n" +
 	"\x03uid\x18\x01 \x01(\tR\x03uid\x129\n" +
 	"\n" +
@@ -1459,19 +1459,25 @@ const file_aquarium_v2_application_proto_rawDesc = "" +
 	"\x03uid\x18\x01 \x01(\tR\x03uid\"X\n" +
 	"$ApplicationServiceDeallocateResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage2\xec\a\n" +
-	"\x12ApplicationService\x12a\n" +
-	"\x04List\x12*.aquarium.v2.ApplicationServiceListRequest\x1a+.aquarium.v2.ApplicationServiceListResponse\"\x00\x12^\n" +
-	"\x03Get\x12).aquarium.v2.ApplicationServiceGetRequest\x1a*.aquarium.v2.ApplicationServiceGetResponse\"\x00\x12g\n" +
-	"\x06Create\x12,.aquarium.v2.ApplicationServiceCreateRequest\x1a-.aquarium.v2.ApplicationServiceCreateResponse\"\x00\x12m\n" +
-	"\bGetState\x12..aquarium.v2.ApplicationServiceGetStateRequest\x1a/.aquarium.v2.ApplicationServiceGetStateResponse\"\x00\x12v\n" +
-	"\vGetResource\x121.aquarium.v2.ApplicationServiceGetResourceRequest\x1a2.aquarium.v2.ApplicationServiceGetResourceResponse\"\x00\x12m\n" +
-	"\bListTask\x12..aquarium.v2.ApplicationServiceListTaskRequest\x1a/.aquarium.v2.ApplicationServiceListTaskResponse\"\x00\x12s\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage2\xca\b\n" +
+	"\x12ApplicationService\x12k\n" +
+	"\x04List\x12*.aquarium.v2.ApplicationServiceListRequest\x1a+.aquarium.v2.ApplicationServiceListResponse\"\n" +
+	"\x82\xb5\x18\x06\x12\x04User\x12h\n" +
+	"\x03Get\x12).aquarium.v2.ApplicationServiceGetRequest\x1a*.aquarium.v2.ApplicationServiceGetResponse\"\n" +
+	"\x82\xb5\x18\x06\x12\x04User\x12q\n" +
+	"\x06Create\x12,.aquarium.v2.ApplicationServiceCreateRequest\x1a-.aquarium.v2.ApplicationServiceCreateResponse\"\n" +
+	"\x82\xb5\x18\x06\x12\x04User\x12w\n" +
+	"\bGetState\x12..aquarium.v2.ApplicationServiceGetStateRequest\x1a/.aquarium.v2.ApplicationServiceGetStateResponse\"\n" +
+	"\x82\xb5\x18\x06\x12\x04User\x12\x80\x01\n" +
+	"\vGetResource\x121.aquarium.v2.ApplicationServiceGetResourceRequest\x1a2.aquarium.v2.ApplicationServiceGetResourceResponse\"\n" +
+	"\x82\xb5\x18\x06\x12\x04User\x12x\n" +
+	"\bListTask\x12..aquarium.v2.ApplicationServiceListTaskRequest\x1a/.aquarium.v2.ApplicationServiceListTaskResponse\"\v\x82\xb5\x18\a\x12\x05Power\x12~\n" +
 	"\n" +
-	"CreateTask\x120.aquarium.v2.ApplicationServiceCreateTaskRequest\x1a1.aquarium.v2.ApplicationServiceCreateTaskResponse\"\x00\x12j\n" +
-	"\aGetTask\x12-.aquarium.v2.ApplicationServiceGetTaskRequest\x1a..aquarium.v2.ApplicationServiceGetTaskResponse\"\x00\x12s\n" +
+	"CreateTask\x120.aquarium.v2.ApplicationServiceCreateTaskRequest\x1a1.aquarium.v2.ApplicationServiceCreateTaskResponse\"\v\x82\xb5\x18\a\x12\x05Power\x12u\n" +
+	"\aGetTask\x12-.aquarium.v2.ApplicationServiceGetTaskRequest\x1a..aquarium.v2.ApplicationServiceGetTaskResponse\"\v\x82\xb5\x18\a\x12\x05Power\x12}\n" +
 	"\n" +
-	"Deallocate\x120.aquarium.v2.ApplicationServiceDeallocateRequest\x1a1.aquarium.v2.ApplicationServiceDeallocateResponse\"\x00BIZGgithub.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2;aquariumv2b\x06proto3"
+	"Deallocate\x120.aquarium.v2.ApplicationServiceDeallocateRequest\x1a1.aquarium.v2.ApplicationServiceDeallocateResponse\"\n" +
+	"\x82\xb5\x18\x06\x12\x04UserBIZGgithub.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2;aquariumv2b\x06proto3"
 
 var (
 	file_aquarium_v2_application_proto_rawDescOnce sync.Once
@@ -1567,6 +1573,7 @@ func file_aquarium_v2_application_proto_init() {
 		return
 	}
 	file_aquarium_v2_common_proto_init()
+	file_aquarium_v2_rbac_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

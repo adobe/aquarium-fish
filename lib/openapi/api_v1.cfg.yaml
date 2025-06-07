@@ -4,8 +4,10 @@ output: api/server_v1.gen.go
 output-options:
   include-tags:
     - Application
+    - ApplicationState
     - ApplicationResource
     - ApplicationResourceAccess
+    - ApplicationTask
     - Label
     - Location
     - Node

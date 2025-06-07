@@ -13,13 +13,16 @@ syntax = "proto3";
 package aquarium.v2;
 
 import "google/protobuf/timestamp.proto";
+import "aquarium/v2/rbac.proto";
 
 option go_package = "github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2;aquariumv2";
 
 // User service handles user management operations
 service UserService {
   // Get current user information
-  rpc GetMe(UserServiceGetMeRequest) returns (UserServiceGetMeResponse) {}
+  rpc GetMe(UserServiceGetMeRequest) returns (UserServiceGetMeResponse) {
+   option (access_control) = {}; // Available for logged-in users
+  }
   
   // Get list of users
   rpc List(UserServiceListRequest) returns (UserServiceListResponse) {}

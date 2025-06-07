@@ -28,6 +28,10 @@ paths:
       operationId: UserListGet
       tags:
         - User
+      x-rbac:
+        Administrator:
+          - List
+          - ListAll
       responses:
         '200':
           description: Successful operation
@@ -47,6 +51,11 @@ paths:
       operationId: UserCreateUpdatePost
       tags:
         - User
+      x-rbac:
+        Administrator:
+          - Create
+          - Update
+          - UpdateAll
       parameters: []
       requestBody:
         required: true
@@ -100,6 +109,10 @@ paths:
       operationId: UserGet
       tags:
         - User
+      x-rbac:
+        Administrator:
+          - Get
+          - GetAll
       parameters:
         - name: name
           in: path
@@ -126,6 +139,9 @@ paths:
       operationId: UserDelete
       tags:
         - User
+      x-rbac:
+        Administrator:
+          - Delete
       parameters:
         - name: name
           in: path
@@ -145,6 +161,161 @@ paths:
       security:
         - basic_auth: []
 
+  /api/v1/user/{name}/roles:
+    post:
+      summary: Assign roles to user
+      description: Assigns one or more roles to a user
+      operationId: UserRolesPost
+      tags:
+        - User
+      x-rbac:
+        Administrator:
+          - AssignRoles
+      parameters:
+        - name: name
+          in: path
+          description: Name of the User
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+              description: List of role names to assign
+      responses:
+        '200':
+          description: Successful operation
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          description: Insufficient permissions
+        '404':
+          description: User or Role not found
+      security:
+        - basic_auth: []
+
+  /api/v1/role/:
+    get:
+      summary: Get list of Roles
+      description: Returns a list of existing Roles
+      operationId: RoleListGet
+      tags:
+        - Role
+      x-rbac:
+        Administrator:
+          - List
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Role'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          description: Insufficient permissions
+      security:
+        - basic_auth: []
+    post:
+      summary: Create or update Role
+      description: Creates or updates a role and its permissions
+      operationId: RoleCreateUpdatePost
+      tags:
+        - Role
+      x-rbac:
+        Administrator:
+          - Create
+          - Update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Role'
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+        '400':
+          description: Bad request
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          description: Insufficient permissions
+      security:
+        - basic_auth: []
+
+  /api/v1/role/{name}:
+    get:
+      summary: Get Role by name
+      description: Returns a single Role by its name
+      operationId: RoleGet
+      tags:
+        - Role
+      x-rbac:
+        Administrator:
+          - Get
+      parameters:
+        - name: name
+          in: path
+          description: Name of the Role
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          description: Insufficient permissions
+        '404':
+          description: Role not found
+      security:
+        - basic_auth: []
+    delete:
+      summary: Delete Role by name
+      description: Deletes a role and its associated permissions
+      operationId: RoleDelete
+      tags:
+        - Role
+      x-rbac:
+        Administrator:
+          - Delete
+      parameters:
+        - name: name
+          in: path
+          description: Name of the Role
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          description: Insufficient permissions
+        '404':
+          description: Role not found
+      security:
+        - basic_auth: []
+
   /api/v1/label/:
     get:
       summary: Get list of Labels
@@ -152,6 +323,11 @@ paths:
       operationId: LabelListGet
       tags:
         - Label
+      x-rbac:
+        Administrator:
+          - List
+        User:
+          - List
       parameters:
         - name: name
           in: query
@@ -184,6 +360,9 @@ paths:
       operationId: LabelCreatePost
       tags:
         - Label
+      x-rbac:
+        Administrator:
+          - Create
       parameters: []
       requestBody:
         required: true
@@ -215,6 +394,9 @@ paths:
       operationId: LabelGet
       tags:
         - Label
+      x-rbac:
+        Administrator:
+          - Get
       parameters:
         - name: uid
           in: path
@@ -242,6 +424,9 @@ paths:
       operationId: LabelDelete
       tags:
         - Label
+      x-rbac:
+        Administrator:
+          - Delete
       parameters:
         - name: uid
           in: path
@@ -267,6 +452,11 @@ paths:
       operationId: ApplicationResourceAccessPut
       tags:
         - ApplicationResourceAccess
+      x-rbac:
+        Administrator:
+          - Access
+        Power:
+          - Access
       parameters:
         - name: uid
           in: path
@@ -296,6 +486,12 @@ paths:
       operationId: ApplicationListGet
       tags:
         - Application
+      x-rbac:
+        Administrator:
+          - List
+          - ListAll
+        User:
+          - List
       responses:
         '200':
           description: Successful operation
@@ -315,6 +511,11 @@ paths:
       operationId: ApplicationCreatePost
       tags:
         - Application
+      x-rbac:
+        Administrator:
+          - Create
+        User:
+          - Create
       parameters: []
       requestBody:
         required: true
@@ -346,6 +547,12 @@ paths:
       operationId: ApplicationGet
       tags:
         - Application
+      x-rbac:
+        Administrator:
+          - Get
+          - GetAll
+        User:
+          - Get
       parameters:
         - name: uid
           in: path
@@ -375,6 +582,12 @@ paths:
       operationId: ApplicationStateGet
       tags:
         - Application
+      x-rbac:
+        Administrator:
+          - GetState
+          - GetStateAll
+        User:
+          - GetState
       parameters:
         - name: uid
           in: path
@@ -404,6 +617,12 @@ paths:
       operationId: ApplicationResourceGet
       tags:
         - Application
+      x-rbac:
+        Administrator:
+          - GetResource
+          - GetResourceAll
+        User:
+          - GetResource
       parameters:
         - name: uid
           in: path
@@ -433,6 +652,11 @@ paths:
       operationId: ApplicationTaskListGet
       tags:
         - Application
+      x-rbac:
+        Administrator:
+          - ListTask
+        Power:
+          - ListTask
       parameters:
         - name: uid
           in: path
@@ -462,6 +686,11 @@ paths:
       operationId: ApplicationTaskCreatePost
       tags:
         - Application
+      x-rbac:
+        Administrator:
+          - CreateTask
+        Power:
+          - CreateTask
       parameters:
         - name: uid
           in: path
@@ -499,7 +728,13 @@ paths:
       description: Returns the Application Task
       operationId: ApplicationTaskGet
       tags:
-        - Application
+        - ApplicationTask
+      x-rbac:
+        Administrator:
+          - Get
+          - GetAll
+        Power:
+          - Get
       parameters:
         - name: task_uid
           in: path
@@ -529,6 +764,12 @@ paths:
       operationId: ApplicationDeallocateGet
       tags:
         - Application
+      x-rbac:
+        Administrator:
+          - Deallocate
+          - DeallocateAll
+        User:
+          - Deallocate
       parameters:
         - name: uid
           in: path
@@ -556,6 +797,10 @@ paths:
       operationId: VoteListGet
       tags:
         - Vote
+      x-rbac:
+        Administrator:
+          - List
+          - ListAll
       responses:
         '200':
           description: Successful operation
@@ -577,6 +822,9 @@ paths:
       operationId: NodeListGet
       tags:
         - Node
+      x-rbac:
+        Administrator:
+          - List
       responses:
         '200':
           description: Successful operation
@@ -598,6 +846,9 @@ paths:
       operationId: NodeThisGet
       tags:
         - Node
+      x-rbac:
+        Administrator:
+          - GetThis
       responses:
         '200':
           description: Successful operation
@@ -620,6 +871,9 @@ paths:
       operationId: NodeThisMaintenanceGet
       tags:
         - Node
+      x-rbac:
+        Administrator:
+          - SetMaintenance
       parameters:
         - name: enable
           in: query
@@ -666,6 +920,9 @@ paths:
       operationId: NodeThisProfilingIndexGet
       tags:
         - Node
+      x-rbac:
+        Administrator:
+          - GetProfiling
       responses:
         '200':
           description: Successful operation
@@ -685,6 +942,9 @@ paths:
       operationId: NodeThisProfilingGet
       tags:
         - Node
+      x-rbac:
+        Administrator:
+          - GetProfiling
       parameters:
         - name: handler
           in: path
@@ -709,6 +969,9 @@ paths:
       operationId: ServiceMappingListGet
       tags:
         - ServiceMapping
+      x-rbac:
+        Administrator:
+          - List
       responses:
         '200':
           description: Successful operation
@@ -728,6 +991,9 @@ paths:
       operationId: ServiceMappingCreatePost
       tags:
         - ServiceMapping
+      x-rbac:
+        Administrator:
+          - Create
       parameters: []
       requestBody:
         required: true
@@ -759,6 +1025,9 @@ paths:
       operationId: ServiceMappingGet
       tags:
         - ServiceMapping
+      x-rbac:
+        Administrator:
+          - Get
       parameters:
         - name: uid
           in: path
@@ -786,6 +1055,9 @@ paths:
       operationId: ServiceMappingDelete
       tags:
         - ServiceMapping
+      x-rbac:
+        Administrator:
+          - Delete
       parameters:
         - name: uid
           in: path
@@ -915,145 +1187,6 @@ paths:
           description: Incorrect request
         '409':
           description: Conflict, the node is already connected to the cluster
-
-  /api/v1/role/:
-    get:
-      summary: Get list of Roles
-      description: Returns a list of existing Roles
-      operationId: RoleListGet
-      tags:
-        - Role
-      responses:
-        '200':
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Role'
-        '401':
-          $ref: '#/components/responses/UnauthorizedError'
-        '403':
-          description: Insufficient permissions
-      security:
-        - basic_auth: []
-    post:
-      summary: Create or update Role
-      description: Creates or updates a role and its permissions
-      operationId: RoleCreateUpdatePost
-      tags:
-        - Role
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Role'
-      responses:
-        '200':
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Role'
-        '400':
-          description: Bad request
-        '401':
-          $ref: '#/components/responses/UnauthorizedError'
-        '403':
-          description: Insufficient permissions
-      security:
-        - basic_auth: []
-
-  /api/v1/role/{name}:
-    get:
-      summary: Get Role by name
-      description: Returns a single Role by its name
-      operationId: RoleGet
-      tags:
-        - Role
-      parameters:
-        - name: name
-          in: path
-          description: Name of the Role
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Role'
-        '401':
-          $ref: '#/components/responses/UnauthorizedError'
-        '403':
-          description: Insufficient permissions
-        '404':
-          description: Role not found
-      security:
-        - basic_auth: []
-    delete:
-      summary: Delete Role by name
-      description: Deletes a role and its associated permissions
-      operationId: RoleDelete
-      tags:
-        - Role
-      parameters:
-        - name: name
-          in: path
-          description: Name of the Role
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Successful operation
-        '401':
-          $ref: '#/components/responses/UnauthorizedError'
-        '403':
-          description: Insufficient permissions
-        '404':
-          description: Role not found
-      security:
-        - basic_auth: []
-
-  /api/v1/user/{name}/roles:
-    post:
-      summary: Assign roles to user
-      description: Assigns one or more roles to a user
-      operationId: UserRolesPost
-      tags:
-        - User
-      parameters:
-        - name: name
-          in: path
-          description: Name of the User
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: array
-              items:
-                type: string
-              description: List of role names to assign
-      responses:
-        '200':
-          description: Successful operation
-        '401':
-          $ref: '#/components/responses/UnauthorizedError'
-        '403':
-          description: Insufficient permissions
-        '404':
-          description: User or Role not found
-      security:
-        - basic_auth: []
 
 components:
   schemas:
@@ -1216,6 +1349,44 @@ components:
           items:
             type: string
           description: List of role names assigned to the user
+
+    Role:
+      type: object
+      description: >
+        Defines a role in the RBAC system with associated permissions.
+      required:
+        - name
+        - created_at
+        - updated_at
+        - permissions
+      properties:
+        name:
+          type: string
+          description: Unique name of the role
+        created_at:
+          x-go-type: time.Time
+        updated_at:
+          x-go-type: time.Time
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Permission'
+          description: List of permissions granted to this role
+
+    Permission:
+      type: object
+      description: >
+        Defines a permission that can be granted to roles.
+      required:
+        - resource
+        - action
+      properties:
+        resource:
+          type: string
+          description: Resource type or specific resource ID this permission applies to
+        action:
+          type: string
+          description: Action allowed on the resource (e.g., read, write, delete)
 
     UserAPIPassword:
       type: object
@@ -1774,44 +1945,6 @@ components:
           x-oapi-codegen-extra-tags:
             yaml: application_UID
             gorm: uniqueIndex:idx_location_service_app_uniq
-
-    Role:
-      type: object
-      description: >
-        Defines a role in the RBAC system with associated permissions.
-      required:
-        - name
-        - created_at
-        - updated_at
-        - permissions
-      properties:
-        name:
-          type: string
-          description: Unique name of the role
-        created_at:
-          x-go-type: time.Time
-        updated_at:
-          x-go-type: time.Time
-        permissions:
-          type: array
-          items:
-            $ref: '#/components/schemas/Permission'
-          description: List of permissions granted to this role
-
-    Permission:
-      type: object
-      description: >
-        Defines a permission that can be granted to roles.
-      required:
-        - resource
-        - action
-      properties:
-        resource:
-          type: string
-          description: Resource type or specific resource ID this permission applies to
-        action:
-          type: string
-          description: Action allowed on the resource (e.g., read, write, delete)
 
   securitySchemes:
     basic_auth:

@@ -793,7 +793,7 @@ var File_aquarium_v2_label_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_label_proto_rawDesc = "" +
 	"\n" +
-	"\x17aquarium/v2/label.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x18aquarium/v2/common.proto\"\xf7\x01\n" +
+	"\x17aquarium/v2/label.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x18aquarium/v2/common.proto\x1a\x16aquarium/v2/rbac.proto\"\xf7\x01\n" +
 	"\x05Label\x12\x10\n" +
 	"\x03uid\x18\x01 \x01(\tR\x03uid\x129\n" +
 	"\n" +
@@ -856,9 +856,10 @@ const file_aquarium_v2_label_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"N\n" +
 	"\x1aLabelServiceDeleteResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage2\xf3\x02\n" +
-	"\fLabelService\x12U\n" +
-	"\x04List\x12$.aquarium.v2.LabelServiceListRequest\x1a%.aquarium.v2.LabelServiceListResponse\"\x00\x12R\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage2\xfd\x02\n" +
+	"\fLabelService\x12_\n" +
+	"\x04List\x12$.aquarium.v2.LabelServiceListRequest\x1a%.aquarium.v2.LabelServiceListResponse\"\n" +
+	"\x82\xb5\x18\x06\x12\x04User\x12R\n" +
 	"\x03Get\x12#.aquarium.v2.LabelServiceGetRequest\x1a$.aquarium.v2.LabelServiceGetResponse\"\x00\x12[\n" +
 	"\x06Create\x12&.aquarium.v2.LabelServiceCreateRequest\x1a'.aquarium.v2.LabelServiceCreateResponse\"\x00\x12[\n" +
 	"\x06Delete\x12&.aquarium.v2.LabelServiceDeleteRequest\x1a'.aquarium.v2.LabelServiceDeleteResponse\"\x00BIZGgithub.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2;aquariumv2b\x06proto3"
@@ -929,6 +930,7 @@ func file_aquarium_v2_label_proto_init() {
 		return
 	}
 	file_aquarium_v2_common_proto_init()
+	file_aquarium_v2_rbac_proto_init()
 	file_aquarium_v2_label_proto_msgTypes[2].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
