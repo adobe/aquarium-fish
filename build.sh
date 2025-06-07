@@ -44,7 +44,7 @@ version_flags="-X '$mod_name/lib/build.Version=${git_version}' -X '$mod_name/lib
 BINARY_NAME="aquarium-fish-$git_version"
 
 # Doing check after generation because generated sources requires additional modules
-./check.sh
+[ "$SKIPCHECK" ] || ./check.sh
 
 echo
 echo "--- RUN UNIT TESTS ---"
