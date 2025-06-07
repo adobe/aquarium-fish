@@ -12,9 +12,11 @@
 # Please set NOBUILD=1 if want to skip build of binary for linux
 # Use first argument to specify the test or skip that and it will run all the tests
 
-TEST="$1"
+TEST="$@"
 
-if [ "x$TEST" != 'x' ]; then
+if [ "$(echo "x$TEST" | cut -c-2)" = 'x-' ]; then
+    test_cmd="$TEST"
+elif [ "x$TEST" != 'x' ]; then
     test_cmd="-run '^$TEST\$'"
 else
     test_cmd="-skip '_stress\$'"

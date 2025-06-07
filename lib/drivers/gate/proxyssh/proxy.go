@@ -175,14 +175,14 @@ func (s *session) handleChannel(ch ssh.NewChannel, dstConn ssh.Conn) {
 	// Need this local channel work group to wait until all the channel routines completed
 	var chWg sync.WaitGroup
 
-	// Use channels to coordinate copy completion
-	dstToSrcDone := make(chan bool)
-	srcToDstDone := make(chan bool)
-
 	// Proxying the requests
 	chWg.Add(1)
 	go func() {
 		defer chWg.Done()
+
+		// End the communication between the source and destination when this function is complete.
+		defer srcChn.Close()
+		defer dstChn.Close()
 
 		log.Debugf("PROXYSSH: %s: %s: Starting to listen for channel requests", s.drv.name, s.SrcAddr)
 		for {
@@ -191,11 +191,15 @@ func (s *session) handleChannel(ch ssh.NewChannel, dstConn ssh.Conn) {
 
 			select {
 			case request = <-srcChnRequests:
+				//log.Debugf("PROXYSSH: %s: %s: Received src channel request: %v", s.drv.name, s.SrcAddr, request)
 				targetChannel = dstChn
 			case request = <-dstChnRequests:
+				//log.Debugf("PROXYSSH: %s: %s: Received dst channel request: %v", s.drv.name, s.SrcAddr, request)
 				targetChannel = srcChn
 			}
 
+			// In the event that an SSH request gets killed (not exited),
+			// the request will be nil. Do not continue, exit the loop.
 			if request == nil {
 				log.Warnf("PROXYSSH: %s: %s: SSH connection terminated ungracefully...", s.drv.name, s.SrcAddr)
 				break
@@ -216,6 +220,7 @@ func (s *session) handleChannel(ch ssh.NewChannel, dstConn ssh.Conn) {
 
 			log.Debugf("PROXYSSH: %s: %s: Request: Type=%q, WantReply='%t'.", s.drv.name, s.SrcAddr, request.Type, request.WantReply)
 			if request.Type == "exit-status" {
+				// Ending the channel requests processing
 				break
 			}
 		}
@@ -234,7 +239,13 @@ func (s *session) handleChannel(ch ssh.NewChannel, dstConn ssh.Conn) {
 		} else {
 			log.Debugf("PROXYSSH: %s: %s: The dst->src channel was closed: %v", s.drv.name, s.SrcAddr, err)
 		}
-		close(dstToSrcDone)
+		// Properly closing the channel
+		if err := dstChn.CloseWrite(); err != nil {
+			log.Warnf("PROXYSSH: %s: %s: The dst->src closing write for dst channel did not go well: %v", s.drv.name, s.SrcAddr, err)
+		}
+		if err := srcChn.CloseWrite(); err != nil {
+			log.Warnf("PROXYSSH: %s: %s: The dst->src closing write for src channel did not go well: %v", s.drv.name, s.SrcAddr, err)
+		}
 	}()
 
 	if _, err := io.Copy(dstChn, srcChn); err != nil && err != io.EOF {
@@ -242,23 +253,13 @@ func (s *session) handleChannel(ch ssh.NewChannel, dstConn ssh.Conn) {
 	} else {
 		log.Debugf("PROXYSSH: %s: %s: The src->dst channel was closed", s.drv.name, s.SrcAddr)
 	}
-	close(srcToDstDone)
-
-	// Wait for both copies to complete before closing writes
-	<-dstToSrcDone
-	<-srcToDstDone
-
-	// Now safe to close both channels
-	if err := dstChn.CloseWrite(); err != nil && err != io.EOF {
-		log.Warnf("PROXYSSH: %s: %s: Error closing dst channel write: %v", s.drv.name, s.SrcAddr, err)
+	// Properly closing the channel
+	if err := dstChn.CloseWrite(); err != nil {
+		log.Warnf("PROXYSSH: %s: %s: The src->dst closing write for dst channel did not go well: %v", s.drv.name, s.SrcAddr, err)
 	}
-	if err := srcChn.CloseWrite(); err != nil && err != io.EOF {
-		log.Warnf("PROXYSSH: %s: %s: Error closing src channel write: %v", s.drv.name, s.SrcAddr, err)
+	if err := srcChn.CloseWrite(); err != nil {
+		log.Warnf("PROXYSSH: %s: %s: The src->dst closing write for src channel did not go well: %v", s.drv.name, s.SrcAddr, err)
 	}
-
-	// Finally close the channels completely
-	dstChn.Close()
-	srcChn.Close()
 
 	chWg.Wait()
 	log.Debugf("PROXYSSH: %s: %s: Completed processing channel: %s", s.drv.name, s.SrcAddr, ch.ChannelType())
