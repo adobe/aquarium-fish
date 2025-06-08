@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"syscall"
 	"testing"
+	"time"
 	"unsafe"
 
 	"github.com/creack/pty"
@@ -183,6 +184,7 @@ func RunCmdPtySSH(addr, username, password, cmd string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("RunCmdPtySSH: Unable to connect to %s: %v", addr, err)
 	}
+	defer conn.Close()
 
 	session, err := conn.NewSession()
 	if err != nil {
@@ -196,20 +198,20 @@ func RunCmdPtySSH(addr, username, password, cmd string) ([]byte, error) {
 		ssh.TTY_OP_ISPEED: 14400, // input speed = 14.4kbaud
 		ssh.TTY_OP_OSPEED: 14400, // output speed = 14.4kbaud
 	}
+
 	// Request pseudo terminal
 	if err := session.RequestPty("xterm", 40, 80, modes); err != nil {
 		return nil, fmt.Errorf("RunCmdPtySSH: Unable to request PTY: %v", err)
 	}
 
-	// Set up standard input/output
+	// Get both pipes before starting shell
 	stdin, err := session.StdinPipe()
 	if err != nil {
-		return nil, fmt.Errorf("RunCmdPtySSH: Unable to get session stdin: %v", err)
+		return nil, fmt.Errorf("RunCmdPtySSH: Unable to get stdin pipe: %v", err)
 	}
-
 	stdout, err := session.StdoutPipe()
 	if err != nil {
-		return nil, fmt.Errorf("RunCmdPtySSH: Unable to get session stdout: %v", err)
+		return nil, fmt.Errorf("RunCmdPtySSH: Unable to get stdout pipe: %v", err)
 	}
 
 	// Start remote shell
@@ -217,16 +219,40 @@ func RunCmdPtySSH(addr, username, password, cmd string) ([]byte, error) {
 		return nil, fmt.Errorf("RunCmdPtySSH: Unable to request shell: %v", err)
 	}
 
-	// Send command
-	if _, err = io.WriteString(stdin, fmt.Sprintf("%s\n", cmd)); err != nil {
-		return nil, fmt.Errorf("RunCmdPtySSH: Unable to write to stdin: %v", err)
-	}
-	// Send exit to shell
-	if _, err = io.WriteString(stdin, "exit\n"); err != nil {
-		return nil, fmt.Errorf("RunCmdPtySSH: Unable to write to stdin: %v", err)
+	// Channel to coordinate between goroutines
+	done := make(chan struct{})
+
+	// Start goroutine to write commands
+	go func() {
+		defer close(done)
+		defer stdin.Close()
+
+		// Wait for shell to be ready
+		time.Sleep(time.Second)
+
+		// Send command
+		fmt.Fprintf(stdin, "%s\n", cmd)
+
+		// Wait for command to execute
+		time.Sleep(500 * time.Millisecond)
+
+		// Send exit
+		fmt.Fprintf(stdin, "exit\n")
+
+		// Wait for shell to process exit
+		time.Sleep(100 * time.Millisecond)
+	}()
+
+	// Read output in the main goroutine
+	output, err := io.ReadAll(stdout)
+	if err != nil {
+		return nil, fmt.Errorf("RunCmdPtySSH: Error reading output: %v", err)
 	}
 
-	return io.ReadAll(stdout)
+	// Wait for writing to finish
+	<-done
+
+	return output, nil
 }
 
 // SCP nowadays uses sftp subsystem with no need for scp binary on the target, so use it directly
