@@ -28,7 +28,7 @@ export PATH="$PATH:$gopath/bin"
 
 # Install buf for protobuf management if not available
 if ! command -v buf >/dev/null 2>&1; then
-    go install github.com/bufbuild/buf/cmd/buf@1.54.0
+    go install github.com/bufbuild/buf/cmd/buf@v1.54.0
 fi
 
 if ! command -v protoc-gen-go >/dev/null 2>&1; then
