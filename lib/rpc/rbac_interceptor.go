@@ -87,6 +87,11 @@ func (i *RBACInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc
 
 // checkPermission checks if the current user has permission to access the procedure
 func (i *RBACInterceptor) checkPermission(ctx context.Context, service, method string) error {
+	// Ignore the service/method when it's in auth.SkipRBAC list
+	if auth.IsEcludedFromRBAC(service, method) {
+		return nil
+	}
+
 	// Get user roles from context
 	user := GetUserFromContext(ctx)
 	if user == nil {

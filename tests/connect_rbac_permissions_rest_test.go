@@ -135,18 +135,24 @@ drivers:
 		}
 	})
 
-	t.Run("Regular user without role: Access denied", func(t *testing.T) {
+	t.Run("Regular user without role: Can access small subset of RPC", func(t *testing.T) {
 		// Try to get own user info
-		_, err := regularUserClient.GetMe(
+		resp, err := regularUserClient.GetMe(
 			context.Background(),
 			connect.NewRequest(&aquariumv2.UserServiceGetMeRequest{}),
 		)
-		if err == nil {
-			t.Error("Expected access denied for user getme")
+		if err != nil {
+			t.Fatal("Failed to get user info:", err)
 		}
 
+		if resp.Msg.Data.Name != regularUser.Name {
+			t.Error("Expected to see myself:", resp.Msg.Data.Name, "!=", regularUser.Name)
+		}
+	})
+
+	t.Run("Regular user without role: Access denied", func(t *testing.T) {
 		// Try to list labels
-		_, err = regularLabelClient.List(
+		_, err := regularLabelClient.List(
 			context.Background(),
 			connect.NewRequest(&aquariumv2.LabelServiceListRequest{}),
 		)
@@ -193,19 +199,6 @@ drivers:
 		)
 		if err != nil {
 			t.Fatal("Failed to assign role:", err)
-		}
-
-		// Try to get own user info
-		resp, err := regularUserClient.GetMe(
-			context.Background(),
-			connect.NewRequest(&aquariumv2.UserServiceGetMeRequest{}),
-		)
-		if err != nil {
-			t.Fatal("Failed to get user info:", err)
-		}
-
-		if resp.Msg.Data.Name != regularUser.Name {
-			t.Error("Expected to see myself:", resp.Msg.Data.Name, "!=", regularUser.Name)
 		}
 	})
 

@@ -52,11 +52,30 @@ const (
 
 	// UserService service constants
 	UserService            = "UserService"
+	UserServiceGetMe       = "GetMe"
 	UserServiceAssignRoles = "AssignRoles"
 	UserServiceCreate      = "Create"
 	UserServiceDelete      = "Delete"
 	UserServiceGet         = "Get"
-	UserServiceGetMe       = "GetMe"
 	UserServiceList        = "List"
 	UserServiceUpdate      = "Update"
 )
+
+// RBAC-excluded services and methods
+var rbacExcluded = map[string][]string{
+	"UserService": {
+		"GetMe",
+	},
+}
+
+// IsEcludedFromRBAC helps connectrpc to exclude methods from RBAC validation
+func IsEcludedFromRBAC(service, method string) bool {
+	if methods, ok := rbacExcluded[service]; ok {
+		for _, m := range methods {
+			if m == method {
+				return true
+			}
+		}
+	}
+	return false
+}

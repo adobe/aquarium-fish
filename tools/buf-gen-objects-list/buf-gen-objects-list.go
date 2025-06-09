@@ -18,10 +18,16 @@ import (
 	"strings"
 
 	"google.golang.org/protobuf/compiler/protogen"
+	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/pluginpb"
 )
 
 func main() {
-	protogen.Options{}.Run(func(gen *protogen.Plugin) error {
+	protogen.Options{}.Run(func(plugin *protogen.Plugin) error {
+		plugin.SupportedFeatures = uint64(pluginpb.CodeGeneratorResponse_FEATURE_PROTO3_OPTIONAL) | uint64(pluginpb.CodeGeneratorResponse_FEATURE_SUPPORTS_EDITIONS)
+		plugin.SupportedEditionsMinimum = descriptorpb.Edition_EDITION_PROTO2
+		plugin.SupportedEditionsMaximum = descriptorpb.Edition_EDITION_2023
+
 		var buf bytes.Buffer
 		buf.WriteString(`/**
  * Copyright 2025 Adobe. All rights reserved.
@@ -42,7 +48,7 @@ func main() {
 
 		seenMessages := make(map[string]bool)
 
-		for _, f := range gen.Files {
+		for _, f := range plugin.Files {
 			if !f.Generate {
 				continue
 			}
@@ -68,7 +74,7 @@ func main() {
 		buf.WriteString(")\n")
 
 		outputFile := "object_list.gen.go"
-		genFile := gen.NewGeneratedFile(outputFile, "")
+		genFile := plugin.NewGeneratedFile(outputFile, "")
 		_, err := genFile.Write(buf.Bytes())
 		return err
 	})

@@ -69,11 +69,39 @@ package auth
 const (
 {{- range $serviceName, $methods := .Services }}
 	// {{ $serviceName }} service constants
-	{{- range $methods }}
-	{{ $serviceName }}{{ . }} = "{{ if eq . "" }}{{ $serviceName }}{{ else }}{{ . }}{{ end }}"
+	{{- range $idx, $method := $methods }}
+	{{- $constName := print $serviceName $method }}
+	{{- if eq $method "" }}
+		{{- $method = $serviceName }}
+	{{- end }}
+	{{ $constName }} = "{{ $method }}"
 	{{- end }}
 {{ end }}
 )
+{{- if gt (len .Excluded) 0 }}
+
+// RBAC-excluded services and methods
+var rbacExcluded = map[string][]string{
+	{{- range $serviceName, $methods := .Excluded }}
+	"{{ $serviceName }}": {
+		{{- range $methods }}
+		"{{ . }}",
+		{{- end }}
+	},
+	{{ end }}
+}
+
+// IsEcludedFromRBAC helps connectrpc to exclude methods from RBAC validation
+func IsEcludedFromRBAC(service, method string) bool {
+	if methods, ok := rbacExcluded[service]; ok {
+		for _, m := range methods {
+			if m == method {
+				return true
+			}
+		}
+	}
+	return false
+}{{ end }}
 `))
 
 var combinedPermissionsTmpl = template.Must(template.New("combined_permissions").Parse(`/**
@@ -171,9 +199,11 @@ func processGrpcPermissions(plugin *protogen.Plugin) (map[string][]string, map[s
 
 				var roles []string
 				if !ok || ac == nil {
+					// If there is no AccessControl specified - assign it to Administrator
 					roles = []string{auth.AdminRoleName} // Default role
 				}
 				if ac != nil && len(ac.AllowedRoles) > 0 {
+					// When AllowedRoles are specified - use admin as default and append them
 					roles = []string{auth.AdminRoleName} // Default role
 					for _, role := range ac.AllowedRoles {
 						if !slices.Contains(roles, role) {
@@ -185,7 +215,14 @@ func processGrpcPermissions(plugin *protogen.Plugin) (map[string][]string, map[s
 					}
 				}
 
-				svcMethods = append(svcMethods, method.GoName)
+				// The AccessControl is defined, but AllowedRoles are
+				// unset - so allowing any logged-in user to call this method
+				if len(roles) == 0 {
+					// Prefixing method name with minus to mark it later in template
+					svcMethods = append(svcMethods, "-"+method.GoName)
+				} else {
+					svcMethods = append(svcMethods, method.GoName)
+				}
 
 				// Add permissions for each role
 				for _, role := range roles {
@@ -239,12 +276,12 @@ func processOpenAPIPermissions(plugin *protogen.Plugin, knownServiceMethods map[
 			// Get x-rbac extension
 			rbacExt := op.Extensions["x-rbac"]
 			if rbacExt == nil {
+				// If x-rbac is not set - then this path is available for logged-in user
 				return
 			}
 
 			// Parse x-rbac extension
 			rbacMap := map[string][]string{}
-			//if err := json.Unmarshal(rbacExt.(json.RawMessage), &rbacMap); err != nil {
 			rbacMapPre, ok := rbacExt.(map[string]any)
 			if !ok {
 				return
@@ -336,9 +373,28 @@ func generatePermissionFiles(grpcServices, openapiServices map[string][]string, 
 }
 
 func generateServiceMethodConstants(services map[string][]string, suffix string) error {
+	// Add services methods with "-" prefix to RBAC exclusion
+	// It's used on ConnectRPC side, OpenAPI uses per-method generation to skip those
+	excluded := make(map[string][]string)
+	for service, methods := range services {
+		for i, method := range methods {
+			if strings.HasPrefix(method, "-") {
+				if _, ok := excluded[service]; !ok {
+					excluded[service] = []string{}
+				}
+				noPrefixMethod := method[1:]
+				excluded[service] = append(excluded[service], noPrefixMethod)
+				methods[i] = noPrefixMethod
+				services[service] = methods
+			}
+		}
+	}
+
+	// Execute template
 	g := &bytes.Buffer{}
 	err := serviceMethodConstantsTmpl.Execute(g, map[string]any{
 		"Services": services,
+		"Excluded": excluded,
 	})
 	if err != nil {
 		return fmt.Errorf("Error executing gRPC template: %v", err)
