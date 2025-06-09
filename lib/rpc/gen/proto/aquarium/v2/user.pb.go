@@ -978,9 +978,9 @@ const file_aquarium_v2_user_proto_rawDesc = "" +
 	"\x05roles\x18\x02 \x03(\tR\x05roles\"R\n" +
 	"\x1eUserServiceAssignRolesResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage2\x8b\x05\n" +
-	"\vUserService\x12Z\n" +
-	"\x05GetMe\x12$.aquarium.v2.UserServiceGetMeRequest\x1a%.aquarium.v2.UserServiceGetMeResponse\"\x04\x82\xb5\x18\x00\x12S\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage2\xa7\x05\n" +
+	"\vUserService\x12v\n" +
+	"\x05GetMe\x12$.aquarium.v2.UserServiceGetMeRequest\x1a%.aquarium.v2.UserServiceGetMeResponse\" \x82\xb5\x18\x1c\x12\rAdministrator\x12\x05Power\x12\x04User\x12S\n" +
 	"\x04List\x12#.aquarium.v2.UserServiceListRequest\x1a$.aquarium.v2.UserServiceListResponse\"\x00\x12P\n" +
 	"\x03Get\x12\".aquarium.v2.UserServiceGetRequest\x1a#.aquarium.v2.UserServiceGetResponse\"\x00\x12Y\n" +
 	"\x06Create\x12%.aquarium.v2.UserServiceCreateRequest\x1a&.aquarium.v2.UserServiceCreateResponse\"\x00\x12Y\n" +

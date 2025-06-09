@@ -20,6 +20,7 @@ import (
 	"connectrpc.com/connect"
 
 	"github.com/adobe/aquarium-fish/lib/fish"
+	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 )
 
@@ -62,6 +63,7 @@ func (i *AuthInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 		}
 
 		username, password := parts[0], parts[1]
+		log.Debugf("RPC: %s: New HTTP request received: %s", username, req.Spec().Procedure)
 
 		var user *types.User
 		if i.fish.GetCfg().DisableAuth {
@@ -91,5 +93,42 @@ func (i *AuthInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) 
 
 // WrapStreamingHandler implements the connect.Interceptor interface
 func (i *AuthInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
-	return next
+	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
+		auth := conn.RequestHeader().Get("Authorization")
+		if !strings.HasPrefix(auth, "Basic ") {
+			return connect.NewError(connect.CodeUnauthenticated, nil)
+		}
+
+		payload, err := base64.StdEncoding.DecodeString(auth[6:])
+		if err != nil {
+			return connect.NewError(connect.CodeUnauthenticated, err)
+		}
+
+		parts := strings.SplitN(string(payload), ":", 2)
+		if len(parts) != 2 {
+			return connect.NewError(connect.CodeUnauthenticated, nil)
+		}
+
+		username, password := parts[0], parts[1]
+		log.Debugf("RPC: %s: New gRPC request received: %s", username, conn.Spec().Procedure)
+
+		var user *types.User
+		if i.fish.GetCfg().DisableAuth {
+			// This logic executed during performance tests only
+			user, err = i.fish.DB().UserGet(username)
+			if err != nil {
+				return connect.NewError(connect.CodeUnauthenticated, err)
+			}
+		} else {
+			user = i.fish.DB().UserAuth(username, password)
+			if user == nil {
+				return connect.NewError(connect.CodeUnauthenticated, nil)
+			}
+		}
+
+		// Add user to context
+		ctx = context.WithValue(ctx, userContextKey, user)
+
+		return nil
+	}
 }

@@ -27,7 +27,7 @@ func (d *Database) ApplicationList() (as []types.Application, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	err = d.be.Collection(types.ObjectApplication).List(&as)
+	err = d.be.Collection(ObjectApplication).List(&as)
 	return as, err
 }
 
@@ -45,7 +45,7 @@ func (d *Database) ApplicationCreate(a *types.Application) error {
 
 	a.UID = d.NewUID()
 	a.CreatedAt = time.Now()
-	err := d.be.Collection(types.ObjectApplication).Add(a.UID.String(), a)
+	err := d.be.Collection(ObjectApplication).Add(a.UID.String(), a)
 
 	// Create ApplicationState NEW too
 	d.ApplicationStateCreate(&types.ApplicationState{
@@ -65,7 +65,7 @@ func (d *Database) ApplicationGet(uid types.ApplicationUID) (a *types.Applicatio
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	err = d.be.Collection(types.ObjectApplication).Get(uid.String(), &a)
+	err = d.be.Collection(ObjectApplication).Get(uid.String(), &a)
 	return a, err
 }
 
@@ -74,7 +74,7 @@ func (d *Database) ApplicationDelete(uid types.ApplicationUID) (err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	return d.be.Collection(types.ObjectApplication).Delete(uid.String())
+	return d.be.Collection(ObjectApplication).Delete(uid.String())
 }
 
 // ApplicationIsAllocated returns if specific Application is allocated

@@ -21,7 +21,9 @@ option go_package = "github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v
 service UserService {
   // Get current user information
   rpc GetMe(UserServiceGetMeRequest) returns (UserServiceGetMeResponse) {
-   option (access_control) = {}; // Available for logged-in users
+   option (access_control) = {
+    allowed_roles: ['Administrator', 'Power', 'User'],
+   };
   }
   
   // Get list of users

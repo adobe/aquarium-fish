@@ -35,15 +35,13 @@ func (s *RoleService) List(ctx context.Context, req *connect.Request[aquariumv2.
 	roles, err := s.fish.DB().RoleList()
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.RoleServiceListResponse{
-			Status:  false,
-			Message: "Failed to list roles: " + err.Error(),
+			Status: false, Message: "Failed to list roles: " + err.Error(),
 		}), connect.NewError(connect.CodeInternal, err)
 	}
 
 	resp := &aquariumv2.RoleServiceListResponse{
-		Status:  true,
-		Message: "Roles listed successfully",
-		Data:    make([]*aquariumv2.Role, len(roles)),
+		Status: true, Message: "Roles listed successfully",
+		Data: make([]*aquariumv2.Role, len(roles)),
 	}
 
 	for i, role := range roles {
@@ -58,15 +56,13 @@ func (s *RoleService) Get(ctx context.Context, req *connect.Request[aquariumv2.R
 	role, err := s.fish.DB().RoleGet(req.Msg.Name)
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.RoleServiceGetResponse{
-			Status:  false,
-			Message: "Role not found: " + err.Error(),
+			Status: false, Message: "Role not found: " + err.Error(),
 		}), connect.NewError(connect.CodeNotFound, err)
 	}
 
 	return connect.NewResponse(&aquariumv2.RoleServiceGetResponse{
-		Status:  true,
-		Message: "Role retrieved successfully",
-		Data:    convertRole(role),
+		Status: true, Message: "Role retrieved successfully",
+		Data: convertRole(role),
 	}), nil
 }
 
@@ -75,8 +71,7 @@ func (s *RoleService) Create(ctx context.Context, req *connect.Request[aquariumv
 	// Check if role already exists
 	if _, err := s.fish.DB().RoleGet(req.Msg.Name); err == nil {
 		return connect.NewResponse(&aquariumv2.RoleServiceCreateResponse{
-			Status:  false,
-			Message: "Role already exists",
+			Status: false, Message: "Role already exists",
 		}), connect.NewError(connect.CodeAlreadyExists, nil)
 	}
 
@@ -94,15 +89,13 @@ func (s *RoleService) Create(ctx context.Context, req *connect.Request[aquariumv
 
 	if err := s.fish.DB().RoleCreate(role); err != nil {
 		return connect.NewResponse(&aquariumv2.RoleServiceCreateResponse{
-			Status:  false,
-			Message: "Failed to create role: " + err.Error(),
+			Status: false, Message: "Failed to create role: " + err.Error(),
 		}), connect.NewError(connect.CodeInternal, err)
 	}
 
 	return connect.NewResponse(&aquariumv2.RoleServiceCreateResponse{
-		Status:  true,
-		Message: "Role created successfully",
-		Data:    convertRole(role),
+		Status: true, Message: "Role created successfully",
+		Data: convertRole(role),
 	}), nil
 }
 
@@ -111,8 +104,7 @@ func (s *RoleService) Update(ctx context.Context, req *connect.Request[aquariumv
 	role, err := s.fish.DB().RoleGet(req.Msg.Name)
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.RoleServiceUpdateResponse{
-			Status:  false,
-			Message: "Role not found: " + err.Error(),
+			Status: false, Message: "Role not found: " + err.Error(),
 		}), connect.NewError(connect.CodeNotFound, err)
 	}
 
@@ -126,15 +118,13 @@ func (s *RoleService) Update(ctx context.Context, req *connect.Request[aquariumv
 
 	if err := s.fish.DB().RoleSave(role); err != nil {
 		return connect.NewResponse(&aquariumv2.RoleServiceUpdateResponse{
-			Status:  false,
-			Message: "Failed to update role: " + err.Error(),
+			Status: false, Message: "Failed to update role: " + err.Error(),
 		}), connect.NewError(connect.CodeInternal, err)
 	}
 
 	return connect.NewResponse(&aquariumv2.RoleServiceUpdateResponse{
-		Status:  true,
-		Message: "Role updated successfully",
-		Data:    convertRole(role),
+		Status: true, Message: "Role updated successfully",
+		Data: convertRole(role),
 	}), nil
 }
 
@@ -142,14 +132,12 @@ func (s *RoleService) Update(ctx context.Context, req *connect.Request[aquariumv
 func (s *RoleService) Delete(ctx context.Context, req *connect.Request[aquariumv2.RoleServiceDeleteRequest]) (*connect.Response[aquariumv2.RoleServiceDeleteResponse], error) {
 	if err := s.fish.DB().RoleDelete(req.Msg.Name); err != nil {
 		return connect.NewResponse(&aquariumv2.RoleServiceDeleteResponse{
-			Status:  false,
-			Message: "Failed to delete role: " + err.Error(),
+			Status: false, Message: "Failed to delete role: " + err.Error(),
 		}), connect.NewError(connect.CodeNotFound, err)
 	}
 
 	return connect.NewResponse(&aquariumv2.RoleServiceDeleteResponse{
-		Status:  true,
-		Message: "Role deleted successfully",
+		Status: true, Message: "Role deleted successfully",
 	}), nil
 }
 

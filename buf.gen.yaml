@@ -16,3 +16,8 @@ plugins:
       - run
       - ./tools/buf-gen-permissions/buf-gen-permissions.go
     out: lib/auth
+  - local:
+      - go
+      - run
+      - ./tools/buf-gen-objects-list/buf-gen-objects-list.go
+    out: lib/database

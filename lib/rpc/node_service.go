@@ -14,10 +14,12 @@ package rpc
 
 import (
 	"context"
+	"fmt"
 
 	"connectrpc.com/connect"
 
 	"github.com/adobe/aquarium-fish/lib/fish"
+	"github.com/adobe/aquarium-fish/lib/rpc/converters"
 	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2"
 )
 
@@ -26,38 +28,59 @@ type NodeService struct {
 	fish *fish.Fish
 }
 
-// ListNodes returns a list of nodes
+// List returns a list of nodes
 func (s *NodeService) List(ctx context.Context, req *connect.Request[aquariumv2.NodeServiceListRequest]) (*connect.Response[aquariumv2.NodeServiceListResponse], error) {
-	// TODO: Implement
+	out, err := s.fish.DB().NodeList()
+	if err != nil {
+		return connect.NewResponse(&aquariumv2.NodeServiceListResponse{
+			Status: false, Message: fmt.Sprintf("Unable to get the node list: %v", err),
+		}), connect.NewError(connect.CodeInternal, err)
+	}
+
+	// Convert nodes to protobuf format
+	protoNodes := make([]*aquariumv2.Node, len(out))
+	for i, node := range out {
+		protoNodes[i] = converters.ConvertNode(&node)
+	}
+
 	return connect.NewResponse(&aquariumv2.NodeServiceListResponse{
-		Status:  false,
-		Message: "Not implemented",
+		Status: true, Message: "Nodes listed successfully",
+		Data: protoNodes,
 	}), nil
 }
 
-// GetThisNode returns information about this node
+// GetThis returns information about this node
 func (s *NodeService) GetThis(ctx context.Context, req *connect.Request[aquariumv2.NodeServiceGetThisRequest]) (*connect.Response[aquariumv2.NodeServiceGetThisResponse], error) {
-	// TODO: Implement
+	node := s.fish.DB().GetNode()
+	if node == nil {
+		return connect.NewResponse(&aquariumv2.NodeServiceGetThisResponse{
+			Status: false, Message: "Node not found",
+		}), connect.NewError(connect.CodeNotFound, nil)
+	}
+
 	return connect.NewResponse(&aquariumv2.NodeServiceGetThisResponse{
-		Status:  false,
-		Message: "Not implemented",
+		Status: true, Message: "Node retrieved successfully",
+		Data: converters.ConvertNode(node),
 	}), nil
 }
 
 // SetMaintenance sets maintenance mode for this node
 func (s *NodeService) SetMaintenance(ctx context.Context, req *connect.Request[aquariumv2.NodeServiceSetMaintenanceRequest]) (*connect.Response[aquariumv2.NodeServiceSetMaintenanceResponse], error) {
-	// TODO: Implement
+	// Set maintenance mode
+	s.fish.MaintenanceSet(req.Msg.Maintenance)
+
 	return connect.NewResponse(&aquariumv2.NodeServiceSetMaintenanceResponse{
-		Status:  false,
-		Message: "Not implemented",
+		Status: true, Message: fmt.Sprintf("Maintenance mode %s", map[bool]string{true: "enabled", false: "disabled"}[req.Msg.Maintenance]),
 	}), nil
 }
 
 // GetProfiling returns profiling data
 func (s *NodeService) GetProfiling(ctx context.Context, req *connect.Request[aquariumv2.NodeServiceGetProfilingRequest]) (*connect.Response[aquariumv2.NodeServiceGetProfilingResponse], error) {
-	// TODO: Implement
+	// TODO: Implement profiling data collection
+	// This will require setting up a custom pprof handler to capture the data
+	// For now, return a placeholder response
 	return connect.NewResponse(&aquariumv2.NodeServiceGetProfilingResponse{
-		Status:  false,
-		Message: "Not implemented",
-	}), nil
+		Status: false, Message: "Profiling data collection not implemented",
+		Data: make(map[string]string),
+	}), connect.NewError(connect.CodeUnimplemented, nil)
 }

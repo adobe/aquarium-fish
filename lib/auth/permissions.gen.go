@@ -76,6 +76,7 @@ var rolePermissions = map[string][]types.Permission{
 		{Resource: UserService, Action: UserServiceDelete},      // gRPC, OpenAPI
 		{Resource: UserService, Action: UserServiceGet},         // gRPC, OpenAPI
 		{Resource: UserService, Action: UserServiceGetAll},      // OpenAPI
+		{Resource: UserService, Action: UserServiceGetMe},       // gRPC
 		{Resource: UserService, Action: UserServiceList},        // gRPC, OpenAPI
 		{Resource: UserService, Action: UserServiceListAll},     // OpenAPI
 		{Resource: UserService, Action: UserServiceUpdate},      // gRPC, OpenAPI
@@ -96,6 +97,9 @@ var rolePermissions = map[string][]types.Permission{
 
 		// ApplicationTaskService
 		{Resource: ApplicationTaskService, Action: ApplicationTaskServiceGet}, // OpenAPI
+
+		// UserService
+		{Resource: UserService, Action: UserServiceGetMe}, // gRPC
 	},
 	"User": {
 		// ApplicationService
@@ -108,6 +112,9 @@ var rolePermissions = map[string][]types.Permission{
 
 		// LabelService
 		{Resource: LabelService, Action: LabelServiceList}, // gRPC, OpenAPI
+
+		// UserService
+		{Resource: UserService, Action: UserServiceGetMe}, // gRPC
 	},
 }
 

@@ -24,7 +24,7 @@ func (d *Database) RoleList() (rs []types.Role, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	err = d.be.Collection(types.ObjectRole).List(&rs)
+	err = d.be.Collection(ObjectRole).List(&rs)
 	return rs, err
 }
 
@@ -33,7 +33,7 @@ func (d *Database) RoleGet(name string) (r *types.Role, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	err = d.be.Collection(types.ObjectRole).Get(name, &r)
+	err = d.be.Collection(ObjectRole).Get(name, &r)
 	return r, err
 }
 
@@ -48,7 +48,7 @@ func (d *Database) RoleCreate(r *types.Role) error {
 
 	r.CreatedAt = time.Now()
 	r.UpdatedAt = r.CreatedAt
-	return d.be.Collection(types.ObjectRole).Add(r.Name, r)
+	return d.be.Collection(ObjectRole).Add(r.Name, r)
 }
 
 // RoleSave saves a role
@@ -64,7 +64,7 @@ func (d *Database) RoleSave(r *types.Role) error {
 	defer d.beMu.RUnlock()
 
 	r.UpdatedAt = time.Now()
-	return d.be.Collection(types.ObjectRole).Add(r.Name, r)
+	return d.be.Collection(ObjectRole).Add(r.Name, r)
 }
 
 // RoleDelete deletes a role
@@ -72,5 +72,5 @@ func (d *Database) RoleDelete(name string) error {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	return d.be.Collection(types.ObjectRole).Delete(name)
+	return d.be.Collection(ObjectRole).Delete(name)
 }

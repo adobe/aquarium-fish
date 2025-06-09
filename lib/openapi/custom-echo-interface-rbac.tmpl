@@ -1,0 +1,11 @@
+// ServerInterface represents all server handlers.
+type ServerInterface interface {
+    // Validate rbac rules automatically, it takes context where finds rbac_service
+    // and methods to verify and then replies with the allowed methods 
+    checkPermission(c echo.Context, methods []string) []string
+
+{{range .}}{{.SummaryAsComment }}
+// ({{.Method}} {{.Path}})
+{{.OperationId}}(ctx echo.Context{{genParamArgs .PathParams}}{{if .RequiresParamObject}}, params {{.OperationId}}Params{{end}}) error
+{{end}}
+}

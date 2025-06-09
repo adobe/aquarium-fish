@@ -31,7 +31,7 @@ func (d *Database) ApplicationResourceList() (rs []types.ApplicationResource, er
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	err = d.be.Collection(types.ObjectApplicationResource).List(&rs)
+	err = d.be.Collection(ObjectApplicationResource).List(&rs)
 	return rs, err
 }
 
@@ -73,7 +73,7 @@ func (d *Database) ApplicationResourceCreate(r *types.ApplicationResource) error
 	r.UID = d.NewUID()
 	r.CreatedAt = time.Now()
 	r.UpdatedAt = r.CreatedAt
-	return d.be.Collection(types.ObjectApplicationResource).Add(r.UID.String(), r)
+	return d.be.Collection(ObjectApplicationResource).Add(r.UID.String(), r)
 }
 
 // ApplicationResourceDelete removes Resource
@@ -89,7 +89,7 @@ func (d *Database) ApplicationResourceDelete(uid types.ApplicationResourceUID) e
 	defer d.beMu.RUnlock()
 
 	// Now purge the resource.
-	return d.be.Collection(types.ObjectApplicationResource).Delete(uid.String())
+	return d.be.Collection(ObjectApplicationResource).Delete(uid.String())
 }
 
 // ApplicationResourceSave stores ApplicationResource
@@ -98,7 +98,7 @@ func (d *Database) ApplicationResourceSave(res *types.ApplicationResource) error
 	defer d.beMu.RUnlock()
 
 	res.UpdatedAt = time.Now()
-	return d.be.Collection(types.ObjectApplicationResource).Add(res.UID.String(), res)
+	return d.be.Collection(ObjectApplicationResource).Add(res.UID.String(), res)
 }
 
 // ApplicationResourceGet returns Resource by it's UID
@@ -106,7 +106,7 @@ func (d *Database) ApplicationResourceGet(uid types.ApplicationResourceUID) (res
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	err = d.be.Collection(types.ObjectApplicationResource).Get(uid.String(), &res)
+	err = d.be.Collection(ObjectApplicationResource).Get(uid.String(), &res)
 	return res, err
 }
 

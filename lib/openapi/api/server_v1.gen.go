@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
+	auth "github.com/adobe/aquarium-fish/lib/auth"
 	. "github.com/adobe/aquarium-fish/lib/openapi/types"
 	"github.com/labstack/echo/v4"
 	"github.com/oapi-codegen/runtime"
@@ -15,6 +16,10 @@ import (
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Validate rbac rules automatically, it takes context where finds rbac_service
+	// and methods to verify and then replies with the allowed methods
+	checkPermission(c echo.Context, methods []string) []string
+
 	// Get list of Applications
 	// (GET /api/v1/application/)
 	ApplicationListGet(ctx echo.Context) error
@@ -127,6 +132,16 @@ type ServerInterfaceWrapper struct {
 // ApplicationListGet converts echo context to params.
 func (w *ServerInterfaceWrapper) ApplicationListGet(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.ApplicationService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.ApplicationServiceList,
+		auth.ApplicationServiceListAll,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
 
 	ctx.Set(Basic_authScopes, []string{})
 
@@ -138,6 +153,15 @@ func (w *ServerInterfaceWrapper) ApplicationListGet(ctx echo.Context) error {
 // ApplicationCreatePost converts echo context to params.
 func (w *ServerInterfaceWrapper) ApplicationCreatePost(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.ApplicationService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.ApplicationServiceCreate,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
 
 	ctx.Set(Basic_authScopes, []string{})
 
@@ -149,6 +173,17 @@ func (w *ServerInterfaceWrapper) ApplicationCreatePost(ctx echo.Context) error {
 // ApplicationGet converts echo context to params.
 func (w *ServerInterfaceWrapper) ApplicationGet(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.ApplicationService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.ApplicationServiceGet,
+		auth.ApplicationServiceGetAll,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
+
 	// ------------- Path parameter "uid" -------------
 	var uid openapi_types.UUID
 
@@ -167,6 +202,17 @@ func (w *ServerInterfaceWrapper) ApplicationGet(ctx echo.Context) error {
 // ApplicationDeallocateGet converts echo context to params.
 func (w *ServerInterfaceWrapper) ApplicationDeallocateGet(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.ApplicationService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.ApplicationServiceDeallocate,
+		auth.ApplicationServiceDeallocateAll,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
+
 	// ------------- Path parameter "uid" -------------
 	var uid openapi_types.UUID
 
@@ -185,6 +231,17 @@ func (w *ServerInterfaceWrapper) ApplicationDeallocateGet(ctx echo.Context) erro
 // ApplicationResourceGet converts echo context to params.
 func (w *ServerInterfaceWrapper) ApplicationResourceGet(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.ApplicationService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.ApplicationServiceGetResource,
+		auth.ApplicationServiceGetResourceAll,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
+
 	// ------------- Path parameter "uid" -------------
 	var uid openapi_types.UUID
 
@@ -203,6 +260,17 @@ func (w *ServerInterfaceWrapper) ApplicationResourceGet(ctx echo.Context) error 
 // ApplicationStateGet converts echo context to params.
 func (w *ServerInterfaceWrapper) ApplicationStateGet(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.ApplicationService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.ApplicationServiceGetState,
+		auth.ApplicationServiceGetStateAll,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
+
 	// ------------- Path parameter "uid" -------------
 	var uid openapi_types.UUID
 
@@ -221,6 +289,17 @@ func (w *ServerInterfaceWrapper) ApplicationStateGet(ctx echo.Context) error {
 // ApplicationTaskListGet converts echo context to params.
 func (w *ServerInterfaceWrapper) ApplicationTaskListGet(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.ApplicationService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.ApplicationServiceListTask,
+		auth.ApplicationServiceListTaskAll,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
+
 	// ------------- Path parameter "uid" -------------
 	var uid openapi_types.UUID
 
@@ -239,6 +318,16 @@ func (w *ServerInterfaceWrapper) ApplicationTaskListGet(ctx echo.Context) error 
 // ApplicationTaskCreatePost converts echo context to params.
 func (w *ServerInterfaceWrapper) ApplicationTaskCreatePost(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.ApplicationService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.ApplicationServiceCreateTask,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
+
 	// ------------- Path parameter "uid" -------------
 	var uid openapi_types.UUID
 
@@ -257,6 +346,16 @@ func (w *ServerInterfaceWrapper) ApplicationTaskCreatePost(ctx echo.Context) err
 // ApplicationResourceAccessPut converts echo context to params.
 func (w *ServerInterfaceWrapper) ApplicationResourceAccessPut(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.ApplicationResourceService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.ApplicationResourceServiceAccess,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
+
 	// ------------- Path parameter "uid" -------------
 	var uid openapi_types.UUID
 
@@ -275,6 +374,15 @@ func (w *ServerInterfaceWrapper) ApplicationResourceAccessPut(ctx echo.Context) 
 // LabelListGet converts echo context to params.
 func (w *ServerInterfaceWrapper) LabelListGet(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.LabelService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.LabelServiceList,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
 
 	ctx.Set(Basic_authScopes, []string{})
 
@@ -302,6 +410,15 @@ func (w *ServerInterfaceWrapper) LabelListGet(ctx echo.Context) error {
 // LabelCreatePost converts echo context to params.
 func (w *ServerInterfaceWrapper) LabelCreatePost(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.LabelService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.LabelServiceCreate,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
 
 	ctx.Set(Basic_authScopes, []string{})
 
@@ -313,6 +430,16 @@ func (w *ServerInterfaceWrapper) LabelCreatePost(ctx echo.Context) error {
 // LabelDelete converts echo context to params.
 func (w *ServerInterfaceWrapper) LabelDelete(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.LabelService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.LabelServiceDelete,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
+
 	// ------------- Path parameter "uid" -------------
 	var uid openapi_types.UUID
 
@@ -331,6 +458,16 @@ func (w *ServerInterfaceWrapper) LabelDelete(ctx echo.Context) error {
 // LabelGet converts echo context to params.
 func (w *ServerInterfaceWrapper) LabelGet(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.LabelService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.LabelServiceGet,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
+
 	// ------------- Path parameter "uid" -------------
 	var uid openapi_types.UUID
 
@@ -349,6 +486,15 @@ func (w *ServerInterfaceWrapper) LabelGet(ctx echo.Context) error {
 // NodeListGet converts echo context to params.
 func (w *ServerInterfaceWrapper) NodeListGet(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.NodeService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.NodeServiceList,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
 
 	ctx.Set(Basic_authScopes, []string{})
 
@@ -360,6 +506,15 @@ func (w *ServerInterfaceWrapper) NodeListGet(ctx echo.Context) error {
 // NodeThisGet converts echo context to params.
 func (w *ServerInterfaceWrapper) NodeThisGet(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.NodeService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.NodeServiceGetThis,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
 
 	ctx.Set(Basic_authScopes, []string{})
 
@@ -371,6 +526,15 @@ func (w *ServerInterfaceWrapper) NodeThisGet(ctx echo.Context) error {
 // NodeThisMaintenanceGet converts echo context to params.
 func (w *ServerInterfaceWrapper) NodeThisMaintenanceGet(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.NodeService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.NodeServiceSetMaintenance,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
 
 	ctx.Set(Basic_authScopes, []string{})
 
@@ -405,6 +569,15 @@ func (w *ServerInterfaceWrapper) NodeThisMaintenanceGet(ctx echo.Context) error 
 // NodeThisProfilingIndexGet converts echo context to params.
 func (w *ServerInterfaceWrapper) NodeThisProfilingIndexGet(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.NodeService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.NodeServiceGetProfiling,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
 
 	ctx.Set(Basic_authScopes, []string{})
 
@@ -416,6 +589,16 @@ func (w *ServerInterfaceWrapper) NodeThisProfilingIndexGet(ctx echo.Context) err
 // NodeThisProfilingGet converts echo context to params.
 func (w *ServerInterfaceWrapper) NodeThisProfilingGet(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.NodeService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.NodeServiceGetProfiling,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
+
 	// ------------- Path parameter "handler" -------------
 	var handler string
 
@@ -434,6 +617,15 @@ func (w *ServerInterfaceWrapper) NodeThisProfilingGet(ctx echo.Context) error {
 // RoleListGet converts echo context to params.
 func (w *ServerInterfaceWrapper) RoleListGet(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.RoleService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.RoleServiceList,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
 
 	ctx.Set(Basic_authScopes, []string{})
 
@@ -445,6 +637,16 @@ func (w *ServerInterfaceWrapper) RoleListGet(ctx echo.Context) error {
 // RoleCreateUpdatePost converts echo context to params.
 func (w *ServerInterfaceWrapper) RoleCreateUpdatePost(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.RoleService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.RoleServiceCreate,
+		auth.RoleServiceUpdate,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
 
 	ctx.Set(Basic_authScopes, []string{})
 
@@ -456,6 +658,16 @@ func (w *ServerInterfaceWrapper) RoleCreateUpdatePost(ctx echo.Context) error {
 // RoleDelete converts echo context to params.
 func (w *ServerInterfaceWrapper) RoleDelete(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.RoleService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.RoleServiceDelete,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
+
 	// ------------- Path parameter "name" -------------
 	var name string
 
@@ -474,6 +686,16 @@ func (w *ServerInterfaceWrapper) RoleDelete(ctx echo.Context) error {
 // RoleGet converts echo context to params.
 func (w *ServerInterfaceWrapper) RoleGet(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.RoleService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.RoleServiceGet,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
+
 	// ------------- Path parameter "name" -------------
 	var name string
 
@@ -492,6 +714,15 @@ func (w *ServerInterfaceWrapper) RoleGet(ctx echo.Context) error {
 // ServiceMappingListGet converts echo context to params.
 func (w *ServerInterfaceWrapper) ServiceMappingListGet(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.ServiceMappingService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.ServiceMappingServiceList,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
 
 	ctx.Set(Basic_authScopes, []string{})
 
@@ -503,6 +734,15 @@ func (w *ServerInterfaceWrapper) ServiceMappingListGet(ctx echo.Context) error {
 // ServiceMappingCreatePost converts echo context to params.
 func (w *ServerInterfaceWrapper) ServiceMappingCreatePost(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.ServiceMappingService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.ServiceMappingServiceCreate,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
 
 	ctx.Set(Basic_authScopes, []string{})
 
@@ -514,6 +754,16 @@ func (w *ServerInterfaceWrapper) ServiceMappingCreatePost(ctx echo.Context) erro
 // ServiceMappingDelete converts echo context to params.
 func (w *ServerInterfaceWrapper) ServiceMappingDelete(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.ServiceMappingService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.ServiceMappingServiceDelete,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
+
 	// ------------- Path parameter "uid" -------------
 	var uid openapi_types.UUID
 
@@ -532,6 +782,16 @@ func (w *ServerInterfaceWrapper) ServiceMappingDelete(ctx echo.Context) error {
 // ServiceMappingGet converts echo context to params.
 func (w *ServerInterfaceWrapper) ServiceMappingGet(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.ServiceMappingService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.ServiceMappingServiceGet,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
+
 	// ------------- Path parameter "uid" -------------
 	var uid openapi_types.UUID
 
@@ -550,6 +810,17 @@ func (w *ServerInterfaceWrapper) ServiceMappingGet(ctx echo.Context) error {
 // ApplicationTaskGet converts echo context to params.
 func (w *ServerInterfaceWrapper) ApplicationTaskGet(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.ApplicationTaskService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.ApplicationTaskServiceGet,
+		auth.ApplicationTaskServiceGetAll,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
+
 	// ------------- Path parameter "task_uid" -------------
 	var taskUid openapi_types.UUID
 
@@ -568,6 +839,16 @@ func (w *ServerInterfaceWrapper) ApplicationTaskGet(ctx echo.Context) error {
 // UserListGet converts echo context to params.
 func (w *ServerInterfaceWrapper) UserListGet(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.UserService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.UserServiceList,
+		auth.UserServiceListAll,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
 
 	ctx.Set(Basic_authScopes, []string{})
 
@@ -579,6 +860,17 @@ func (w *ServerInterfaceWrapper) UserListGet(ctx echo.Context) error {
 // UserCreateUpdatePost converts echo context to params.
 func (w *ServerInterfaceWrapper) UserCreateUpdatePost(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.UserService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.UserServiceCreate,
+		auth.UserServiceUpdate,
+		auth.UserServiceUpdateAll,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
 
 	ctx.Set(Basic_authScopes, []string{})
 
@@ -590,6 +882,9 @@ func (w *ServerInterfaceWrapper) UserCreateUpdatePost(ctx echo.Context) error {
 // UserMeGet converts echo context to params.
 func (w *ServerInterfaceWrapper) UserMeGet(ctx echo.Context) error {
 	var err error
+	// RBAC validation skipped due to x-rbac extension was not found
+	ctx.Set("rbac_service", auth.UserService)
+	ctx.Set("rbac_methods", []string{})
 
 	ctx.Set(Basic_authScopes, []string{})
 
@@ -601,6 +896,16 @@ func (w *ServerInterfaceWrapper) UserMeGet(ctx echo.Context) error {
 // UserDelete converts echo context to params.
 func (w *ServerInterfaceWrapper) UserDelete(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.UserService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.UserServiceDelete,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
+
 	// ------------- Path parameter "name" -------------
 	var name string
 
@@ -619,6 +924,17 @@ func (w *ServerInterfaceWrapper) UserDelete(ctx echo.Context) error {
 // UserGet converts echo context to params.
 func (w *ServerInterfaceWrapper) UserGet(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.UserService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.UserServiceGet,
+		auth.UserServiceGetAll,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
+
 	// ------------- Path parameter "name" -------------
 	var name string
 
@@ -637,6 +953,16 @@ func (w *ServerInterfaceWrapper) UserGet(ctx echo.Context) error {
 // UserRolesPost converts echo context to params.
 func (w *ServerInterfaceWrapper) UserRolesPost(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.UserService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.UserServiceAssignRoles,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
+
 	// ------------- Path parameter "name" -------------
 	var name string
 
@@ -655,6 +981,16 @@ func (w *ServerInterfaceWrapper) UserRolesPost(ctx echo.Context) error {
 // VoteListGet converts echo context to params.
 func (w *ServerInterfaceWrapper) VoteListGet(ctx echo.Context) error {
 	var err error
+	// RBAC validation based on x-rbac extension first defined role/method
+	ctx.Set("rbac_service", auth.VoteService)
+	allowedMethods := w.Handler.checkPermission(ctx, []string{
+		auth.VoteServiceList,
+		auth.VoteServiceListAll,
+	})
+	if len(allowedMethods) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+	}
+	ctx.Set("rbac_methods", allowedMethods)
 
 	ctx.Set(Basic_authScopes, []string{})
 

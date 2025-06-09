@@ -34,14 +34,12 @@ func (s *UserService) GetMe(ctx context.Context, req *connect.Request[aquariumv2
 	user := GetUserFromContext(ctx)
 	if user == nil {
 		return connect.NewResponse(&aquariumv2.UserServiceGetMeResponse{
-			Status:  false,
-			Message: "User not authenticated",
+			Status: false, Message: "User not authenticated",
 		}), connect.NewError(connect.CodeUnauthenticated, nil)
 	}
 
 	return connect.NewResponse(&aquariumv2.UserServiceGetMeResponse{
-		Status:  true,
-		Message: "User details retrieved successfully",
+		Status: true, Message: "User details retrieved successfully",
 		Data: &aquariumv2.User{
 			Name:      user.Name,
 			CreatedAt: timestamppb.New(user.CreatedAt),
@@ -56,15 +54,13 @@ func (s *UserService) List(ctx context.Context, req *connect.Request[aquariumv2.
 	users, err := s.fish.DB().UserList()
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceListResponse{
-			Status:  false,
-			Message: "Failed to list users: " + err.Error(),
+			Status: false, Message: "Failed to list users: " + err.Error(),
 		}), connect.NewError(connect.CodeInternal, err)
 	}
 
 	resp := &aquariumv2.UserServiceListResponse{
-		Status:  true,
-		Message: "Users listed successfully",
-		Data:    make([]*aquariumv2.User, len(users)),
+		Status: true, Message: "Users listed successfully",
+		Data: make([]*aquariumv2.User, len(users)),
 	}
 
 	for i, user := range users {
@@ -84,14 +80,12 @@ func (s *UserService) Get(ctx context.Context, req *connect.Request[aquariumv2.U
 	user, err := s.fish.DB().UserGet(req.Msg.Name)
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceGetResponse{
-			Status:  false,
-			Message: "User not found: " + err.Error(),
+			Status: false, Message: "User not found: " + err.Error(),
 		}), connect.NewError(connect.CodeNotFound, err)
 	}
 
 	return connect.NewResponse(&aquariumv2.UserServiceGetResponse{
-		Status:  true,
-		Message: "User retrieved successfully",
+		Status: true, Message: "User retrieved successfully",
 		Data: &aquariumv2.User{
 			Name:      user.Name,
 			CreatedAt: timestamppb.New(user.CreatedAt),
@@ -113,14 +107,12 @@ func (s *UserService) Create(ctx context.Context, req *connect.Request[aquariumv
 	password, user, err := s.fish.DB().UserNew(req.Msg.Name, password)
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceCreateResponse{
-			Status:  false,
-			Message: "Failed to create user: " + err.Error(),
+			Status: false, Message: "Failed to create user: " + err.Error(),
 		}), connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
 	return connect.NewResponse(&aquariumv2.UserServiceCreateResponse{
-		Status:  true,
-		Message: "User created successfully",
+		Status: true, Message: "User created successfully",
 		Data: &aquariumv2.UserWithPassword{
 			Name:      user.Name,
 			CreatedAt: timestamppb.New(user.CreatedAt),
@@ -136,8 +128,7 @@ func (s *UserService) Update(ctx context.Context, req *connect.Request[aquariumv
 	user, err := s.fish.DB().UserGet(req.Msg.Name)
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceUpdateResponse{
-			Status:  false,
-			Message: "User not found: " + err.Error(),
+			Status: false, Message: "User not found: " + err.Error(),
 		}), connect.NewError(connect.CodeNotFound, err)
 	}
 
@@ -149,14 +140,12 @@ func (s *UserService) Update(ctx context.Context, req *connect.Request[aquariumv
 	user.Roles = req.Msg.Roles
 	if err := s.fish.DB().UserSave(user); err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceUpdateResponse{
-			Status:  false,
-			Message: "Failed to update user: " + err.Error(),
+			Status: false, Message: "Failed to update user: " + err.Error(),
 		}), connect.NewError(connect.CodeInternal, err)
 	}
 
 	return connect.NewResponse(&aquariumv2.UserServiceUpdateResponse{
-		Status:  true,
-		Message: "User updated successfully",
+		Status: true, Message: "User updated successfully",
 		Data: &aquariumv2.UserWithPassword{
 			Name:      user.Name,
 			CreatedAt: timestamppb.New(user.CreatedAt),
@@ -171,14 +160,12 @@ func (s *UserService) Update(ctx context.Context, req *connect.Request[aquariumv
 func (s *UserService) Delete(ctx context.Context, req *connect.Request[aquariumv2.UserServiceDeleteRequest]) (*connect.Response[aquariumv2.UserServiceDeleteResponse], error) {
 	if err := s.fish.DB().UserDelete(req.Msg.Name); err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceDeleteResponse{
-			Status:  false,
-			Message: "Failed to delete user: " + err.Error(),
+			Status: false, Message: "Failed to delete user: " + err.Error(),
 		}), connect.NewError(connect.CodeNotFound, err)
 	}
 
 	return connect.NewResponse(&aquariumv2.UserServiceDeleteResponse{
-		Status:  true,
-		Message: "User deleted successfully",
+		Status: true, Message: "User deleted successfully",
 	}), nil
 }
 
@@ -187,21 +174,18 @@ func (s *UserService) AssignRoles(ctx context.Context, req *connect.Request[aqua
 	user, err := s.fish.DB().UserGet(req.Msg.Name)
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceAssignRolesResponse{
-			Status:  false,
-			Message: "User not found: " + err.Error(),
+			Status: false, Message: "User not found: " + err.Error(),
 		}), connect.NewError(connect.CodeNotFound, err)
 	}
 
 	user.Roles = req.Msg.Roles
 	if err := s.fish.DB().UserSave(user); err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceAssignRolesResponse{
-			Status:  false,
-			Message: "Failed to assign roles: " + err.Error(),
+			Status: false, Message: "Failed to assign roles: " + err.Error(),
 		}), connect.NewError(connect.CodeInternal, err)
 	}
 
 	return connect.NewResponse(&aquariumv2.UserServiceAssignRolesResponse{
-		Status:  true,
-		Message: "User roles updated successfully",
+		Status: true, Message: "User roles updated successfully",
 	}), nil
 }

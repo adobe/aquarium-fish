@@ -70,7 +70,7 @@ const (
 {{- range $serviceName, $methods := .Services }}
 	// {{ $serviceName }} service constants
 	{{- range $methods }}
-	{{ $serviceName }}{{ . }} = "{{ $serviceName }}{{ . }}"
+	{{ $serviceName }}{{ . }} = "{{ if eq . "" }}{{ $serviceName }}{{ else }}{{ . }}{{ end }}"
 	{{- end }}
 {{ end }}
 )

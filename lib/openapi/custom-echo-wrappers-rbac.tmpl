@@ -6,6 +6,30 @@ type ServerInterfaceWrapper struct {
 {{range .}}{{$opid := .OperationId}}// {{$opid}} converts echo context to params.
 func (w *ServerInterfaceWrapper) {{.OperationId}} (ctx echo.Context) error {
     var err error
+
+{{- $resource := index .Spec.Tags 0 }}
+{{- $x_rbac := index .Spec.Extensions "x-rbac" }}
+{{- if $x_rbac }}
+    // RBAC validation based on x-rbac extension first defined role/method
+{{- range $role, $actions := $x_rbac }}
+    ctx.Set("rbac_service", auth.{{ $resource }}Service)
+    allowedMethods := w.Handler.checkPermission(ctx, []string{
+    {{- range $actions }}
+        auth.{{ $resource }}Service{{ . }},
+    {{- end }}
+    })
+    if len(allowedMethods) == 0 {
+        return echo.NewHTTPError(http.StatusForbidden, "Insufficient permissions")
+    }
+    ctx.Set("rbac_methods", allowedMethods)
+{{- break }}
+{{- end }}
+{{- else }}
+    // RBAC validation skipped due to x-rbac extension was not found
+    ctx.Set("rbac_service", auth.{{ $resource }}Service)
+    ctx.Set("rbac_methods", []string{})
+{{- end }}
+
 {{range .PathParams}}// ------------- Path parameter "{{.ParamName}}" -------------
     var {{$varName := .GoVariableName}}{{$varName}} {{.TypeDef}}
 {{if .IsPassThrough}}
@@ -128,4 +152,4 @@ func (w *ServerInterfaceWrapper) {{.OperationId}} (ctx echo.Context) error {
     err = w.Handler.{{.OperationId}}(ctx{{genParamNames .PathParams}}{{if .RequiresParamObject}}, params{{end}})
     return err
 }
-{{end}}
+{{end}} 

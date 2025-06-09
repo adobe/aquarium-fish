@@ -14,11 +14,15 @@ package rpc
 
 import (
 	"context"
+	"encoding/json"
 
 	"connectrpc.com/connect"
 
 	"github.com/adobe/aquarium-fish/lib/fish"
+	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	"github.com/adobe/aquarium-fish/lib/rpc/converters"
 	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2"
+	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 // LabelService implements the Label service
@@ -26,38 +30,120 @@ type LabelService struct {
 	fish *fish.Fish
 }
 
-// ListLabels returns a list of labels
+// List returns a list of labels
 func (s *LabelService) List(ctx context.Context, req *connect.Request[aquariumv2.LabelServiceListRequest]) (*connect.Response[aquariumv2.LabelServiceListResponse], error) {
-	// TODO: Implement
+	// Get labels from database
+	params := types.LabelListGetParams{}
+	out, err := s.fish.DB().LabelList(params)
+	if err != nil {
+		return connect.NewResponse(&aquariumv2.LabelServiceListResponse{
+			Status: false, Message: "Unable to get the label list: " + err.Error(),
+		}), connect.NewError(connect.CodeInternal, err)
+	}
+
+	// Convert labels to protobuf format
+	protoLabels := make([]*aquariumv2.Label, len(out))
+	for i, label := range out {
+		protoLabels[i] = converters.ConvertLabel(&label)
+	}
+
 	return connect.NewResponse(&aquariumv2.LabelServiceListResponse{
-		Status:  false,
-		Message: "Not implemented",
+		Status: true, Message: "Labels retrieved successfully",
+		Data: protoLabels,
 	}), nil
 }
 
-// GetLabel returns a label by name
+// Get returns a label by name
 func (s *LabelService) Get(ctx context.Context, req *connect.Request[aquariumv2.LabelServiceGetRequest]) (*connect.Response[aquariumv2.LabelServiceGetResponse], error) {
-	// TODO: Implement
+	// Get labels with the specified name
+	labels, err := s.fish.DB().LabelListName(req.Msg.Name)
+	if err != nil {
+		return connect.NewResponse(&aquariumv2.LabelServiceGetResponse{
+			Status: false, Message: "Unable to get the label: " + err.Error(),
+		}), connect.NewError(connect.CodeInternal, err)
+	}
+
+	if len(labels) == 0 {
+		return connect.NewResponse(&aquariumv2.LabelServiceGetResponse{
+			Status: false, Message: "Label not found",
+		}), connect.NewError(connect.CodeNotFound, err)
+	}
+
+	// Return the latest version
+	var latest types.Label
+	for _, label := range labels {
+		if label.Version > latest.Version {
+			latest = label
+		}
+	}
+
 	return connect.NewResponse(&aquariumv2.LabelServiceGetResponse{
-		Status:  false,
-		Message: "Not implemented",
+		Status: true, Message: "Label retrieved successfully",
+		Data: converters.ConvertLabel(&latest),
 	}), nil
 }
 
-// CreateLabel creates a new label
+// Create creates a new label
 func (s *LabelService) Create(ctx context.Context, req *connect.Request[aquariumv2.LabelServiceCreateRequest]) (*connect.Response[aquariumv2.LabelServiceCreateResponse], error) {
-	// TODO: Implement
+	// Create a new label
+	label := &types.Label{
+		Name:    req.Msg.Name,
+		Version: 1, // Start with version 1
+	}
+
+	// Convert metadata map to JSON string
+	if len(req.Msg.Metadata) > 0 {
+		metadata := make(map[string]interface{})
+		for k, v := range req.Msg.Metadata {
+			metadata[k] = v
+		}
+		metadataJSON, err := json.Marshal(metadata)
+		if err != nil {
+			return connect.NewResponse(&aquariumv2.LabelServiceCreateResponse{
+				Status: false, Message: "Unable to marshal metadata: " + err.Error(),
+			}), connect.NewError(connect.CodeInternal, err)
+		}
+		label.Metadata = util.UnparsedJSON(metadataJSON)
+	}
+
+	if err := s.fish.DB().LabelCreate(label); err != nil {
+		return connect.NewResponse(&aquariumv2.LabelServiceCreateResponse{
+			Status: false, Message: "Unable to create label: " + err.Error(),
+		}), connect.NewError(connect.CodeInternal, err)
+	}
+
 	return connect.NewResponse(&aquariumv2.LabelServiceCreateResponse{
-		Status:  false,
-		Message: "Not implemented",
+		Status: true, Message: "Label created successfully",
+		Data: converters.ConvertLabel(label),
 	}), nil
 }
 
-// DeleteLabel deletes a label
+// Delete deletes a label
 func (s *LabelService) Delete(ctx context.Context, req *connect.Request[aquariumv2.LabelServiceDeleteRequest]) (*connect.Response[aquariumv2.LabelServiceDeleteResponse], error) {
-	// TODO: Implement
+	// Get labels with the specified name
+	labels, err := s.fish.DB().LabelListName(req.Msg.Name)
+	if err != nil {
+		return connect.NewResponse(&aquariumv2.LabelServiceDeleteResponse{
+			Status: false, Message: "Unable to get the label: " + err.Error(),
+		}), connect.NewError(connect.CodeInternal, err)
+	}
+
+	if len(labels) == 0 {
+		return connect.NewResponse(&aquariumv2.LabelServiceDeleteResponse{
+			Status: false, Message: "Label not found",
+		}), connect.NewError(connect.CodeNotFound, err)
+	}
+
+	// Delete all versions of the label
+	for _, label := range labels {
+		if err := s.fish.DB().LabelDelete(label.UID); err != nil {
+			return connect.NewResponse(&aquariumv2.LabelServiceDeleteResponse{
+				Status: false, Message: "Unable to delete label: " + err.Error(),
+			}), connect.NewError(connect.CodeInternal, err)
+		}
+	}
+
 	return connect.NewResponse(&aquariumv2.LabelServiceDeleteResponse{
-		Status:  false,
-		Message: "Not implemented",
+		Status: true, Message: "Label deleted successfully",
 	}), nil
 }

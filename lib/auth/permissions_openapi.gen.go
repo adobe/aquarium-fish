@@ -18,20 +18,20 @@ package auth
 const (
 	// ApplicationResourceService service constants
 	ApplicationResourceService       = "ApplicationResourceService"
-	ApplicationResourceServiceAccess = "ApplicationResourceServiceAccess"
+	ApplicationResourceServiceAccess = "Access"
 
 	// ApplicationService service constants
-	ApplicationServiceDeallocateAll  = "ApplicationServiceDeallocateAll"
-	ApplicationServiceGetAll         = "ApplicationServiceGetAll"
-	ApplicationServiceGetResourceAll = "ApplicationServiceGetResourceAll"
-	ApplicationServiceGetStateAll    = "ApplicationServiceGetStateAll"
-	ApplicationServiceListAll        = "ApplicationServiceListAll"
-	ApplicationServiceListTaskAll    = "ApplicationServiceListTaskAll"
+	ApplicationServiceDeallocateAll  = "DeallocateAll"
+	ApplicationServiceGetAll         = "GetAll"
+	ApplicationServiceGetResourceAll = "GetResourceAll"
+	ApplicationServiceGetStateAll    = "GetStateAll"
+	ApplicationServiceListAll        = "ListAll"
+	ApplicationServiceListTaskAll    = "ListTaskAll"
 
 	// ApplicationTaskService service constants
 	ApplicationTaskService       = "ApplicationTaskService"
-	ApplicationTaskServiceGet    = "ApplicationTaskServiceGet"
-	ApplicationTaskServiceGetAll = "ApplicationTaskServiceGetAll"
+	ApplicationTaskServiceGet    = "Get"
+	ApplicationTaskServiceGetAll = "GetAll"
 
 	// LabelService service constants
 
@@ -41,18 +41,18 @@ const (
 
 	// ServiceMappingService service constants
 	ServiceMappingService       = "ServiceMappingService"
-	ServiceMappingServiceCreate = "ServiceMappingServiceCreate"
-	ServiceMappingServiceDelete = "ServiceMappingServiceDelete"
-	ServiceMappingServiceGet    = "ServiceMappingServiceGet"
-	ServiceMappingServiceList   = "ServiceMappingServiceList"
+	ServiceMappingServiceCreate = "Create"
+	ServiceMappingServiceDelete = "Delete"
+	ServiceMappingServiceGet    = "Get"
+	ServiceMappingServiceList   = "List"
 
 	// UserService service constants
-	UserServiceGetAll    = "UserServiceGetAll"
-	UserServiceListAll   = "UserServiceListAll"
-	UserServiceUpdateAll = "UserServiceUpdateAll"
+	UserServiceGetAll    = "GetAll"
+	UserServiceListAll   = "ListAll"
+	UserServiceUpdateAll = "UpdateAll"
 
 	// VoteService service constants
 	VoteService        = "VoteService"
-	VoteServiceList    = "VoteServiceList"
-	VoteServiceListAll = "VoteServiceListAll"
+	VoteServiceList    = "List"
+	VoteServiceListAll = "ListAll"
 )
