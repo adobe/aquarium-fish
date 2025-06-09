@@ -23,7 +23,7 @@ import (
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
-// Test_connect_rbac_permissions_rest verifies that:
+// Test_rbac_permissions verifies that:
 // 1. A new user without any role cannot access any resources
 // 2. A user with User role can:
 //   - List labels
@@ -31,7 +31,7 @@ import (
 //   - Cannot see or manage other users' applications
 //
 // 3. A user with Administrator role can access and manage all resources
-func Test_connect_rbac_permissions_rest(t *testing.T) {
+func Test_rbac_permissions(t *testing.T) {
 	t.Parallel()
 	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
@@ -164,13 +164,16 @@ drivers:
 		_, err = regularLabelClient.Create(
 			context.Background(),
 			connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
-				Name: "test-label",
-				Metadata: map[string]string{
-					"version":     "1",
-					"driver":      "test",
-					"cpu":         "1",
-					"ram":         "2",
-					"definitions": `[{"driver":"test","resources":{"cpu":1,"ram":2}}]`,
+				Label: &aquariumv2.Label{
+					Name:    "test-label",
+					Version: 1,
+					Definitions: []*aquariumv2.LabelDefinition{{
+						Driver: "test",
+						Resources: &aquariumv2.Resources{
+							Cpu: 1,
+							Ram: 2,
+						},
+					}},
 				},
 			}),
 		)
@@ -208,13 +211,16 @@ drivers:
 		resp, err := adminLabelClient.Create(
 			context.Background(),
 			connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
-				Name: "test-label",
-				Metadata: map[string]string{
-					"version":     "1",
-					"driver":      "test",
-					"cpu":         "1",
-					"ram":         "2",
-					"definitions": `[{"driver":"test","resources":{"cpu":1,"ram":2}}]`,
+				Label: &aquariumv2.Label{
+					Name:    "test-label",
+					Version: 1,
+					Definitions: []*aquariumv2.LabelDefinition{{
+						Driver: "test",
+						Resources: &aquariumv2.Resources{
+							Cpu: 1,
+							Ram: 2,
+						},
+					}},
 				},
 			}),
 		)
@@ -320,13 +326,16 @@ drivers:
 		_, err = powerLabelClient.Create(
 			context.Background(),
 			connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
-				Name: "admin-label",
-				Metadata: map[string]string{
-					"version":     "1",
-					"driver":      "test",
-					"cpu":         "1",
-					"ram":         "2",
-					"definitions": `[{"driver":"test","resources":{"cpu":1,"ram":2}}]`,
+				Label: &aquariumv2.Label{
+					Name:    "admin-label",
+					Version: 1,
+					Definitions: []*aquariumv2.LabelDefinition{{
+						Driver: "test",
+						Resources: &aquariumv2.Resources{
+							Cpu: 1,
+							Ram: 2,
+						},
+					}},
 				},
 			}),
 		)

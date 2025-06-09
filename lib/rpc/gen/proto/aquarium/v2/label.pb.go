@@ -583,8 +583,7 @@ func (x *LabelServiceGetResponse) GetData() *Label {
 
 type LabelServiceCreateRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Metadata      map[string]string      `protobuf:"bytes,2,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Label         *Label                 `protobuf:"bytes,1,opt,name=label,proto3" json:"label,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -619,16 +618,9 @@ func (*LabelServiceCreateRequest) Descriptor() ([]byte, []int) {
 	return file_aquarium_v2_label_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *LabelServiceCreateRequest) GetName() string {
+func (x *LabelServiceCreateRequest) GetLabel() *Label {
 	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *LabelServiceCreateRequest) GetMetadata() map[string]string {
-	if x != nil {
-		return x.Metadata
+		return x.Label
 	}
 	return nil
 }
@@ -841,13 +833,9 @@ const file_aquarium_v2_label_proto_rawDesc = "" +
 	"\x17LabelServiceGetResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12&\n" +
-	"\x04data\x18\x03 \x01(\v2\x12.aquarium.v2.LabelR\x04data\"\xbe\x01\n" +
-	"\x19LabelServiceCreateRequest\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12P\n" +
-	"\bmetadata\x18\x02 \x03(\v24.aquarium.v2.LabelServiceCreateRequest.MetadataEntryR\bmetadata\x1a;\n" +
-	"\rMetadataEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"v\n" +
+	"\x04data\x18\x03 \x01(\v2\x12.aquarium.v2.LabelR\x04data\"E\n" +
+	"\x19LabelServiceCreateRequest\x12(\n" +
+	"\x05label\x18\x01 \x01(\v2\x12.aquarium.v2.LabelR\x05label\"v\n" +
 	"\x1aLabelServiceCreateResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12&\n" +
@@ -876,7 +864,7 @@ func file_aquarium_v2_label_proto_rawDescGZIP() []byte {
 	return file_aquarium_v2_label_proto_rawDescData
 }
 
-var file_aquarium_v2_label_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_aquarium_v2_label_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_aquarium_v2_label_proto_goTypes = []any{
 	(*Label)(nil),                      // 0: aquarium.v2.Label
 	(*LabelDefinition)(nil),            // 1: aquarium.v2.LabelDefinition
@@ -891,22 +879,21 @@ var file_aquarium_v2_label_proto_goTypes = []any{
 	(*LabelServiceDeleteRequest)(nil),  // 10: aquarium.v2.LabelServiceDeleteRequest
 	(*LabelServiceDeleteResponse)(nil), // 11: aquarium.v2.LabelServiceDeleteResponse
 	nil,                                // 12: aquarium.v2.Resources.DisksEntry
-	nil,                                // 13: aquarium.v2.LabelServiceCreateRequest.MetadataEntry
-	(*timestamppb.Timestamp)(nil),      // 14: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),            // 15: google.protobuf.Struct
-	(*Authentication)(nil),             // 16: aquarium.v2.Authentication
+	(*timestamppb.Timestamp)(nil),      // 13: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),            // 14: google.protobuf.Struct
+	(*Authentication)(nil),             // 15: aquarium.v2.Authentication
 }
 var file_aquarium_v2_label_proto_depIdxs = []int32{
-	14, // 0: aquarium.v2.Label.created_at:type_name -> google.protobuf.Timestamp
+	13, // 0: aquarium.v2.Label.created_at:type_name -> google.protobuf.Timestamp
 	1,  // 1: aquarium.v2.Label.definitions:type_name -> aquarium.v2.LabelDefinition
-	15, // 2: aquarium.v2.Label.metadata:type_name -> google.protobuf.Struct
+	14, // 2: aquarium.v2.Label.metadata:type_name -> google.protobuf.Struct
 	2,  // 3: aquarium.v2.LabelDefinition.resources:type_name -> aquarium.v2.Resources
-	15, // 4: aquarium.v2.LabelDefinition.options:type_name -> google.protobuf.Struct
-	16, // 5: aquarium.v2.LabelDefinition.authentication:type_name -> aquarium.v2.Authentication
+	14, // 4: aquarium.v2.LabelDefinition.options:type_name -> google.protobuf.Struct
+	15, // 5: aquarium.v2.LabelDefinition.authentication:type_name -> aquarium.v2.Authentication
 	12, // 6: aquarium.v2.Resources.disks:type_name -> aquarium.v2.Resources.DisksEntry
 	0,  // 7: aquarium.v2.LabelServiceListResponse.data:type_name -> aquarium.v2.Label
 	0,  // 8: aquarium.v2.LabelServiceGetResponse.data:type_name -> aquarium.v2.Label
-	13, // 9: aquarium.v2.LabelServiceCreateRequest.metadata:type_name -> aquarium.v2.LabelServiceCreateRequest.MetadataEntry
+	0,  // 9: aquarium.v2.LabelServiceCreateRequest.label:type_name -> aquarium.v2.Label
 	0,  // 10: aquarium.v2.LabelServiceCreateResponse.data:type_name -> aquarium.v2.Label
 	3,  // 11: aquarium.v2.Resources.DisksEntry.value:type_name -> aquarium.v2.ResourcesDisk
 	4,  // 12: aquarium.v2.LabelService.List:input_type -> aquarium.v2.LabelServiceListRequest
@@ -938,7 +925,7 @@ func file_aquarium_v2_label_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aquarium_v2_label_proto_rawDesc), len(file_aquarium_v2_label_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   14,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

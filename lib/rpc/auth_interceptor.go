@@ -88,7 +88,45 @@ func (i *AuthInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 
 // WrapStreamingClient implements the connect.Interceptor interface
 func (i *AuthInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
-	return next
+	return connect.StreamingClientFunc(func(ctx context.Context, spec connect.Spec) connect.StreamingClientConn {
+		conn := next(ctx, spec)
+		auth := conn.RequestHeader().Get("Authorization")
+		if !strings.HasPrefix(auth, "Basic ") {
+			return nil
+		}
+
+		payload, err := base64.StdEncoding.DecodeString(auth[6:])
+		if err != nil {
+			return nil
+		}
+
+		parts := strings.SplitN(string(payload), ":", 2)
+		if len(parts) != 2 {
+			return nil
+		}
+
+		username, password := parts[0], parts[1]
+		log.Debugf("RPC: %s: New gRPC-Client request received: %s", username, conn.Spec().Procedure)
+
+		var user *types.User
+		if i.fish.GetCfg().DisableAuth {
+			// This logic executed during performance tests only
+			user, err = i.fish.DB().UserGet(username)
+			if err != nil {
+				return nil
+			}
+		} else {
+			user = i.fish.DB().UserAuth(username, password)
+			if user == nil {
+				return nil
+			}
+		}
+
+		// Add user to context
+		ctx = context.WithValue(ctx, userContextKey, user)
+
+		return conn
+	})
 }
 
 // WrapStreamingHandler implements the connect.Interceptor interface

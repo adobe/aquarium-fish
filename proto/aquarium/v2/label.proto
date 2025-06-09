@@ -98,8 +98,7 @@ message LabelServiceGetResponse {
 }
 
 message LabelServiceCreateRequest {
-  string name = 1;
-  map<string, string> metadata = 2;
+  Label label = 1;
 }
 
 message LabelServiceCreateResponse {

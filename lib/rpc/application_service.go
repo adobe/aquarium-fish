@@ -139,7 +139,7 @@ func (s *ApplicationService) GetState(ctx context.Context, req *connect.Request[
 		}), err
 	}
 
-	state, err := s.fish.DB().ApplicationStateGet(app.UID)
+	state, err := s.fish.DB().ApplicationStateGetByApplication(app.UID)
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.ApplicationServiceGetStateResponse{
 			Status: false, Message: "Unable to get application state: " + err.Error(),
@@ -161,7 +161,7 @@ func (s *ApplicationService) GetResource(ctx context.Context, req *connect.Reque
 		}), err
 	}
 
-	resource, err := s.fish.DB().ApplicationResourceGet(app.UID)
+	resource, err := s.fish.DB().ApplicationResourceGetByApplication(app.UID)
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.ApplicationServiceGetResourceResponse{
 			Status: false, Message: "Unable to get application resource: " + err.Error(),

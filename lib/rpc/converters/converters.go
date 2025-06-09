@@ -75,6 +75,56 @@ func ConvertLabel(label *types.Label) *aquariumv2.Label {
 	return protoLabel
 }
 
+// ConvertLabelFromProto converts new aquariumv2.Label to types.Label
+func ConvertLabelNewFromProto(label *aquariumv2.Label) (*types.Label, error) {
+	if label == nil {
+		return nil, fmt.Errorf("nil source label")
+	}
+
+	metadata, err := StructToUnparsedJSON(label.Metadata)
+	if err != nil {
+		return nil, fmt.Errorf("invalid metadata: %w", err)
+	}
+
+	outLabel := &types.Label{
+		Name:      label.Name,
+		Version:   int(label.Version),
+		CreatedAt: label.CreatedAt.AsTime(),
+		Metadata:  metadata,
+	}
+
+	// Convert definitions
+	outLabel.Definitions = make(types.LabelDefinitions, len(label.Definitions))
+	for i, def := range label.Definitions {
+		if def == nil {
+			continue
+		}
+
+		converted, err := convertLabelDefinitionFromProto(def)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert definition at index %d: %w", i, err)
+		}
+		outLabel.Definitions[i] = converted
+	}
+
+	return outLabel, nil
+}
+
+// ConvertLabelFromProto converts aquariumv2.Label to types.Label
+func ConvertLabelFromProto(label *aquariumv2.Label) (*types.Label, error) {
+	outLabel, err := ConvertLabelNewFromProto(label)
+	if err != nil {
+		return nil, err
+	}
+
+	outLabel.UID, err = StringToLabelUID(label.Uid)
+	if err != nil {
+		return nil, err
+	}
+
+	return outLabel, nil
+}
+
 // ConvertNode converts types.Node to aquariumv2.Node
 func ConvertNode(node *types.Node) *aquariumv2.Node {
 	if node == nil {
@@ -123,7 +173,7 @@ func ConvertApplication(app *types.Application) *aquariumv2.Application {
 // ConvertApplicationNewFromProto converts aquariumv2.Application with no UID to types.Application
 func ConvertApplicationNewFromProto(app *aquariumv2.Application) (*types.Application, error) {
 	if app == nil {
-		return nil, nil
+		return nil, fmt.Errorf("nil source application")
 	}
 
 	labelUID, err := StringToLabelUID(app.LabelUid)
@@ -361,6 +411,82 @@ func convertResources(res *types.Resources) *aquariumv2.Resources {
 	}
 
 	return protoRes
+}
+
+func convertLabelDefinitionFromProto(def *aquariumv2.LabelDefinition) (types.LabelDefinition, error) {
+	options, err := StructToUnparsedJSON(def.Options)
+	if err != nil {
+		return types.LabelDefinition{}, fmt.Errorf("invalid options: %w", err)
+	}
+
+	labelDef := types.LabelDefinition{
+		Driver:  def.Driver,
+		Options: options,
+	}
+
+	// Convert resources if present
+	if def.Resources != nil {
+		resources, err := convertResourcesFromProto(def.Resources)
+		if err != nil {
+			return types.LabelDefinition{}, fmt.Errorf("invalid resources: %w", err)
+		}
+		labelDef.Resources = resources
+	}
+
+	// Convert authentication if present
+	if def.Authentication != nil {
+		labelDef.Authentication = convertAuthenticationFromProto(def.Authentication)
+	}
+
+	return labelDef, nil
+}
+
+func convertResourcesFromProto(res *aquariumv2.Resources) (types.Resources, error) {
+	resources := types.Resources{
+		Cpu:          uint(res.Cpu),
+		Ram:          uint(res.Ram),
+		CpuOverbook:  res.CpuOverbook,
+		RamOverbook:  res.RamOverbook,
+		Multitenancy: res.Multitenancy,
+		Network:      res.Network,
+		NodeFilter:   res.NodeFilter,
+		Lifetime:     res.Lifetime,
+	}
+
+	if res.Slots != nil {
+		slots := uint(*res.Slots)
+		resources.Slots = &slots
+	}
+
+	if res.Disks != nil {
+		resources.Disks = make(map[string]types.ResourcesDisk)
+		for k, v := range res.Disks {
+			if v != nil {
+				resources.Disks[k] = convertResourcesDiskFromProto(v)
+			}
+		}
+	}
+
+	return resources, nil
+}
+
+func convertResourcesDiskFromProto(disk *aquariumv2.ResourcesDisk) types.ResourcesDisk {
+	return types.ResourcesDisk{
+		Type:  disk.Type,
+		Label: disk.Label,
+		Size:  uint(disk.Size),
+		Clone: disk.Clone,
+		Reuse: disk.Reuse,
+	}
+}
+
+func convertAuthenticationFromProto(auth *aquariumv2.Authentication) *types.Authentication {
+	return &types.Authentication{
+		Username: auth.Username,
+		Password: auth.Password,
+		Key:      auth.Key,
+		Port:     int(auth.Port),
+	}
 }
 
 func convertNodeDefinition(def *types.NodeDefinition) *aquariumv2.NodeDefinition {

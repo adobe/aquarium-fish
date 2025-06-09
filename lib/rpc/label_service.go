@@ -14,7 +14,6 @@ package rpc
 
 import (
 	"context"
-	"encoding/json"
 
 	"connectrpc.com/connect"
 
@@ -22,7 +21,6 @@ import (
 	"github.com/adobe/aquarium-fish/lib/openapi/types"
 	"github.com/adobe/aquarium-fish/lib/rpc/converters"
 	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2"
-	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 // LabelService implements the Label service
@@ -85,25 +83,11 @@ func (s *LabelService) Get(ctx context.Context, req *connect.Request[aquariumv2.
 
 // Create creates a new label
 func (s *LabelService) Create(ctx context.Context, req *connect.Request[aquariumv2.LabelServiceCreateRequest]) (*connect.Response[aquariumv2.LabelServiceCreateResponse], error) {
-	// Create a new label
-	label := &types.Label{
-		Name:    req.Msg.Name,
-		Version: 1, // Start with version 1
-	}
-
-	// Convert metadata map to JSON string
-	if len(req.Msg.Metadata) > 0 {
-		metadata := make(map[string]interface{})
-		for k, v := range req.Msg.Metadata {
-			metadata[k] = v
-		}
-		metadataJSON, err := json.Marshal(metadata)
-		if err != nil {
-			return connect.NewResponse(&aquariumv2.LabelServiceCreateResponse{
-				Status: false, Message: "Unable to marshal metadata: " + err.Error(),
-			}), connect.NewError(connect.CodeInternal, err)
-		}
-		label.Metadata = util.UnparsedJSON(metadataJSON)
+	label, err := converters.ConvertLabelNewFromProto(req.Msg.Label)
+	if err != nil {
+		return connect.NewResponse(&aquariumv2.LabelServiceCreateResponse{
+			Status: false, Message: "Invalid label data: " + err.Error(),
+		}), connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
 	if err := s.fish.DB().LabelCreate(label); err != nil {
