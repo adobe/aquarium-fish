@@ -85,11 +85,17 @@ func (e *Processor) BasicAuth(username, password string, c echo.Context) (bool, 
 }
 
 func getRbacService(c echo.Context) string {
-	return c.Get("rbac_service").(string)
+	if service, ok := c.Get("rbac_service").(string); ok {
+		return service
+	}
+	return ""
 }
 
 func getRbacMethods(c echo.Context) []string {
-	return c.Get("rbac_methods").([]string)
+	if methods, ok := c.Get("rbac_methods").([]string); ok {
+		return methods
+	}
+	return []string{}
 }
 
 // checkPermission checks if the user has permission to perform the action on the object
@@ -710,7 +716,7 @@ func (e *Processor) NodeThisProfilingIndexGet(c echo.Context) error {
 }
 
 // NodeThisProfilingGet API call processor
-func (e *Processor) NodeThisProfilingGet(c echo.Context, handler string) error {
+func (*Processor) NodeThisProfilingGet(c echo.Context, handler string) error {
 	switch handler {
 	case "":
 		// Show index if no handler name provided

@@ -32,14 +32,18 @@ const rbacMethodContextKey = contextKey("rbac_method")
 
 // GetServiceFromContext retrieves the service from context
 func GetServiceFromContext(ctx context.Context) string {
-	service, _ := ctx.Value(rbacServiceContextKey).(string)
-	return service
+	if service, ok := ctx.Value(rbacServiceContextKey).(string); ok {
+		return service
+	}
+	return ""
 }
 
 // GetMethodFromContext retrieves the service from context
 func GetMethodFromContext(ctx context.Context) string {
-	method, _ := ctx.Value(rbacMethodContextKey).(string)
-	return method
+	if method, ok := ctx.Value(rbacMethodContextKey).(string); ok {
+		return method
+	}
+	return ""
 }
 
 // NewRBACInterceptor creates a new RBAC interceptor
@@ -64,7 +68,7 @@ func (i *RBACInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 }
 
 // WrapStreamingClient implements connect.Interceptor
-func (i *RBACInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
+func (*RBACInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
 	return func(ctx context.Context, spec connect.Spec) connect.StreamingClientConn {
 		// We don't support streaming yet, so just pass through
 		return next(ctx, spec)

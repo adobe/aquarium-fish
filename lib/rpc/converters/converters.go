@@ -52,7 +52,7 @@ func ConvertLabel(label *types.Label) *aquariumv2.Label {
 		return nil
 	}
 
-	metadata, err := structpb.NewStruct(map[string]interface{}{
+	metadata, err := structpb.NewStruct(map[string]any{
 		"metadata": string(label.Metadata),
 	})
 	if err != nil {
@@ -81,21 +81,21 @@ func ConvertLabelNewFromProto(label *aquariumv2.Label) (*types.Label, error) {
 		return nil, fmt.Errorf("nil source label")
 	}
 
-	metadata, err := StructToUnparsedJSON(label.Metadata)
+	metadata, err := StructToUnparsedJSON(label.GetMetadata())
 	if err != nil {
 		return nil, fmt.Errorf("invalid metadata: %w", err)
 	}
 
 	outLabel := &types.Label{
-		Name:      label.Name,
-		Version:   int(label.Version),
-		CreatedAt: label.CreatedAt.AsTime(),
+		Name:      label.GetName(),
+		Version:   int(label.GetVersion()),
+		CreatedAt: label.GetCreatedAt().AsTime(),
 		Metadata:  metadata,
 	}
 
 	// Convert definitions
-	outLabel.Definitions = make(types.LabelDefinitions, len(label.Definitions))
-	for i, def := range label.Definitions {
+	outLabel.Definitions = make(types.LabelDefinitions, len(label.GetDefinitions()))
+	for i, def := range label.GetDefinitions() {
 		if def == nil {
 			continue
 		}
@@ -117,7 +117,7 @@ func ConvertLabelFromProto(label *aquariumv2.Label) (*types.Label, error) {
 		return nil, err
 	}
 
-	outLabel.UID, err = StringToLabelUID(label.Uid)
+	outLabel.UID, err = StringToLabelUID(label.GetUid())
 	if err != nil {
 		return nil, err
 	}
@@ -176,20 +176,20 @@ func ConvertApplicationNewFromProto(app *aquariumv2.Application) (*types.Applica
 		return nil, fmt.Errorf("nil source application")
 	}
 
-	labelUID, err := StringToLabelUID(app.LabelUid)
+	labelUID, err := StringToLabelUID(app.GetLabelUid())
 	if err != nil {
 		return nil, err
 	}
 
-	metadata, err := StructToUnparsedJSON(app.Metadata)
+	metadata, err := StructToUnparsedJSON(app.GetMetadata())
 	if err != nil {
 		return nil, err
 	}
 
 	return &types.Application{
 		LabelUID:  labelUID,
-		OwnerName: app.OwnerName,
-		CreatedAt: app.CreatedAt.AsTime(),
+		OwnerName: app.GetOwnerName(),
+		CreatedAt: app.GetCreatedAt().AsTime(),
 		Metadata:  metadata,
 	}, nil
 }
@@ -201,7 +201,7 @@ func ConvertApplicationFromProto(app *aquariumv2.Application) (*types.Applicatio
 		return nil, err
 	}
 
-	outApp.UID, err = StringToApplicationUID(app.Uid)
+	outApp.UID, err = StringToApplicationUID(app.GetUid())
 	if err != nil {
 		return nil, err
 	}
@@ -258,22 +258,22 @@ func ConvertApplicationTaskFromProto(task *aquariumv2.ApplicationTask) (*types.A
 		return nil, nil
 	}
 
-	uid, err := StringToApplicationTaskUID(task.Uid)
+	uid, err := StringToApplicationTaskUID(task.GetUid())
 	if err != nil {
 		return nil, err
 	}
 
-	appUID, err := StringToApplicationUID(task.ApplicationUid)
+	appUID, err := StringToApplicationUID(task.GetApplicationUid())
 	if err != nil {
 		return nil, err
 	}
 
-	options, err := StructToUnparsedJSON(task.Options)
+	options, err := StructToUnparsedJSON(task.GetOptions())
 	if err != nil {
 		return nil, fmt.Errorf("invalid options: %w", err)
 	}
 
-	result, err := StructToUnparsedJSON(task.Result)
+	result, err := StructToUnparsedJSON(task.GetResult())
 	if err != nil {
 		return nil, fmt.Errorf("invalid result: %w", err)
 	}
@@ -281,12 +281,12 @@ func ConvertApplicationTaskFromProto(task *aquariumv2.ApplicationTask) (*types.A
 	return &types.ApplicationTask{
 		UID:            uid,
 		ApplicationUID: appUID,
-		Task:           task.Task,
+		Task:           task.GetTask(),
 		Options:        options,
 		Result:         result,
-		When:           types.ApplicationStatus(task.When),
-		CreatedAt:      task.CreatedAt.AsTime(),
-		UpdatedAt:      task.UpdatedAt.AsTime(),
+		When:           types.ApplicationStatus(task.GetWhen()),
+		CreatedAt:      task.GetCreatedAt().AsTime(),
+		UpdatedAt:      task.GetUpdatedAt().AsTime(),
 	}, nil
 }
 
@@ -296,7 +296,7 @@ func ConvertApplicationResource(res *types.ApplicationResource) *aquariumv2.Appl
 		return nil
 	}
 
-	metadata, err := structpb.NewStruct(map[string]interface{}{
+	metadata, err := structpb.NewStruct(map[string]any{
 		"metadata": string(res.Metadata),
 	})
 	if err != nil {
@@ -349,7 +349,7 @@ func convertLabelDefinition(def *types.LabelDefinition) *aquariumv2.LabelDefinit
 		return nil
 	}
 
-	options, err := structpb.NewStruct(map[string]interface{}{
+	options, err := structpb.NewStruct(map[string]any{
 		"options": string(def.Options),
 	})
 	if err != nil {
@@ -414,78 +414,74 @@ func convertResources(res *types.Resources) *aquariumv2.Resources {
 }
 
 func convertLabelDefinitionFromProto(def *aquariumv2.LabelDefinition) (types.LabelDefinition, error) {
-	options, err := StructToUnparsedJSON(def.Options)
+	options, err := StructToUnparsedJSON(def.GetOptions())
 	if err != nil {
 		return types.LabelDefinition{}, fmt.Errorf("invalid options: %w", err)
 	}
 
 	labelDef := types.LabelDefinition{
-		Driver:  def.Driver,
+		Driver:  def.GetDriver(),
 		Options: options,
 	}
 
 	// Convert resources if present
-	if def.Resources != nil {
-		resources, err := convertResourcesFromProto(def.Resources)
-		if err != nil {
-			return types.LabelDefinition{}, fmt.Errorf("invalid resources: %w", err)
-		}
-		labelDef.Resources = resources
+	if def.GetResources() != nil {
+		labelDef.Resources = convertResourcesFromProto(def.GetResources())
 	}
 
 	// Convert authentication if present
-	if def.Authentication != nil {
-		labelDef.Authentication = convertAuthenticationFromProto(def.Authentication)
+	if def.GetAuthentication() != nil {
+		labelDef.Authentication = convertAuthenticationFromProto(def.GetAuthentication())
 	}
 
 	return labelDef, nil
 }
 
-func convertResourcesFromProto(res *aquariumv2.Resources) (types.Resources, error) {
+func convertResourcesFromProto(res *aquariumv2.Resources) types.Resources {
 	resources := types.Resources{
-		Cpu:          uint(res.Cpu),
-		Ram:          uint(res.Ram),
-		CpuOverbook:  res.CpuOverbook,
-		RamOverbook:  res.RamOverbook,
-		Multitenancy: res.Multitenancy,
-		Network:      res.Network,
-		NodeFilter:   res.NodeFilter,
-		Lifetime:     res.Lifetime,
+		Cpu:          uint(res.GetCpu()),
+		Ram:          uint(res.GetRam()),
+		CpuOverbook:  res.GetCpuOverbook(),
+		RamOverbook:  res.GetRamOverbook(),
+		Multitenancy: res.GetMultitenancy(),
+		Network:      res.GetNetwork(),
+		NodeFilter:   res.GetNodeFilter(),
+		Lifetime:     res.GetLifetime(),
 	}
 
 	if res.Slots != nil {
-		slots := uint(*res.Slots)
+		slots := uint(res.GetSlots())
 		resources.Slots = &slots
 	}
 
-	if res.Disks != nil {
+	if res.GetDisks() != nil {
 		resources.Disks = make(map[string]types.ResourcesDisk)
-		for k, v := range res.Disks {
+		for k, v := range res.GetDisks() {
 			if v != nil {
 				resources.Disks[k] = convertResourcesDiskFromProto(v)
 			}
 		}
 	}
 
-	return resources, nil
+	return resources
 }
 
 func convertResourcesDiskFromProto(disk *aquariumv2.ResourcesDisk) types.ResourcesDisk {
 	return types.ResourcesDisk{
-		Type:  disk.Type,
-		Label: disk.Label,
-		Size:  uint(disk.Size),
-		Clone: disk.Clone,
-		Reuse: disk.Reuse,
+		Type:  disk.GetType(),
+		Label: disk.GetLabel(),
+		Size:  uint(disk.GetSize()),
+		Clone: disk.GetClone(),
+		Reuse: disk.GetReuse(),
 	}
 }
 
 func convertAuthenticationFromProto(auth *aquariumv2.Authentication) *types.Authentication {
 	return &types.Authentication{
-		Username: auth.Username,
-		Password: auth.Password,
-		Key:      auth.Key,
-		Port:     int(auth.Port),
+		Username: auth.GetUsername(),
+		Password: auth.GetPassword(),
+		Key:      auth.GetKey(),
+		Port:     int(auth.GetPort()),
 	}
 }
 
@@ -500,7 +496,7 @@ func convertNodeDefinition(def *types.NodeDefinition) *aquariumv2.NodeDefinition
 	protoDef.Cpu = make([]*aquariumv2.CpuInfo, len(def.Cpu))
 	for i, cpu := range def.Cpu {
 		protoDef.Cpu[i] = &aquariumv2.CpuInfo{
-			Cores:      int32(cpu.Cores),
+			Cores:      cpu.Cores,
 			ModelName:  cpu.ModelName,
 			Mhz:        float32(cpu.Mhz),
 			CacheSize:  strconv.FormatInt(int64(cpu.CacheSize), 10),

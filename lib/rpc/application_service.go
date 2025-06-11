@@ -55,7 +55,7 @@ func (s *ApplicationService) getApplicationIfUserIsOwnerOrHasAccess(ctx context.
 }
 
 // List returns a list of applications
-func (s *ApplicationService) List(ctx context.Context, req *connect.Request[aquariumv2.ApplicationServiceListRequest]) (*connect.Response[aquariumv2.ApplicationServiceListResponse], error) {
+func (s *ApplicationService) List(ctx context.Context, _ /*req*/ *connect.Request[aquariumv2.ApplicationServiceListRequest]) (*connect.Response[aquariumv2.ApplicationServiceListResponse], error) {
 	out, err := s.fish.DB().ApplicationList()
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.ApplicationServiceListResponse{
@@ -90,7 +90,7 @@ func (s *ApplicationService) List(ctx context.Context, req *connect.Request[aqua
 
 // Get returns an application by UID
 func (s *ApplicationService) Get(ctx context.Context, req *connect.Request[aquariumv2.ApplicationServiceGetRequest]) (*connect.Response[aquariumv2.ApplicationServiceGetResponse], error) {
-	app, err := s.getApplicationIfUserIsOwnerOrHasAccess(ctx, req.Msg.Uid, auth.ApplicationServiceGetAll)
+	app, err := s.getApplicationIfUserIsOwnerOrHasAccess(ctx, req.Msg.GetUid(), auth.ApplicationServiceGetAll)
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.ApplicationServiceGetResponse{
 			Status: false, Message: err.Error(),
@@ -106,7 +106,7 @@ func (s *ApplicationService) Get(ctx context.Context, req *connect.Request[aquar
 // Create creates a new application
 func (s *ApplicationService) Create(ctx context.Context, req *connect.Request[aquariumv2.ApplicationServiceCreateRequest]) (*connect.Response[aquariumv2.ApplicationServiceCreateResponse], error) {
 	// Convert proto application to internal type
-	app, err := converters.ConvertApplicationNewFromProto(req.Msg.Application)
+	app, err := converters.ConvertApplicationNewFromProto(req.Msg.GetApplication())
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.ApplicationServiceCreateResponse{
 			Status: false, Message: "Invalid application data: " + err.Error(),
@@ -132,7 +132,7 @@ func (s *ApplicationService) Create(ctx context.Context, req *connect.Request[aq
 
 // GetState returns the state of an application
 func (s *ApplicationService) GetState(ctx context.Context, req *connect.Request[aquariumv2.ApplicationServiceGetStateRequest]) (*connect.Response[aquariumv2.ApplicationServiceGetStateResponse], error) {
-	app, err := s.getApplicationIfUserIsOwnerOrHasAccess(ctx, req.Msg.Uid, auth.ApplicationServiceGetStateAll)
+	app, err := s.getApplicationIfUserIsOwnerOrHasAccess(ctx, req.Msg.GetUid(), auth.ApplicationServiceGetStateAll)
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.ApplicationServiceGetStateResponse{
 			Status: false, Message: err.Error(),
@@ -154,7 +154,7 @@ func (s *ApplicationService) GetState(ctx context.Context, req *connect.Request[
 
 // GetResource returns the resource of an application
 func (s *ApplicationService) GetResource(ctx context.Context, req *connect.Request[aquariumv2.ApplicationServiceGetResourceRequest]) (*connect.Response[aquariumv2.ApplicationServiceGetResourceResponse], error) {
-	app, err := s.getApplicationIfUserIsOwnerOrHasAccess(ctx, req.Msg.Uid, auth.ApplicationServiceGetResourceAll)
+	app, err := s.getApplicationIfUserIsOwnerOrHasAccess(ctx, req.Msg.GetUid(), auth.ApplicationServiceGetResourceAll)
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.ApplicationServiceGetResourceResponse{
 			Status: false, Message: err.Error(),
@@ -176,7 +176,7 @@ func (s *ApplicationService) GetResource(ctx context.Context, req *connect.Reque
 
 // ListTask returns the list of tasks for an application
 func (s *ApplicationService) ListTask(ctx context.Context, req *connect.Request[aquariumv2.ApplicationServiceListTaskRequest]) (*connect.Response[aquariumv2.ApplicationServiceListTaskResponse], error) {
-	app, err := s.getApplicationIfUserIsOwnerOrHasAccess(ctx, req.Msg.Uid, auth.ApplicationServiceListTaskAll)
+	app, err := s.getApplicationIfUserIsOwnerOrHasAccess(ctx, req.Msg.GetUid(), auth.ApplicationServiceListTaskAll)
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.ApplicationServiceListTaskResponse{
 			Status: false, Message: err.Error(),
@@ -204,14 +204,14 @@ func (s *ApplicationService) ListTask(ctx context.Context, req *connect.Request[
 
 // CreateTask creates a new task for an application
 func (s *ApplicationService) CreateTask(ctx context.Context, req *connect.Request[aquariumv2.ApplicationServiceCreateTaskRequest]) (*connect.Response[aquariumv2.ApplicationServiceCreateTaskResponse], error) {
-	app, err := s.getApplicationIfUserIsOwnerOrHasAccess(ctx, req.Msg.Uid, "")
+	app, err := s.getApplicationIfUserIsOwnerOrHasAccess(ctx, req.Msg.GetUid(), "")
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.ApplicationServiceCreateTaskResponse{
 			Status: false, Message: err.Error(),
 		}), err
 	}
 
-	task, err := converters.ConvertApplicationTaskFromProto(req.Msg.Task)
+	task, err := converters.ConvertApplicationTaskFromProto(req.Msg.GetTask())
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.ApplicationServiceCreateTaskResponse{
 			Status: false, Message: "Invalid task data: " + err.Error(),
@@ -235,7 +235,7 @@ func (s *ApplicationService) CreateTask(ctx context.Context, req *connect.Reques
 
 // GetTask returns a specific task for an application
 func (s *ApplicationService) GetTask(ctx context.Context, req *connect.Request[aquariumv2.ApplicationServiceGetTaskRequest]) (*connect.Response[aquariumv2.ApplicationServiceGetTaskResponse], error) {
-	taskUID, err1 := converters.StringToApplicationTaskUID(req.Msg.TaskUid)
+	taskUID, err1 := converters.StringToApplicationTaskUID(req.Msg.GetTaskUid())
 
 	var task *types.ApplicationTask
 	var err2 error
@@ -279,7 +279,7 @@ func (s *ApplicationService) GetTask(ctx context.Context, req *connect.Request[a
 
 // Deallocate deallocates an application
 func (s *ApplicationService) Deallocate(ctx context.Context, req *connect.Request[aquariumv2.ApplicationServiceDeallocateRequest]) (*connect.Response[aquariumv2.ApplicationServiceDeallocateResponse], error) {
-	app, err := s.getApplicationIfUserIsOwnerOrHasAccess(ctx, req.Msg.Uid, auth.ApplicationServiceDeallocateAll)
+	app, err := s.getApplicationIfUserIsOwnerOrHasAccess(ctx, req.Msg.GetUid(), auth.ApplicationServiceDeallocateAll)
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.ApplicationServiceDeallocateResponse{
 			Status: false, Message: err.Error(),

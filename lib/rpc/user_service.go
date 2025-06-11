@@ -30,7 +30,7 @@ type UserService struct {
 }
 
 // GetMe implements the GetMe RPC
-func (s *UserService) GetMe(ctx context.Context, req *connect.Request[aquariumv2.UserServiceGetMeRequest]) (*connect.Response[aquariumv2.UserServiceGetMeResponse], error) {
+func (*UserService) GetMe(ctx context.Context, _ /*req*/ *connect.Request[aquariumv2.UserServiceGetMeRequest]) (*connect.Response[aquariumv2.UserServiceGetMeResponse], error) {
 	user := GetUserFromContext(ctx)
 	if user == nil {
 		return connect.NewResponse(&aquariumv2.UserServiceGetMeResponse{
@@ -50,7 +50,7 @@ func (s *UserService) GetMe(ctx context.Context, req *connect.Request[aquariumv2
 }
 
 // List implements the List RPC
-func (s *UserService) List(ctx context.Context, req *connect.Request[aquariumv2.UserServiceListRequest]) (*connect.Response[aquariumv2.UserServiceListResponse], error) {
+func (s *UserService) List(_ /*ctx*/ context.Context, _ /*req*/ *connect.Request[aquariumv2.UserServiceListRequest]) (*connect.Response[aquariumv2.UserServiceListResponse], error) {
 	users, err := s.fish.DB().UserList()
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceListResponse{
@@ -76,8 +76,8 @@ func (s *UserService) List(ctx context.Context, req *connect.Request[aquariumv2.
 }
 
 // Get implements the Get RPC
-func (s *UserService) Get(ctx context.Context, req *connect.Request[aquariumv2.UserServiceGetRequest]) (*connect.Response[aquariumv2.UserServiceGetResponse], error) {
-	user, err := s.fish.DB().UserGet(req.Msg.Name)
+func (s *UserService) Get(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.UserServiceGetRequest]) (*connect.Response[aquariumv2.UserServiceGetResponse], error) {
+	user, err := s.fish.DB().UserGet(req.Msg.GetName())
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceGetResponse{
 			Status: false, Message: "User not found: " + err.Error(),
@@ -96,7 +96,7 @@ func (s *UserService) Get(ctx context.Context, req *connect.Request[aquariumv2.U
 }
 
 // Create implements the Create RPC
-func (s *UserService) Create(ctx context.Context, req *connect.Request[aquariumv2.UserServiceCreateRequest]) (*connect.Response[aquariumv2.UserServiceCreateResponse], error) {
+func (s *UserService) Create(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.UserServiceCreateRequest]) (*connect.Response[aquariumv2.UserServiceCreateResponse], error) {
 	password := req.Msg.GetPassword()
 	if password == "" {
 		// Generate random password if not provided
@@ -104,7 +104,7 @@ func (s *UserService) Create(ctx context.Context, req *connect.Request[aquariumv
 	}
 
 	// Create new user
-	password, user, err := s.fish.DB().UserNew(req.Msg.Name, password)
+	password, user, err := s.fish.DB().UserNew(req.Msg.GetName(), password)
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceCreateResponse{
 			Status: false, Message: "Failed to create user: " + err.Error(),
@@ -124,8 +124,8 @@ func (s *UserService) Create(ctx context.Context, req *connect.Request[aquariumv
 }
 
 // Update implements the Update RPC
-func (s *UserService) Update(ctx context.Context, req *connect.Request[aquariumv2.UserServiceUpdateRequest]) (*connect.Response[aquariumv2.UserServiceUpdateResponse], error) {
-	user, err := s.fish.DB().UserGet(req.Msg.Name)
+func (s *UserService) Update(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.UserServiceUpdateRequest]) (*connect.Response[aquariumv2.UserServiceUpdateResponse], error) {
+	user, err := s.fish.DB().UserGet(req.Msg.GetName())
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceUpdateResponse{
 			Status: false, Message: "User not found: " + err.Error(),
@@ -137,7 +137,7 @@ func (s *UserService) Update(ctx context.Context, req *connect.Request[aquariumv
 		user.Hash = GeneratePasswordHash(password)
 	}
 
-	user.Roles = req.Msg.Roles
+	user.Roles = req.Msg.GetRoles()
 	if err := s.fish.DB().UserSave(user); err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceUpdateResponse{
 			Status: false, Message: "Failed to update user: " + err.Error(),
@@ -157,8 +157,8 @@ func (s *UserService) Update(ctx context.Context, req *connect.Request[aquariumv
 }
 
 // Delete implements the Delete RPC
-func (s *UserService) Delete(ctx context.Context, req *connect.Request[aquariumv2.UserServiceDeleteRequest]) (*connect.Response[aquariumv2.UserServiceDeleteResponse], error) {
-	if err := s.fish.DB().UserDelete(req.Msg.Name); err != nil {
+func (s *UserService) Delete(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.UserServiceDeleteRequest]) (*connect.Response[aquariumv2.UserServiceDeleteResponse], error) {
+	if err := s.fish.DB().UserDelete(req.Msg.GetName()); err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceDeleteResponse{
 			Status: false, Message: "Failed to delete user: " + err.Error(),
 		}), connect.NewError(connect.CodeNotFound, err)
@@ -170,15 +170,15 @@ func (s *UserService) Delete(ctx context.Context, req *connect.Request[aquariumv
 }
 
 // AssignRoles implements the AssignRoles RPC
-func (s *UserService) AssignRoles(ctx context.Context, req *connect.Request[aquariumv2.UserServiceAssignRolesRequest]) (*connect.Response[aquariumv2.UserServiceAssignRolesResponse], error) {
-	user, err := s.fish.DB().UserGet(req.Msg.Name)
+func (s *UserService) AssignRoles(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.UserServiceAssignRolesRequest]) (*connect.Response[aquariumv2.UserServiceAssignRolesResponse], error) {
+	user, err := s.fish.DB().UserGet(req.Msg.GetName())
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceAssignRolesResponse{
 			Status: false, Message: "User not found: " + err.Error(),
 		}), connect.NewError(connect.CodeNotFound, err)
 	}
 
-	user.Roles = req.Msg.Roles
+	user.Roles = req.Msg.GetRoles()
 	if err := s.fish.DB().UserSave(user); err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceAssignRolesResponse{
 			Status: false, Message: "Failed to assign roles: " + err.Error(),

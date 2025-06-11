@@ -22,16 +22,16 @@ import (
 	"connectrpc.com/connect"
 )
 
-// ConnectClientType represents the type of ConnectRPC client to create
-type ConnectClientType int
+// RPCClientType represents the type of ConnectRPC client to create
+type RPCClientType int
 
 const (
-	// ConnectClientREST creates a REST-like client using HTTP GET
-	ConnectClientREST ConnectClientType = iota
-	// ConnectClientGRPC creates a gRPC client
-	ConnectClientGRPC
-	// ConnectClientGRPCWeb creates a gRPC-Web client
-	ConnectClientGRPCWeb
+	// RPCClientREST creates a REST-like client using HTTP GET
+	RPCClientREST RPCClientType = iota
+	// RPCClientGRPC creates a gRPC client
+	RPCClientGRPC
+	// RPCClientGRPCWeb creates a gRPC-Web client
+	RPCClientGRPCWeb
 )
 
 // basicAuth returns the base64 encoded string of username:password
@@ -40,12 +40,12 @@ func basicAuth(username, password string) string {
 	return base64.StdEncoding.EncodeToString([]byte(auth))
 }
 
-// NewConnectClient creates a new HTTP client and returns it along with the appropriate connect options
+// NewRPCClient creates a new HTTP client and returns it along with the appropriate connect options
 // for the specified client type and authentication credentials.
-func NewConnectClient(username, password string, clientType ConnectClientType) (*http.Client, []connect.ClientOption) {
+func NewRPCClient(username, password string, clientType RPCClientType) (*http.Client, []connect.ClientOption) {
 	// Create transport with TLS config
 	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // G402 - used in tests, so not big deal
 	}
 
 	// Create HTTP client
@@ -68,11 +68,11 @@ func NewConnectClient(username, password string, clientType ConnectClientType) (
 
 	// Add client type specific options
 	switch clientType {
-	case ConnectClientREST:
+	case RPCClientREST:
 		baseOptions = append(baseOptions, connect.WithHTTPGet())
-	case ConnectClientGRPC:
+	case RPCClientGRPC:
 		baseOptions = append(baseOptions, connect.WithGRPC())
-	case ConnectClientGRPCWeb:
+	case RPCClientGRPCWeb:
 		baseOptions = append(baseOptions, connect.WithGRPCWeb())
 	}
 

@@ -20,6 +20,7 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
+	"github.com/adobe/aquarium-fish/lib/auth"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2/aquariumv2connect"
@@ -40,7 +41,7 @@ func NewServer(f *fish.Fish) *Server {
 
 	// Create interceptors
 	authInterceptor := NewAuthInterceptor(f)
-	rbacInterceptor := NewRBACInterceptor(f.GetEnforcer())
+	rbacInterceptor := NewRBACInterceptor(auth.GetEnforcer())
 
 	// Common interceptor options
 	interceptors := connect.WithInterceptors(authInterceptor, rbacInterceptor)
@@ -90,13 +91,13 @@ func (s *Server) ListenAndServe(addr string, certFile, keyFile string) error {
 	handler := s.Handler()
 
 	if certFile != "" && keyFile != "" {
-		return http.ListenAndServeTLS(addr, certFile, keyFile, handler)
+		return http.ListenAndServeTLS(addr, certFile, keyFile, handler) //nolint:gosec // G114 - We don't need timeouts here
 	}
-	return http.ListenAndServe(addr, handler)
+	return http.ListenAndServe(addr, handler) //nolint:gosec // G114 - We don't need timeouts here
 }
 
 // Shutdown gracefully shuts down the server
-func (s *Server) Shutdown(ctx context.Context) error {
+func (*Server) Shutdown(_ /*ctx*/ context.Context) error {
 	// TODO: Implement graceful shutdown
 	return nil
 }

@@ -299,7 +299,6 @@ func (f *Fish) initDefaultRoles() error {
 				return log.Errorf("Fish: Failed to add %q role permission %v: %v", role, p, err)
 			}
 		}
-
 	}
 
 	return nil
@@ -683,9 +682,4 @@ func (f *Fish) activateShutdown() {
 		// Sending signal since no need to wait for the apps
 		waitApps <- true
 	}
-}
-
-// GetEnforcer returns the auth enforcer instance
-func (f *Fish) GetEnforcer() *auth.Enforcer {
-	return auth.GetEnforcer()
 }

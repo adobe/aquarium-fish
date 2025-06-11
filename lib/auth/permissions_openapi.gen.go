@@ -33,7 +33,13 @@ const (
 	ApplicationTaskServiceGet    = "Get"
 	ApplicationTaskServiceGetAll = "GetAll"
 
+	// ClusterService service constants
+	ClusterService = "ClusterService"
+
 	// LabelService service constants
+
+	// MetaDataService service constants
+	MetaDataService = "MetaDataService"
 
 	// NodeService service constants
 

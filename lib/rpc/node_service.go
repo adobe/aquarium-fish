@@ -29,7 +29,7 @@ type NodeService struct {
 }
 
 // List returns a list of nodes
-func (s *NodeService) List(ctx context.Context, req *connect.Request[aquariumv2.NodeServiceListRequest]) (*connect.Response[aquariumv2.NodeServiceListResponse], error) {
+func (s *NodeService) List(_ /*ctx*/ context.Context, _ /*req*/ *connect.Request[aquariumv2.NodeServiceListRequest]) (*connect.Response[aquariumv2.NodeServiceListResponse], error) {
 	out, err := s.fish.DB().NodeList()
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.NodeServiceListResponse{
@@ -50,7 +50,7 @@ func (s *NodeService) List(ctx context.Context, req *connect.Request[aquariumv2.
 }
 
 // GetThis returns information about this node
-func (s *NodeService) GetThis(ctx context.Context, req *connect.Request[aquariumv2.NodeServiceGetThisRequest]) (*connect.Response[aquariumv2.NodeServiceGetThisResponse], error) {
+func (s *NodeService) GetThis(_ /*ctx*/ context.Context, _ /*req*/ *connect.Request[aquariumv2.NodeServiceGetThisRequest]) (*connect.Response[aquariumv2.NodeServiceGetThisResponse], error) {
 	node := s.fish.DB().GetNode()
 	if node == nil {
 		return connect.NewResponse(&aquariumv2.NodeServiceGetThisResponse{
@@ -65,17 +65,17 @@ func (s *NodeService) GetThis(ctx context.Context, req *connect.Request[aquarium
 }
 
 // SetMaintenance sets maintenance mode for this node
-func (s *NodeService) SetMaintenance(ctx context.Context, req *connect.Request[aquariumv2.NodeServiceSetMaintenanceRequest]) (*connect.Response[aquariumv2.NodeServiceSetMaintenanceResponse], error) {
+func (s *NodeService) SetMaintenance(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.NodeServiceSetMaintenanceRequest]) (*connect.Response[aquariumv2.NodeServiceSetMaintenanceResponse], error) {
 	// Set maintenance mode
-	s.fish.MaintenanceSet(req.Msg.Maintenance)
+	s.fish.MaintenanceSet(req.Msg.GetMaintenance())
 
 	return connect.NewResponse(&aquariumv2.NodeServiceSetMaintenanceResponse{
-		Status: true, Message: fmt.Sprintf("Maintenance mode %s", map[bool]string{true: "enabled", false: "disabled"}[req.Msg.Maintenance]),
+		Status: true, Message: fmt.Sprintf("Maintenance mode %s", map[bool]string{true: "enabled", false: "disabled"}[req.Msg.GetMaintenance()]),
 	}), nil
 }
 
 // GetProfiling returns profiling data
-func (s *NodeService) GetProfiling(ctx context.Context, req *connect.Request[aquariumv2.NodeServiceGetProfilingRequest]) (*connect.Response[aquariumv2.NodeServiceGetProfilingResponse], error) {
+func (*NodeService) GetProfiling(_ /*ctx*/ context.Context, _ /*req*/ *connect.Request[aquariumv2.NodeServiceGetProfilingRequest]) (*connect.Response[aquariumv2.NodeServiceGetProfilingResponse], error) {
 	// TODO: Implement profiling data collection
 	// This will require setting up a custom pprof handler to capture the data
 	// For now, return a placeholder response

@@ -29,7 +29,7 @@ type LabelService struct {
 }
 
 // List returns a list of labels
-func (s *LabelService) List(ctx context.Context, req *connect.Request[aquariumv2.LabelServiceListRequest]) (*connect.Response[aquariumv2.LabelServiceListResponse], error) {
+func (s *LabelService) List(_ /*ctx*/ context.Context, _ /*req*/ *connect.Request[aquariumv2.LabelServiceListRequest]) (*connect.Response[aquariumv2.LabelServiceListResponse], error) {
 	// Get labels from database
 	params := types.LabelListGetParams{}
 	out, err := s.fish.DB().LabelList(params)
@@ -52,9 +52,9 @@ func (s *LabelService) List(ctx context.Context, req *connect.Request[aquariumv2
 }
 
 // Get returns a label by name
-func (s *LabelService) Get(ctx context.Context, req *connect.Request[aquariumv2.LabelServiceGetRequest]) (*connect.Response[aquariumv2.LabelServiceGetResponse], error) {
+func (s *LabelService) Get(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.LabelServiceGetRequest]) (*connect.Response[aquariumv2.LabelServiceGetResponse], error) {
 	// Get labels with the specified name
-	labels, err := s.fish.DB().LabelListName(req.Msg.Name)
+	labels, err := s.fish.DB().LabelListName(req.Msg.GetName())
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.LabelServiceGetResponse{
 			Status: false, Message: "Unable to get the label: " + err.Error(),
@@ -82,8 +82,8 @@ func (s *LabelService) Get(ctx context.Context, req *connect.Request[aquariumv2.
 }
 
 // Create creates a new label
-func (s *LabelService) Create(ctx context.Context, req *connect.Request[aquariumv2.LabelServiceCreateRequest]) (*connect.Response[aquariumv2.LabelServiceCreateResponse], error) {
-	label, err := converters.ConvertLabelNewFromProto(req.Msg.Label)
+func (s *LabelService) Create(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.LabelServiceCreateRequest]) (*connect.Response[aquariumv2.LabelServiceCreateResponse], error) {
+	label, err := converters.ConvertLabelNewFromProto(req.Msg.GetLabel())
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.LabelServiceCreateResponse{
 			Status: false, Message: "Invalid label data: " + err.Error(),
@@ -103,9 +103,9 @@ func (s *LabelService) Create(ctx context.Context, req *connect.Request[aquarium
 }
 
 // Delete deletes a label
-func (s *LabelService) Delete(ctx context.Context, req *connect.Request[aquariumv2.LabelServiceDeleteRequest]) (*connect.Response[aquariumv2.LabelServiceDeleteResponse], error) {
+func (s *LabelService) Delete(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.LabelServiceDeleteRequest]) (*connect.Response[aquariumv2.LabelServiceDeleteResponse], error) {
 	// Get labels with the specified name
-	labels, err := s.fish.DB().LabelListName(req.Msg.Name)
+	labels, err := s.fish.DB().LabelListName(req.Msg.GetName())
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.LabelServiceDeleteResponse{
 			Status: false, Message: "Unable to get the label: " + err.Error(),

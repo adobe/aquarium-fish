@@ -29,7 +29,7 @@ func StringToApplicationUID(s string) (types.ApplicationUID, error) {
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("invalid ApplicationUID: %w", err)
 	}
-	return types.ApplicationUID(uid), nil
+	return uid, nil
 }
 
 // StringToLabelUID converts a string to LabelUID
@@ -38,7 +38,7 @@ func StringToLabelUID(s string) (types.LabelUID, error) {
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("invalid LabelUID: %w", err)
 	}
-	return types.LabelUID(uid), nil
+	return uid, nil
 }
 
 // StringToNodeUID converts a string to NodeUID
@@ -47,7 +47,7 @@ func StringToNodeUID(s string) (types.NodeUID, error) {
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("invalid NodeUID: %w", err)
 	}
-	return types.NodeUID(uid), nil
+	return uid, nil
 }
 
 // StringToApplicationTaskUID converts a string to ApplicationTaskUID
@@ -56,7 +56,7 @@ func StringToApplicationTaskUID(s string) (types.ApplicationTaskUID, error) {
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("invalid ApplicationTaskUID: %w", err)
 	}
-	return types.ApplicationTaskUID(uid), nil
+	return uid, nil
 }
 
 // UnparsedJSONToStruct converts UnparsedJSON to structpb.Struct
@@ -65,7 +65,7 @@ func UnparsedJSONToStruct(j util.UnparsedJSON) (*structpb.Struct, error) {
 		return &structpb.Struct{}, nil
 	}
 
-	var data map[string]interface{}
+	var data map[string]any
 	if err := json.Unmarshal([]byte(j), &data); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal UnparsedJSON: %w", err)
 	}

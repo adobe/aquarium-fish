@@ -27,6 +27,7 @@ import (
 	"os"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
@@ -117,6 +118,9 @@ func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*http.Ser
 			ClientAuth: tls.RequestClientCert, // Need for the client certificate auth
 			ClientCAs:  caPool,                // Verify client certificate with the cluster CA
 		},
+
+		// Security settings
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 
 	errChan := make(chan error)
