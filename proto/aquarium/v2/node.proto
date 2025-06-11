@@ -1,0 +1,140 @@
+// Copyright 2025 Adobe. All rights reserved.
+// This file is licensed to you under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may obtain a copy
+// of the License at http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software distributed under
+// the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR REPRESENTATIONS
+// OF ANY KIND, either express or implied. See the License for the specific language
+// governing permissions and limitations under the License.
+
+syntax = "proto3";
+
+package aquarium.v2;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2;aquariumv2";
+
+// NodeService handles node management operations
+service NodeService {
+  // Get list of nodes
+  rpc List(NodeServiceListRequest) returns (NodeServiceListResponse) {}
+  
+  // Get this node information
+  rpc GetThis(NodeServiceGetThisRequest) returns (NodeServiceGetThisResponse) {}
+  
+  // Set maintenance mode
+  rpc SetMaintenance(NodeServiceSetMaintenanceRequest) returns (NodeServiceSetMaintenanceResponse) {}
+  
+  // Get profiling data
+  rpc GetProfiling(NodeServiceGetProfilingRequest) returns (NodeServiceGetProfilingResponse) {}
+}
+
+// Node represents a node in the system
+message Node {
+  string uid = 1;
+  google.protobuf.Timestamp created_at = 2;
+  google.protobuf.Timestamp updated_at = 3;
+  string name = 4;
+  NodeDefinition definition = 5;
+  string location = 6;
+  string address = 7;
+  bytes pubkey = 8;
+  bool maintenance = 9;
+  map<string, string> metadata = 10;
+}
+
+// NodeDefinition contains technical information about the node
+message NodeDefinition {
+  HostInfo host = 1;
+  MemoryInfo memory = 2;
+  repeated CpuInfo cpu = 3;
+  map<string, DiskUsage> disks = 4;
+  repeated NetworkInterface nets = 5;
+}
+
+// HostInfo represents host system information
+message HostInfo {
+  string hostname = 1;
+  string os = 2;
+  string platform = 3;
+  string platform_family = 4;
+  string platform_version = 5;
+  string kernel_version = 6;
+  string kernel_arch = 7;
+}
+
+// MemoryInfo represents memory statistics
+message MemoryInfo {
+  uint64 total = 1;
+  uint64 available = 2;
+  uint64 used = 3;
+  float used_percent = 4;
+}
+
+// CpuInfo represents CPU information
+message CpuInfo {
+  string cpu = 1;
+  string vendor_id = 2;
+  string family = 3;
+  string model = 4;
+  string stepping = 5;
+  string physical_id = 6;
+  string core_id = 7;
+  int32 cores = 8;
+  string model_name = 9;
+  float mhz = 10;
+  string cache_size = 11;
+  string microcode = 12;
+}
+
+// DiskUsage represents disk usage statistics
+message DiskUsage {
+  string path = 1;
+  string fstype = 2;
+  uint64 total = 3;
+  uint64 free = 4;
+  uint64 used = 5;
+  float used_percent = 6;
+}
+
+// NetworkInterface represents network interface information
+message NetworkInterface {
+  string name = 1;
+  repeated string addrs = 2;
+  repeated string flags = 3;
+}
+
+message NodeServiceListRequest {}
+
+message NodeServiceListResponse {
+  bool status = 1;
+  string message = 2;
+  repeated Node data = 3;
+}
+
+message NodeServiceGetThisRequest {}
+
+message NodeServiceGetThisResponse {
+  bool status = 1;
+  string message = 2;
+  Node data = 3;
+}
+
+message NodeServiceSetMaintenanceRequest {
+  bool maintenance = 1;
+}
+
+message NodeServiceSetMaintenanceResponse {
+  bool status = 1;
+  string message = 2;
+}
+
+message NodeServiceGetProfilingRequest {}
+
+message NodeServiceGetProfilingResponse {
+  bool status = 1;
+  string message = 2;
+  map<string, string> data = 3;
+} 

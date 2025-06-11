@@ -10,18 +10,8 @@
  * governing permissions and limitations under the License.
  */
 
-package types
+package auth
 
-// Objects list
 const (
-	ObjectApplication         = "application"
-	ObjectApplicationResource = "application_resource"
-	ObjectApplicationState    = "application_state"
-	ObjectApplicationTask     = "application_task"
-	ObjectLabel               = "label"
-	ObjectNode                = "node"
-	ObjectVote                = "vote"
-
-	ObjectUser = "user"
-	ObjectRole = "role"
+	AdminRoleName = "Administrator"
 )

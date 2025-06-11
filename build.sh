@@ -21,18 +21,35 @@ cd "${root_dir}"
 export CGO_ENABLED=0
 
 echo "--- GENERATE CODE FOR AQUARIUM-FISH ---"
-# Install oapi-codegen if it's not available or version is not the same with go.mod
+
+# Install required tools if not available
 gopath=$(go env GOPATH)
+export PATH="$PATH:$gopath/bin" 
+
+# Install buf for protobuf management if not available
+if ! command -v buf >/dev/null 2>&1; then
+    go install github.com/bufbuild/buf/cmd/buf@v1.54.0
+fi
+
+if ! command -v protoc-gen-go >/dev/null 2>&1; then
+    # Version is from go.mod
+    go install google.golang.org/protobuf/cmd/protoc-gen-go
+fi
+
+if ! command -v protoc-gen-connect-go >/dev/null 2>&1; then
+    # Version is from go.mod
+    go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.18.1
+fi
+
+# Install oapi-codegen if it's not available or version is not the same with go.mod
 req_ver=$(grep -F 'github.com/oapi-codegen/oapi-codegen/v2' go.mod | cut -d' ' -f 2)
-curr_ver="$(PATH="$gopath/bin:$PATH" oapi-codegen --version 2>/dev/null | tail -1 || true)"
+curr_ver="$(oapi-codegen --version 2>/dev/null | tail -1 || true)"
 if [ "$curr_ver" != "$req_ver" ]; then
     go install "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@$req_ver"
 fi
-# Cleanup the old generated files
-find ./lib -name '*.gen.go' -delete
 
 # Run code generation
-PATH="$gopath/bin:$PATH" go generate -v ./lib/...
+go generate -v . ./lib/...
 
 # If ONLYGEN is specified - skip the build
 [ -z "$ONLYGEN" ] || exit 0
@@ -49,8 +66,6 @@ BINARY_NAME="aquarium-fish-$git_version"
 echo
 echo "--- RUN UNIT TESTS ---"
 # Unit tests should not consume more then 5 sec per run - for that we have integration tests
-# TODO: Need to add `-race` and coverage, but for now it can't be running properly on amd64 macbook pro...
-#go test -timeout=5s -ldflags="$version_flags" -v -cover -coverprofile=coverage.out -covermode=atomic -coverpkg=$(go list) -race ./lib/...
 go test -v -failfast -count=1 -timeout=5s -ldflags="$version_flags" -v ./lib/...
 
 echo
@@ -65,7 +80,6 @@ else
     os_list="$(go env GOOS)"
     arch_list="$(go env GOARCH)"
 fi
-
 
 # Run parallel builds but no more than limit (gox doesn't support all the os/archs we need)
 pwait() {

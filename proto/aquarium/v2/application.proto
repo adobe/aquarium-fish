@@ -1,0 +1,221 @@
+// Copyright 2025 Adobe. All rights reserved.
+// This file is licensed to you under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may obtain a copy
+// of the License at http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software distributed under
+// the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR REPRESENTATIONS
+// OF ANY KIND, either express or implied. See the License for the specific language
+// governing permissions and limitations under the License.
+
+syntax = "proto3";
+
+package aquarium.v2;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+import "aquarium/v2/common.proto";
+import "aquarium/v2/rbac.proto";
+
+option go_package = "github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2;aquariumv2";
+
+// ApplicationService handles application management operations
+service ApplicationService {
+  // Get list of applications
+  rpc List(ApplicationServiceListRequest) returns (ApplicationServiceListResponse) {
+   option (access_control) = {
+     allowed_roles: ["User"]
+   };
+  }
+  
+  // Get application by UID
+  rpc Get(ApplicationServiceGetRequest) returns (ApplicationServiceGetResponse) {
+   option (access_control) = {
+     allowed_roles: ["User"]
+   };
+  }
+  
+  // Create new application
+  rpc Create(ApplicationServiceCreateRequest) returns (ApplicationServiceCreateResponse) {
+   option (access_control) = {
+     allowed_roles: ["User"]
+   };
+  }
+  
+  // Get application state
+  rpc GetState(ApplicationServiceGetStateRequest) returns (ApplicationServiceGetStateResponse) {
+   option (access_control) = {
+     allowed_roles: ["User"]
+   };
+  }
+  
+  // Get application resource
+  rpc GetResource(ApplicationServiceGetResourceRequest) returns (ApplicationServiceGetResourceResponse) {
+   option (access_control) = {
+     allowed_roles: ["User"]
+   };
+  }
+  
+  // List application tasks
+  rpc ListTask(ApplicationServiceListTaskRequest) returns (ApplicationServiceListTaskResponse) {
+   option (access_control) = {
+     allowed_roles: ["Power"]
+   };
+  }
+  
+  // Create application task
+  rpc CreateTask(ApplicationServiceCreateTaskRequest) returns (ApplicationServiceCreateTaskResponse) {
+   option (access_control) = {
+     allowed_roles: ["Power"]
+   };
+  }
+  
+  // Get application task
+  rpc GetTask(ApplicationServiceGetTaskRequest) returns (ApplicationServiceGetTaskResponse) {
+   option (access_control) = {
+     allowed_roles: ["Power"]
+   };
+  }
+  
+  // Deallocate application
+  rpc Deallocate(ApplicationServiceDeallocateRequest) returns (ApplicationServiceDeallocateResponse) {
+   option (access_control) = {
+     allowed_roles: ["User"]
+   };
+  }
+}
+
+// Application represents an allocation request
+message Application {
+  string uid = 1;
+  google.protobuf.Timestamp created_at = 2;
+  string owner_name = 3;
+  string label_uid = 4;
+  google.protobuf.Struct metadata = 5;
+}
+
+// ApplicationState represents the current state of an application
+message ApplicationState {
+  string uid = 1;
+  google.protobuf.Timestamp created_at = 2;
+  string application_uid = 3;
+  string status = 4;
+  string description = 5;
+}
+
+// ApplicationResource represents a managed instance
+message ApplicationResource {
+  string uid = 1;
+  google.protobuf.Timestamp created_at = 2;
+  google.protobuf.Timestamp updated_at = 3;
+  string application_uid = 4;
+  string node_uid = 5;
+  string label_uid = 6;
+  int32 definition_index = 7;
+  string identifier = 8;
+  string ip_addr = 9;
+  string hw_addr = 10;
+  google.protobuf.Struct metadata = 11;
+  Authentication authentication = 12;
+  google.protobuf.Timestamp timeout = 13;
+}
+
+// ApplicationTask represents an async action on an application
+message ApplicationTask {
+  string uid = 1;
+  google.protobuf.Timestamp created_at = 2;
+  google.protobuf.Timestamp updated_at = 3;
+  string application_uid = 4;
+  string task = 5;
+  string when = 6;
+  google.protobuf.Struct options = 7;
+  google.protobuf.Struct result = 8;
+}
+
+message ApplicationServiceListRequest {}
+
+message ApplicationServiceListResponse {
+  bool status = 1;
+  string message = 2;
+  repeated Application data = 3;
+}
+
+message ApplicationServiceGetRequest {
+  string uid = 1;
+}
+
+message ApplicationServiceGetResponse {
+  bool status = 1;
+  string message = 2;
+  Application data = 3;
+}
+
+message ApplicationServiceCreateRequest {
+  Application application = 1;
+}
+
+message ApplicationServiceCreateResponse {
+  bool status = 1;
+  string message = 2;
+  Application data = 3;
+}
+
+message ApplicationServiceGetStateRequest {
+  string uid = 1;
+}
+
+message ApplicationServiceGetStateResponse {
+  bool status = 1;
+  string message = 2;
+  ApplicationState data = 3;
+}
+
+message ApplicationServiceGetResourceRequest {
+  string uid = 1;
+}
+
+message ApplicationServiceGetResourceResponse {
+  bool status = 1;
+  string message = 2;
+  ApplicationResource data = 3;
+}
+
+message ApplicationServiceListTaskRequest {
+  string uid = 1;
+}
+
+message ApplicationServiceListTaskResponse {
+  bool status = 1;
+  string message = 2;
+  repeated ApplicationTask data = 3;
+}
+
+message ApplicationServiceCreateTaskRequest {
+  string uid = 1;
+  ApplicationTask task = 2;
+}
+
+message ApplicationServiceCreateTaskResponse {
+  bool status = 1;
+  string message = 2;
+  ApplicationTask data = 3;
+}
+
+message ApplicationServiceGetTaskRequest {
+  string task_uid = 1;
+}
+
+message ApplicationServiceGetTaskResponse {
+  bool status = 1;
+  string message = 2;
+  ApplicationTask data = 3;
+}
+
+message ApplicationServiceDeallocateRequest {
+  string uid = 1;
+}
+
+message ApplicationServiceDeallocateResponse {
+  bool status = 1;
+  string message = 2;
+} 

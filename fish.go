@@ -13,6 +13,9 @@
 // Starting point for fish cmd
 package main
 
+// Generating everything from protobuf specs for RPC interface and OpenAPI specs for REST interface
+//go:generate buf generate
+
 import (
 	"context"
 	"os"

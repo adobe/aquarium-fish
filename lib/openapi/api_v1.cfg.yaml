@@ -2,10 +2,15 @@
 package: api
 output: api/server_v1.gen.go
 output-options:
+  user-templates:
+    echo/echo-interface.tmpl: ./custom-echo-interface-rbac.tmpl
+    echo/echo-wrappers.tmpl: ./custom-echo-wrappers-rbac.tmpl
   include-tags:
     - Application
+    - ApplicationState
     - ApplicationResource
     - ApplicationResourceAccess
+    - ApplicationTask
     - Label
     - Location
     - Node
@@ -18,3 +23,5 @@ generate:
 additional-imports:
   - alias: .
     package: github.com/adobe/aquarium-fish/lib/openapi/types
+  - alias: auth
+    package: github.com/adobe/aquarium-fish/lib/auth

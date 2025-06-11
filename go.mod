@@ -5,6 +5,7 @@ go 1.23.0
 toolchain go1.23.1
 
 require (
+	connectrpc.com/connect v1.18.1
 	github.com/alessio/shellescape v1.4.1
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/aws/aws-sdk-go-v2 v1.27.2
@@ -32,7 +33,8 @@ require (
 	github.com/ulikunitz/xz v0.5.11
 	go.mills.io/bitcask/v2 v2.1.3
 	golang.org/x/crypto v0.26.0
-	golang.org/x/net v0.21.0
+	golang.org/x/net v0.23.0
+	google.golang.org/protobuf v1.36.6
 	gopkg.in/yaml.v3 v3.0.1
 )
 

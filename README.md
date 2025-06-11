@@ -172,7 +172,8 @@ configuration. In this example, Labels created will need to specify either `driv
 The cluster supports the internal SQL database, which provides a common storage for the node &
 cluster data. The current schema could be found in OpenAPI format here:
  * When the Fish app is running locally: https://0.0.0.0:8001/api/
- * YAML OpenAPI specification: https://github.com/adobe/aquarium-fish/blob/main/docs/openapi.yaml
+ * API v1 OpenAPI specification: https://github.com/adobe/aquarium-fish/blob/main/docs/openapi.yaml
+ * API v2 gRPC specifications: https://github.com/adobe/aquarium-fish/blob/main/proto/
 
 ### How the cluster choose node for resource allocation
 

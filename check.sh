@@ -22,8 +22,31 @@ for f in `git ls-files`; do
     if file "$f" | grep -q 'text$'; then
         # Ends with newline as POSIX requires
         if [ -n "$(tail -c 1 "$f")" ]; then
-            echo "Not ends with newline: $f"
+            echo "ERROR: Should end with newline: $f"
             errors=$((${errors}+1))
+        fi
+
+        # Logic files: go, proto, sh
+        if echo "$f" | grep -q '\.\(go\|proto\|sh\)$'; then
+            if ! echo "$f" | fgrep -q '.gen.'; then
+                # Should contain copyright
+                if !(head -20 "$f" | grep -q 'Copyright 20.. Adobe. All rights reserved'); then
+                    echo "ERROR: Should contain Adobe copyright header: $f"
+                    errors=$((${errors}+1))
+                fi
+
+                # Should contain license
+                if !(head -20 "$f" | grep -q 'Apache License, Version 2.0'); then
+                    echo "ERROR: Should contain license name and version: $f"
+                    errors=$((${errors}+1))
+                fi
+
+                #  Should contain Author
+                #if !(head -20 "$f" | grep -q 'Author: .\+'); then
+                #    echo "ERROR: Should contain Author: $f"
+                #    errors=$((${errors}+1))
+                #fi
+            fi
         fi
     fi
 done
@@ -34,7 +57,7 @@ echo '---------------------- GoFmt verify ----------------------'
 echo
 reformat=$(gofmt -l -s . 2>&1)
 if [ "${reformat}" ]; then
-    echo "Please run 'gofmt -s -w .': \n${reformat}"
+    echo "ERROR: Please run 'gofmt -s -w .': \n${reformat}"
     errors=$((${errors}+$(echo "${reformat}" | wc -l)))
 fi
 
@@ -45,7 +68,7 @@ echo
 cp -af go.mod go.sum /tmp/
 tidy=$(go mod tidy -v)
 if [ "${tidy}" -o "x$(date -r /tmp/go.mod ; date -r /tmp/go.sum)" != "x$(date -r go.mod ; date -r go.sum)" ]; then
-    echo "Please run 'go mod tidy -v' \n${tidy}"
+    echo "ERROR: Please run 'go mod tidy -v' \n${tidy}"
     errors=$((${errors}+$(echo "${tidy}" | wc -l)))
 fi
 mv /tmp/go.mod /tmp/go.sum ./
@@ -56,8 +79,18 @@ echo '---------------------- GoVet verify ----------------------'
 echo
 vet=$(go vet ./... 2>&1)
 if [ "${vet}" ]; then
-    echo "Please fix the issues: \n${vet}"
+    echo "ERROR: Please fix the issues: \n${vet}"
     errors=$(( ${errors}+$(echo "${vet}" | wc -l) ))
+fi
+
+
+echo
+echo '---------------------- Proto verify ----------------------'
+echo
+buf=$(buf lint 2>&1)
+if [ "${buf}" ]; then
+    echo "ERROR: Please fix the issues: \n${buf}"
+    errors=$(( ${errors}+$(echo "${buf}" | wc -l) ))
 fi
 
 
