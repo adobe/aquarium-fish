@@ -112,9 +112,7 @@ jobs:
 
       - name: Unpack built binaries
         run: |
-          ls -alh
-          unzip binaries.zip
-          tar xf binaries/aquarium-fish*.linux_amd64.tar.xz
+          tar xf aquarium-fish*.linux_amd64.tar.xz
 
       - name: Set up Go
         uses: actions/setup-go@v5
