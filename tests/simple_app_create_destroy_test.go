@@ -67,7 +67,7 @@ drivers:
 		apitest.New().
 			EnableNetworking(cli).
 			Post(afi.APIAddress("api/v1/label/")).
-			JSON(`{"name":"test-label", "version":1, "definitions": [{"driver":"test", "resources":{"cpu":1,"ram":2}}]}`).
+			JSON(`{"name":"test-label", "version":1, "definitions": [{"driver":"test", "resources":{"cpu":1,"ram":2}}], "metadata":{"test1":"test2"}}}`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
@@ -84,7 +84,7 @@ drivers:
 		apitest.New().
 			EnableNetworking(cli).
 			Post(afi.APIAddress("api/v1/application/")).
-			JSON(`{"label_UID":"`+label.UID.String()+`"}`).
+			JSON(`{"label_UID":"`+label.UID.String()+`", "metadata":{"testk":"testv"}}`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
@@ -143,6 +143,29 @@ drivers:
 
 		if res.Identifier == "" {
 			t.Fatalf("Resource identifier is incorrect: %v", res.Identifier)
+		}
+	})
+
+	var metadata map[string]string
+	t.Run("Check metadata is available for the Application", func(t *testing.T) {
+		apitest.New().
+			EnableNetworking(cli).
+			Get(afi.APIAddress("meta/v1/data/")).
+			Expect(t).
+			Status(http.StatusOK).
+			End().
+			JSON(&metadata)
+
+		if len(metadata) != 2 {
+			t.Fatalf("Amount of metadata keys is incorrect: %d != 2, %v", len(metadata), metadata)
+		}
+
+		if val, ok := metadata["test1"]; !ok || val != "test2" {
+			t.Fatalf("Metadata key from label is unset: %v", metadata)
+		}
+
+		if val, ok := metadata["testk"]; !ok || val != "testv" {
+			t.Fatalf("Metadata key from application is unset: %v", metadata)
 		}
 	})
 
