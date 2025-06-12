@@ -10,6 +10,8 @@
  * governing permissions and limitations under the License.
  */
 
+// Author: Sergei Parshev (@sparshev)
+
 // Database management for the Fish node
 package database
 

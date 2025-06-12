@@ -8,6 +8,8 @@
 // OF ANY KIND, either express or implied. See the License for the specific language
 // governing permissions and limitations under the License.
 
+// Author: Sergei Parshev (@sparshev)
+
 // Contains options for rpc's to alter RBAC behavior
 // Example:
 // rpc GetMe(UserServiceGetMeRequest) returns (UserServiceGetMeResponse) {

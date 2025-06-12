@@ -10,6 +10,8 @@
  * governing permissions and limitations under the License.
  */
 
+// Author: Sergei Parshev (@sparshev)
+
 // Package github implements GitHub Actions gate to allow Webhooks to trigger Applications events
 package github
 
