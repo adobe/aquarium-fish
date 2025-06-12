@@ -10,6 +10,8 @@
  * governing permissions and limitations under the License.
  */
 
+// Author: Sergei Parshev (@sparshev)
+
 // Package gates implements interface for each gate (api/webhook integration)
 package gate
 

@@ -10,6 +10,8 @@
  * governing permissions and limitations under the License.
  */
 
+// Author: Sergei Parshev (@sparshev)
+
 // Package proxyssh implements SSH Proxy for user to get to the ApplicationResource
 package proxyssh
 

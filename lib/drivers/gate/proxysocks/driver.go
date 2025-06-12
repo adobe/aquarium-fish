@@ -10,6 +10,8 @@
  * governing permissions and limitations under the License.
  */
 
+// Author: Sergei Parshev (@sparshev)
+
 // Package proxysocks allows host VM's to reach the remote services in controllable manner
 package proxysocks
 
