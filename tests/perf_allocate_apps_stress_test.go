@@ -25,7 +25,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/steinfletcher/apitest"
 
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
@@ -65,7 +65,7 @@ drivers:
 		Transport: tr,
 	}
 
-	var label types.Label
+	var label aquariumv2.Label
 	t.Run("Create Label", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
@@ -79,8 +79,8 @@ drivers:
 			End().
 			JSON(&label)
 
-		if label.UID == uuid.Nil {
-			t.Fatalf("Label UID is incorrect: %v", label.UID)
+		if label.Uid == uuid.Nil.String() {
+			t.Fatalf("Label UID is incorrect: %v", label.Uid)
 		}
 	})
 
@@ -99,7 +99,7 @@ drivers:
 				Transport: tr,
 			}
 
-			var app types.Application
+			var app aquariumv2.Application
 			t.Run(fmt.Sprintf("%04d Create Application", id), func(t *testing.T) {
 				apitest.New().
 					EnableNetworking(cli).
@@ -111,11 +111,11 @@ drivers:
 					End().
 					JSON(&app)
 
-				if app.UID == uuid.Nil {
-					t.Errorf("Application UID is incorrect: %v", app.UID)
+				if app.Uid == uuid.Nil.String() {
+					t.Errorf("Application UID is incorrect: %v", app.Uid)
 				}
 			})
-		}(t, wg, i, afi, label.UID.String())
+		}(t, wg, i, afi, label.Uid)
 	}
 	wg.Wait()
 }
@@ -156,7 +156,7 @@ drivers:
 		Transport: &tr,
 	}
 
-	var label types.Label
+	var label aquariumv2.Label
 	t.Run("Create Label", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(&cli).
@@ -170,8 +170,8 @@ drivers:
 			End().
 			JSON(&label)
 
-		if label.UID == uuid.Nil {
-			t.Fatalf("Label UID is incorrect: %v", label.UID)
+		if label.Uid == uuid.Nil.String() {
+			t.Fatalf("Label UID is incorrect: %v", label.Uid)
 		}
 	})
 
@@ -185,7 +185,7 @@ drivers:
 			go func(t *testing.T, wg *sync.WaitGroup, batch, id int, afi *h.AFInstance, label string) {
 				defer wg.Done()
 
-				var app types.Application
+				var app aquariumv2.Application
 				t.Run(fmt.Sprintf("%03d-%04d Create Application", batch, id), func(t *testing.T) {
 					h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 300 * time.Millisecond}, t, func(r *h.R) {
 						apitest.New().
@@ -198,12 +198,12 @@ drivers:
 							End().
 							JSON(&app)
 
-						if app.UID == uuid.Nil {
-							r.Errorf("Application UID is incorrect: %v", app.UID)
+						if app.Uid == uuid.Nil.String() {
+							r.Errorf("Application UID is incorrect: %v", app.Uid)
 						}
 					})
 				})
-			}(t, wg, b, i, afi, label.UID.String())
+			}(t, wg, b, i, afi, label.Uid)
 		}
 		wg.Wait()
 		time.Sleep(100 * time.Millisecond)

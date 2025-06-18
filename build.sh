@@ -43,13 +43,6 @@ if ! command -v protoc-gen-connect-go >/dev/null 2>&1; then
     go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.18.1
 fi
 
-# Install oapi-codegen if it's not available or version is not the same with go.mod
-req_ver=$(grep -F 'github.com/oapi-codegen/oapi-codegen/v2' go.mod | cut -d' ' -f 2)
-curr_ver="$(oapi-codegen --version 2>/dev/null | tail -1 || true)"
-if [ "$curr_ver" != "$req_ver" ]; then
-    go install "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@$req_ver"
-fi
-
 # Run code generation
 go generate -v . ./lib/...
 

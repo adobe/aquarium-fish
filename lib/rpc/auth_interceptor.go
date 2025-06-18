@@ -23,7 +23,8 @@ import (
 
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
 type contextKey string
@@ -31,8 +32,8 @@ type contextKey string
 const userContextKey = contextKey("user")
 
 // GetUserFromContext retrieves the user from context
-func GetUserFromContext(ctx context.Context) *types.User {
-	if user, ok := ctx.Value(userContextKey).(*types.User); ok {
+func GetUserFromContext(ctx context.Context) *aquariumv2.User {
+	if user, ok := ctx.Value(userContextKey).(*aquariumv2.User); ok {
 		return user
 	}
 	return nil
@@ -69,7 +70,7 @@ func (i *AuthInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 		username, password := parts[0], parts[1]
 		log.Debugf("RPC: %s: New HTTP request received: %s", username, req.Spec().Procedure)
 
-		var user *types.User
+		var user *typesv2.User
 		if i.fish.GetCfg().DisableAuth {
 			// This logic executed during performance tests only
 			user, err = i.fish.DB().UserGet(username)
@@ -117,7 +118,7 @@ func (i *AuthInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc
 		username, password := parts[0], parts[1]
 		log.Debugf("RPC: %s: New gRPC request received: %s", username, conn.Spec().Procedure)
 
-		var user *types.User
+		var user *typesv2.User
 		if i.fish.GetCfg().DisableAuth {
 			// This logic executed during performance tests only
 			user, err = i.fish.DB().UserGet(username)

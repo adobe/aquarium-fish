@@ -21,8 +21,7 @@ import (
 	"connectrpc.com/connect"
 
 	"github.com/adobe/aquarium-fish/lib/fish"
-	"github.com/adobe/aquarium-fish/lib/rpc/converters"
-	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 )
 
 // NodeService implements the Node service
@@ -42,7 +41,7 @@ func (s *NodeService) List(_ /*ctx*/ context.Context, _ /*req*/ *connect.Request
 	// Convert nodes to protobuf format
 	protoNodes := make([]*aquariumv2.Node, len(out))
 	for i, node := range out {
-		protoNodes[i] = converters.ConvertNode(&node)
+		protoNodes[i] = node.ToNode()
 	}
 
 	return connect.NewResponse(&aquariumv2.NodeServiceListResponse{
@@ -62,7 +61,7 @@ func (s *NodeService) GetThis(_ /*ctx*/ context.Context, _ /*req*/ *connect.Requ
 
 	return connect.NewResponse(&aquariumv2.NodeServiceGetThisResponse{
 		Status: true, Message: "Node retrieved successfully",
-		Data: converters.ConvertNode(node),
+		Data: node.ToNode(),
 	}), nil
 }
 
@@ -74,15 +73,4 @@ func (s *NodeService) SetMaintenance(_ /*ctx*/ context.Context, req *connect.Req
 	return connect.NewResponse(&aquariumv2.NodeServiceSetMaintenanceResponse{
 		Status: true, Message: fmt.Sprintf("Maintenance mode %s", map[bool]string{true: "enabled", false: "disabled"}[req.Msg.GetMaintenance()]),
 	}), nil
-}
-
-// GetProfiling returns profiling data
-func (*NodeService) GetProfiling(_ /*ctx*/ context.Context, _ /*req*/ *connect.Request[aquariumv2.NodeServiceGetProfilingRequest]) (*connect.Response[aquariumv2.NodeServiceGetProfilingResponse], error) {
-	// TODO: Implement profiling data collection
-	// This will require setting up a custom pprof handler to capture the data
-	// For now, return a placeholder response
-	return connect.NewResponse(&aquariumv2.NodeServiceGetProfilingResponse{
-		Status: false, Message: "Profiling data collection not implemented",
-		Data: make(map[string]string),
-	}), connect.NewError(connect.CodeUnimplemented, nil)
 }

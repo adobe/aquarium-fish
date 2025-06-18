@@ -24,7 +24,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/steinfletcher/apitest"
 
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
@@ -61,7 +61,7 @@ drivers:
 		Transport: tr,
 	}
 
-	var label types.Label
+	var label aquariumv2.Label
 	t.Run("Create & check JSON Label", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
@@ -74,8 +74,8 @@ drivers:
 			End().
 			JSON(&label)
 
-		if label.UID == uuid.Nil {
-			t.Fatalf("Label UID is incorrect: %v", label.UID)
+		if label.Uid == uuid.Nil.String() {
+			t.Fatalf("Label UID is incorrect: %v", label.Uid)
 		}
 		if label.Name != "test-label" {
 			t.Fatalf("Label Name is incorrect: %v", label.Name)

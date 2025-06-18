@@ -24,6 +24,7 @@ import (
 	"golang.org/x/crypto/argon2"
 
 	"github.com/adobe/aquarium-fish/lib/log"
+	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 // Default parameters for the Argon2 hashing and some charsets usable for representing the data
@@ -35,13 +36,6 @@ const (
 	Argon2Threads    = 8 // Optimal to quickly execute one request, with not much overhead
 	Argon2Saltlen    = 8
 	Argon2Hashlen    = 32
-
-	// <= v0.7.4 hash params for backward-compatibility
-	// could easily choke the API system and cause OOMs so not recommended to use them
-	v074Argon2Algo       = "Argon2"
-	v074Argon2Memory     = 524288
-	v074Argon2Iterations = 1
-	v074Argon2Threads    = 1
 
 	RandStringCharsetB58 = "abcdefghijkmnopqrstuvwxyz" +
 		"ABCDEFGHJKLMNPQRSTUVWXYZ123456789" // Base58
@@ -92,32 +86,29 @@ func RandStringCharset(size int, charset string) string {
 }
 
 // NewHash generates a salted hash for the input string with default parameters
-func NewHash(input string, salt []byte) (h Hash) {
-	h.Algo = Argon2Algo
+func NewHash(input string, salt []byte) (h *Hash) {
+	h = &Hash{
+		Algo: Argon2Algo,
+		Prop: properties{
+			Iterations: Argon2Iterations,
+			Memory:     Argon2Memory,
+			Threads:    Argon2Threads,
+		},
+	}
 	if salt != nil {
 		h.Salt = salt
 	} else {
 		h.Salt = RandBytes(Argon2Saltlen)
 	}
-	h.Prop.Iterations = Argon2Iterations
-	h.Prop.Memory = Argon2Memory
-	h.Prop.Threads = Argon2Threads
 
 	// Create hash data
 	h.Hash = argon2.IDKey([]byte(input), h.Salt, h.Prop.Iterations, h.Prop.Memory, h.Prop.Threads, Argon2Hashlen)
 
-	return
+	return h
 }
 
 // IsEqual checks the input equal to the current hashed one
 func (h *Hash) IsEqual(input string) bool {
-	if h.Algo == v074Argon2Algo {
-		// Legacy low-performant parameters, not defined in hash
-		h.Prop.Iterations = v074Argon2Iterations
-		h.Prop.Memory = v074Argon2Memory
-		h.Prop.Threads = v074Argon2Threads
-	}
-
 	return bytes.Equal(h.Hash, argon2.IDKey([]byte(input), h.Salt, h.Prop.Iterations, h.Prop.Memory, h.Prop.Threads, uint32(len(h.Hash))))
 }
 
@@ -126,15 +117,15 @@ func (h *Hash) IsEmpty() bool {
 	return h.Algo == ""
 }
 
-func (h Hash) Serialize() ([]byte, error) {
+func (h Hash) Serialize() (util.UnparsedJSON, error) {
 	jsonHash, err := json.Marshal(h)
 	if err != nil {
-		return nil, log.Errorf("Unable to serialize Hash: %v", err)
+		return util.UnparsedJSON("{}"), log.Errorf("Unable to serialize Hash: %v", err)
 	}
-	return jsonHash, nil
+	return util.UnparsedJSON(jsonHash), nil
 }
 
-func (h *Hash) Deserialize(jsonHash string) error {
+func (h *Hash) Deserialize(jsonHash util.UnparsedJSON) error {
 	err := json.Unmarshal([]byte(jsonHash), h)
 	if err != nil {
 		return log.Errorf("Unable to deserialize Hash: %v", err)

@@ -24,7 +24,7 @@ import (
 	"go.mills.io/bitcask/v2"
 
 	"github.com/adobe/aquarium-fish/lib/log"
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
 var ErrObjectNotFound = bitcask.ErrObjectNotFound
@@ -40,11 +40,11 @@ type Database struct {
 	beMu sync.RWMutex
 
 	// Memory storage for current node - we using it to generate new UIDs
-	node types.Node
+	node typesv2.Node
 
 	// Subscriptions to notify subscribers about changes in DB, contains key prefix and channel
-	subsApplicationState []chan *types.ApplicationState
-	subsApplicationTask  []chan *types.ApplicationTask
+	subsApplicationState []chan *typesv2.ApplicationState
+	subsApplicationTask  []chan *typesv2.ApplicationTask
 }
 
 // Init creates the database object by provided path
@@ -99,18 +99,18 @@ func (d *Database) Shutdown() error {
 }
 
 // SetNode puts current node in the memory storage
-func (d *Database) SetNode(node types.Node) {
+func (d *Database) SetNode(node typesv2.Node) {
 	d.node = node
 }
 
 // GetNode returns current Fish node spec
-func (d *Database) GetNode() *types.Node {
+func (d *Database) GetNode() *typesv2.Node {
 	return &d.node
 }
 
 // GetNodeUID returns node UID
-func (d *Database) GetNodeUID() types.NodeUID {
-	return d.node.UID
+func (d *Database) GetNodeUID() typesv2.NodeUID {
+	return d.node.Uid
 }
 
 // GetNodeName returns current node name
@@ -126,6 +126,6 @@ func (d *Database) GetNodeLocation() string {
 // NewUID Creates new UID with 6 starting bytes of Node UID as prefix
 func (d *Database) NewUID() uuid.UUID {
 	uid := uuid.New()
-	copy(uid[:], d.node.UID[:6])
+	copy(uid[:], d.node.Uid[:6])
 	return uid
 }

@@ -24,7 +24,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/steinfletcher/apitest"
 
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
@@ -61,7 +61,7 @@ drivers:
 		Transport: tr,
 	}
 
-	var label types.Label
+	var label aquariumv2.Label
 	t.Run("Create test-label Label", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
@@ -81,8 +81,8 @@ definitions:
 			End().
 			JSON(&label)
 
-		if label.UID == uuid.Nil {
-			t.Fatalf("Label UID is incorrect: %v", label.UID)
+		if label.Uid == uuid.Nil.String() {
+			t.Fatalf("Label UID is incorrect: %v", label.Uid)
 		}
 	})
 	t.Run("Create second version of test-label Label", func(t *testing.T) {
@@ -104,8 +104,8 @@ definitions:
 			End().
 			JSON(&label)
 
-		if label.UID == uuid.Nil {
-			t.Fatalf("Label UID is incorrect: %v", label.UID)
+		if label.Uid == uuid.Nil.String() {
+			t.Fatalf("Label UID is incorrect: %v", label.Uid)
 		}
 	})
 	t.Run("Create another test-label2 Label", func(t *testing.T) {
@@ -127,13 +127,13 @@ definitions:
 			End().
 			JSON(&label)
 
-		if label.UID == uuid.Nil {
-			t.Fatalf("Label UID is incorrect: %v", label.UID)
+		if label.Uid == uuid.Nil.String() {
+			t.Fatalf("Label UID is incorrect: %v", label.Uid)
 		}
 	})
 
 	// Perform label list tests
-	var labels []types.Label
+	var labels []aquariumv2.Label
 	t.Run("Listing all the labels & versions", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).

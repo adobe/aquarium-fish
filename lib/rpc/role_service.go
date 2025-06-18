@@ -18,12 +18,11 @@ import (
 	"context"
 
 	"connectrpc.com/connect"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/adobe/aquarium-fish/lib/fish"
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
-	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2"
-	"github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2/aquariumv2connect"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
+	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
 // RoleService implements the Role service
@@ -47,7 +46,7 @@ func (s *RoleService) List(_ /*ctx*/ context.Context, _ /*req*/ *connect.Request
 	}
 
 	for i, role := range roles {
-		resp.Data[i] = convertRole(&role)
+		resp.Data[i] = role.ToRole()
 	}
 
 	return connect.NewResponse(resp), nil
@@ -55,7 +54,7 @@ func (s *RoleService) List(_ /*ctx*/ context.Context, _ /*req*/ *connect.Request
 
 // Get implements the Get RPC
 func (s *RoleService) Get(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.RoleServiceGetRequest]) (*connect.Response[aquariumv2.RoleServiceGetResponse], error) {
-	role, err := s.fish.DB().RoleGet(req.Msg.GetName())
+	role, err := s.fish.DB().RoleGet(req.Msg.GetRoleName())
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.RoleServiceGetResponse{
 			Status: false, Message: "Role not found: " + err.Error(),
@@ -64,26 +63,32 @@ func (s *RoleService) Get(_ /*ctx*/ context.Context, req *connect.Request[aquari
 
 	return connect.NewResponse(&aquariumv2.RoleServiceGetResponse{
 		Status: true, Message: "Role retrieved successfully",
-		Data: convertRole(role),
+		Data: role.ToRole(),
 	}), nil
 }
 
 // Create implements the Create RPC
 func (s *RoleService) Create(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.RoleServiceCreateRequest]) (*connect.Response[aquariumv2.RoleServiceCreateResponse], error) {
+	msgRole := req.Msg.Role
+	if msgRole == nil {
+		return connect.NewResponse(&aquariumv2.RoleServiceCreateResponse{
+			Status: false, Message: "Role not provided",
+		}), connect.NewError(connect.CodeInvalidArgument, nil)
+	}
 	// Check if role already exists
-	if _, err := s.fish.DB().RoleGet(req.Msg.GetName()); err == nil {
+	if _, err := s.fish.DB().RoleGet(msgRole.GetName()); err == nil {
 		return connect.NewResponse(&aquariumv2.RoleServiceCreateResponse{
 			Status: false, Message: "Role already exists",
 		}), connect.NewError(connect.CodeAlreadyExists, nil)
 	}
 
-	role := &types.Role{
-		Name:        req.Msg.GetName(),
-		Permissions: make([]types.Permission, len(req.Msg.GetPermissions())),
+	role := &typesv2.Role{
+		Name:        msgRole.GetName(),
+		Permissions: make([]typesv2.Permission, len(msgRole.GetPermissions())),
 	}
 
-	for i, p := range req.Msg.GetPermissions() {
-		role.Permissions[i] = types.Permission{
+	for i, p := range msgRole.GetPermissions() {
+		role.Permissions[i] = typesv2.Permission{
 			Resource: p.GetResource(),
 			Action:   p.GetAction(),
 		}
@@ -97,22 +102,28 @@ func (s *RoleService) Create(_ /*ctx*/ context.Context, req *connect.Request[aqu
 
 	return connect.NewResponse(&aquariumv2.RoleServiceCreateResponse{
 		Status: true, Message: "Role created successfully",
-		Data: convertRole(role),
+		Data: role.ToRole(),
 	}), nil
 }
 
 // Update implements the Update RPC
 func (s *RoleService) Update(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.RoleServiceUpdateRequest]) (*connect.Response[aquariumv2.RoleServiceUpdateResponse], error) {
-	role, err := s.fish.DB().RoleGet(req.Msg.GetName())
+	msgRole := req.Msg.Role
+	if msgRole == nil {
+		return connect.NewResponse(&aquariumv2.RoleServiceUpdateResponse{
+			Status: false, Message: "Role not provided",
+		}), connect.NewError(connect.CodeInvalidArgument, nil)
+	}
+	role, err := s.fish.DB().RoleGet(msgRole.GetName())
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.RoleServiceUpdateResponse{
 			Status: false, Message: "Role not found: " + err.Error(),
 		}), connect.NewError(connect.CodeNotFound, err)
 	}
 
-	role.Permissions = make([]types.Permission, len(req.Msg.GetPermissions()))
-	for i, p := range req.Msg.GetPermissions() {
-		role.Permissions[i] = types.Permission{
+	role.Permissions = make([]typesv2.Permission, len(msgRole.GetPermissions()))
+	for i, p := range msgRole.GetPermissions() {
+		role.Permissions[i] = typesv2.Permission{
 			Resource: p.GetResource(),
 			Action:   p.GetAction(),
 		}
@@ -126,13 +137,13 @@ func (s *RoleService) Update(_ /*ctx*/ context.Context, req *connect.Request[aqu
 
 	return connect.NewResponse(&aquariumv2.RoleServiceUpdateResponse{
 		Status: true, Message: "Role updated successfully",
-		Data: convertRole(role),
+		Data: role.ToRole(),
 	}), nil
 }
 
 // Delete implements the Delete RPC
 func (s *RoleService) Delete(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.RoleServiceDeleteRequest]) (*connect.Response[aquariumv2.RoleServiceDeleteResponse], error) {
-	if err := s.fish.DB().RoleDelete(req.Msg.GetName()); err != nil {
+	if err := s.fish.DB().RoleDelete(req.Msg.GetRoleName()); err != nil {
 		return connect.NewResponse(&aquariumv2.RoleServiceDeleteResponse{
 			Status: false, Message: "Failed to delete role: " + err.Error(),
 		}), connect.NewError(connect.CodeNotFound, err)
@@ -141,27 +152,4 @@ func (s *RoleService) Delete(_ /*ctx*/ context.Context, req *connect.Request[aqu
 	return connect.NewResponse(&aquariumv2.RoleServiceDeleteResponse{
 		Status: true, Message: "Role deleted successfully",
 	}), nil
-}
-
-// Helper function to convert types.Role to aquariumv2.Role
-func convertRole(role *types.Role) *aquariumv2.Role {
-	if role == nil {
-		return nil
-	}
-
-	protoRole := &aquariumv2.Role{
-		Name:        role.Name,
-		CreatedAt:   timestamppb.New(role.CreatedAt),
-		UpdatedAt:   timestamppb.New(role.UpdatedAt),
-		Permissions: make([]*aquariumv2.Permission, len(role.Permissions)),
-	}
-
-	for i, p := range role.Permissions {
-		protoRole.Permissions[i] = &aquariumv2.Permission{
-			Resource: p.Resource,
-			Action:   p.Action,
-		}
-	}
-
-	return protoRole
 }

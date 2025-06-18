@@ -15,15 +15,25 @@
 package rpc
 
 import (
+	"github.com/google/uuid"
+
 	"github.com/adobe/aquarium-fish/lib/crypt"
 )
 
 // GenerateRandomPassword generates a random password for new users
-func GenerateRandomPassword() string {
+func generateRandomPassword() string {
 	return crypt.RandString(64)
 }
 
 // GeneratePasswordHash generates a salted hash for the given password
-func GeneratePasswordHash(password string) crypt.Hash {
+func generatePasswordHash(password string) *crypt.Hash {
 	return crypt.NewHash(password, nil)
+}
+
+// StringToUUID converts string to UUID
+func stringToUUID(strUUID string) uuid.UUID {
+	if uid, err := uuid.Parse(strUUID); err == nil {
+		return uid
+	}
+	return uuid.Nil
 }

@@ -21,8 +21,8 @@ import (
 
 	"connectrpc.com/connect"
 
-	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2"
-	"github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2/aquariumv2connect"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
+	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
@@ -122,13 +122,13 @@ drivers:
 			resp, err := appClient.GetState(
 				context.Background(),
 				connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
-					Uid: appUID,
+					ApplicationUid: appUID,
 				}),
 			)
 			if err != nil {
 				r.Fatal("Failed to get application state:", err, resp)
 			}
-			if resp.Msg.Data.Status != "ALLOCATED" {
+			if resp.Msg.Data.Status != aquariumv2.ApplicationState_ALLOCATED {
 				r.Fatalf("Application Status is incorrect: %v", resp.Msg.Data.Status)
 			}
 		})
@@ -138,7 +138,7 @@ drivers:
 		resp, err := appClient.GetResource(
 			context.Background(),
 			connect.NewRequest(&aquariumv2.ApplicationServiceGetResourceRequest{
-				Uid: appUID,
+				ApplicationUid: appUID,
 			}),
 		)
 		if err != nil {
@@ -153,7 +153,7 @@ drivers:
 		_, err := appClient.Deallocate(
 			context.Background(),
 			connect.NewRequest(&aquariumv2.ApplicationServiceDeallocateRequest{
-				Uid: appUID,
+				ApplicationUid: appUID,
 			}),
 		)
 		if err != nil {
@@ -166,13 +166,13 @@ drivers:
 			resp, err := appClient.GetState(
 				context.Background(),
 				connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
-					Uid: appUID,
+					ApplicationUid: appUID,
 				}),
 			)
 			if err != nil {
 				r.Fatal("Failed to get application state:", err)
 			}
-			if resp.Msg.Data.Status != "DEALLOCATED" {
+			if resp.Msg.Data.Status != aquariumv2.ApplicationState_DEALLOCATED {
 				r.Fatalf("Application Status is incorrect: %v", resp.Msg.Data.Status)
 			}
 		})

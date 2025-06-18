@@ -25,7 +25,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/steinfletcher/apitest"
 
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
@@ -62,7 +62,7 @@ drivers:
 		Transport: tr,
 	}
 
-	var label types.Label
+	var label aquariumv2.Label
 	apitest.New().
 		EnableNetworking(cli).
 		Post(afi.APIAddress("api/v1/label/")).
@@ -75,8 +75,8 @@ drivers:
 		End().
 		JSON(&label)
 
-	if label.UID == uuid.Nil {
-		t.Fatalf("Label UID is incorrect: %v", label.UID)
+	if label.Uid == uuid.Nil.String() {
+		t.Fatalf("Label UID is incorrect: %v", label.Uid)
 	}
 
 	// Running periodic requests to test what's the delay will be
@@ -85,27 +85,27 @@ drivers:
 	workerFunc := func(t *testing.T, wg *sync.WaitGroup, afi *h.AFInstance, cli *http.Client) {
 		defer wg.Done()
 
-		var app types.Application
+		var app aquariumv2.Application
 		apitest.New().
 			EnableNetworking(cli).
 			Post(afi.APIAddress("api/v1/application/")).
-			JSON(`{"label_UID":"`+label.UID.String()+`"}`).
+			JSON(`{"label_UID":"`+label.Uid+`"}`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
 			End().
 			JSON(&app)
 
-		if app.UID == uuid.Nil {
-			t.Errorf("Application UID is incorrect: %v", app.UID)
+		if app.Uid == uuid.Nil.String() {
+			t.Errorf("Application UID is incorrect: %v", app.Uid)
 		}
 
-		var appState types.ApplicationState
+		var appState aquariumv2.ApplicationState
 		for !reachedLimit {
 			start := time.Now()
 			apitest.New().
 				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
+				Get(afi.APIAddress("api/v1/application/"+app.Uid+"/state")).
 				BasicAuth("admin", afi.AdminToken()).
 				Expect(t).
 				Status(http.StatusOK).

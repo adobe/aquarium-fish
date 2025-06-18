@@ -21,11 +21,11 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
 // NodeFind returns list of Nodes that fits filter
-func (d *Database) NodeList() (ns []types.Node, err error) {
+func (d *Database) NodeList() (ns []typesv2.Node, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -34,7 +34,7 @@ func (d *Database) NodeList() (ns []types.Node, err error) {
 }
 
 // NodeGet returns Node by it's unique name
-func (d *Database) NodeGet(name string) (node *types.Node, err error) {
+func (d *Database) NodeGet(name string) (node *typesv2.Node, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -43,9 +43,9 @@ func (d *Database) NodeGet(name string) (node *types.Node, err error) {
 }
 
 // NodeActiveList lists all the nodes in the cluster
-func (d *Database) NodeActiveList() (ns []types.Node, err error) {
+func (d *Database) NodeActiveList() (ns []typesv2.Node, err error) {
 	// Only the nodes that pinged at least twice the delay time
-	t := time.Now().Add(-types.NodePingDelay * 2 * time.Second)
+	t := time.Now().Add(-typesv2.NodePingDelay * 2 * time.Second)
 	all, err := d.NodeList()
 	if err != nil {
 		return ns, err
@@ -59,7 +59,7 @@ func (d *Database) NodeActiveList() (ns []types.Node, err error) {
 }
 
 // NodeCreate makes new Node
-func (d *Database) NodeCreate(n *types.Node) error {
+func (d *Database) NodeCreate(n *typesv2.Node) error {
 	if n.Name == "" {
 		return fmt.Errorf("Fish: Name can't be empty")
 	}
@@ -72,15 +72,15 @@ func (d *Database) NodeCreate(n *types.Node) error {
 
 	// Create node UUID based on the public key
 	hash := sha256.New()
-	hash.Write(*n.Pubkey)
-	n.UID = uuid.NewHash(hash, uuid.UUID{}, *n.Pubkey, 0)
+	hash.Write(n.Pubkey)
+	n.Uid = uuid.NewHash(hash, uuid.UUID{}, n.Pubkey, 0)
 	n.CreatedAt = time.Now()
 	n.UpdatedAt = n.CreatedAt
 	return d.be.Collection(ObjectNode).Add(n.Name, n)
 }
 
 // NodeSave stores Node
-func (d *Database) NodeSave(node *types.Node) error {
+func (d *Database) NodeSave(node *typesv2.Node) error {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -89,6 +89,6 @@ func (d *Database) NodeSave(node *types.Node) error {
 }
 
 // NodePing updates Node and shows that it's active
-func (d *Database) NodePing(node *types.Node) error {
+func (d *Database) NodePing(node *typesv2.Node) error {
 	return d.NodeSave(node)
 }

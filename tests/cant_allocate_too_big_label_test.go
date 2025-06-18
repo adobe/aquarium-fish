@@ -24,7 +24,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/steinfletcher/apitest"
 
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
@@ -32,7 +32,7 @@ import (
 // * Create Application
 // * It still NEW after 40 secs
 // * Destroy Application
-// * Should get RECALLED state
+// * Should get DEALLOCATED state
 func Test_cant_allocate_too_big_label(t *testing.T) {
 	t.Parallel()
 	afi := h.NewAquariumFish(t, "node-1", `---
@@ -65,7 +65,7 @@ drivers:
 		Transport: tr,
 	}
 
-	var label types.Label
+	var label aquariumv2.Label
 	t.Run("Create Label", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
@@ -77,42 +77,42 @@ drivers:
 			End().
 			JSON(&label)
 
-		if label.UID == uuid.Nil {
-			t.Fatalf("Label UID is incorrect: %v", label.UID)
+		if label.Uid == uuid.Nil.String() {
+			t.Fatalf("Label UID is incorrect: %v", label.Uid)
 		}
 	})
 
-	var app types.Application
+	var app aquariumv2.Application
 	t.Run("Create Application", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
 			Post(afi.APIAddress("api/v1/application/")).
-			JSON(`{"label_UID":"`+label.UID.String()+`"}`).
+			JSON(`{"label_UID":"`+label.Uid+`"}`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
 			End().
 			JSON(&app)
 
-		if app.UID == uuid.Nil {
-			t.Fatalf("Application UID is incorrect: %v", app.UID)
+		if app.Uid == uuid.Nil.String() {
+			t.Fatalf("Application UID is incorrect: %v", app.Uid)
 		}
 	})
 
 	time.Sleep(10 * time.Second)
 
-	var appState types.ApplicationState
+	var appState aquariumv2.ApplicationState
 	t.Run("Application should have state NEW in 10 sec", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
+			Get(afi.APIAddress("api/v1/application/"+app.Uid+"/state")).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
 			End().
 			JSON(&appState)
 
-		if appState.Status != types.ApplicationStatusNEW {
+		if appState.Status != aquariumv2.ApplicationState_NEW {
 			t.Fatalf("Application Status is incorrect: %v", appState.Status)
 		}
 	})
@@ -122,14 +122,14 @@ drivers:
 	t.Run("Application should have state NEW in 20 sec", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
+			Get(afi.APIAddress("api/v1/application/"+app.Uid+"/state")).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
 			End().
 			JSON(&appState)
 
-		if appState.Status != types.ApplicationStatusNEW {
+		if appState.Status != aquariumv2.ApplicationState_NEW {
 			t.Fatalf("Application Status is incorrect: %v", appState.Status)
 		}
 	})
@@ -139,14 +139,14 @@ drivers:
 	t.Run("Application should have state NEW in 30 sec", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
+			Get(afi.APIAddress("api/v1/application/"+app.Uid+"/state")).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
 			End().
 			JSON(&appState)
 
-		if appState.Status != types.ApplicationStatusNEW {
+		if appState.Status != aquariumv2.ApplicationState_NEW {
 			t.Fatalf("Application Status is incorrect: %v", appState.Status)
 		}
 	})
@@ -156,14 +156,14 @@ drivers:
 	t.Run("Application should have state NEW in 40 sec", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
+			Get(afi.APIAddress("api/v1/application/"+app.Uid+"/state")).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
 			End().
 			JSON(&appState)
 
-		if appState.Status != types.ApplicationStatusNEW {
+		if appState.Status != aquariumv2.ApplicationState_NEW {
 			t.Fatalf("Application Status is incorrect: %v", appState.Status)
 		}
 	})
@@ -171,25 +171,25 @@ drivers:
 	t.Run("Deallocate the Application", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/deallocate")).
+			Get(afi.APIAddress("api/v1/application/"+app.Uid+"/deallocate")).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
 			End()
 	})
 
-	t.Run("Application should get RECALLED in 10 sec", func(t *testing.T) {
+	t.Run("Application should get DEALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 5 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
+				Get(afi.APIAddress("api/v1/application/"+app.Uid+"/state")).
 				BasicAuth("admin", afi.AdminToken()).
 				Expect(r).
 				Status(http.StatusOK).
 				End().
 				JSON(&appState)
 
-			if appState.Status != types.ApplicationStatusRECALLED {
+			if appState.Status != aquariumv2.ApplicationState_DEALLOCATED {
 				r.Fatalf("Application Status is incorrect: %v", appState.Status)
 			}
 		})

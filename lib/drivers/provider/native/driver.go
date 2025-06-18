@@ -25,7 +25,7 @@ import (
 
 	"github.com/adobe/aquarium-fish/lib/drivers/provider"
 	"github.com/adobe/aquarium-fish/lib/log"
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
 // Factory implements provider.DriverFactory interface
@@ -52,8 +52,8 @@ type Driver struct {
 	// Contains the available tasks of the driver
 	tasksList []provider.DriverTask
 
-	totalCPU uint // In logical threads
-	totalRAM uint // In RAM GB
+	totalCPU uint32 // In logical threads
+	totalRAM uint32 // In RAM GB
 }
 
 // EnvData is used to provide some data to the entry/metadata values which could contain templates
@@ -90,13 +90,13 @@ func (d *Driver) Prepare(config []byte) error {
 	if err != nil {
 		return err
 	}
-	d.totalCPU = uint(cpuStat)
+	d.totalCPU = uint32(cpuStat)
 
 	memStat, err := mem.VirtualMemory()
 	if err != nil {
 		return err
 	}
-	d.totalRAM = uint(memStat.Total / 1073741824) // Getting GB from Bytes
+	d.totalRAM = uint32(memStat.Total / 1073741824) // Getting GB from Bytes
 
 	// TODO: Cleanup the image directory in case the images are not good
 
@@ -104,7 +104,7 @@ func (d *Driver) Prepare(config []byte) error {
 }
 
 // ValidateDefinition checks LabelDefinition is ok
-func (*Driver) ValidateDefinition(def types.LabelDefinition) error {
+func (*Driver) ValidateDefinition(def typesv2.LabelDefinition) error {
 	// Check options
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
@@ -130,7 +130,7 @@ func (*Driver) ValidateDefinition(def types.LabelDefinition) error {
 }
 
 // AvailableCapacity allows Fish to ask the driver about it's capacity (free slots) of a specific definition
-func (d *Driver) AvailableCapacity(nodeUsage types.Resources, req types.LabelDefinition) int64 {
+func (d *Driver) AvailableCapacity(nodeUsage typesv2.Resources, req typesv2.LabelDefinition) int64 {
 	var outCount int64
 
 	var opts Options
@@ -182,7 +182,7 @@ func (d *Driver) AvailableCapacity(nodeUsage types.Resources, req types.LabelDef
 //
 // It automatically download the required images, unpack them and runs the workload.
 // Using metadata to pass the env to the entry point of the image.
-func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*types.ApplicationResource, error) {
+func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) (*typesv2.ApplicationResource, error) {
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
 		return nil, log.Errorf("NATIVE: %s: Unable to apply options: %v", d.name, err)
@@ -223,12 +223,12 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 
 	log.Infof("NATIVE: %s: Started environment for user %q", d.name, user)
 
-	return &types.ApplicationResource{Identifier: user}, nil
+	return &typesv2.ApplicationResource{Identifier: user}, nil
 }
 
 // Status shows status of the resource
-func (d *Driver) Status(res *types.ApplicationResource) (string, error) {
-	if res == nil || res.Identifier == "" {
+func (d *Driver) Status(res typesv2.ApplicationResource) (string, error) {
+	if res.Identifier == "" {
 		return "", fmt.Errorf("NATIVE: %s: Invalid resource: %v", d.name, res)
 	}
 	if isEnvAllocated(res.Identifier) {
@@ -259,8 +259,8 @@ func (d *Driver) GetTask(name, options string) provider.DriverTask {
 }
 
 // Deallocate the resource
-func (d *Driver) Deallocate(res *types.ApplicationResource) error {
-	if res == nil || res.Identifier == "" {
+func (d *Driver) Deallocate(res typesv2.ApplicationResource) error {
+	if res.Identifier == "" {
 		return fmt.Errorf("NATIVE: %s: Invalid resource: %v", d.name, res)
 	}
 	if !isEnvAllocated(res.Identifier) {

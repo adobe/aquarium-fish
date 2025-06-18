@@ -26,7 +26,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/steinfletcher/apitest"
 
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
@@ -71,7 +71,7 @@ drivers:
 		return true
 	})
 
-	var label types.Label
+	var label aquariumv2.Label
 	t.Run("Create Label", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
@@ -83,8 +83,8 @@ drivers:
 			End().
 			JSON(&label)
 
-		if label.UID == uuid.Nil {
-			t.Fatalf("Label UID is incorrect: %v", label.UID)
+		if label.Uid == uuid.Nil.String() {
+			t.Fatalf("Label UID is incorrect: %v", label.Uid)
 		}
 	})
 
@@ -95,40 +95,40 @@ drivers:
 		defer wg.Done()
 
 		for !completed {
-			var app types.Application
-			var appState types.ApplicationState
+			var app aquariumv2.Application
+			var appState aquariumv2.ApplicationState
 
 			apitest.New().
 				EnableNetworking(cli).
 				Post(afi.APIAddress("api/v1/application/")).
-				JSON(`{"label_UID":"`+label.UID.String()+`"}`).
+				JSON(`{"label_UID":"`+label.Uid+`"}`).
 				BasicAuth("admin", afi.AdminToken()).
 				Expect(t).
 				Status(http.StatusOK).
 				End().
 				JSON(&app)
 
-			if app.UID == uuid.Nil {
-				t.Errorf("Worker %d: Application UID is incorrect: %v", id, app.UID)
+			if app.Uid == uuid.Nil.String() {
+				t.Errorf("Worker %d: Application UID is incorrect: %v", id, app.Uid)
 				return
 			}
 
 			// Checking state until it's allocated
-			for appState.Status != types.ApplicationStatusALLOCATED {
+			for appState.Status != aquariumv2.ApplicationState_ALLOCATED {
 				apitest.New().
 					EnableNetworking(cli).
-					Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
+					Get(afi.APIAddress("api/v1/application/"+app.Uid+"/state")).
 					BasicAuth("admin", afi.AdminToken()).
 					Expect(t).
 					Status(http.StatusOK).
 					End().
 					JSON(&appState)
 
-				if appState.UID == uuid.Nil {
-					t.Errorf("Worker %d: ApplicationStatus UID is incorrect: %v", id, appState.UID)
+				if appState.Uid == uuid.Nil.String() {
+					t.Errorf("Worker %d: ApplicationStatus UID is incorrect: %v", id, appState.Uid)
 					return
 				}
-				if appState.Status == types.ApplicationStatusERROR {
+				if appState.Status == aquariumv2.ApplicationState_ERROR {
 					t.Errorf("Worker %d: ApplicationStatus is incorrect: %v", id, appState.Status)
 					return
 				}
@@ -139,7 +139,7 @@ drivers:
 			// Time to deallocate
 			apitest.New().
 				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/deallocate")).
+				Get(afi.APIAddress("api/v1/application/"+app.Uid+"/deallocate")).
 				BasicAuth("admin", afi.AdminToken()).
 				Expect(t).
 				Status(http.StatusOK).

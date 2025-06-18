@@ -20,15 +20,15 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/adobe/aquarium-fish/lib/log"
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
 // ElectionRoundTime defines how long the voting round will take in seconds - so cluster nodes will be able to interchange their responses
 const ElectionRoundTime = 30
 
 // maybeRunElectionProcess will run election process if it's not already running
-func (f *Fish) maybeRunElectionProcess(appState *types.ApplicationState) {
-	if appState.Status != types.ApplicationStatusNEW && appState.Status != types.ApplicationStatusELECTED {
+func (f *Fish) maybeRunElectionProcess(appState *typesv2.ApplicationState) {
+	if appState.Status != typesv2.ApplicationState_NEW && appState.Status != typesv2.ApplicationState_ELECTED {
 		// Election is only for new & elected Applications
 		return
 	}
@@ -37,19 +37,19 @@ func (f *Fish) maybeRunElectionProcess(appState *types.ApplicationState) {
 	defer f.activeVotesMutex.Unlock()
 
 	// Check if Vote is already here
-	if _, ok := f.activeVotes[appState.ApplicationUID]; ok {
+	if _, ok := f.activeVotes[appState.ApplicationUid]; ok {
 		return
 	}
-	log.Info("Fish: Application with no Vote:", appState.ApplicationUID, appState.CreatedAt)
+	log.Info("Fish: Application with no Vote:", appState.ApplicationUid, appState.CreatedAt)
 
 	// Create new Vote and run background vote process
-	f.activeVotes[appState.ApplicationUID] = f.voteNew(appState.ApplicationUID)
-	go f.electionProcess(appState.ApplicationUID)
+	f.activeVotes[appState.ApplicationUid] = f.voteNew(appState.ApplicationUid)
+	go f.electionProcess(appState.ApplicationUid)
 }
 
 // electionProcess performs & monitors the election process for the NEW Application until it's in
 // ALLOCATED state.
-func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
+func (f *Fish) electionProcess(appUID typesv2.ApplicationUID) error {
 	// It's not a waited Fish routine - because doesn't actually hold anything valuable, so
 	// could be terminated at any time with no particular harm to the rest of the system.
 
@@ -66,9 +66,9 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 	}
 
 	// Get label with the definitions
-	label, err := f.db.LabelGet(app.LabelUID)
+	label, err := f.db.LabelGet(app.LabelUid)
 	if err != nil {
-		return log.Errorf("Fish: Election %s: Fatal: Unable to get the Label %s: %v", appUID, app.LabelUID, err)
+		return log.Errorf("Fish: Election %s: Fatal: Unable to get the Label %s: %v", appUID, app.LabelUid, err)
 	}
 
 	// Variable stores the amount of rounds after which Election process will be recovered
@@ -79,7 +79,7 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 	// Loop to reiterate each new round
 	for {
 		// Set the round based on the time of Application creation to join the election process
-		myvote.Round = f.voteCurrentRoundGet(app.CreatedAt)
+		myvote.Round = uint32(f.voteCurrentRoundGet(app.CreatedAt))
 
 		// Calculating the end time of the round to not stuck if some nodes are not available
 		roundEndsAt := app.CreatedAt.Add(time.Duration(ElectionRoundTime*(myvote.Round+1)) * time.Second)
@@ -90,10 +90,10 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 			// can actually complete it's journey before election process confirms it's state, so
 			// not existing Application can't be elected anymore and we can safely drop here
 			log.Infof("Fish: Election %s: Application state is missing, dropping the election: %v", appUID, err)
-			f.activeVotesRemove(myvote.UID)
+			f.activeVotesRemove(myvote.Uid)
 			f.storageVotesCleanup()
 			return nil
-		} else if appState.Status == types.ApplicationStatusELECTED {
+		} else if appState.Status == typesv2.ApplicationState_ELECTED {
 			// The Application become elected, so wait for 10 rounds while in ELECTED to
 			// give the node some time to actually allocate the Application.
 			// When the ELECTED status is here for >10 rounds - then something went wrong with
@@ -124,10 +124,10 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 			// use ELECTED state.
 			log.Warnf("Fish: Election %s: Elected node did not allocated the Application, reruning election on round %d", appUID, myvote.Round)
 			electedRoundsToWait = -1
-		} else if appState.Status != types.ApplicationStatusNEW {
+		} else if appState.Status != typesv2.ApplicationState_NEW {
 			log.Debugf("Fish: Election %s: Completed with status: %s", appUID, appState.Status)
 			// The Application state went after
-			f.activeVotesRemove(myvote.UID)
+			f.activeVotesRemove(myvote.Uid)
 			f.storageVotesCleanup()
 			return nil
 		}
@@ -135,7 +135,7 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 		log.Infof("Fish: Election %s: Starting Application election round %d", appUID, myvote.Round)
 
 		// Determine answer for this round, it will try find the first possible definition to serve
-		myvote.Available = f.isNodeAvailableForDefinitions(label.Definitions)
+		myvote.Available = int32(f.isNodeAvailableForDefinitions(label.Definitions))
 
 		// Create and Sync vote with the other nodes
 		if err := f.voteCreate(myvote); err != nil {
@@ -157,7 +157,7 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 				log.Debugf("Fish: Election %s: Some nodes didn't vote in round %d (%d < %d), waiting till %v...", appUID, myvote.Round, len(votes), len(nodes), roundEndsAt)
 				if len(votes) == 0 {
 					log.Warnf("Fish: Election %q: Something weird happened (votes len can't be 0), here is additional info:", appUID)
-					log.Warnf("Fish: Election %q:   Vote UID:", appUID, myvote.UID)
+					log.Warnf("Fish: Election %q:   Vote UID:", appUID, myvote.Uid)
 					f.activeVotesMutex.Lock()
 					log.Warnf("Fish: Election %q:   List of active votes: %+v", appUID, f.activeVotes)
 					f.activeVotesMutex.Unlock()
@@ -166,7 +166,7 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 					f.storageVotesMutex.Unlock()
 
 					// Recovering
-					myvote.UID = uuid.Nil
+					myvote.Uid = uuid.Nil
 					break
 				}
 
@@ -179,25 +179,25 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 			bestVote := f.electionBestVote(votes)
 
 			// Checking the best vote
-			if bestVote.UID == uuid.Nil {
+			if bestVote.Uid == uuid.Nil {
 				log.Infof("Fish: Election %s: No candidates in round %d", appUID, myvote.Round)
-			} else if bestVote.NodeUID == f.db.GetNodeUID() {
+			} else if bestVote.NodeUid == f.db.GetNodeUID() {
 				log.Infof("Fish: Election %s: I won the election", appUID)
 
 				// Adding the vote to won ones - it should be present before state is passed
 				f.wonVotesAdd(bestVote)
 
 				// Set Application state as ELECTED
-				appState := types.ApplicationState{
-					ApplicationUID: app.UID,
-					Status:         types.ApplicationStatusELECTED,
+				appState := typesv2.ApplicationState{
+					ApplicationUid: app.Uid,
+					Status:         typesv2.ApplicationState_ELECTED,
 					Description:    "Elected node: " + f.db.GetNodeName(),
 				}
 				if err := f.db.ApplicationStateCreate(&appState); err != nil {
-					return log.Errorf("Fish: Election %s: Unable to set Application state: %v", app.UID, err)
+					return log.Errorf("Fish: Election %s: Unable to set Application state: %v", app.Uid, err)
 				}
 			} else {
-				log.Infof("Fish: Election %s: I lost the election to Node %s", appUID, myvote.NodeUID)
+				log.Infof("Fish: Election %s: I lost the election to Node %s", appUID, myvote.NodeUid)
 			}
 
 			// Wait till the next round
@@ -210,14 +210,14 @@ func (f *Fish) electionProcess(appUID types.ApplicationUID) error {
 }
 
 // electionBestVote picks the best vote out of the list of cluster votes
-func (*Fish) electionBestVote(votes []types.Vote) (bestVote types.Vote) {
+func (*Fish) electionBestVote(votes []typesv2.Vote) (bestVote typesv2.Vote) {
 	for _, v := range votes {
 		// Available must be >= 0, otherwise the node is not available to execute this Application
 		if v.Available < 0 {
 			continue
 		}
 		// If there is no best one - set this one as best to compare the others with it
-		if bestVote.UID == uuid.Nil {
+		if bestVote.Uid == uuid.Nil {
 			bestVote = v
 			continue
 		}
@@ -235,8 +235,8 @@ func (*Fish) electionBestVote(votes []types.Vote) (bestVote types.Vote) {
 				if v.Rand < bestVote.Rand {
 					continue
 				} else if v.Rand == bestVote.Rand {
-					log.Warnf("Fish: Election %s: This round is a lucky one! Rands are equal for nodes %s and %s", v.ApplicationUID, v.NodeUID, bestVote.NodeUID)
-					bestVote.UID = uuid.Nil
+					log.Warnf("Fish: Election %s: This round is a lucky one! Rands are equal for nodes %s and %s", v.ApplicationUid, v.NodeUid, bestVote.NodeUid)
+					bestVote.Uid = uuid.Nil
 					break
 				}
 			}

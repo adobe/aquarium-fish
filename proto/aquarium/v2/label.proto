@@ -19,7 +19,7 @@ import "google/protobuf/struct.proto";
 import "aquarium/v2/common.proto";
 import "aquarium/v2/rbac.proto";
 
-option go_package = "github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2;aquariumv2";
+option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2";
 
 // LabelService handles label management operations
 service LabelService {
@@ -30,58 +30,161 @@ service LabelService {
    };
   }
   
-  // Get label by name
+  // Get label by UID
   rpc Get(LabelServiceGetRequest) returns (LabelServiceGetResponse) {}
   
   // Create new label
   rpc Create(LabelServiceCreateRequest) returns (LabelServiceCreateResponse) {}
   
-  // Delete label
+  // Delete label by UID
   rpc Delete(LabelServiceDeleteRequest) returns (LabelServiceDeleteResponse) {}
 }
 
 // Label represents a reproducible environment configuration
+//
+// This one filled by the cluster admin, depends on the needs. Labels could be defined in
+// different drivers and the priority is sequential. Version could be used during request and
+// by default is the latest.
+//
+// Label - is one of the most important part of the system, because it makes the resources
+// reproducible in time. Definitions contains the driver name and configuration, so can be
+// started again and again as much times we need. Versions make possible to update the labels
+// and store the old ones in case we need to run the same environment 10y from now and rebuild
+// the old code revision for example.
+//
+// Labels can't be updated. Once they are stored - they are here to keep the history of
+// environements and make possible to mark build with the specified label version in order to
+// be able to reproduce it later. Also labels can be implemented just by one or multiple
+// drivers. Sometimes it's useful to switch to another provider in case the previous ones are
+// not available or completely used.
+//
+// Combination of Name and Version should be unique.
 message Label {
   string uid = 1;
   google.protobuf.Timestamp created_at = 2;
+  // Simple name to identify the Label
+  // example: macos1405-xcode161-ci_aws
   string name = 3;
+  // In order to update the labels freely and save the previous Label state for the past builds.
   int32 version = 4;
+  // List of label definitions that describes required resources, driver and it's options.
+  // The order is sequential - so the priority is to the first driver and if it's not
+  // available than the next definitions will be used.
+  // example:
+  //   - driver: vmx
+  //     options:
+  //       image: winserver2019-vs2019-ci
+  //       images:
+  //         - url: 'https://artifact-storage/aquarium/image/vmx/winserver2019/winserver2019-VERSION.tar.xz'
+  //         - url: 'https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019/winserver2019-vs2019-VERSION.tar.xz'
+  //         - url: 'https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019-ci/winserver2019-vs2019-ci-VERSION.tar.xz'
+  //     resources:
+  //       cpu: 16
+  //       ram: 20
+  //       disks:
+  //         ws:
+  //           size: 100
+  //           reuse: true
+  //       network: nat
+  //   - driver: aws
+  //     options:
+  //       image: aquarium/winserver2019-vs2019-ci-VERSION
+  //       instance_type: c6a.4xlarge
+  //       security_groups:
+  //         - jenkins-worker
+  //       userdata_format: ps1
+  //     resources:
+  //       cpu: 16
+  //       ram: 32
+  //       disks:
+  //         xvdb:
+  //           size: 100
+  //       network: Name:build-vpc
   repeated LabelDefinition definitions = 5;
+  // Basic metadata to pass to the ApplicationResource
+  // example:
+  //   JENKINS_AGENT_WORKSPACE: 'D:\'
   google.protobuf.Struct metadata = 6;
 }
 
 // LabelDefinition describes how to provide resources
+//
+// Describes Label's ways to provide aa ApplicationResource - it contains name of the driver,
+// it's resource and additional options.
 message LabelDefinition {
+  // Name of the driver to execute
   string driver = 1;
-  Resources resources = 2;
-  google.protobuf.Struct options = 3;
-  Authentication authentication = 4;
+  // Driver-specific options to execute the environment
+  google.protobuf.Struct options = 2;
+  // Resources Driver need to provide for the Label execution
+  Resources resources = 3;
+  // Authentication information to connect - is used by:
+  // * ProxySSH gate to allow access to the resource
+  optional Authentication authentication = 4;
 }
 
 // Resources defines required compute resources for a label
+//
+// It's used for 2 purposes, in Label definitions to describe the required amount of resources
+// and in Fish to store the currently used resources, so could add and subtract resources.
+// 
+// Modificators are used for parallel node usage by different Applications, they are stored
+// for the first Application and used for the others to determine node tenancy/overbook
+// tolerance.
+// 
+// Different drivers uses it in different ways to provide quite similar functionality, so it's
+// a good idea to check the driver's wiki page to get some clue on how to create Label def.
 message Resources {
+  // Global amount of slots to be filled with ApplicationResources
   optional uint32 slots = 1;
+  // Amount of vCPUs (logical CPU with HT enabled will have 2 per core)
   uint32 cpu = 2;
+  // Amount of RAM in GB
   uint32 ram = 3;
+  // Defines disks to attach/clone...
   map<string, ResourcesDisk> disks = 4;
+  // Which network configuration to use for the environment
   string network = 5;
+  // The list of the Node identifiers to run resource on, supports path wildcards
+  // example:
+  //   - OS:darwin
+  //   - OSVersion:12.*
+  //   - Arch:x86_64
   repeated string node_filter = 6;
+  // Tolerate to run along with the other envs on the same node
   bool multitenancy = 7;
+  // Tolerate to node CPU overbooking when executed together with other envs
   bool cpu_overbook = 8;
+  // Tolerate to RAM overbooking when executed together with other envs
   bool ram_overbook = 9;
+  // Total lifetime of the ApplicationResource in Time Duration (ex. "1h30m30s"). Begins on
+  // ApplicationResource create time till deallocate by user or auto deallocate by timeout.
+  // If it's empty or "0" then default value from fish node config will be used. If it's
+  // negative (ex. "-1s") then the ApplicationResource will live forever or until the user
+  // requests deallocate.
   string lifetime = 10;
 }
 
 // ResourcesDisk defines disk configuration
 message ResourcesDisk {
+  // Type of the filesystem to create by Fish - usually handled by the formatter of the image
   string type = 1;
+  // Volume name will be given to the disk, empty will use the disk key
   string label = 2;
+  // Amount of disk space in GB for new disk, could not used if clone is set
   uint32 size = 3;
+  // Do not remove the disk and reuse it for the next resource run
   bool reuse = 4;
+  // Clone the snapshot of existing disk instead of creating the new one
   string clone = 5;
 }
 
-message LabelServiceListRequest {}
+message LabelServiceListRequest {
+  // Filter the list by name of the label
+  optional string name = 1;
+  // Filter the list by version of the label, "last" will return only latest version of labels
+  optional string version = 2;
+}
 
 message LabelServiceListResponse {
   bool status = 1;
@@ -90,7 +193,7 @@ message LabelServiceListResponse {
 }
 
 message LabelServiceGetRequest {
-  string name = 1;
+  string label_uid = 1;
 }
 
 message LabelServiceGetResponse {
@@ -110,7 +213,7 @@ message LabelServiceCreateResponse {
 }
 
 message LabelServiceDeleteRequest {
-  string name = 1;
+  string label_uid = 1;
 }
 
 message LabelServiceDeleteResponse {

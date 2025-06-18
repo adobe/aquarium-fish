@@ -33,7 +33,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/drivers/provider"
 	"github.com/adobe/aquarium-fish/lib/log"
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
@@ -41,17 +41,17 @@ import (
 var userCreateLock sync.Mutex
 
 // Returns the total resources available for the node after alteration
-func (d *Driver) getAvailResources() (availCPU, availRAM uint) {
+func (d *Driver) getAvailResources() (availCPU, availRAM uint32) {
 	if d.cfg.CPUAlter < 0 {
-		availCPU = d.totalCPU - uint(-d.cfg.CPUAlter)
+		availCPU = d.totalCPU - uint32(-d.cfg.CPUAlter)
 	} else {
-		availCPU = d.totalCPU + uint(d.cfg.CPUAlter)
+		availCPU = d.totalCPU + uint32(d.cfg.CPUAlter)
 	}
 
 	if d.cfg.RAMAlter < 0 {
-		availRAM = d.totalRAM - uint(-d.cfg.RAMAlter)
+		availRAM = d.totalRAM - uint32(-d.cfg.RAMAlter)
 	} else {
-		availRAM = d.totalRAM + uint(d.cfg.RAMAlter)
+		availRAM = d.totalRAM + uint32(d.cfg.RAMAlter)
 	}
 
 	return
@@ -421,7 +421,7 @@ func (d *Driver) disksDelete(user string) (outErr error) {
 }
 
 // Creates disks directories described by the disks map, returns the map of disks to mount paths
-func (d *Driver) disksCreate(user string, disks map[string]types.ResourcesDisk) (map[string]string, error) {
+func (d *Driver) disksCreate(user string, disks map[string]typesv2.ResourcesDisk) (map[string]string, error) {
 	// Create disks
 	diskPaths := make(map[string]string, len(disks))
 

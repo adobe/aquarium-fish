@@ -31,13 +31,13 @@ import (
 	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/log"
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
 // ClusterInterface defines required functions for Fish to run on the cluster
 type ClusterInterface interface {
 	// Requesting send of Vote to cluster, since it's not a part of DB
-	SendVote(vote *types.Vote) error
+	SendVote(vote *typesv2.Vote) error
 }
 
 // Fish structure is used to store the node internal state
@@ -65,32 +65,32 @@ type Fish struct {
 
 	// Storage for the current Node Votes participating in election process
 	activeVotesMutex sync.RWMutex
-	activeVotes      map[types.ApplicationUID]*types.Vote
+	activeVotes      map[typesv2.ApplicationUID]*typesv2.Vote
 
 	// Used to temporary store the won Votes by Application UID to tell node to run execution
 	wonVotesMutex sync.Mutex
-	wonVotes      map[types.ApplicationUID]*types.Vote
+	wonVotes      map[typesv2.ApplicationUID]*typesv2.Vote
 
 	// Votes of the other nodes in the cluster
 	storageVotesMutex sync.RWMutex
-	storageVotes      map[types.VoteUID]types.Vote
+	storageVotes      map[typesv2.VoteUID]typesv2.Vote
 
 	// Stores the currently executing Applications and their locks
 	applicationsMutex sync.Mutex
-	applications      map[types.ApplicationUID]*sync.Mutex
+	applications      map[typesv2.ApplicationUID]*sync.Mutex
 
 	// Keeps Applications timeouts Fish watching for
 	applicationsTimeoutsMutex   sync.Mutex
-	applicationsTimeouts        map[types.ApplicationUID]time.Time
+	applicationsTimeouts        map[typesv2.ApplicationUID]time.Time
 	applicationsTimeoutsUpdated chan struct{} // Notifies about the earlier timeout then exists
 
 	// When Application changes - fish figures that out through those channels
-	applicationStateChannel chan *types.ApplicationState
-	applicationTaskChannel  chan *types.ApplicationTask
+	applicationStateChannel chan *typesv2.ApplicationState
+	applicationTaskChannel  chan *typesv2.ApplicationTask
 
 	// Stores the current usage of the node resources
 	nodeUsageMutex sync.Mutex // Is needed to protect node resources from concurrent allocations
-	nodeUsage      types.Resources
+	nodeUsage      typesv2.Resources
 }
 
 // New creates new Fish node
@@ -111,23 +111,23 @@ func (f *Fish) Init() error {
 	signal.Notify(f.Quit, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 
 	// Init channel for ApplicationState changes
-	f.applicationStateChannel = make(chan *types.ApplicationState)
+	f.applicationStateChannel = make(chan *typesv2.ApplicationState)
 	f.db.SubscribeApplicationState(f.applicationStateChannel)
 
 	// Init channel for ApplicationTask changes
-	f.applicationTaskChannel = make(chan *types.ApplicationTask)
+	f.applicationTaskChannel = make(chan *typesv2.ApplicationTask)
 	f.db.SubscribeApplicationTask(f.applicationTaskChannel)
 
 	// Init variables
-	f.activeVotes = make(map[types.ApplicationUID]*types.Vote)
-	f.wonVotes = make(map[types.ApplicationUID]*types.Vote)
-	f.storageVotes = make(map[types.VoteUID]types.Vote)
-	f.applications = make(map[types.ApplicationUID]*sync.Mutex)
-	f.applicationsTimeouts = make(map[types.ApplicationUID]time.Time)
+	f.activeVotes = make(map[typesv2.ApplicationUID]*typesv2.Vote)
+	f.wonVotes = make(map[typesv2.ApplicationUID]*typesv2.Vote)
+	f.storageVotes = make(map[typesv2.VoteUID]typesv2.Vote)
+	f.applications = make(map[typesv2.ApplicationUID]*sync.Mutex)
+	f.applicationsTimeouts = make(map[typesv2.ApplicationUID]time.Time)
 	f.applicationsTimeoutsUpdated = make(chan struct{})
 
 	// Set slots to 0
-	var zeroSlotsValue uint
+	var zeroSlotsValue uint32
 	f.nodeUsage.Slots = &zeroSlotsValue
 
 	f.initDefaultRoles()
@@ -160,7 +160,7 @@ func (f *Fish) Init() error {
 		log.Info("Fish: Create new node:", f.cfg.NodeName, f.cfg.NodeLocation)
 		createNode = true
 
-		node = &types.Node{
+		node = &typesv2.Node{
 			Name:     f.cfg.NodeName,
 			Location: f.cfg.NodeLocation,
 		}
@@ -193,7 +193,7 @@ func (f *Fish) Init() error {
 		// Capturing the current host identifiers
 		f.cfg.NodeIdentifiers = append(f.cfg.NodeIdentifiers, "FishName:"+node.Name,
 			"HostName:"+node.Definition.Host.Hostname,
-			"OS:"+node.Definition.Host.OS,
+			"OS:"+node.Definition.Host.Os,
 			"OSVersion:"+node.Definition.Host.PlatformVersion,
 			"OSPlatform:"+node.Definition.Host.Platform,
 			"OSFamily:"+node.Definition.Host.PlatformFamily,
@@ -218,23 +218,23 @@ func (f *Fish) Init() error {
 		return log.Error("Fish: Unable to get the node resources:", err)
 	}
 	for _, res := range resources {
-		log.Debugf("Fish: Resuming Resource execution for Application: %q", res.ApplicationUID)
-		if f.db.ApplicationIsAllocated(res.ApplicationUID) == nil {
-			log.Info("Fish: Found allocated resource to serve:", res.UID)
+		log.Debugf("Fish: Resuming Resource execution for Application: %q", res.ApplicationUid)
+		if f.db.ApplicationIsAllocated(res.ApplicationUid) == nil {
+			log.Info("Fish: Found allocated resource to serve:", res.Uid)
 			// We will not retry here, because the mentioned Applications should be already running
-			if _, err := f.executeApplicationStart(res.ApplicationUID, res.DefinitionIndex); err != nil {
+			if _, err := f.executeApplicationStart(res.ApplicationUid, res.DefinitionIndex); err != nil {
 				f.applicationsMutex.Lock()
-				delete(f.applications, res.ApplicationUID)
+				delete(f.applications, res.ApplicationUid)
 				f.applicationsMutex.Unlock()
-				log.Errorf("Fish: Can't execute Application %s: %v", res.ApplicationUID, err)
+				log.Errorf("Fish: Can't execute Application %s: %v", res.ApplicationUid, err)
 			}
 		} else {
-			log.Warn("Fish: Found not allocated Resource of Application, cleaning up:", res.ApplicationUID)
-			if err := f.db.ApplicationResourceDelete(res.UID); err != nil {
-				log.Error("Fish: Unable to delete Resource of Application:", res.ApplicationUID, err)
+			log.Warn("Fish: Found not allocated Resource of Application, cleaning up:", res.ApplicationUid)
+			if err := f.db.ApplicationResourceDelete(res.Uid); err != nil {
+				log.Error("Fish: Unable to delete Resource of Application:", res.ApplicationUid, err)
 			}
-			appState := types.ApplicationState{
-				ApplicationUID: res.ApplicationUID, Status: types.ApplicationStatusERROR,
+			appState := typesv2.ApplicationState{
+				ApplicationUid: res.ApplicationUid, Status: typesv2.ApplicationState_ERROR,
 				Description: "Found not cleaned up resource",
 			}
 			f.db.ApplicationStateCreate(&appState)
@@ -279,7 +279,7 @@ func (f *Fish) initDefaultRoles() error {
 
 	// Create all roles described in the proto specs
 	for role, perms := range auth.GetRolePermissions() {
-		newRole := types.Role{
+		newRole := typesv2.Role{
 			Name:        role,
 			Permissions: perms,
 		}
@@ -342,7 +342,7 @@ func (f *Fish) pingProcess() {
 	defer log.Info("Fish Node: pingProcess stopped")
 
 	// In order to optimize network & database - update just UpdatedAt field
-	pingTicker := time.NewTicker(types.NodePingDelay * time.Second)
+	pingTicker := time.NewTicker(typesv2.NodePingDelay * time.Second)
 	defer pingTicker.Stop()
 	for {
 		select {
@@ -370,29 +370,29 @@ func (f *Fish) applicationProcess() {
 			return
 		case appState := <-f.applicationStateChannel:
 			switch appState.Status {
-			case types.ApplicationStatusNEW:
+			case typesv2.ApplicationState_NEW:
 				// Running election process for the new Application, if it's not already procesing
 				f.maybeRunElectionProcess(appState)
-			case types.ApplicationStatusELECTED:
+			case typesv2.ApplicationState_ELECTED:
 				// Starting Application execution if we are winners of the election
 				f.maybeRunExecuteApplicationStart(appState)
-			case types.ApplicationStatusALLOCATED:
+			case typesv2.ApplicationState_ALLOCATED:
 				// Executing deallocation procedures for the Application
-				f.maybeRunApplicationTask(appState.ApplicationUID, nil)
-			case types.ApplicationStatusDEALLOCATE, types.ApplicationStatusRECALLED:
+				f.maybeRunApplicationTask(appState.ApplicationUid, nil)
+			case typesv2.ApplicationState_DEALLOCATE:
 				// Executing deallocation procedures for the Application
 				f.maybeRunExecuteApplicationStop(appState)
-			case types.ApplicationStatusDEALLOCATED, types.ApplicationStatusERROR:
+			case typesv2.ApplicationState_DEALLOCATED, typesv2.ApplicationState_ERROR:
 				// Not much to do here, but maybe later in the future?
 				// In this state the Application has no Resource to deal with, so no luck for now
-				//f.maybeRunApplicationTask(appState.ApplicationUID, nil)
-				log.Debugf("Fish: Application %s reached end state %s", appState.ApplicationUID, appState.Status)
+				//f.maybeRunApplicationTask(appState.ApplicationUid, nil)
+				log.Debugf("Fish: Application %s reached end state %s", appState.ApplicationUid, appState.Status)
 			}
 		case appTask := <-f.applicationTaskChannel:
 			// Runs check for Application state and decides if need to execute or drop
 			// If the Application state doesn't fit the task - then it will be skipped to be
 			// started later by the ApplicationState change event
-			f.maybeRunApplicationTask(appTask.ApplicationUID, appTask)
+			f.maybeRunApplicationTask(appTask.ApplicationUid, appTask)
 		}
 	}
 }
@@ -447,51 +447,44 @@ func (f *Fish) CleanupDB() {
 		if !f.db.ApplicationStateIsDead(state.Status) {
 			continue
 		}
-		log.Debugf("Fish: CleanupDB: Checking Application %s (%s): %v", state.ApplicationUID, state.Status, state.CreatedAt)
+		log.Debugf("Fish: CleanupDB: Checking Application %s (%s): %v", state.ApplicationUid, state.Status, state.CreatedAt)
 
 		if state.CreatedAt.After(cutTime) {
-			log.Debugf("Fish: CleanupDB: Skipping %s due to not reached the cut time, left: %s", state.ApplicationUID, state.CreatedAt.Sub(cutTime))
+			log.Debugf("Fish: CleanupDB: Skipping %s due to not reached the cut time, left: %s", state.ApplicationUid, state.CreatedAt.Sub(cutTime))
 			continue
 		}
 
 		// If the Application died before the Fish is started - then we need to give it aditional dbCleanupDelay time
 		if f.startup.After(cutTime) {
-			log.Debugf("Fish: CleanupDB: Skipping %s due to recent startup, left: %s", state.ApplicationUID, f.startup.Sub(cutTime))
+			log.Debugf("Fish: CleanupDB: Skipping %s due to recent startup, left: %s", state.ApplicationUid, f.startup.Sub(cutTime))
 			continue
 		}
 
-		log.Debugf("Fish: CleanupDB: Removing everything related to Application %s (%s)", state.ApplicationUID, state.Status)
+		log.Debugf("Fish: CleanupDB: Removing everything related to Application %s (%s)", state.ApplicationUid, state.Status)
 
 		// First of all removing the Application itself to make sure it will not be restarted
-		if err = f.db.ApplicationDelete(state.ApplicationUID); err != nil {
-			log.Errorf("Fish: CleanupDB: Unable to remove Application %s: %v", state.ApplicationUID, err)
+		if err = f.db.ApplicationDelete(state.ApplicationUid); err != nil {
+			log.Errorf("Fish: CleanupDB: Unable to remove Application %s: %v", state.ApplicationUid, err)
 			continue
 		}
 
-		ats, _ := f.db.ApplicationTaskListByApplication(state.ApplicationUID)
+		ats, _ := f.db.ApplicationTaskListByApplication(state.ApplicationUid)
 		for _, at := range ats {
-			if err = f.db.ApplicationTaskDelete(at.UID); err != nil {
-				log.Errorf("Fish: CleanupDB: Unable to remove ApplicationTask %s: %v", at.UID, err)
+			if err = f.db.ApplicationTaskDelete(at.Uid); err != nil {
+				log.Errorf("Fish: CleanupDB: Unable to remove ApplicationTask %s: %v", at.Uid, err)
 			}
 		}
 
-		sms, _ := f.db.ServiceMappingListByApplication(state.ApplicationUID)
-		for _, sm := range sms {
-			if err = f.db.ServiceMappingDelete(sm.UID); err != nil {
-				log.Errorf("Fish: CleanupDB: Unable to remove ServiceMapping %s: %v", sm.UID, err)
-			}
-		}
-
-		ss, _ := f.db.ApplicationStateListByApplication(state.ApplicationUID)
+		ss, _ := f.db.ApplicationStateListByApplication(state.ApplicationUid)
 		for _, s := range ss {
-			if err = f.db.ApplicationStateDelete(s.UID); err != nil {
-				log.Errorf("Fish: CleanupDB: Unable to remove ApplicationState %s: %v", s.UID, err)
+			if err = f.db.ApplicationStateDelete(s.Uid); err != nil {
+				log.Errorf("Fish: CleanupDB: Unable to remove ApplicationState %s: %v", s.Uid, err)
 			}
 		}
 	}
 }
 
-func (f *Fish) isNodeAvailableForDefinitions(defs []types.LabelDefinition) int {
+func (f *Fish) isNodeAvailableForDefinitions(defs []typesv2.LabelDefinition) int {
 	available := -1 // Set "nope" answer by default in case all the definitions are not fit
 	for i, def := range defs {
 		if f.isNodeAvailableForDefinition(def) {
@@ -503,7 +496,7 @@ func (f *Fish) isNodeAvailableForDefinitions(defs []types.LabelDefinition) int {
 	return available
 }
 
-func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
+func (f *Fish) isNodeAvailableForDefinition(def typesv2.LabelDefinition) bool {
 	// When node is in maintenance mode - it should not accept any Applications
 	if f.maintenance {
 		log.Debug("Fish: Maintenance mode blocks node availability")
@@ -527,11 +520,11 @@ func (f *Fish) isNodeAvailableForDefinition(def types.LabelDefinition) bool {
 		if f.cfg.NodeSlotsLimit > 0 {
 			// Use 1 by default for the definitions where slots value is not set
 			if def.Resources.Slots == nil {
-				var val uint = 1
+				var val uint32 = 1
 				def.Resources.Slots = &val
 			}
 			neededSlots := (*f.nodeUsage.Slots) + (*def.Resources.Slots)
-			if neededSlots > f.cfg.NodeSlotsLimit {
+			if uint(neededSlots) > f.cfg.NodeSlotsLimit {
 				log.Debugf("Fish: Not enough slots to execute definition: %d > %d", neededSlots, f.cfg.NodeSlotsLimit)
 				return false
 			}

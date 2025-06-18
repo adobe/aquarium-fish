@@ -22,6 +22,7 @@ const (
 	ObjectApplicationState       = "ApplicationState"
 	ObjectApplicationResource    = "ApplicationResource"
 	ObjectApplicationTask        = "ApplicationTask"
+	ObjectGateProxySSHAccess     = "GateProxySSHAccess"
 	ObjectLabel                  = "Label"
 	ObjectLabelDefinition        = "LabelDefinition"
 	ObjectResources              = "Resources"
@@ -36,5 +37,5 @@ const (
 	ObjectRole                   = "Role"
 	ObjectPermission             = "Permission"
 	ObjectUser                   = "User"
-	ObjectUserWithPassword       = "UserWithPassword"
+	ObjectVote                   = "Vote"
 )

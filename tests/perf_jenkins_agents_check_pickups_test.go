@@ -27,7 +27,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/steinfletcher/apitest"
 
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
@@ -70,7 +70,7 @@ drivers:
 	}
 
 	// Creating 2 labels - one for the app that can't be allocated and another one for a good app
-	var labelNoWay types.Label
+	var labelNoWay aquariumv2.Label
 	apitest.New().
 		EnableNetworking(cli).
 		Post(afi.APIAddress("api/v1/label/")).
@@ -83,11 +83,11 @@ drivers:
 		End().
 		JSON(&labelNoWay)
 
-	if labelNoWay.UID == uuid.Nil {
-		t.Fatalf("LabelNoWay UID is incorrect: %v", labelNoWay.UID)
+	if labelNoWay.Uid == uuid.Nil.String() {
+		t.Fatalf("LabelNoWay UID is incorrect: %v", labelNoWay.Uid)
 	}
 
-	var labelTheWay types.Label
+	var labelTheWay aquariumv2.Label
 	apitest.New().
 		EnableNetworking(cli).
 		Post(afi.APIAddress("api/v1/label/")).
@@ -100,8 +100,8 @@ drivers:
 		End().
 		JSON(&labelTheWay)
 
-	if labelTheWay.UID == uuid.Nil {
-		t.Fatalf("LabelTheWay UID is incorrect: %v", labelTheWay.UID)
+	if labelTheWay.Uid == uuid.Nil.String() {
+		t.Fatalf("LabelTheWay UID is incorrect: %v", labelTheWay.Uid)
 	}
 
 	// Running goroutines amount fetcher
@@ -137,20 +137,20 @@ drivers:
 
 	// Running periodic requests to test what's the delay will be
 	workerFunc := func(t *testing.T, afi *h.AFInstance, cli *http.Client) {
-		var app types.Application
+		var app aquariumv2.Application
 		apitest.New().
 			EnableNetworking(cli).
 			Post(afi.APIAddress("api/v1/application/")).
-			JSON(`{"label_UID":"`+labelNoWay.UID.String()+`"}`).
+			JSON(`{"label_UID":"`+labelNoWay.Uid+`"}`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
 			End().
 			JSON(&app)
 
-		if app.UID == uuid.Nil {
+		if app.Uid == uuid.Nil.String() {
 			exitTest = true
-			t.Errorf("Application UID is incorrect: %v", app.UID)
+			t.Errorf("Application UID is incorrect: %v", app.Uid)
 		}
 	}
 
@@ -181,39 +181,39 @@ drivers:
 		// It should be no longer then 5 seconds (delay between pickups)
 		t.Logf("Running test: (bg elections: %d)", counter)
 		t.Run(fmt.Sprintf("Application should be ALLOCATED in 20 sec (bg elections: %d)", counter), func(t *testing.T) {
-			var app types.Application
+			var app aquariumv2.Application
 			// Keep track of applications in wg to make sure there is no more apps picked up by the Fish
 			wg.Add(1)
 			apitest.New().
 				EnableNetworking(cli).
 				Post(afi.APIAddress("api/v1/application/")).
-				JSON(`{"label_UID":"`+labelTheWay.UID.String()+`"}`).
+				JSON(`{"label_UID":"`+labelTheWay.Uid+`"}`).
 				BasicAuth("admin", afi.AdminToken()).
 				Expect(t).
 				Status(http.StatusOK).
 				End().
 				JSON(&app)
 
-			if app.UID == uuid.Nil {
+			if app.Uid == uuid.Nil.String() {
 				exitTest = true
-				t.Errorf("Desired Application UID is incorrect: %v", app.UID)
+				t.Errorf("Desired Application UID is incorrect: %v", app.Uid)
 			}
 
 			// Wait for Allocate of the Application
-			var appState types.ApplicationState
+			var appState aquariumv2.ApplicationState
 			h.Retry(&h.Timer{Timeout: 15 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 				apitest.New().
 					EnableNetworking(cli).
-					Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
+					Get(afi.APIAddress("api/v1/application/"+app.Uid+"/state")).
 					BasicAuth("admin", afi.AdminToken()).
 					Expect(r).
 					Status(http.StatusOK).
 					End().
 					JSON(&appState)
 
-				if appState.Status != types.ApplicationStatusALLOCATED {
+				if appState.Status != aquariumv2.ApplicationState_ALLOCATED {
 					exitTest = true
-					r.Fatalf("Desired Application %s Status is incorrect: %v", appState.ApplicationUID, appState.Status)
+					r.Fatalf("Desired Application %s Status is incorrect: %v", appState.ApplicationUid, appState.Status)
 				} else {
 					exitTest = false
 				}

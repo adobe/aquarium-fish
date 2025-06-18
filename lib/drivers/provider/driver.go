@@ -16,7 +16,7 @@
 package provider
 
 import (
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
 // Status of the driver returned by Status()
@@ -55,24 +55,24 @@ type Driver interface {
 
 	// Make sure the allocate definition is appropriate for the driver
 	// -> def - describes the driver options to allocate the required resource
-	ValidateDefinition(def types.LabelDefinition) error
+	ValidateDefinition(def typesv2.LabelDefinition) error
 
 	// Check if the described definition can be running on the current node
 	// -> node_usage - how much of node resources was used by all the drivers. Usually should not be used by the cloud drivers
 	// -> req - definition describes requirements for the resource
 	// <- capacity - the number of such definitions the driver could run, if -1 - error happened
-	AvailableCapacity(nodeUsage types.Resources, req types.LabelDefinition) (capacity int64)
+	AvailableCapacity(nodeUsage typesv2.Resources, req typesv2.LabelDefinition) (capacity int64)
 
 	// Allocate the resource by definition and returns hw address
 	// -> def - describes the driver options to allocate the required resource
 	// -> metadata - user metadata to use during resource allocation
 	// <- res - initial resource information to store driver instance state
-	Allocate(def types.LabelDefinition, metadata map[string]any) (res *types.ApplicationResource, err error)
+	Allocate(def typesv2.LabelDefinition, metadata map[string]any) (res *typesv2.ApplicationResource, err error)
 
 	// Get the status of the resource with given hw address
 	// -> res - resource information with stored driver instance state
 	// <- status - current status of the resource
-	Status(res *types.ApplicationResource) (status string, err error)
+	Status(res typesv2.ApplicationResource) (status string, err error)
 
 	// Get task struct with implementation to execute it later
 	// -> task - identifier of the task operation
@@ -81,5 +81,5 @@ type Driver interface {
 
 	// Deallocate resource with provided hw addr
 	// -> res - resource information with stored driver instance state
-	Deallocate(res *types.ApplicationResource) error
+	Deallocate(res typesv2.ApplicationResource) error
 }

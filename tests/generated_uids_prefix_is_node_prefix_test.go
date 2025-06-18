@@ -15,7 +15,6 @@
 package tests
 
 import (
-	"bytes"
 	"crypto/tls"
 	"fmt"
 	"net/http"
@@ -25,7 +24,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/steinfletcher/apitest"
 
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
@@ -65,8 +64,8 @@ drivers:
 		Transport: tr,
 	}
 
-	var nodes []types.Node
-	var node types.Node
+	var nodes []*aquariumv2.Node
+	var node *aquariumv2.Node
 	t.Run("Get node data", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
@@ -81,12 +80,12 @@ drivers:
 			t.Fatalf("Nodes list count is not 1: %d", len(nodes))
 		}
 		node = nodes[0]
-		if node.UID == uuid.Nil {
-			t.Fatalf("Node UID is incorrect: %v", node.UID)
+		if node.Uid == uuid.Nil.String() {
+			t.Fatalf("Node UID is incorrect: %v", node.Uid)
 		}
 	})
 
-	var label types.Label
+	var label aquariumv2.Label
 	t.Run("Create Label", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
@@ -98,90 +97,90 @@ drivers:
 			End().
 			JSON(&label)
 
-		if label.UID == uuid.Nil {
-			t.Fatalf("Label UID is incorrect: %v", label.UID)
+		if label.Uid == uuid.Nil.String() {
+			t.Fatalf("Label UID is incorrect: %v", label.Uid)
 		}
 
-		if !bytes.Equal(label.UID[:6], node.UID[:6]) {
-			t.Fatalf("Label UID prefix != Node UID prefix: %v, %v", label.UID, node.UID)
+		if label.Uid[:6] != node.Uid[:6] {
+			t.Fatalf("Label UID prefix != Node UID prefix: %v, %v", label.Uid, node.Uid)
 		}
 	})
 
-	var app types.Application
+	var app aquariumv2.Application
 	t.Run("Create Application", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
 			Post(afi.APIAddress("api/v1/application/")).
-			JSON(`{"label_UID":"`+label.UID.String()+`"}`).
+			JSON(`{"label_UID":"`+label.Uid+`"}`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
 			End().
 			JSON(&app)
 
-		if app.UID == uuid.Nil {
-			t.Fatalf("Application UID is incorrect: %v", app.UID)
+		if app.Uid == uuid.Nil.String() {
+			t.Fatalf("Application UID is incorrect: %v", app.Uid)
 		}
 
-		if !bytes.Equal(app.UID[:6], node.UID[:6]) {
-			t.Fatalf("Application UID prefix != Node UID prefix: %v, %v", app.UID, node.UID)
+		if app.Uid[:6] != node.Uid[:6] {
+			t.Fatalf("Application UID prefix != Node UID prefix: %v, %v", app.Uid, node.Uid)
 		}
 	})
 
-	var appState types.ApplicationState
+	var appState aquariumv2.ApplicationState
 	t.Run("Application should get ALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
+				Get(afi.APIAddress("api/v1/application/"+app.Uid+"/state")).
 				BasicAuth("admin", afi.AdminToken()).
 				Expect(r).
 				Status(http.StatusOK).
 				End().
 				JSON(&appState)
 
-			if appState.UID == uuid.Nil {
-				t.Fatalf("ApplicationState UID is incorrect: %v", appState.UID)
+			if appState.Uid == uuid.Nil.String() {
+				t.Fatalf("ApplicationState UID is incorrect: %v", appState.Uid)
 			}
 
-			if appState.Status != types.ApplicationStatusALLOCATED {
+			if appState.Status != aquariumv2.ApplicationState_ALLOCATED {
 				r.Fatalf("Application Status is incorrect: %v", appState.Status)
 			}
 
-			if !bytes.Equal(appState.UID[:6], node.UID[:6]) {
-				t.Fatalf("ApplicationState UID prefix != Node UID prefix: %v, %v", appState.UID, node.UID)
+			if appState.Uid[:6] != node.Uid[:6] {
+				t.Fatalf("ApplicationState UID prefix != Node UID prefix: %v, %v", appState.Uid, node.Uid)
 			}
 		})
 	})
 
-	var res types.ApplicationResource
+	var res aquariumv2.ApplicationResource
 	t.Run("Resource should be created", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/resource")).
+			Get(afi.APIAddress("api/v1/application/"+app.Uid+"/resource")).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
 			End().
 			JSON(&res)
 
-		if res.UID == uuid.Nil {
-			t.Fatalf("Resource UID is incorrect: %v", res.UID)
+		if res.Uid == uuid.Nil.String() {
+			t.Fatalf("Resource UID is incorrect: %v", res.Uid)
 		}
 
 		if res.Identifier == "" {
 			t.Fatalf("Resource identifier is incorrect: %v", res.Identifier)
 		}
 
-		if !bytes.Equal(res.UID[:6], node.UID[:6]) {
-			t.Fatalf("Resource UID prefix != Node UID prefix: %v, %v", res.UID, node.UID)
+		if res.Uid[:6] != node.Uid[:6] {
+			t.Fatalf("Resource UID prefix != Node UID prefix: %v, %v", res.Uid, node.Uid)
 		}
 	})
 
 	t.Run("Deallocate the Application", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/deallocate")).
+			Get(afi.APIAddress("api/v1/application/"+app.Uid+"/deallocate")).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
@@ -192,14 +191,14 @@ drivers:
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			apitest.New().
 				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
+				Get(afi.APIAddress("api/v1/application/"+app.Uid+"/state")).
 				BasicAuth("admin", afi.AdminToken()).
 				Expect(r).
 				Status(http.StatusOK).
 				End().
 				JSON(&appState)
 
-			if appState.Status != types.ApplicationStatusDEALLOCATED {
+			if appState.Status != aquariumv2.ApplicationState_DEALLOCATED {
 				r.Fatalf("Application Status is incorrect: %v", appState.Status)
 			}
 		})

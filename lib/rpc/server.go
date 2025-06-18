@@ -25,7 +25,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/auth"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
-	"github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2/aquariumv2connect"
+	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
 )
 
 // Server represents the Connect server
@@ -73,9 +73,6 @@ func NewServer(f *fish.Fish) *Server {
 		&NodeService{fish: f},
 		interceptors,
 	))
-
-	// Serve static files for web UI
-	s.mux.Handle("/", http.FileServer(http.Dir("web/dist")))
 
 	return s
 }

@@ -28,7 +28,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/log"
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
@@ -49,19 +49,19 @@ var jobsToCareAbout = []string{jobQueued, jobInProgress, jobCompleted}
 
 // dbWebhook is created with dbPrefixHook:guid and is here to tell that the webhook was processed
 type dbWebhook struct {
-	CreatedAt time.Time     `json:"created_at"` // To figure out the cleanup time
-	NodeUID   types.NodeUID `json:"node_uid"`   // Which node received the webhook
+	CreatedAt time.Time       `json:"created_at"` // To figure out the cleanup time
+	NodeUID   typesv2.NodeUID `json:"node_uid"`   // Which node received the webhook
 }
 
 // dbJob is created with dbPrefixJob:RunID-JobID and shows the current status of the job
 type dbJob struct {
-	CreatedAt   time.Time     `json:"created_at"`  // To figure out the cleanup time
-	Status      string        `json:"status"`      // Current job status
-	NodeUID     types.NodeUID `json:"node_uid"`    // Which node processing the job
-	Description string        `json:"description"` // Simple one-line description of what's up
+	CreatedAt   time.Time       `json:"created_at"`  // To figure out the cleanup time
+	Status      string          `json:"status"`      // Current job status
+	NodeUID     typesv2.NodeUID `json:"node_uid"`    // Which node processing the job
+	Description string          `json:"description"` // Simple one-line description of what's up
 
-	ApplicationUID types.ApplicationUID `json:"application_uid"` // Link to the Application
-	RunnerID       int64                `json:"runner_id"`       // Identifies used runner
+	ApplicationUID typesv2.ApplicationUID `json:"application_uid"` // Link to the Application
+	RunnerID       int64                  `json:"runner_id"`       // Identifies used runner
 }
 
 // isWebhookProcessed makes sure there is no duplication in webhooks processing
@@ -187,7 +187,7 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 		}
 		name := job.Labels[1]
 		version := "last"
-		params := types.LabelListGetParams{
+		params := database.LabelListParams{
 			Name:    &name,
 			Version: &version,
 		}
@@ -214,7 +214,7 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 		log.Debugf("GITHUB: %s: Job %s of repo %s/%s: Created runner token for Fish %q: %q", d.name, runJobID, owner, repo, fishName, runnerToken.GetToken())
 
 		// Sending allocation request to the Fish core to write down the ApplicationUID
-		log.Debugf("GITHUB: %s: Job %s of repo %s/%s: Creating Application using Label %q", d.name, runJobID, owner, repo, labels[0].UID)
+		log.Debugf("GITHUB: %s: Job %s of repo %s/%s: Creating Application using Label %q", d.name, runJobID, owner, repo, labels[0].Uid)
 		metadata, err := json.Marshal(map[string]string{
 			"GITHUB_RUNNER_URL":       fmt.Sprintf("%s/%s/%s", d.githubURL, owner, repo),
 			"GITHUB_RUNNER_NAME":      fishName,
@@ -224,8 +224,8 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 		if err != nil {
 			return fmt.Errorf("Unable to create application metadata: %v", err)
 		}
-		app := types.Application{
-			LabelUID:  labels[0].UID,
+		app := typesv2.Application{
+			LabelUid:  labels[0].Uid,
 			OwnerName: d.name,
 			Metadata:  util.UnparsedJSON(metadata),
 		}
@@ -240,7 +240,7 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 			NodeUID:     d.db.GetNodeUID(),
 			Description: fmt.Sprintf("Created by node %s", d.db.GetNodeName()),
 
-			ApplicationUID: app.UID,
+			ApplicationUID: app.Uid,
 		}
 		if err := d.db.Set(dbPrefixJob, runJobID, &j); err != nil {
 			return fmt.Errorf("Unable to create db entry for job %d-%d: %v", job.GetRunID(), job.GetID(), err)

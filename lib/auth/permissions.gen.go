@@ -15,103 +15,75 @@
 package auth
 
 import (
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
 // All available permissions per role
-var rolePermissions = map[string][]types.Permission{
+var rolePermissions = map[string][]typesv2.Permission{
 	"Administrator": {
-		// ApplicationResourceService
-		{Resource: ApplicationResourceService, Action: ApplicationResourceServiceAccess}, // OpenAPI
-
 		// ApplicationService
-		{Resource: ApplicationService, Action: ApplicationServiceCreate},         // gRPC, OpenAPI
-		{Resource: ApplicationService, Action: ApplicationServiceCreateTask},     // gRPC, OpenAPI
-		{Resource: ApplicationService, Action: ApplicationServiceDeallocate},     // gRPC, OpenAPI
-		{Resource: ApplicationService, Action: ApplicationServiceDeallocateAll},  // OpenAPI
-		{Resource: ApplicationService, Action: ApplicationServiceGet},            // gRPC, OpenAPI
-		{Resource: ApplicationService, Action: ApplicationServiceGetAll},         // OpenAPI
-		{Resource: ApplicationService, Action: ApplicationServiceGetResource},    // gRPC, OpenAPI
-		{Resource: ApplicationService, Action: ApplicationServiceGetResourceAll}, // OpenAPI
-		{Resource: ApplicationService, Action: ApplicationServiceGetState},       // gRPC, OpenAPI
-		{Resource: ApplicationService, Action: ApplicationServiceGetStateAll},    // OpenAPI
-		{Resource: ApplicationService, Action: ApplicationServiceGetTask},        // gRPC
-		{Resource: ApplicationService, Action: ApplicationServiceList},           // gRPC, OpenAPI
-		{Resource: ApplicationService, Action: ApplicationServiceListAll},        // OpenAPI
-		{Resource: ApplicationService, Action: ApplicationServiceListTask},       // gRPC, OpenAPI
-		{Resource: ApplicationService, Action: ApplicationServiceListTaskAll},    // OpenAPI
+		{Resource: ApplicationService, Action: ApplicationServiceCreate},      // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceCreateTask},  // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceDeallocate},  // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceGet},         // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceGetResource}, // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceGetState},    // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceGetTask},     // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceList},        // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceListTask},    // gRPC
 
-		// ApplicationTaskService
-		{Resource: ApplicationTaskService, Action: ApplicationTaskServiceGet},    // OpenAPI
-		{Resource: ApplicationTaskService, Action: ApplicationTaskServiceGetAll}, // OpenAPI
+		// GateProxySSHService
+		{Resource: GateProxySSHService, Action: GateProxySSHServiceGetResourceAccess}, // gRPC
 
 		// LabelService
-		{Resource: LabelService, Action: LabelServiceCreate}, // gRPC, OpenAPI
-		{Resource: LabelService, Action: LabelServiceDelete}, // gRPC, OpenAPI
-		{Resource: LabelService, Action: LabelServiceGet},    // gRPC, OpenAPI
-		{Resource: LabelService, Action: LabelServiceList},   // gRPC, OpenAPI
+		{Resource: LabelService, Action: LabelServiceCreate}, // gRPC
+		{Resource: LabelService, Action: LabelServiceDelete}, // gRPC
+		{Resource: LabelService, Action: LabelServiceGet},    // gRPC
+		{Resource: LabelService, Action: LabelServiceList},   // gRPC
 
 		// NodeService
-		{Resource: NodeService, Action: NodeServiceGetProfiling},   // gRPC, OpenAPI
-		{Resource: NodeService, Action: NodeServiceGetThis},        // gRPC, OpenAPI
-		{Resource: NodeService, Action: NodeServiceList},           // gRPC, OpenAPI
-		{Resource: NodeService, Action: NodeServiceSetMaintenance}, // gRPC, OpenAPI
+		{Resource: NodeService, Action: NodeServiceGetThis},        // gRPC
+		{Resource: NodeService, Action: NodeServiceList},           // gRPC
+		{Resource: NodeService, Action: NodeServiceSetMaintenance}, // gRPC
 
 		// RoleService
-		{Resource: RoleService, Action: RoleServiceCreate}, // gRPC, OpenAPI
-		{Resource: RoleService, Action: RoleServiceDelete}, // gRPC, OpenAPI
-		{Resource: RoleService, Action: RoleServiceGet},    // gRPC, OpenAPI
-		{Resource: RoleService, Action: RoleServiceList},   // gRPC, OpenAPI
-		{Resource: RoleService, Action: RoleServiceUpdate}, // gRPC, OpenAPI
-
-		// ServiceMappingService
-		{Resource: ServiceMappingService, Action: ServiceMappingServiceCreate}, // OpenAPI
-		{Resource: ServiceMappingService, Action: ServiceMappingServiceDelete}, // OpenAPI
-		{Resource: ServiceMappingService, Action: ServiceMappingServiceGet},    // OpenAPI
-		{Resource: ServiceMappingService, Action: ServiceMappingServiceList},   // OpenAPI
+		{Resource: RoleService, Action: RoleServiceCreate}, // gRPC
+		{Resource: RoleService, Action: RoleServiceDelete}, // gRPC
+		{Resource: RoleService, Action: RoleServiceGet},    // gRPC
+		{Resource: RoleService, Action: RoleServiceList},   // gRPC
+		{Resource: RoleService, Action: RoleServiceUpdate}, // gRPC
 
 		// UserService
-		{Resource: UserService, Action: UserServiceAssignRoles}, // gRPC, OpenAPI
-		{Resource: UserService, Action: UserServiceCreate},      // gRPC, OpenAPI
-		{Resource: UserService, Action: UserServiceDelete},      // gRPC, OpenAPI
-		{Resource: UserService, Action: UserServiceGet},         // gRPC, OpenAPI
-		{Resource: UserService, Action: UserServiceGetAll},      // OpenAPI
-		{Resource: UserService, Action: UserServiceList},        // gRPC, OpenAPI
-		{Resource: UserService, Action: UserServiceListAll},     // OpenAPI
-		{Resource: UserService, Action: UserServiceUpdate},      // gRPC, OpenAPI
-		{Resource: UserService, Action: UserServiceUpdateAll},   // OpenAPI
-
-		// VoteService
-		{Resource: VoteService, Action: VoteServiceList},    // OpenAPI
-		{Resource: VoteService, Action: VoteServiceListAll}, // OpenAPI
+		{Resource: UserService, Action: UserServiceCreate}, // gRPC
+		{Resource: UserService, Action: UserServiceDelete}, // gRPC
+		{Resource: UserService, Action: UserServiceGet},    // gRPC
+		{Resource: UserService, Action: UserServiceList},   // gRPC
+		{Resource: UserService, Action: UserServiceUpdate}, // gRPC
 	},
 	"Power": {
-		// ApplicationResourceService
-		{Resource: ApplicationResourceService, Action: ApplicationResourceServiceAccess}, // OpenAPI
-
 		// ApplicationService
-		{Resource: ApplicationService, Action: ApplicationServiceCreateTask}, // gRPC, OpenAPI
+		{Resource: ApplicationService, Action: ApplicationServiceCreateTask}, // gRPC
 		{Resource: ApplicationService, Action: ApplicationServiceGetTask},    // gRPC
-		{Resource: ApplicationService, Action: ApplicationServiceListTask},   // gRPC, OpenAPI
+		{Resource: ApplicationService, Action: ApplicationServiceListTask},   // gRPC
 
-		// ApplicationTaskService
-		{Resource: ApplicationTaskService, Action: ApplicationTaskServiceGet}, // OpenAPI
+		// GateProxySSHService
+		{Resource: GateProxySSHService, Action: GateProxySSHServiceGetResourceAccess}, // gRPC
 	},
 	"User": {
 		// ApplicationService
-		{Resource: ApplicationService, Action: ApplicationServiceCreate},      // gRPC, OpenAPI
-		{Resource: ApplicationService, Action: ApplicationServiceDeallocate},  // gRPC, OpenAPI
-		{Resource: ApplicationService, Action: ApplicationServiceGet},         // gRPC, OpenAPI
-		{Resource: ApplicationService, Action: ApplicationServiceGetResource}, // gRPC, OpenAPI
-		{Resource: ApplicationService, Action: ApplicationServiceGetState},    // gRPC, OpenAPI
-		{Resource: ApplicationService, Action: ApplicationServiceList},        // gRPC, OpenAPI
+		{Resource: ApplicationService, Action: ApplicationServiceCreate},      // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceDeallocate},  // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceGet},         // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceGetResource}, // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceGetState},    // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceList},        // gRPC
 
 		// LabelService
-		{Resource: LabelService, Action: LabelServiceList}, // gRPC, OpenAPI
+		{Resource: LabelService, Action: LabelServiceList}, // gRPC
 	},
 }
 
 // GetRolePermissions returns a map of all possible permissions for all known roles
-func GetRolePermissions() map[string][]types.Permission {
+func GetRolePermissions() map[string][]typesv2.Permission {
 	return rolePermissions
 }

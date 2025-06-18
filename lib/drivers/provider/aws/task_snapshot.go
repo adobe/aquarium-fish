@@ -26,16 +26,16 @@ import (
 
 	"github.com/adobe/aquarium-fish/lib/drivers/provider"
 	"github.com/adobe/aquarium-fish/lib/log"
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
 // TaskSnapshot stores the task data
 type TaskSnapshot struct {
 	driver *Driver
 
-	*types.ApplicationTask     `json:"-"` // Info about the requested task
-	*types.LabelDefinition     `json:"-"` // Info about the used label definition
-	*types.ApplicationResource `json:"-"` // Info about the processed resource
+	*typesv2.ApplicationTask     `json:"-"` // Info about the requested task
+	*typesv2.LabelDefinition     `json:"-"` // Info about the used label definition
+	*typesv2.ApplicationResource `json:"-"` // Info about the processed resource
 
 	Full bool `json:"full"` // Make full (all disks including OS image), or just the additional disks snapshot
 }
@@ -52,7 +52,7 @@ func (t *TaskSnapshot) Clone() provider.DriverTask {
 }
 
 // SetInfo defines information of the environment
-func (t *TaskSnapshot) SetInfo(task *types.ApplicationTask, def *types.LabelDefinition, res *types.ApplicationResource) {
+func (t *TaskSnapshot) SetInfo(task *typesv2.ApplicationTask, def *typesv2.LabelDefinition, res *typesv2.ApplicationResource) {
 	t.ApplicationTask = task
 	t.LabelDefinition = def
 	t.ApplicationResource = res
@@ -69,24 +69,24 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 	if t.ApplicationResource == nil || t.ApplicationResource.Identifier == "" {
 		return []byte(`{"error":"internal: invalid resource"}`), log.Errorf("AWS: %s: Invalid resource: %#v", t.driver.name, t.ApplicationResource)
 	}
-	log.Infof("AWS: %s: TaskSnapshot %s: Creating snapshot for Application %s", t.driver.name, t.ApplicationTask.UID, t.ApplicationTask.ApplicationUID)
+	log.Infof("AWS: %s: TaskSnapshot %s: Creating snapshot for Application %s", t.driver.name, t.ApplicationTask.Uid, t.ApplicationTask.ApplicationUid)
 	conn := t.driver.newEC2Conn()
 
-	if t.ApplicationTask.When == types.ApplicationStatusDEALLOCATE {
+	if t.ApplicationTask.When == typesv2.ApplicationState_DEALLOCATE {
 		// We need to stop the instance before executing snapshot to ensure it will be consistent
 		input := ec2.StopInstancesInput{
 			InstanceIds: []string{t.ApplicationResource.Identifier},
 		}
 
-		log.Infof("AWS: %s: TaskSnapshot %s: Stopping instance %q...", t.driver.name, t.ApplicationTask.UID, t.ApplicationResource.Identifier)
+		log.Infof("AWS: %s: TaskSnapshot %s: Stopping instance %q...", t.driver.name, t.ApplicationTask.Uid, t.ApplicationResource.Identifier)
 		result, err := conn.StopInstances(context.TODO(), &input)
 		if err != nil {
 			// Do not fail hard here - it's still possible to take snapshot of the instance
-			log.Errorf("AWS: %s: TaskSnapshot %s: Error during stopping the instance %s: %v", t.driver.name, t.ApplicationTask.UID, t.ApplicationResource.Identifier, err)
+			log.Errorf("AWS: %s: TaskSnapshot %s: Error during stopping the instance %s: %v", t.driver.name, t.ApplicationTask.Uid, t.ApplicationResource.Identifier, err)
 		}
 		if len(result.StoppingInstances) < 1 || *result.StoppingInstances[0].InstanceId != t.ApplicationResource.Identifier {
 			// Do not fail hard here - it's still possible to take snapshot of the instance
-			log.Errorf("AWS: %s: TaskSnapshot %s: Wrong instance id result during stopping: %s", t.driver.name, t.ApplicationTask.UID, t.ApplicationResource.Identifier)
+			log.Errorf("AWS: %s: TaskSnapshot %s: Wrong instance id result during stopping: %s", t.driver.name, t.ApplicationTask.Uid, t.ApplicationResource.Identifier)
 		}
 
 		// Wait for instance stopped before going forward with snapshot
@@ -100,7 +100,7 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 		if err := sw.Wait(context.TODO(), &waitInput, maxWait); err != nil {
 			// We have to fail here - not stopped instance means potential silent failure in snapshot capturing
 			return []byte(`{"error":"AWS: timeout stoping the instance"}`),
-				log.Errorf("AWS: %s: TaskSnapshot %s: Timeout during wait for instance %s stop: %v", t.driver.name, t.ApplicationTask.UID, t.ApplicationResource.Identifier, err)
+				log.Errorf("AWS: %s: TaskSnapshot %s: Timeout during wait for instance %s stop: %v", t.driver.name, t.ApplicationTask.Uid, t.ApplicationResource.Identifier, err)
 		}
 	}
 
@@ -121,13 +121,13 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 				},
 				{
 					Key:   aws.String("ApplicationTask"),
-					Value: aws.String(t.ApplicationTask.UID.String()),
+					Value: aws.String(t.ApplicationTask.Uid.String()),
 				},
 			},
 		}},
 	}
 
-	log.Debugf("AWS: %s: TaskSnapshot %s: Creating snapshot for %q...", t.driver.name, t.ApplicationTask.UID, t.ApplicationResource.Identifier)
+	log.Debugf("AWS: %s: TaskSnapshot %s: Creating snapshot for %q...", t.driver.name, t.ApplicationTask.Uid, t.ApplicationResource.Identifier)
 	resp, err := conn.CreateSnapshots(context.TODO(), &input)
 	if err != nil {
 		return []byte(`{"error":"internal: failed to create snapshots for instance"}`),
@@ -144,7 +144,7 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 	}
 
 	// Wait for snapshots to be available...
-	log.Infof("AWS: %s: TaskSnapshot %s: Wait for snapshots %s availability...", t.driver.name, t.ApplicationTask.UID, snapshots)
+	log.Infof("AWS: %s: TaskSnapshot %s: Wait for snapshots %s availability...", t.driver.name, t.ApplicationTask.Uid, snapshots)
 	sw := ec2.NewSnapshotCompletedWaiter(conn)
 	maxWait := time.Duration(t.driver.cfg.SnapshotCreateWait)
 	waitInput := ec2.DescribeSnapshotsInput{
@@ -152,10 +152,10 @@ func (t *TaskSnapshot) Execute() (result []byte, err error) {
 	}
 	if err = sw.Wait(context.TODO(), &waitInput, maxWait); err != nil {
 		// Do not fail hard here - we still need to remove the tmp image
-		log.Errorf("AWS: %s: TaskSnapshot %s: Error during wait snapshots availability: %s, %v", t.driver.name, t.ApplicationTask.UID, snapshots, err)
+		log.Errorf("AWS: %s: TaskSnapshot %s: Error during wait snapshots availability: %s, %v", t.driver.name, t.ApplicationTask.Uid, snapshots, err)
 	}
 
-	log.Infof("AWS: %s: TaskSnapshot %s: Created snapshots for instance %s: %s", t.driver.name, t.ApplicationTask.UID, t.ApplicationResource.Identifier, strings.Join(snapshots, ", "))
+	log.Infof("AWS: %s: TaskSnapshot %s: Created snapshots for instance %s: %s", t.driver.name, t.ApplicationTask.Uid, t.ApplicationResource.Identifier, strings.Join(snapshots, ", "))
 
 	return json.Marshal(map[string]any{"snapshots": snapshots})
 }

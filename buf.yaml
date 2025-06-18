@@ -14,3 +14,6 @@ breaking:
 lint:
   use:
     - STANDARD
+  except:
+    - ENUM_VALUE_PREFIX       # We don't need that - generates huge useless names
+    - ENUM_ZERO_VALUE_SUFFIX  # Still need to follow - but enough just "UNSPECIFIED"

@@ -16,7 +16,6 @@ package main
 
 import (
 	"bytes"
-	//"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -26,7 +25,6 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/getkin/kin-openapi/openapi3"
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
@@ -34,7 +32,7 @@ import (
 
 	"github.com/adobe/aquarium-fish/lib/auth"
 	"github.com/adobe/aquarium-fish/lib/build"
-	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 )
 
 const (
@@ -123,11 +121,11 @@ var combinedPermissionsTmpl = template.Must(template.New("combined_permissions")
 package auth
 
 import (
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
 // All available permissions per role
-var rolePermissions = map[string][]types.Permission{
+var rolePermissions = map[string][]typesv2.Permission{
 	{{- range $role, $perms := . }}
 	"{{ $role }}": {
 		{{- $lastResource := "" }}
@@ -145,40 +143,10 @@ var rolePermissions = map[string][]types.Permission{
 }
 
 // GetRolePermissions returns a map of all possible permissions for all known roles
-func GetRolePermissions() map[string][]types.Permission {
+func GetRolePermissions() map[string][]typesv2.Permission {
 	return rolePermissions
 }
 `))
-
-func main() {
-	if len(os.Args) == 2 && os.Args[1] == "--version" {
-		fmt.Fprintln(os.Stdout, build.Version)
-		os.Exit(0)
-	}
-	if len(os.Args) == 2 && (os.Args[1] == "-h" || os.Args[1] == "--help") {
-		fmt.Fprintln(os.Stdout, usage)
-		os.Exit(0)
-	}
-	if len(os.Args) != 1 {
-		fmt.Fprintln(os.Stderr, usage)
-		os.Exit(1)
-	}
-
-	protogen.Options{}.Run(func(plugin *protogen.Plugin) error {
-		plugin.SupportedFeatures = uint64(pluginpb.CodeGeneratorResponse_FEATURE_PROTO3_OPTIONAL) | uint64(pluginpb.CodeGeneratorResponse_FEATURE_SUPPORTS_EDITIONS)
-		plugin.SupportedEditionsMinimum = descriptorpb.Edition_EDITION_PROTO2
-		plugin.SupportedEditionsMaximum = descriptorpb.Edition_EDITION_2023
-
-		// Process gRPC permissions
-		grpcServices, grpcRoles := processGrpcPermissions(plugin)
-
-		// Process OpenAPI permissions if available
-		openapiServices, openapiRoles := processOpenAPIPermissions(plugin, grpcServices)
-
-		// Merge roles and generate files
-		return generatePermissionFiles(grpcServices, openapiServices, grpcRoles, openapiRoles)
-	})
-}
 
 func processGrpcPermissions(plugin *protogen.Plugin) (map[string][]string, map[string][]Permission) {
 	serviceMethods := make(map[string][]string)
@@ -205,15 +173,24 @@ func processGrpcPermissions(plugin *protogen.Plugin) (map[string][]string, map[s
 						// If there is no AccessControl specified - assign it to Administrator
 						roles = []string{auth.AdminRoleName} // Default role
 					}
-					if ac != nil && len(ac.GetAllowedRoles()) > 0 {
-						// When AllowedRoles are specified - use admin as default and append them
-						roles = []string{auth.AdminRoleName} // Default role
-						for _, role := range ac.GetAllowedRoles() {
-							if !slices.Contains(roles, role) {
-								roles = append(roles, role)
+					if ac != nil {
+						// If no_permission_needed is set - skipping roles processing for method
+						if !ac.GetNoPermissionNeeded() {
+							// Administrator as default
+							roles = []string{auth.AdminRoleName} // Default role
+							for _, role := range ac.GetAllowedRoles() {
+								if !slices.Contains(roles, role) {
+									roles = append(roles, role)
+								}
+								if !slices.Contains(uniqueRoles, role) {
+									uniqueRoles = append(uniqueRoles, role)
+								}
 							}
-							if !slices.Contains(uniqueRoles, role) {
-								uniqueRoles = append(uniqueRoles, role)
+						}
+						// Additional actions
+						for _, action := range ac.GetAdditionalActions() {
+							if !slices.Contains(svcMethods, action) {
+								svcMethods = append(svcMethods, action)
 							}
 						}
 					}
@@ -251,138 +228,19 @@ func processGrpcPermissions(plugin *protogen.Plugin) (map[string][]string, map[s
 	return serviceMethods, rolePermissions
 }
 
-func processOpenAPIPermissions(plugin *protogen.Plugin, knownServiceMethods map[string][]string) (map[string][]string, map[string][]Permission) {
-	serviceMethods := make(map[string][]string)
-	rolePermissions := make(map[string][]Permission)
-
-	// Check if OpenAPI spec exists
-	specPath := "docs/openapi.yaml"
-	if _, err := os.Stat(specPath); os.IsNotExist(err) {
-		return serviceMethods, rolePermissions
-	}
-
-	// Load OpenAPI spec
-	loader := openapi3.NewLoader()
-	doc, err := loader.LoadFromFile(specPath)
-	if err != nil {
-		plugin.Error(fmt.Errorf("WARN: Failed to load OpenAPI spec: %v", err))
-		return serviceMethods, rolePermissions
-	}
-
-	// Process all paths
-	for path, pathItem := range doc.Paths.Map() {
-		if pathItem == nil {
-			continue
-		}
-
-		processOperation := func(method string, op *openapi3.Operation) {
-			if op == nil {
-				return
-			}
-
-			if len(op.Tags) < 1 {
-				plugin.Error(fmt.Errorf("ERROR: Unable to find Resource specifying tag for path %q method %q", path, method))
-				return
-			}
-
-			serviceName := op.Tags[0] + "Service"
-
-			if _, ok := serviceMethods[serviceName]; !ok {
-				if _, ok = knownServiceMethods[serviceName]; !ok {
-					// Adding service itself to the constants
-					serviceMethods[serviceName] = []string{""}
-				} else {
-					// Not adding service since it's already defined in known services
-					serviceMethods[serviceName] = []string{}
-				}
-			}
-
-			// Get x-rbac extension
-			rbacExt := op.Extensions["x-rbac"]
-			if rbacExt == nil {
-				// If x-rbac is not set - then this path is available for logged-in user
-				return
-			}
-
-			// Parse x-rbac extension
-			rbacMap := map[string][]string{}
-			rbacMapPre, ok := rbacExt.(map[string]any)
-			if !ok {
-				return
-			}
-			for role, actionsPre := range rbacMapPre {
-				if actionsPreList, ok := actionsPre.([]any); ok {
-					actions := []string{}
-					for _, actionPre := range actionsPreList {
-						if action, ok := actionPre.(string); ok {
-							actions = append(actions, action)
-						}
-					}
-					if len(actions) > 0 {
-						rbacMap[role] = actions
-					}
-				}
-			}
-
-			if len(rbacMap) == 0 {
-				rbacMap = map[string][]string{
-					auth.AdminRoleName: {method},
-				}
-			}
-
-			// Process each role and its permissions
-			for role, actions := range rbacMap {
-				if len(actions) == 0 && op.OperationID != "" {
-					actions = []string{op.OperationID}
-				}
-
-				for _, action := range actions {
-					if _, ok := knownServiceMethods[serviceName]; !ok || !slices.Contains(knownServiceMethods[serviceName], action) {
-						if !slices.Contains(serviceMethods[serviceName], action) {
-							serviceMethods[serviceName] = append(serviceMethods[serviceName], action)
-						}
-					}
-					rolePermissions[role] = append(rolePermissions[role], Permission{
-						Resource: serviceName,
-						Action:   action,
-						Comment:  "OpenAPI",
-					})
-				}
-			}
-		}
-
-		processOperation("Get", pathItem.Get)
-		processOperation("Create", pathItem.Post)
-		processOperation("Update", pathItem.Put)
-		processOperation("Delete", pathItem.Delete)
-	}
-
-	// Sort methods to ensure they will be in order
-	for role := range serviceMethods {
-		sort.Strings(serviceMethods[role])
-	}
-
-	return serviceMethods, rolePermissions
-}
-
-func generatePermissionFiles(grpcServices, openapiServices map[string][]string, grpcRoles, openapiRoles map[string][]Permission) error {
+func generatePermissionFiles(grpcServices map[string][]string, grpcRoles map[string][]Permission) error {
 	// Generate gRPC-specific permissions
 	if err := generateServiceMethodConstants(grpcServices, "grpc"); err != nil {
 		return err
 	}
 
-	// Generate OpenAPI-specific permissions
-	if err := generateServiceMethodConstants(openapiServices, "openapi"); err != nil {
-		return err
-	}
-
 	// Generate combined permissions
-	return generateCombinedPermissions(grpcRoles, openapiRoles)
+	return generateCombinedPermissions(grpcRoles)
 }
 
 func generateServiceMethodConstants(services map[string][]string, suffix string) error {
 	// Add services methods with "-" prefix to RBAC exclusion
-	// It's used on ConnectRPC side, OpenAPI uses per-method generation to skip those
+	// It's used on ConnectRPC side
 	excluded := make(map[string][]string)
 	for service, methods := range services {
 		for i, method := range methods {
@@ -420,38 +278,13 @@ func generateServiceMethodConstants(services map[string][]string, suffix string)
 	return nil
 }
 
-func generateCombinedPermissions(grpcRoles, openapiRoles map[string][]Permission) error {
+func generateCombinedPermissions(grpcRoles map[string][]Permission) error {
 	// Merge roles and permissions
 	combinedRoles := make(map[string][]Permission)
 
 	// Add gRPC roles
 	for role, perms := range grpcRoles {
 		combinedRoles[role] = append(combinedRoles[role], perms...)
-	}
-
-	// Add OpenAPI roles
-	for role, perms := range openapiRoles {
-		// Skipping the existing permissions to not duplicate
-		if existingPerms, ok := combinedRoles[role]; ok {
-			for _, perm := range perms {
-				found := false
-				for existingIndex, existingPerm := range existingPerms {
-					if existingPerm.Resource == perm.Resource && existingPerm.Action == perm.Action {
-						if !strings.HasSuffix(existingPerm.Comment, perm.Comment) {
-							// Appending comment of existing one with the proposed one
-							combinedRoles[role][existingIndex].Comment = existingPerm.Comment + ", " + perm.Comment
-						}
-						found = true
-						break
-					}
-				}
-				if !found {
-					combinedRoles[role] = append(combinedRoles[role], perm)
-				}
-			}
-		} else {
-			combinedRoles[role] = append(combinedRoles[role], perms...)
-		}
 	}
 
 	// Sort permissions for each role
@@ -490,4 +323,31 @@ func formatGoFile(filename string) error {
 		return fmt.Errorf("gofmt failed: %v\n%s", err, output)
 	}
 	return nil
+}
+
+func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--version" {
+		fmt.Fprintln(os.Stdout, build.Version)
+		os.Exit(0)
+	}
+	if len(os.Args) == 2 && (os.Args[1] == "-h" || os.Args[1] == "--help") {
+		fmt.Fprintln(os.Stdout, usage)
+		os.Exit(0)
+	}
+	if len(os.Args) != 1 {
+		fmt.Fprintln(os.Stderr, usage)
+		os.Exit(1)
+	}
+
+	protogen.Options{}.Run(func(plugin *protogen.Plugin) error {
+		plugin.SupportedFeatures = uint64(pluginpb.CodeGeneratorResponse_FEATURE_PROTO3_OPTIONAL) | uint64(pluginpb.CodeGeneratorResponse_FEATURE_SUPPORTS_EDITIONS)
+		plugin.SupportedEditionsMinimum = descriptorpb.Edition_EDITION_PROTO2
+		plugin.SupportedEditionsMaximum = descriptorpb.Edition_EDITION_2023
+
+		// Process gRPC permissions
+		grpcServices, grpcRoles := processGrpcPermissions(plugin)
+
+		// Merge roles and generate files
+		return generatePermissionFiles(grpcServices, grpcRoles)
+	})
 }

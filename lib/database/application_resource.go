@@ -25,11 +25,11 @@ import (
 	"go.mills.io/bitcask/v2"
 
 	"github.com/adobe/aquarium-fish/lib/log"
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
 // ApplicationResourceList returns a list of all known ApplicationResource objects
-func (d *Database) ApplicationResourceList() (rs []types.ApplicationResource, err error) {
+func (d *Database) ApplicationResourceList() (rs []typesv2.ApplicationResource, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -38,11 +38,11 @@ func (d *Database) ApplicationResourceList() (rs []types.ApplicationResource, er
 }
 
 // ApplicationResourceListNode returns list of resources for provided NodeUID
-func (d *Database) ApplicationResourceListNode(nodeUID types.NodeUID) (rs []types.ApplicationResource, err error) {
+func (d *Database) ApplicationResourceListNode(nodeUID typesv2.NodeUID) (rs []typesv2.ApplicationResource, err error) {
 	all, err := d.ApplicationResourceList()
 	if err == nil {
 		for _, r := range all {
-			if r.NodeUID == nodeUID {
+			if r.NodeUid == nodeUID {
 				rs = append(rs, r)
 			}
 		}
@@ -51,40 +51,36 @@ func (d *Database) ApplicationResourceListNode(nodeUID types.NodeUID) (rs []type
 }
 
 // ApplicationResourceCreate makes new Resource
-func (d *Database) ApplicationResourceCreate(r *types.ApplicationResource) error {
-	if r.ApplicationUID == uuid.Nil {
+func (d *Database) ApplicationResourceCreate(r *typesv2.ApplicationResource) error {
+	if r.ApplicationUid == uuid.Nil {
 		return fmt.Errorf("Fish: ApplicationUID can't be unset")
 	}
-	if r.LabelUID == uuid.Nil {
+	if r.LabelUid == uuid.Nil {
 		return fmt.Errorf("Fish: LabelUID can't be unset")
 	}
-	if r.NodeUID == uuid.Nil {
+	if r.NodeUid == uuid.Nil {
 		return fmt.Errorf("Fish: NodeUID can't be unset")
 	}
 	if len(r.Identifier) == 0 {
 		return fmt.Errorf("Fish: Identifier can't be empty")
 	}
-	// TODO: check JSON
-	if len(r.Metadata) < 2 {
-		return fmt.Errorf("Fish: Metadata can't be empty")
-	}
 
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	r.UID = d.NewUID()
+	r.Uid = d.NewUID()
 	r.CreatedAt = time.Now()
 	r.UpdatedAt = r.CreatedAt
-	return d.be.Collection(ObjectApplicationResource).Add(r.UID.String(), r)
+	return d.be.Collection(ObjectApplicationResource).Add(r.Uid.String(), r)
 }
 
 // ApplicationResourceDelete removes Resource
-func (d *Database) ApplicationResourceDelete(uid types.ApplicationResourceUID) error {
+func (d *Database) ApplicationResourceDelete(uid typesv2.ApplicationResourceUID) error {
 	// First delete any references to this resource.
-	err := d.ApplicationResourceAccessDeleteByResource(uid)
+	err := d.GateProxySSHAccessDeleteByResource(uid)
 	if err != nil {
 		// This issue is not a big deal, because most of the time there is no access to delete
-		log.Debugf("Unable to delete ApplicationResourceAccess associated with ApplicationResourceUID %s: %v", uid, err)
+		log.Debugf("Unable to delete GateProxySSHAccess associated with ApplicationResourceUID %s: %v", uid, err)
 	}
 
 	d.beMu.RLock()
@@ -95,16 +91,16 @@ func (d *Database) ApplicationResourceDelete(uid types.ApplicationResourceUID) e
 }
 
 // ApplicationResourceSave stores ApplicationResource
-func (d *Database) ApplicationResourceSave(res *types.ApplicationResource) error {
+func (d *Database) ApplicationResourceSave(res *typesv2.ApplicationResource) error {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
 	res.UpdatedAt = time.Now()
-	return d.be.Collection(ObjectApplicationResource).Add(res.UID.String(), res)
+	return d.be.Collection(ObjectApplicationResource).Add(res.Uid.String(), res)
 }
 
 // ApplicationResourceGet returns Resource by it's UID
-func (d *Database) ApplicationResourceGet(uid types.ApplicationResourceUID) (res *types.ApplicationResource, err error) {
+func (d *Database) ApplicationResourceGet(uid typesv2.ApplicationResourceUID) (res *typesv2.ApplicationResource, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -168,21 +164,21 @@ func isControlledNetwork(ip string) bool {
 }
 
 // ApplicationResourceGetByIP returns Resource by it's IP address
-func (d *Database) ApplicationResourceGetByIP(ip string) (res *types.ApplicationResource, err error) {
+func (d *Database) ApplicationResourceGetByIP(ip string) (res *typesv2.ApplicationResource, err error) {
 	// Check by IP first
 	all, err := d.ApplicationResourceList()
 	if err != nil {
 		return nil, fmt.Errorf("Fish: Unable to get any ApplicationResource")
 	}
 	for _, r := range all {
-		if r.NodeUID == d.GetNodeUID() && r.IpAddr == ip {
+		if r.NodeUid == d.GetNodeUID() && r.IpAddr == ip {
 			res = &r
 			break
 		}
 	}
 	if res != nil {
 		// Check if the state is allocated to prevent old resources access
-		if d.ApplicationIsAllocated(res.ApplicationUID) != nil {
+		if d.ApplicationIsAllocated(res.ApplicationUid) != nil {
 			return nil, fmt.Errorf("Fish: Prohibited to access the ApplicationResource of not allocated Application")
 		}
 
@@ -202,7 +198,7 @@ func (d *Database) ApplicationResourceGetByIP(ip string) (res *types.Application
 		return nil, bitcask.ErrKeyNotFound
 	}
 	for _, r := range all {
-		if r.NodeUID == d.GetNodeUID() && r.HwAddr == hwAddr {
+		if r.NodeUid == d.GetNodeUID() && r.HwAddr == hwAddr {
 			res = &r
 			break
 		}
@@ -212,11 +208,11 @@ func (d *Database) ApplicationResourceGetByIP(ip string) (res *types.Application
 	}
 
 	// Check if the state is allocated to prevent old resources access
-	if d.ApplicationIsAllocated(res.ApplicationUID) != nil {
+	if d.ApplicationIsAllocated(res.ApplicationUid) != nil {
 		return nil, fmt.Errorf("Fish: Prohibited to access the ApplicationResource of not allocated Application")
 	}
 
-	log.Debug("Fish: Update IP address for the ApplicationResource", res.ApplicationUID, ip)
+	log.Debug("Fish: Update IP address for the ApplicationResource", res.ApplicationUid, ip)
 	res.IpAddr = ip
 	err = d.ApplicationResourceSave(res)
 
@@ -224,11 +220,11 @@ func (d *Database) ApplicationResourceGetByIP(ip string) (res *types.Application
 }
 
 // ApplicationResourceGetByApplication returns ApplicationResource by ApplicationUID
-func (d *Database) ApplicationResourceGetByApplication(appUID types.ApplicationUID) (res *types.ApplicationResource, err error) {
+func (d *Database) ApplicationResourceGetByApplication(appUID typesv2.ApplicationUID) (res *typesv2.ApplicationResource, err error) {
 	all, err := d.ApplicationResourceList()
 	if err == nil {
 		for _, r := range all {
-			if r.ApplicationUID == appUID {
+			if r.ApplicationUid == appUID {
 				return &r, nil
 			}
 		}

@@ -26,15 +26,18 @@ package aquarium.v2;
 
 import "google/protobuf/descriptor.proto";
 
-option go_package = "github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2;aquariumv2";
+option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2";
 
 // RoleBasedAccessControl defines the RBAC policy for a method
 message RoleBasedAccessControl {
   // Whether unauthenticated access is allowed
   optional bool allow_unauthenticated = 1;
+  optional bool no_permission_needed = 2;
   // List of roles that are allowed to access this method
   // If empty, only Administrator role is allowed
-  repeated string allowed_roles = 2;
+  repeated string allowed_roles = 3;
+  // List of additional actions used by the RPC method
+  repeated string additional_actions = 4;
 }
 
 extend google.protobuf.MethodOptions {

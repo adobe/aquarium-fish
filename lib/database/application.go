@@ -21,11 +21,11 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/adobe/aquarium-fish/lib/log"
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
 // ApplicationFind lists Applications by filter
-func (d *Database) ApplicationList() (as []types.Application, err error) {
+func (d *Database) ApplicationList() (as []typesv2.Application, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -34,36 +34,33 @@ func (d *Database) ApplicationList() (as []types.Application, err error) {
 }
 
 // ApplicationCreate makes new Application
-func (d *Database) ApplicationCreate(a *types.Application) error {
-	if a.LabelUID == uuid.Nil {
+func (d *Database) ApplicationCreate(a *typesv2.Application) error {
+	if a.LabelUid == uuid.Nil {
 		return fmt.Errorf("Fish: LabelUID can't be unset")
-	}
-	if a.Metadata == "" {
-		a.Metadata = "{}"
 	}
 
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	a.UID = d.NewUID()
+	a.Uid = d.NewUID()
 	a.CreatedAt = time.Now()
-	err := d.be.Collection(ObjectApplication).Add(a.UID.String(), a)
+	err := d.be.Collection(ObjectApplication).Add(a.Uid.String(), a)
 
 	// Create ApplicationState NEW too
-	d.ApplicationStateCreate(&types.ApplicationState{
-		ApplicationUID: a.UID, Status: types.ApplicationStatusNEW,
+	d.ApplicationStateCreate(&typesv2.ApplicationState{
+		ApplicationUid: a.Uid, Status: typesv2.ApplicationState_NEW,
 		Description: "Just created by Fish " + d.node.Name,
 	})
 	return err
 }
 
 // Intentionally disabled, application can't be updated
-/*func (d *Database) ApplicationSave(app *types.Application) error {
+/*func (d *Database) ApplicationSave(app *typesv2.Application) error {
 	return d.be.Save(app).Error
 }*/
 
 // ApplicationGet returns Application by UID
-func (d *Database) ApplicationGet(uid types.ApplicationUID) (a *types.Application, err error) {
+func (d *Database) ApplicationGet(uid typesv2.ApplicationUID) (a *typesv2.Application, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -72,7 +69,7 @@ func (d *Database) ApplicationGet(uid types.ApplicationUID) (a *types.Applicatio
 }
 
 // ApplicationDelete removes the Application
-func (d *Database) ApplicationDelete(uid types.ApplicationUID) (err error) {
+func (d *Database) ApplicationDelete(uid typesv2.ApplicationUID) (err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -80,18 +77,18 @@ func (d *Database) ApplicationDelete(uid types.ApplicationUID) (err error) {
 }
 
 // ApplicationIsAllocated returns if specific Application is allocated
-func (d *Database) ApplicationIsAllocated(appUID types.ApplicationUID) (err error) {
+func (d *Database) ApplicationIsAllocated(appUID typesv2.ApplicationUID) (err error) {
 	state, err := d.ApplicationStateGetByApplication(appUID)
 	if err != nil {
 		return err
-	} else if state.Status != types.ApplicationStatusALLOCATED {
+	} else if state.Status != typesv2.ApplicationState_ALLOCATED {
 		return fmt.Errorf("Fish: The Application is not allocated")
 	}
 	return nil
 }
 
 // ApplicationDeallocate helps with creating deallocate/recalled state for the Application
-func (d *Database) ApplicationDeallocate(appUID types.ApplicationUID, requestor string) (*types.ApplicationState, error) {
+func (d *Database) ApplicationDeallocate(appUID typesv2.ApplicationUID, requestor string) (*typesv2.ApplicationState, error) {
 	out, err := d.ApplicationStateGetByApplication(appUID)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to find status for the Application: %s, %w", appUID, err)
@@ -102,12 +99,8 @@ func (d *Database) ApplicationDeallocate(appUID types.ApplicationUID, requestor 
 		return out, nil
 	}
 
-	newStatus := types.ApplicationStatusDEALLOCATE
-	if out.Status != types.ApplicationStatusALLOCATED {
-		// The Application was not yet Allocated so just mark it as Recalled
-		newStatus = types.ApplicationStatusRECALLED
-	}
-	as := &types.ApplicationState{ApplicationUID: appUID, Status: newStatus,
+	newStatus := typesv2.ApplicationState_DEALLOCATE
+	as := &typesv2.ApplicationState{ApplicationUid: appUID, Status: newStatus,
 		Description: fmt.Sprintf("Requested by %s", requestor),
 	}
 

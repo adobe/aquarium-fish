@@ -19,25 +19,34 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
+// Reflection of RPC LabelServiceListRequest to pass to database function LabelList
+type LabelListParams struct {
+	Name    *string
+	Version *string
+}
+
 // LabelFind returns list of Labels that fits filters
-func (d *Database) LabelList(filters types.LabelListGetParams) (labels []types.Label, err error) {
+func (d *Database) LabelList(filters LabelListParams) (labels []typesv2.Label, err error) {
 	d.beMu.RLock()
 	err = d.be.Collection(ObjectLabel).List(&labels)
 	d.beMu.RUnlock()
 
-	filterVersion := 0
+	var filterVersion int32
 	if filters.Version != nil && *filters.Version != "last" {
 		// Try to convert to int and if fails
-		if filterVersion, err = strconv.Atoi(*filters.Version); err != nil {
+		if version64, err := strconv.ParseInt(*filters.Version, 10, 32); err != nil {
 			return labels, fmt.Errorf("Unable to parse Version integer: %v", err)
+		} else {
+			// Converting to int32
+			filterVersion = int32(version64)
 		}
 	}
 	if err == nil && (filters.Name != nil || filters.Version != nil) {
-		passed := []types.Label{}
-		uniqueLabels := make(map[string]types.Label)
+		passed := []typesv2.Label{}
+		uniqueLabels := make(map[string]typesv2.Label)
 		for _, label := range labels {
 			if filters.Name != nil && label.Name != *filters.Name {
 				continue
@@ -67,8 +76,8 @@ func (d *Database) LabelList(filters types.LabelListGetParams) (labels []types.L
 	return labels, err
 }
 
-func (d *Database) LabelListName(name string) (labels []types.Label, err error) {
-	allLabels := []types.Label{}
+func (d *Database) LabelListName(name string) (labels []typesv2.Label, err error) {
+	allLabels := []typesv2.Label{}
 
 	d.beMu.RLock()
 	err = d.be.Collection(ObjectLabel).List(&allLabels)
@@ -85,7 +94,7 @@ func (d *Database) LabelListName(name string) (labels []types.Label, err error) 
 }
 
 // LabelCreate makes new Label
-func (d *Database) LabelCreate(l *types.Label) error {
+func (d *Database) LabelCreate(l *typesv2.Label) error {
 	if l.Name == "" {
 		return fmt.Errorf("Fish: Name can't be empty")
 	}
@@ -100,17 +109,11 @@ func (d *Database) LabelCreate(l *types.Label) error {
 		if err := l.Definitions[i].Resources.Validate([]string{}, false); err != nil {
 			return fmt.Errorf("Fish: Resources validation failed: %v", err)
 		}
-		if def.Options == "" {
-			l.Definitions[i].Options = "{}"
-		}
-	}
-	if l.Metadata == "" {
-		l.Metadata = "{}"
 	}
 
 	// Name and version need to be unique
 	strversion := fmt.Sprintf("%d", l.Version)
-	founds, err := d.LabelList(types.LabelListGetParams{Name: &l.Name, Version: &strversion})
+	founds, err := d.LabelList(LabelListParams{Name: &l.Name, Version: &strversion})
 	if err != nil || len(founds) != 0 {
 		return fmt.Errorf("Fish: Label name + version is not unique: %v", err)
 	}
@@ -118,14 +121,14 @@ func (d *Database) LabelCreate(l *types.Label) error {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	l.UID = d.NewUID()
+	l.Uid = d.NewUID()
 	l.CreatedAt = time.Now()
-	return d.be.Collection(ObjectLabel).Add(l.UID.String(), l)
+	return d.be.Collection(ObjectLabel).Add(l.Uid.String(), l)
 }
 
 // Intentionally disabled - labels can be created once and can't be updated
 // Create label with incremented version instead
-/*func (d *Database) LabelSave(label *types.Label) error {
+/*func (d *Database) LabelSave(label *typesv2.Label) error {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -133,7 +136,7 @@ func (d *Database) LabelCreate(l *types.Label) error {
 }*/
 
 // LabelGet returns Label by UID
-func (d *Database) LabelGet(uid types.LabelUID) (label *types.Label, err error) {
+func (d *Database) LabelGet(uid typesv2.LabelUID) (label *typesv2.Label, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -142,7 +145,7 @@ func (d *Database) LabelGet(uid types.LabelUID) (label *types.Label, err error) 
 }
 
 // LabelDelete deletes the Label by UID
-func (d *Database) LabelDelete(uid types.LabelUID) error {
+func (d *Database) LabelDelete(uid typesv2.LabelUID) error {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 

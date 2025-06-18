@@ -1,0 +1,42 @@
+// Copyright 2025 Adobe. All rights reserved.
+// This file is licensed to you under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may obtain a copy
+// of the License at http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software distributed under
+// the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR REPRESENTATIONS
+// OF ANY KIND, either express or implied. See the License for the specific language
+// governing permissions and limitations under the License.
+
+// Author: Sergei Parshev (@sparshev)
+
+syntax = "proto3";
+
+package aquarium.v2;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2";
+
+// Vote represents the current state of Applciation election process of specific node
+//
+// When Application becomes available for the node it starts to vote to notify the cluster
+// about its availability. Votes are basically "yes" or "no" and could take a number of rounds
+// depends on the cluster voting and election rules.
+// Votes are not stored in DB and lives only in-memory.
+message Vote {
+  string uid = 1;
+  google.protobuf.Timestamp created_at = 2;
+  string application_uid = 3;
+  string node_uid = 4;
+  // Round of the election, because it can take a number of rounds to figure out the Only One.
+  uint32 round = 5;
+  // Node places answer to the Vote for the Application's definitions, the number represents
+  // the first available index of the definition which fits the node available resources. In
+  // case it's `-1` then node can't run any of the definitions.
+  int32 available = 6;
+  // The custom rule result is needed to store the custom rule decision
+  uint32 rule_result = 7;
+  // The last resort to figure out for the winner.
+  uint32 rand = 8;
+}
