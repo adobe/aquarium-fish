@@ -165,6 +165,7 @@ func processGrpcPermissions(plugin *protogen.Plugin) (map[string][]string, map[s
 			for _, method := range service.Methods {
 				opts, ok := method.Desc.Options().(*descriptorpb.MethodOptions)
 				var roles []string
+				var additionalActions []string
 				if ok {
 					ext := proto.GetExtension(opts, aquariumv2.E_AccessControl)
 					ac, ok := ext.(*aquariumv2.RoleBasedAccessControl)
@@ -189,6 +190,7 @@ func processGrpcPermissions(plugin *protogen.Plugin) (map[string][]string, map[s
 						}
 						// Additional actions
 						for _, action := range ac.GetAdditionalActions() {
+							additionalActions = append(additionalActions, action)
 							if !slices.Contains(svcMethods, action) {
 								svcMethods = append(svcMethods, action)
 							}
@@ -216,6 +218,18 @@ func processGrpcPermissions(plugin *protogen.Plugin) (map[string][]string, map[s
 						Comment:  "gRPC",
 					}
 					rolePermissions[role] = append(rolePermissions[role], perm)
+
+					// Allowing admin role to use additional actions as well
+					if role == auth.AdminRoleName {
+						for _, action := range additionalActions {
+							perm = Permission{
+								Resource: svcName,
+								Action:   action,
+								Comment:  "gRPC additional",
+							}
+							rolePermissions[role] = append(rolePermissions[role], perm)
+						}
+					}
 				}
 			}
 

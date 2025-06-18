@@ -23,7 +23,6 @@ import (
 
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
-	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
@@ -32,8 +31,8 @@ type contextKey string
 const userContextKey = contextKey("user")
 
 // GetUserFromContext retrieves the user from context
-func GetUserFromContext(ctx context.Context) *aquariumv2.User {
-	if user, ok := ctx.Value(userContextKey).(*aquariumv2.User); ok {
+func GetUserFromContext(ctx context.Context) *typesv2.User {
+	if user, ok := ctx.Value(userContextKey).(*typesv2.User); ok {
 		return user
 	}
 	return nil

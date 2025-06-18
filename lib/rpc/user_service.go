@@ -44,7 +44,7 @@ func (*UserService) GetMe(ctx context.Context, _ /*req*/ *connect.Request[aquari
 
 	return connect.NewResponse(&aquariumv2.UserServiceGetMeResponse{
 		Status: true, Message: "User details retrieved successfully",
-		Data: user,
+		Data: user.ToUser(),
 	}), nil
 }
 
