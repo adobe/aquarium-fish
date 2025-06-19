@@ -16,10 +16,14 @@ package tests
 
 import (
 	"context"
+	"crypto/tls"
+	"net/http"
 	"testing"
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/steinfletcher/apitest"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
@@ -49,6 +53,13 @@ drivers:
 		afi.Cleanup(t)
 	})
 
+	cli := &http.Client{
+		Timeout: time.Second * 5,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+
 	// Create admin client
 	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
 
@@ -66,6 +77,7 @@ drivers:
 
 	var labelUID string
 	t.Run("Create Label", func(t *testing.T) {
+		md, _ := structpb.NewStruct(map[string]any{"test1": "test2"})
 		resp, err := labelClient.Create(
 			context.Background(),
 			connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
@@ -79,6 +91,7 @@ drivers:
 							Ram: 2,
 						},
 					}},
+					Metadata: md,
 				},
 			}),
 		)
@@ -90,11 +103,13 @@ drivers:
 
 	var appUID string
 	t.Run("Create Application", func(t *testing.T) {
+		md, _ := structpb.NewStruct(map[string]any{"testk": "testv"})
 		resp, err := appClient.Create(
 			context.Background(),
 			connect.NewRequest(&aquariumv2.ApplicationServiceCreateRequest{
 				Application: &aquariumv2.Application{
 					LabelUid: labelUID,
+					Metadata: md,
 				},
 			}),
 		)
@@ -147,6 +162,49 @@ drivers:
 		if resp.Msg.Data.Identifier == "" {
 			t.Fatal("Resource identifier is empty")
 		}
+	})
+
+	var metadata map[string]string
+	t.Run("Check metadata is available for the Application", func(t *testing.T) {
+		apitest.New().
+			EnableNetworking(cli).
+			Get(afi.APIAddress("meta/v1/data/")).
+			Expect(t).
+			Status(http.StatusOK).
+			End().
+			JSON(&metadata)
+
+		if len(metadata) != 2 {
+			t.Fatalf("Amount of metadata keys is incorrect: %d != 2, %v", len(metadata), metadata)
+		}
+
+		if val, ok := metadata["test1"]; !ok || val != "test2" {
+			t.Fatalf("Metadata key from label is unset: %v", metadata)
+		}
+
+		if val, ok := metadata["testk"]; !ok || val != "testv" {
+			t.Fatalf("Metadata key from application is unset: %v", metadata)
+		}
+
+		// Also check for env formatter
+		apitest.New().
+			EnableNetworking(cli).
+			Get(afi.APIAddress("meta/v1/data/")).
+			Query("format", "env").
+			Expect(t).
+			Status(http.StatusOK).
+			Body("test1=test2\ntestk=testv\n").
+			End()
+
+		// And ps1 formatter
+		apitest.New().
+			EnableNetworking(cli).
+			Get(afi.APIAddress("meta/v1/data/")).
+			Query("format", "ps1").
+			Expect(t).
+			Status(http.StatusOK).
+			Body("$test1='test2'\n$testk='testv'\n").
+			End()
 	})
 
 	t.Run("Deallocate the Application", func(t *testing.T) {
