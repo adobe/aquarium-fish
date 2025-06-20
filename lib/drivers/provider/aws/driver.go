@@ -587,7 +587,9 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 		}
 	}
 
-	res := &types.ApplicationResource{}
+	res := &types.ApplicationResource{
+		HwAddr: iName,
+	}
 
 	if keyPem != "" && def.Authentication != nil && def.Authentication.Username != "" {
 		port := 22
@@ -673,6 +675,7 @@ func (d *Driver) Deallocate(res *types.ApplicationResource) error {
 		return fmt.Errorf("AWS: %s: Invalid resource: %v", d.name, res)
 	}
 	conn := d.newEC2Conn()
+	iName := res.HwAddr
 
 	input := ec2.TerminateInstancesInput{
 		InstanceIds: []string{res.Identifier},
@@ -680,16 +683,16 @@ func (d *Driver) Deallocate(res *types.ApplicationResource) error {
 
 	result, err := conn.TerminateInstances(context.TODO(), &input)
 	if err != nil || len(result.TerminatingInstances) < 1 {
-		return fmt.Errorf("AWS: %s: Error during termianting the instance %s: %s", d.name, res.Identifier, err)
+		return fmt.Errorf("AWS: %s: Error during termianting the instance %s: %s", d.name, iName, err)
 	}
 	inst := result.TerminatingInstances[0]
 	if aws.ToString(inst.InstanceId) != res.Identifier {
-		return fmt.Errorf("AWS: %s: Wrong instance id result %s during terminating of %s", d.name, aws.ToString(inst.InstanceId), res.Identifier)
+		return fmt.Errorf("AWS: %s: Wrong instance id result %s during terminating of %s", d.name, aws.ToString(inst.InstanceId), iName)
 	}
 
 	// Removing the generated instance key
 	if d.cfg.InstanceKey == "generate" && res.Authentication != nil {
-		keyName := fmt.Sprintf("%s%s", d.cfg.InstanceKeyPrefix, res.Identifier)
+		keyName := fmt.Sprintf("%s%s", d.cfg.InstanceKeyPrefix, res.HwAddr)
 		keypairInput := ec2.DeleteKeyPairInput{
 			KeyName: aws.String(keyName),
 		}
@@ -697,13 +700,13 @@ func (d *Driver) Deallocate(res *types.ApplicationResource) error {
 		result, err := conn.DeleteKeyPair(context.TODO(), &keypairInput)
 		if err != nil || result == nil || !aws.ToBool(result.Return) {
 			// It's not critical, but could leave some additional work for cleanup
-			log.Errorf("AWS: %s: Unable to delete keypair %q: %v", res.Identifier, keyName, err)
+			log.Errorf("AWS: %s: Unable to delete %s keypair %q: %v", d.name, iName, keyName, err)
 		} else {
-			log.Debugf("AWS: %s: Removed generated keypair: %q", res.Identifier, keyName)
+			log.Debugf("AWS: %s: Removed generated keypair for %s: %q", d.name, iName, keyName)
 		}
 	}
 
-	log.Infof("AWS: %s: Deallocate of instance completed: %s", res.Identifier, inst.CurrentState.Name)
+	log.Infof("AWS: %s: Deallocate of instance completed: %s", d.name, iName, inst.CurrentState.Name)
 
 	return nil
 }
