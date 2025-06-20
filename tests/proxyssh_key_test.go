@@ -738,22 +738,6 @@ drivers:
 		}
 	})
 
-	// Re-requesting the access to copy in other direction
-	t.Run("Requesting access 2 to the Application Resource", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/applicationresource/"+res.UID.String()+"/access")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&acc)
-
-		if res.Identifier == "" {
-			t.Fatalf("Unable to get access to Resource: %v", res.Identifier)
-		}
-	})
-
 	t.Run("Uploading files by SCP SFTP through PROXYSSH", func(t *testing.T) {
 		// Create temp dirs for input and output
 		srcdir, err := os.MkdirTemp("", "srcdir")

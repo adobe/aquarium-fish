@@ -203,7 +203,7 @@ func (e *Processor) UserDelete(c echo.Context, name string) error {
 }
 
 // ApplicationResourceAccessPut API call processor
-func (e *Processor) ApplicationResourceAccessPut(c echo.Context, uid types.ApplicationResourceUID) error {
+func (e *Processor) ApplicationResourceAccessPut(c echo.Context, uid types.ApplicationResourceUID, params types.ApplicationResourceAccessPutParams) error {
 	user, ok := c.Get("user").(*types.User)
 	if !ok {
 		c.JSON(http.StatusBadRequest, H{"message": "Not authentified"})
@@ -252,6 +252,8 @@ func (e *Processor) ApplicationResourceAccessPut(c echo.Context, uid types.Appli
 		Password: fmt.Sprintf("%x", pwdHash),
 		// Key need to be stored as public key
 		Key: string(pubkey),
+		// By default it's nil/false so could be used until the instance deallocated
+		OneTime: params.Onetime,
 	}
 	e.fish.DB().ApplicationResourceAccessCreate(&rAccess)
 

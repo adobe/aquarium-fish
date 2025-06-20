@@ -281,6 +281,12 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: onetime
+          in: query
+          description: To requests one-time access, which will be removed after use
+          required: false
+          schema:
+            type: boolean
       responses:
         '200':
           description: Successful operation
@@ -1511,6 +1517,9 @@ components:
           type: string
           description: >
             SSH key could be used instead of password to access the system.
+        one_time:
+          type: boolean
+          description: If set to true - the access will be removed from DB after usage
 
     Authentication:
       type: object

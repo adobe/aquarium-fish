@@ -299,7 +299,7 @@ func (d *Driver) passwordCallback(incomingConn ssh.ConnMetadata, pass []byte) (*
 	passHash := crypt.NewHash(string(pass), []byte{}).Hash
 	passHashStr := fmt.Sprintf("%x", passHash)
 
-	ra, err := d.db.ApplicationResourceAccessSingleUsePasswordHash(fishUser.Name, passHashStr)
+	ra, err := d.db.ApplicationResourceAccessPasswordHash(fishUser.Name, passHashStr)
 	if err != nil {
 		log.Errorf("PROXYSSH: %s: %s: Invalid access for user %q: %v", d.name, incomingConn.RemoteAddr(), fishUser.Name, err)
 		return nil, fmt.Errorf("Invalid access")
@@ -330,7 +330,7 @@ func (d *Driver) publicKeyCallback(incomingConn ssh.ConnMetadata, key ssh.Public
 
 	stringKey := string(ssh.MarshalAuthorizedKey(key))
 
-	ra, err := d.db.ApplicationResourceAccessSingleUseKey(fishUser.Name, stringKey)
+	ra, err := d.db.ApplicationResourceAccessKey(fishUser.Name, stringKey)
 	if err != nil {
 		log.Errorf("PROXYSSH: %s: %s: Invalid access for user %q: %v", d.name, incomingConn.RemoteAddr(), fishUser.Name, err)
 		return nil, fmt.Errorf("Invalid access")
