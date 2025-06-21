@@ -1030,9 +1030,7 @@ drivers:
 		}
 	})
 
-	// TODO: For some reason mock server does not accept reverse port forwarding, but
-	// I spent too much time on that already, so the direct forwarding enough for testing now
-	/*t.Run("Executing SSH port reverse pass through PROXYSSH", func(t *testing.T) {
+	t.Run("Executing SSH port reverse pass through PROXYSSH", func(t *testing.T) {
 		// Writing ssh private key to temp file
 		proxyKeyFile, err := os.CreateTemp("", "proxykey")
 		if err != nil {
@@ -1076,7 +1074,7 @@ drivers:
 		cmd.Start()
 
 		// Wait for ssh port passthrough startup
-		time.Sleep(2*time.Second)
+		time.Sleep(2 * time.Second)
 
 		// Requesting Fish API through proxied port
 		apitest.New().
@@ -1087,7 +1085,7 @@ drivers:
 			Status(http.StatusOK).
 			End().
 			JSON(&res)
-	})*/
+	})
 
 	t.Run("Deallocate the Application", func(t *testing.T) {
 		apitest.New().

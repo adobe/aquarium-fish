@@ -72,7 +72,7 @@ func (d *Driver) serveConnection(clientConn net.Conn) error {
 	}
 
 	// Establish destination connection
-	dstConn, err := session.connectToDestination(resource)
+	dstConn, dstChannels, dstRequests, err := session.connectToDestination(resource)
 	if err != nil {
 		return log.Errorf("PROXYSSH: %s: %s: Unable to connect to destination: %v", d.name, session.SrcAddr, err)
 	}
@@ -82,10 +82,31 @@ func (d *Driver) serveConnection(clientConn net.Conn) error {
 	session.wg.Add(1)
 	go session.handleSourceRequests(srcConnReqs, dstConn)
 
-	for newChannel := range srcConnChannels {
-		session.wg.Add(1)
-		go session.handleChannel(newChannel, dstConn)
-	}
+	// Handle destination requests (for reverse port forwarding)
+	session.wg.Add(1)
+	go session.handleDestinationRequests(dstRequests, srcConn)
+
+	// Handle channels from source to destination
+	session.wg.Add(1)
+	go func() {
+		defer session.wg.Done()
+		for newChannel := range srcConnChannels {
+			session.wg.Add(1)
+			go session.handleChannel(newChannel, dstConn)
+		}
+	}()
+
+	// Handle incoming channels from destination (for reverse port forwarding)
+	// This handles forwarded-tcpip channels that come from the server when
+	// someone connects to a reverse-forwarded port
+	session.wg.Add(1)
+	go func() {
+		defer session.wg.Done()
+		for newChannel := range dstChannels {
+			session.wg.Add(1)
+			go session.handleReverseChannel(newChannel, srcConn)
+		}
+	}()
 
 	// Wait for goroutines to finish
 	session.wg.Wait()
@@ -114,7 +135,7 @@ func (d *Driver) getSession(sessionID []byte) (*session, error) {
 	return session, nil
 }
 
-func (s *session) connectToDestination(res *types.ApplicationResource) (*ssh.Client, error) {
+func (s *session) connectToDestination(res *types.ApplicationResource) (ssh.Conn, <-chan ssh.NewChannel, <-chan *ssh.Request, error) {
 	dstAddr := net.JoinHostPort(res.IpAddr, strconv.Itoa(res.Authentication.Port))
 	dstConfig := &ssh.ClientConfig{
 		User:            res.Authentication.Username,
@@ -131,19 +152,27 @@ func (s *session) connectToDestination(res *types.ApplicationResource) (*ssh.Cli
 	if res.Authentication.Key != "" {
 		signer, err := ssh.ParsePrivateKey([]byte(res.Authentication.Key))
 		if err != nil {
-			return nil, log.Errorf("PROXYSSH: %s: %s: Unable to parse private key len %d: %v", s.drv.name, s.SrcAddr, len(res.Authentication.Key), err)
+			return nil, nil, nil, log.Errorf("PROXYSSH: %s: %s: Unable to parse private key len %d: %v", s.drv.name, s.SrcAddr, len(res.Authentication.Key), err)
 		}
 		dstConfig.Auth = append(dstConfig.Auth, ssh.PublicKeys(signer))
 	}
 
-	dstConn, err := ssh.Dial("tcp", dstAddr, dstConfig)
+	// Use lower-level connection to get access to incoming channels
+	tcpConn, err := net.Dial("tcp", dstAddr)
 	if err != nil {
-		return nil, log.Errorf("PROXYSSH: %s: %s: Unable to dial destination %q: %v", s.drv.name, s.SrcAddr, dstAddr, err)
+		return nil, nil, nil, log.Errorf("PROXYSSH: %s: %s: Unable to dial destination %q: %v", s.drv.name, s.SrcAddr, dstAddr, err)
 	}
-	return dstConn, nil
+
+	dstConn, dstChannels, dstRequests, err := ssh.NewClientConn(tcpConn, dstAddr, dstConfig)
+	if err != nil {
+		tcpConn.Close()
+		return nil, nil, nil, log.Errorf("PROXYSSH: %s: %s: Unable to establish SSH connection to destination %q: %v", s.drv.name, s.SrcAddr, dstAddr, err)
+	}
+
+	return dstConn, dstChannels, dstRequests, nil
 }
 
-func (s *session) handleSourceRequests(srcConnReqs <-chan *ssh.Request, dstConn *ssh.Client) {
+func (s *session) handleSourceRequests(srcConnReqs <-chan *ssh.Request, dstConn ssh.Conn) {
 	defer s.wg.Done()
 	log.Debugf("PROXYSSH: %s: %s: Handling source requests", s.drv.name, s.SrcAddr)
 
@@ -265,7 +294,127 @@ func (s *session) handleChannel(ch ssh.NewChannel, dstConn ssh.Conn) {
 	log.Debugf("PROXYSSH: %s: %s: Completed processing channel: %s", s.drv.name, s.SrcAddr, ch.ChannelType())
 }
 
-func (s *session) handleRequest(r *ssh.Request, c *ssh.Client) {
+// handleDestinationRequests handles requests from the destination server
+func (s *session) handleDestinationRequests(dstRequests <-chan *ssh.Request, srcConn *ssh.ServerConn) {
+	defer s.wg.Done()
+	log.Debugf("PROXYSSH: %s: %s: Handling destination requests", s.drv.name, s.SrcAddr)
+
+	for r := range dstRequests {
+		s.handleRequest(r, srcConn)
+	}
+	log.Debugf("PROXYSSH: %s: %s: Finished handling destination requests", s.drv.name, s.SrcAddr)
+}
+
+// handleReverseChannel handles incoming channels from the destination server
+// This is particularly important for reverse port forwarding where the server
+// initiates forwarded-tcpip channels back to the client
+func (s *session) handleReverseChannel(ch ssh.NewChannel, srcConn *ssh.ServerConn) {
+	defer s.wg.Done()
+	log.Debugf("PROXYSSH: %s: %s: Handling reverse channel: %s", s.drv.name, s.SrcAddr, ch.ChannelType())
+
+	// For reverse port forwarding, we need to forward the channel from destination to source
+	srcChn, srcChnRequests, srcChnErr := srcConn.OpenChannel(ch.ChannelType(), ch.ExtraData())
+	if srcChnErr != nil {
+		log.Errorf("PROXYSSH: %s: %s: Could not open reverse channel to source: %v", s.drv.name, s.SrcAddr, srcChnErr)
+		ch.Reject(ssh.ConnectionFailed, "Unable to connect to source")
+		return
+	}
+
+	dstChn, dstChnRequests, dstChnErr := ch.Accept()
+	if dstChnErr != nil {
+		log.Errorf("PROXYSSH: %s: %s: Could not accept reverse channel from destination: %v", s.drv.name, s.SrcAddr, dstChnErr)
+		srcChn.Close()
+		return
+	}
+
+	// Need this local channel work group to wait until all the channel routines completed
+	var chWg sync.WaitGroup
+
+	// Proxying the requests
+	chWg.Add(1)
+	go func() {
+		defer chWg.Done()
+
+		// End the communication between the source and destination when this function is complete.
+		defer srcChn.Close()
+		defer dstChn.Close()
+
+		log.Debugf("PROXYSSH: %s: %s: Starting to listen for reverse channel requests", s.drv.name, s.SrcAddr)
+		for {
+			var request *ssh.Request
+			var targetChannel ssh.Channel
+
+			select {
+			case request = <-srcChnRequests:
+				targetChannel = dstChn
+			case request = <-dstChnRequests:
+				targetChannel = srcChn
+			}
+
+			// In the event that an SSH request gets killed (not exited),
+			// the request will be nil. Do not continue, exit the loop.
+			if request == nil {
+				log.Warnf("PROXYSSH: %s: %s: SSH reverse channel connection terminated ungracefully...", s.drv.name, s.SrcAddr)
+				break
+			}
+
+			requestValid, requestError := targetChannel.SendRequest(request.Type, request.WantReply, request.Payload)
+			if requestError != nil {
+				log.Errorf("PROXYSSH: %s: %s: SendRequest error in reverse channel: %v", s.drv.name, s.SrcAddr, requestError)
+				break
+			}
+
+			if request.WantReply {
+				if err := request.Reply(requestValid, nil); err != nil {
+					log.Errorf("PROXYSSH: %s: %s: Unable to respond to reverse channel request %s: %v", s.drv.name, s.SrcAddr, request.Type, err)
+					break
+				}
+			}
+
+			log.Debugf("PROXYSSH: %s: %s: Reverse channel request: Type=%q, WantReply='%t'.", s.drv.name, s.SrcAddr, request.Type, request.WantReply)
+		}
+
+		log.Debugf("PROXYSSH: %s: %s: Stopped listening for reverse channel requests", s.drv.name, s.SrcAddr)
+	}()
+
+	log.Debugf("PROXYSSH: %s: %s: Begin reverse streaming between source and destination", s.drv.name, s.SrcAddr)
+
+	chWg.Add(1)
+	go func() {
+		defer chWg.Done()
+		log.Debugf("PROXYSSH: %s: %s: Starting dst->src reverse stream copy", s.drv.name, s.SrcAddr)
+		if _, err := io.Copy(srcChn, dstChn); err != nil && err != io.EOF {
+			log.Errorf("PROXYSSH: %s: %s: The dst->src reverse channel was closed unexpectedly: %v", s.drv.name, s.SrcAddr, err)
+		} else {
+			log.Debugf("PROXYSSH: %s: %s: The dst->src reverse channel was closed: %v", s.drv.name, s.SrcAddr, err)
+		}
+		// Properly closing the channel
+		if err := dstChn.CloseWrite(); err != nil {
+			log.Warnf("PROXYSSH: %s: %s: The dst->src reverse closing write for dst channel did not go well: %v", s.drv.name, s.SrcAddr, err)
+		}
+		if err := srcChn.CloseWrite(); err != nil {
+			log.Warnf("PROXYSSH: %s: %s: The dst->src reverse closing write for src channel did not go well: %v", s.drv.name, s.SrcAddr, err)
+		}
+	}()
+
+	if _, err := io.Copy(dstChn, srcChn); err != nil && err != io.EOF {
+		log.Errorf("PROXYSSH: %s: %s: The src->dst reverse channel was closed unexpectedly: %v", s.drv.name, s.SrcAddr, err)
+	} else {
+		log.Debugf("PROXYSSH: %s: %s: The src->dst reverse channel was closed", s.drv.name, s.SrcAddr)
+	}
+	// Properly closing the channel
+	if err := dstChn.CloseWrite(); err != nil {
+		log.Warnf("PROXYSSH: %s: %s: The src->dst reverse closing write for dst channel did not go well: %v", s.drv.name, s.SrcAddr, err)
+	}
+	if err := srcChn.CloseWrite(); err != nil {
+		log.Warnf("PROXYSSH: %s: %s: The src->dst reverse closing write for src channel did not go well: %v", s.drv.name, s.SrcAddr, err)
+	}
+
+	chWg.Wait()
+	log.Debugf("PROXYSSH: %s: %s: Completed processing reverse channel: %s", s.drv.name, s.SrcAddr, ch.ChannelType())
+}
+
+func (s *session) handleRequest(r *ssh.Request, c ssh.Conn) {
 	log.Debugf("PROXYSSH: %s: %s: Handling src request: %s", s.drv.name, s.SrcAddr, r.Type)
 
 	// Proxy to destination
