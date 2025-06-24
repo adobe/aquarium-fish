@@ -20,7 +20,6 @@ import (
 	"connectrpc.com/connect"
 
 	"github.com/adobe/aquarium-fish/lib/auth"
-	"github.com/adobe/aquarium-fish/lib/database"
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
@@ -90,20 +89,4 @@ func GetUserName(ctx context.Context) string {
 	}
 
 	return user.Name
-}
-
-// GetInterceptors returns common set of interceptors for RPC
-func GetInterceptors(db *database.Database) connect.Option {
-	if interceptors == nil {
-		// Create interceptors
-		authInterceptor := NewAuthInterceptor(db)
-		rbacInterceptor := NewRBACInterceptor(auth.GetEnforcer())
-
-		// Store in module var for future use
-		interceptors = connect.WithInterceptors(
-			authInterceptor,
-			rbacInterceptor,
-		)
-	}
-	return interceptors
 }

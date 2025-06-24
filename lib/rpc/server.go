@@ -21,6 +21,7 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
+	"github.com/adobe/aquarium-fish/lib/auth"
 	"github.com/adobe/aquarium-fish/lib/drivers/gate"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
@@ -41,33 +42,25 @@ func NewServer(f *fish.Fish, additionalServices []gate.RPCService) *Server {
 		mux:  http.NewServeMux(),
 	}
 
-	// Common interceptor options
-	interceptors := rpcutil.GetInterceptors(f.DB())
-
-	// Register services
+	// Register services WITHOUT interceptors (auth/rbac is handled at HTTP level)
 	s.mux.Handle(aquariumv2connect.NewUserServiceHandler(
 		&UserService{fish: f},
-		interceptors,
 	))
 
 	s.mux.Handle(aquariumv2connect.NewRoleServiceHandler(
 		&RoleService{fish: f},
-		interceptors,
 	))
 
 	s.mux.Handle(aquariumv2connect.NewApplicationServiceHandler(
 		&ApplicationService{fish: f},
-		interceptors,
 	))
 
 	s.mux.Handle(aquariumv2connect.NewLabelServiceHandler(
 		&LabelService{fish: f},
-		interceptors,
 	))
 
 	s.mux.Handle(aquariumv2connect.NewNodeServiceHandler(
 		&NodeService{fish: f},
-		interceptors,
 	))
 
 	// Register additional services from gate drivers
@@ -81,8 +74,19 @@ func NewServer(f *fish.Fish, additionalServices []gate.RPCService) *Server {
 
 // Handler returns the server's HTTP handler
 func (s *Server) Handler() http.Handler {
-	// Apply YAML middleware first to convert YAML to JSON
-	handler := YAMLToJSONHandler(s.mux)
+	// Create auth and RBAC handlers
+	authHandler := rpcutil.NewAuthHandler(s.fish.DB())
+	rbacHandler := rpcutil.NewRBACHandler(auth.GetEnforcer())
+
+	// Build middleware chain: Auth -> RBAC -> YAML -> Connect RPC
+	// I found that ConnectRPC interceptors are not very good for auth needs,
+	// so moved those to the handlers even before it gets to the RPC side
+	handler := authHandler.Handler(
+		rbacHandler.Handler(
+			rpcutil.YAMLToJSONHandler(s.mux),
+		),
+	)
+
 	// Support both HTTP/1.1 and HTTP/2
 	return h2c.NewHandler(handler, &http2.Server{})
 }

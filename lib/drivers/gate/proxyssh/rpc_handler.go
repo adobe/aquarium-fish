@@ -40,10 +40,9 @@ type driverRPCHandler struct {
 // NewRPCHandler returns RPC services this gate driver wants to register
 func (d *Driver) newRPCHandler() gate.RPCService {
 	// Create the service handler
-	// The interceptors will be applied at the server level
+	// Auth/RBAC is handled at the HTTP level
 	path, handler := aquariumv2connect.NewGateProxySSHServiceHandler(
 		&driverRPCHandler{d},
-		rpcutil.GetInterceptors(d.db),
 	)
 
 	return gate.RPCService{

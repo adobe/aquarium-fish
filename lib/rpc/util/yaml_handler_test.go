@@ -12,7 +12,7 @@
 
 // Author: Sergei Parshev (@sparshev)
 
-package rpc
+package util
 
 import (
 	"bytes"
