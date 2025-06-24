@@ -1,5 +1,5 @@
 /**
- * Copyright 2021-2025 Adobe. All rights reserved.
+ * Copyright 2024-2025 Adobe. All rights reserved.
  * This file is licensed to you under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may obtain a copy
  * of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -21,18 +21,16 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
-// Checks that the node will not try to execute the bigger Label Application:
-// * Create Application
-// * It still NEW after 40 secs
-// * Destroy Application
-// * Should get DEALLOCATED state
-func Test_cant_allocate_too_big_label(t *testing.T) {
+// This test checks that transition from ELECTED to ALLOCATED state will not
+// affect the DEALLOCATE request and it will be noticed and executed correctly by the system.
+func Test_elected_deallocate(t *testing.T) {
 	t.Parallel()
 	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
@@ -42,9 +40,7 @@ api_address: 127.0.0.1:0
 drivers:
   gates: {}
   providers:
-    test:
-      cpu_limit: 4
-      ram_limit: 8`)
+    test:`)
 
 	t.Cleanup(func() {
 		afi.Cleanup(t)
@@ -72,7 +68,8 @@ drivers:
 	)
 
 	var labelUID string
-	t.Run("Create Label", func(t *testing.T) {
+	t.Run("Create new Label with allocation delay", func(t *testing.T) {
+		delayOptions, _ := structpb.NewStruct(map[string]any{"delay_allocate": 10})
 		resp, err := labelClient.Create(
 			context.Background(),
 			connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
@@ -80,10 +77,11 @@ drivers:
 					Name:    "test-label",
 					Version: 1,
 					Definitions: []*aquariumv2.LabelDefinition{{
-						Driver: "test",
+						Driver:  "test",
+						Options: delayOptions,
 						Resources: &aquariumv2.Resources{
-							Cpu: 5,
-							Ram: 9,
+							Cpu: 2,
+							Ram: 4,
 						},
 					}},
 				},
@@ -93,6 +91,10 @@ drivers:
 			t.Fatal("Failed to create label:", err)
 		}
 		labelUID = resp.Msg.Data.Uid
+
+		if labelUID == "" {
+			t.Fatalf("Label UID is incorrect: %v", labelUID)
+		}
 	})
 
 	var appUID string
@@ -109,11 +111,14 @@ drivers:
 			t.Fatal("Failed to create application:", err)
 		}
 		appUID = resp.Msg.Data.Uid
+
+		if appUID == "" {
+			t.Fatalf("Application UID is incorrect: %v", appUID)
+		}
 	})
 
-	time.Sleep(10 * time.Second)
-
-	t.Run("Application should have state NEW in 10 sec", func(t *testing.T) {
+	t.Run("Application should have state ELECTED in 5 sec", func(t *testing.T) {
+		time.Sleep(5 * time.Second)
 		resp, err := appClient.GetState(
 			context.Background(),
 			connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
@@ -124,66 +129,12 @@ drivers:
 			t.Fatal("Failed to get application state:", err)
 		}
 
-		if resp.Msg.Data.Status != aquariumv2.ApplicationState_NEW {
+		if resp.Msg.Data.Status != aquariumv2.ApplicationState_ELECTED {
 			t.Fatalf("Application Status is incorrect: %v", resp.Msg.Data.Status)
 		}
 	})
 
-	time.Sleep(10 * time.Second)
-
-	t.Run("Application should have state NEW in 20 sec", func(t *testing.T) {
-		resp, err := appClient.GetState(
-			context.Background(),
-			connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
-				ApplicationUid: appUID,
-			}),
-		)
-		if err != nil {
-			t.Fatal("Failed to get application state:", err)
-		}
-
-		if resp.Msg.Data.Status != aquariumv2.ApplicationState_NEW {
-			t.Fatalf("Application Status is incorrect: %v", resp.Msg.Data.Status)
-		}
-	})
-
-	time.Sleep(10 * time.Second)
-
-	t.Run("Application should have state NEW in 30 sec", func(t *testing.T) {
-		resp, err := appClient.GetState(
-			context.Background(),
-			connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
-				ApplicationUid: appUID,
-			}),
-		)
-		if err != nil {
-			t.Fatal("Failed to get application state:", err)
-		}
-
-		if resp.Msg.Data.Status != aquariumv2.ApplicationState_NEW {
-			t.Fatalf("Application Status is incorrect: %v", resp.Msg.Data.Status)
-		}
-	})
-
-	time.Sleep(10 * time.Second)
-
-	t.Run("Application should have state NEW in 40 sec", func(t *testing.T) {
-		resp, err := appClient.GetState(
-			context.Background(),
-			connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
-				ApplicationUid: appUID,
-			}),
-		)
-		if err != nil {
-			t.Fatal("Failed to get application state:", err)
-		}
-
-		if resp.Msg.Data.Status != aquariumv2.ApplicationState_NEW {
-			t.Fatalf("Application Status is incorrect: %v", resp.Msg.Data.Status)
-		}
-	})
-
-	t.Run("Deallocate the Application", func(t *testing.T) {
+	t.Run("Sending Deallocate to the Application while in ELECTED state", func(t *testing.T) {
 		_, err := appClient.Deallocate(
 			context.Background(),
 			connect.NewRequest(&aquariumv2.ApplicationServiceDeallocateRequest{
@@ -191,12 +142,12 @@ drivers:
 			}),
 		)
 		if err != nil {
-			t.Error("Failed to deallocate application:", err)
+			t.Fatal("Failed to deallocate application:", err)
 		}
 	})
 
 	t.Run("Application should get DEALLOCATED in 10 sec", func(t *testing.T) {
-		h.Retry(&h.Timer{Timeout: 5 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
+		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
 			resp, err := appClient.GetState(
 				context.Background(),
 				connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{

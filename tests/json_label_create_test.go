@@ -61,19 +61,24 @@ drivers:
 		Transport: tr,
 	}
 
-	var label aquariumv2.Label
+	var labelResp aquariumv2.LabelServiceCreateResponse
 	t.Run("Create & check JSON Label", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/label/")).
+			Post(afi.APIAddress("grpc/aquarium.v2.LabelService/Create")).
 			Header("Content-Type", "application/json").
-			Body(`{"name":"test-label","version":1,"definitions":[{"driver":"test","options":{"fail_options_apply":0},"resources":{"cpu":1,"ram":2}}]}`).
+			Body(`{"label":{"name":"test-label","version":1,"definitions":[{"driver":"test","options":{"fail_options_apply":0},"resources":{"cpu":1,"ram":2}}]}}`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
 			End().
-			JSON(&label)
+			JSON(&labelResp)
 
+		if labelResp.GetStatus() != true {
+			t.Fatalf("Can't create label: %v", labelResp.Message)
+		}
+
+		label := labelResp.Data
 		if label.Uid == uuid.Nil.String() {
 			t.Fatalf("Label UID is incorrect: %v", label.Uid)
 		}

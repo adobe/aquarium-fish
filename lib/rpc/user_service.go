@@ -25,6 +25,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/fish"
 	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
+	rpcutil "github.com/adobe/aquarium-fish/lib/rpc/util"
 )
 
 // UserService implements the User service
@@ -35,7 +36,7 @@ type UserService struct {
 
 // GetMe implements the GetMe RPC
 func (*UserService) GetMe(ctx context.Context, _ /*req*/ *connect.Request[aquariumv2.UserServiceGetMeRequest]) (*connect.Response[aquariumv2.UserServiceGetMeResponse], error) {
-	user := GetUserFromContext(ctx)
+	user := rpcutil.GetUserFromContext(ctx)
 	if user == nil {
 		return connect.NewResponse(&aquariumv2.UserServiceGetMeResponse{
 			Status: false, Message: "User not authenticated",
@@ -130,7 +131,7 @@ func (s *UserService) Update(ctx context.Context, req *connect.Request[aquariumv
 		}), connect.NewError(connect.CodeInvalidArgument, nil)
 	}
 	// Update of User allowed for the User itself & the one who has UpdateAll action
-	if !isUserName(ctx, msgUser.GetName()) && !checkPermission(ctx, auth.UserServiceUpdateAll) {
+	if !rpcutil.IsUserName(ctx, msgUser.GetName()) && !rpcutil.CheckUserPermission(ctx, auth.UserServiceUpdateAll) {
 		return connect.NewResponse(&aquariumv2.UserServiceUpdateResponse{
 			Status: false, Message: "Permission denied",
 		}), connect.NewError(connect.CodePermissionDenied, fmt.Errorf("Permission denied"))
@@ -143,7 +144,7 @@ func (s *UserService) Update(ctx context.Context, req *connect.Request[aquariumv
 	}
 
 	// Attempt to change password
-	if checkPermission(ctx, auth.UserServiceUpdatePassword) {
+	if rpcutil.CheckUserPermission(ctx, auth.UserServiceUpdatePassword) {
 		password := msgUser.GetPassword()
 		if password != "" {
 			user.SetHash(generatePasswordHash(password))
@@ -151,7 +152,7 @@ func (s *UserService) Update(ctx context.Context, req *connect.Request[aquariumv
 	}
 
 	// Attempt to assign user roles
-	if checkPermission(ctx, auth.UserServiceUpdateRoles) {
+	if rpcutil.CheckUserPermission(ctx, auth.UserServiceUpdateRoles) {
 		user.Roles = msgUser.GetRoles()
 	}
 

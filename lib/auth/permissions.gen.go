@@ -41,7 +41,8 @@ var rolePermissions = map[string][]typesv2.Permission{
 		{Resource: ApplicationService, Action: ApplicationServiceListTaskAll},    // gRPC additional
 
 		// GateProxySSHService
-		{Resource: GateProxySSHService, Action: GateProxySSHServiceGetResourceAccess}, // gRPC
+		{Resource: GateProxySSHService, Action: GateProxySSHServiceGetResourceAccess},    // gRPC
+		{Resource: GateProxySSHService, Action: GateProxySSHServiceGetResourceAccessAll}, // gRPC additional
 
 		// LabelService
 		{Resource: LabelService, Action: LabelServiceCreate}, // gRPC

@@ -17,6 +17,7 @@ package rpc
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -67,10 +68,26 @@ func (s *NodeService) GetThis(_ /*ctx*/ context.Context, _ /*req*/ *connect.Requ
 
 // SetMaintenance sets maintenance mode for this node
 func (s *NodeService) SetMaintenance(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.NodeServiceSetMaintenanceRequest]) (*connect.Response[aquariumv2.NodeServiceSetMaintenanceResponse], error) {
-	// Set maintenance mode
-	s.fish.MaintenanceSet(req.Msg.GetMaintenance())
+	// Set shutdown delay first
+	if req.Msg.ShutdownDelay != nil {
+		dur, err := time.ParseDuration(req.Msg.GetShutdownDelay())
+		if err != nil {
+			return connect.NewResponse(&aquariumv2.NodeServiceSetMaintenanceResponse{
+				Status: false, Message: fmt.Sprintf("Wrong duration format: %v", err),
+			}), connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		s.fish.ShutdownDelaySet(dur)
+	}
+
+	// Set maintenance mode (default true)
+	s.fish.MaintenanceSet(req.Msg.Maintenance == nil || req.Msg.GetMaintenance())
+
+	// Shutdown last, technically will work immediately if maintenance enable is false
+	if req.Msg.Shutdown != nil {
+		s.fish.ShutdownSet(req.Msg.GetShutdown())
+	}
 
 	return connect.NewResponse(&aquariumv2.NodeServiceSetMaintenanceResponse{
-		Status: true, Message: fmt.Sprintf("Maintenance mode %s", map[bool]string{true: "enabled", false: "disabled"}[req.Msg.GetMaintenance()]),
+		Status: true, Message: "OK",
 	}), nil
 }

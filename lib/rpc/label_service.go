@@ -58,31 +58,17 @@ func (s *LabelService) List(_ /*ctx*/ context.Context, req *connect.Request[aqua
 
 // Get returns a label by name
 func (s *LabelService) Get(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.LabelServiceGetRequest]) (*connect.Response[aquariumv2.LabelServiceGetResponse], error) {
-	// Get labels with the specified name
-	labels, err := s.fish.DB().LabelListName(req.Msg.GetLabelUid())
+	// Get labels with the specified uid
+	label, err := s.fish.DB().LabelGet(stringToUUID(req.Msg.GetLabelUid()))
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.LabelServiceGetResponse{
 			Status: false, Message: "Unable to get the label: " + err.Error(),
 		}), connect.NewError(connect.CodeInternal, err)
 	}
 
-	if len(labels) == 0 {
-		return connect.NewResponse(&aquariumv2.LabelServiceGetResponse{
-			Status: false, Message: "Label not found",
-		}), connect.NewError(connect.CodeNotFound, err)
-	}
-
-	// Return the latest version
-	var latest typesv2.Label
-	for _, label := range labels {
-		if label.Version > latest.Version {
-			latest = label
-		}
-	}
-
 	return connect.NewResponse(&aquariumv2.LabelServiceGetResponse{
 		Status: true, Message: "Label retrieved successfully",
-		Data: latest.ToLabel(),
+		Data: label.ToLabel(),
 	}), nil
 }
 

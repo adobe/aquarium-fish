@@ -258,9 +258,9 @@ const file_aquarium_v2_gate_proxyssh_access_proto_rawDesc = "" +
 	",GateProxySSHServiceGetResourceAccessResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x123\n" +
-	"\x04data\x18\x03 \x01(\v2\x1f.aquarium.v2.GateProxySSHAccessR\x04data2\xad\x01\n" +
-	"\x13GateProxySSHService\x12\x95\x01\n" +
-	"\x11GetResourceAccess\x128.aquarium.v2.GateProxySSHServiceGetResourceAccessRequest\x1a9.aquarium.v2.GateProxySSHServiceGetResourceAccessResponse\"\v\x82\xb5\x18\a\x1a\x05PowerBEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"
+	"\x04data\x18\x03 \x01(\v2\x1f.aquarium.v2.GateProxySSHAccessR\x04data2\xc3\x01\n" +
+	"\x13GateProxySSHService\x12\xab\x01\n" +
+	"\x11GetResourceAccess\x128.aquarium.v2.GateProxySSHServiceGetResourceAccessRequest\x1a9.aquarium.v2.GateProxySSHServiceGetResourceAccessResponse\"!\x82\xb5\x18\x1d\x1a\x05Power\"\x14GetResourceAccessAllBEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"
 
 var (
 	file_aquarium_v2_gate_proxyssh_access_proto_rawDescOnce sync.Once

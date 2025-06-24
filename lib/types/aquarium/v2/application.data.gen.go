@@ -34,6 +34,10 @@ import (
 // ApplicationState_Status mirrors the protobuf enum
 type ApplicationState_Status int32
 
+func (c ApplicationState_Status) String() string {
+	return pbTypes.ApplicationState_Status_name[int32(c)]
+}
+
 const (
 	ApplicationState_ALLOCATED   ApplicationState_Status = 3
 	ApplicationState_DEALLOCATE  ApplicationState_Status = 4

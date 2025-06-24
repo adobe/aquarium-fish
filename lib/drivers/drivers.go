@@ -210,6 +210,26 @@ func GetGate(name string) gate.Driver {
 	return drv
 }
 
+// GetGateRPCServices returns RPC services from all active gate drivers
+func GetGateRPCServices() []gate.RPCService {
+	var services []gate.RPCService
+
+	if gateDrivers == nil {
+		log.Debug("Drivers: No gate drivers initialized")
+		return services
+	}
+
+	for name, drv := range gateDrivers {
+		drvServices := drv.GetRPCServices()
+		if len(drvServices) > 0 {
+			log.Debugf("Drivers: Gate driver %s registered %d RPC services", name, len(drvServices))
+			services = append(services, drvServices...)
+		}
+	}
+
+	return services
+}
+
 // Shutdown gracefully shutdowns the running drivers
 func Shutdown() (errs []error) {
 	for name, drv := range gateDrivers {

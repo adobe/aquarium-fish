@@ -23,6 +23,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/auth"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
+	rpcutil "github.com/adobe/aquarium-fish/lib/rpc/util"
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
@@ -38,7 +39,7 @@ func (s *ApplicationService) getApplicationIfUserIsOwnerOrHasAccess(ctx context.
 	app, err := s.fish.DB().ApplicationGet(stringToUUID(appUIDStr))
 
 	// Method could be set to "" when only owner is needed verification
-	if (app == nil || !isUserName(ctx, app.OwnerName)) && (method == "" || !checkPermission(ctx, method)) {
+	if (app == nil || !rpcutil.IsUserName(ctx, app.OwnerName)) && (method == "" || !rpcutil.CheckUserPermission(ctx, method)) {
 		return nil, connect.NewError(connect.CodePermissionDenied, fmt.Errorf("Permission denied"))
 	}
 	if err != nil {
@@ -58,8 +59,8 @@ func (s *ApplicationService) List(ctx context.Context, _ /*req*/ *connect.Reques
 	}
 
 	// Filter the output by owner unless user has permission to view all applications
-	if !checkPermission(ctx, auth.ApplicationServiceListAll) {
-		userName := getUserName(ctx)
+	if !rpcutil.CheckUserPermission(ctx, auth.ApplicationServiceListAll) {
+		userName := rpcutil.GetUserName(ctx)
 		var ownerOut []typesv2.Application
 		for _, app := range out {
 			if app.OwnerName == userName {
@@ -103,7 +104,7 @@ func (s *ApplicationService) Create(ctx context.Context, req *connect.Request[aq
 	app := typesv2.FromApplication(req.Msg.GetApplication())
 
 	// Set owner name from context
-	app.OwnerName = getUserName(ctx)
+	app.OwnerName = rpcutil.GetUserName(ctx)
 
 	// Create the application
 	if err := s.fish.DB().ApplicationCreate(&app); err != nil {
@@ -228,7 +229,7 @@ func (s *ApplicationService) GetTask(ctx context.Context, req *connect.Request[a
 		app, err2 = s.fish.DB().ApplicationGet(task.ApplicationUid)
 	}
 
-	if app == nil || !isUserName(ctx, app.OwnerName) && !checkPermission(ctx, auth.ApplicationServiceGetTaskAll) {
+	if app == nil || !rpcutil.IsUserName(ctx, app.OwnerName) && !rpcutil.CheckUserPermission(ctx, auth.ApplicationServiceGetTaskAll) {
 		return connect.NewResponse(&aquariumv2.ApplicationServiceGetTaskResponse{
 			Status: false, Message: "Permission denied",
 		}), connect.NewError(connect.CodePermissionDenied, nil)
@@ -259,7 +260,7 @@ func (s *ApplicationService) Deallocate(ctx context.Context, req *connect.Reques
 		}), err
 	}
 
-	state, err := s.fish.DB().ApplicationDeallocate(app.Uid, getUserName(ctx))
+	state, err := s.fish.DB().ApplicationDeallocate(app.Uid, rpcutil.GetUserName(ctx))
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.ApplicationServiceDeallocateResponse{
 			Status: false, Message: "Failed to deallocate application: " + err.Error(),

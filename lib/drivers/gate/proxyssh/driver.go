@@ -16,7 +16,6 @@
 package proxyssh
 
 import (
-	"net"
 	"path/filepath"
 	"sync"
 
@@ -56,9 +55,6 @@ type Driver struct {
 	// Proxy data
 	serverConfig *ssh.ServerConfig
 
-	// Actual listening address of the service
-	Address net.Addr
-
 	// Keeps session info for auth, key is src address, value is session
 	sessions sync.Map
 }
@@ -96,4 +92,11 @@ func (d *Driver) Prepare(wd string, config []byte) (err error) {
 // Shutdown gracefully stops the gate
 func (*Driver) Shutdown() error {
 	return nil
+}
+
+// GetRPCServices returns RPC services this gate driver wants to register
+func (d *Driver) GetRPCServices() []gate.RPCService {
+	return []gate.RPCService{
+		d.newRPCHandler(),
+	}
 }

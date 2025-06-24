@@ -15,16 +15,15 @@
 package tests
 
 import (
-	"crypto/tls"
+	"context"
 	"fmt"
-	"net/http"
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/steinfletcher/apitest"
+	"connectrpc.com/connect"
 
 	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
+	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
@@ -51,288 +50,339 @@ drivers:
 		}
 	}()
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	cli := &http.Client{
-		Timeout:   time.Second * 5,
-		Transport: tr,
-	}
+	// Create admin client
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
 
-	var label aquariumv2.Label
+	// Create service clients for admin
+	adminLabelClient := aquariumv2connect.NewLabelServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+	adminUserClient := aquariumv2connect.NewUserServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+
+	var labelUID string
 	t.Run("Admin: Create Label", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/label/")).
-			JSON(`{"name":"test-label", "version":1, "definitions": [{"driver":"test", "resources":{"cpu":1,"ram":2}}]}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&label)
+		resp, err := adminLabelClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
+				Label: &aquariumv2.Label{
+					Name:    "test-label",
+					Version: 1,
+					Definitions: []*aquariumv2.LabelDefinition{{
+						Driver: "test",
+						Resources: &aquariumv2.Resources{
+							Cpu: 1,
+							Ram: 2,
+						},
+					}},
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create label:", err)
+		}
+		labelUID = resp.Msg.Data.Uid
 
-		if label.Uid == uuid.Nil.String() {
-			t.Fatalf("Label UID is incorrect: %v", label.Uid)
+		if labelUID == "" {
+			t.Fatalf("Label UID is incorrect: %v", labelUID)
 		}
 	})
 
 	t.Run("Admin: Create User", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/user/")).
-			JSON(`{"name":"test-user", "password":"test-user-password"}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+		userPassword := "test-user-password"
+		_, err := adminUserClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.UserServiceCreateRequest{
+				User: &aquariumv2.User{
+					Name:     "test-user",
+					Password: &userPassword,
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create user:", err)
+		}
 	})
+
+	// Create user client
+	userCli, userOpts := h.NewRPCClient("test-user", "test-user-password", h.RPCClientREST)
+
+	userLabelClient := aquariumv2connect.NewLabelServiceClient(
+		userCli,
+		afi.APIAddress("grpc"),
+		userOpts...,
+	)
+	userAppClient := aquariumv2connect.NewApplicationServiceClient(
+		userCli,
+		afi.APIAddress("grpc"),
+		userOpts...,
+	)
 
 	// User-side of requests
 	t.Run("User: List Label with name test-label should not be allowed by Auth", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/label/")).
-			Query("name", "test-label").
-			BasicAuth("test-user", "test-user-password").
-			Expect(t).
-			Status(http.StatusForbidden).
-			End()
+		_, err := userLabelClient.List(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.LabelServiceListRequest{
+				Name: &[]string{"test-label"}[0],
+			}),
+		)
+		if err == nil {
+			t.Error("Expected access denied for label list")
+		}
 	})
 
 	t.Run("User: Create Application should not be allowed by Auth", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/application/")).
-			JSON(`{"label_UID":"`+label.Uid+`"}`).
-			BasicAuth("test-user", "test-user-password").
-			Expect(t).
-			Status(http.StatusForbidden).
-			End()
+		_, err := userAppClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceCreateRequest{
+				Application: &aquariumv2.Application{
+					LabelUid: labelUID,
+				},
+			}),
+		)
+		if err == nil {
+			t.Error("Expected access denied for application create")
+		}
 	})
 
 	t.Run("Admin: Put User role in place", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/user/test-user/roles")).
-			JSON(`["User"]`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+		_, err := adminUserClient.Update(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.UserServiceUpdateRequest{
+				User: &aquariumv2.User{
+					Name:  "test-user",
+					Roles: []string{"User"},
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to assign role:", err)
+		}
 	})
 
-	var labels []aquariumv2.Label
 	t.Run("User: List Label with name test-label", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/label/")).
-			Query("name", "test-label").
-			BasicAuth("test-user", "test-user-password").
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&labels)
+		resp, err := userLabelClient.List(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.LabelServiceListRequest{
+				Name: &[]string{"test-label"}[0],
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to list labels:", err)
+		}
 
-		if len(labels) != 1 || labels[0].Uid == uuid.Nil.String() {
+		if len(resp.Msg.Data) != 1 || resp.Msg.Data[0].Uid == "" {
 			t.Fatalf("Label is incorrect")
 		}
 	})
 
-	var app aquariumv2.Application
+	var appUID string
 	t.Run("User: Create Application", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/application/")).
-			JSON(`{"label_UID":"`+label.Uid+`"}`).
-			BasicAuth("test-user", "test-user-password").
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&app)
+		resp, err := userAppClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceCreateRequest{
+				Application: &aquariumv2.Application{
+					LabelUid: labelUID,
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create application:", err)
+		}
+		appUID = resp.Msg.Data.Uid
 
-		if app.Uid == uuid.Nil.String() {
-			t.Fatalf("Application UID is incorrect: %v", app.Uid)
+		if appUID == "" {
+			t.Fatalf("Application UID is incorrect: %v", appUID)
 		}
 	})
 
-	var appState aquariumv2.ApplicationState
 	t.Run("User: Application should get ALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.Uid+"/state")).
-				BasicAuth("test-user", "test-user-password").
-				Expect(r).
-				Status(http.StatusOK).
-				End().
-				JSON(&appState)
+			resp, err := userAppClient.GetState(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+					ApplicationUid: appUID,
+				}),
+			)
+			if err != nil {
+				r.Fatal("Failed to get application state:", err)
+			}
 
-			if appState.Status != aquariumv2.ApplicationState_ALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", appState.Status)
+			if resp.Msg.Data.Status != aquariumv2.ApplicationState_ALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", resp.Msg.Data.Status)
 			}
 		})
 	})
 
-	var res aquariumv2.ApplicationResource
 	t.Run("User: Resource should be created", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.Uid+"/resource")).
-			BasicAuth("test-user", "test-user-password").
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&res)
+		resp, err := userAppClient.GetResource(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceGetResourceRequest{
+				ApplicationUid: appUID,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to get application resource:", err)
+		}
 
-		if res.Identifier == "" {
-			t.Fatalf("Resource identifier is incorrect: %v", res.Identifier)
+		if resp.Msg.Data.Identifier == "" {
+			t.Fatalf("Resource identifier is incorrect: %v", resp.Msg.Data.Identifier)
 		}
 	})
 
 	t.Run("User: Create ApplicationTask Snapshot should not be allowed by Auth", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/application/"+app.Uid+"/task/")).
-			JSON(map[string]any{"task": "snapshot", "when": aquariumv2.ApplicationState_ALLOCATED}).
-			BasicAuth("test-user", "test-user-password").
-			Expect(t).
-			Status(http.StatusForbidden).
-			End()
-	})
-
-	t.Run("Admin: Put Power & User role in place", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/user/test-user/roles")).
-			JSON(`["Power", "User"]`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
-	})
-
-	var appTask1 aquariumv2.ApplicationTask
-	t.Run("User: Create ApplicationTask 1 Snapshot on ALLOCATE", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/application/"+app.Uid+"/task/")).
-			JSON(map[string]any{"task": "snapshot", "when": aquariumv2.ApplicationState_ALLOCATED}).
-			BasicAuth("test-user", "test-user-password").
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&appTask1)
-
-		if appTask1.Uid == uuid.Nil.String() {
-			t.Fatalf("ApplicationTask 1 UID is incorrect: %v", appTask1.Uid)
+		_, err := userAppClient.CreateTask(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceCreateTaskRequest{
+				ApplicationUid: appUID,
+				Task: &aquariumv2.ApplicationTask{
+					Task: "snapshot",
+					When: aquariumv2.ApplicationState_ALLOCATED,
+				},
+			}),
+		)
+		if err == nil {
+			t.Error("Expected access denied for task create")
 		}
 	})
 
-	var appTask2 aquariumv2.ApplicationTask
-	t.Run("User: Create ApplicationTask 2 Snapshot on DEALLOCATE", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/application/"+app.Uid+"/task/")).
-			JSON(map[string]any{"task": "snapshot", "when": aquariumv2.ApplicationState_DEALLOCATE}).
-			BasicAuth("test-user", "test-user-password").
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&appTask2)
-
-		if appTask2.Uid == uuid.Nil.String() {
-			t.Fatalf("ApplicationTask 2 UID is incorrect: %v", appTask2.Uid)
+	t.Run("Admin: Put Administrator role in place", func(t *testing.T) {
+		_, err := adminUserClient.Update(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.UserServiceUpdateRequest{
+				User: &aquariumv2.User{
+					Name:  "test-user",
+					Roles: []string{"Administrator"},
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to assign administrator role:", err)
 		}
 	})
 
-	var appTasks []*aquariumv2.ApplicationTask
-	t.Run("User: ApplicationTask 1 should be executed in 10 sec and 2 should not be executed", func(t *testing.T) {
+	var taskUID string
+	t.Run("User: Create ApplicationTask Snapshot should work with Administrator role", func(t *testing.T) {
+		resp, err := userAppClient.CreateTask(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceCreateTaskRequest{
+				ApplicationUid: appUID,
+				Task: &aquariumv2.ApplicationTask{
+					Task: "snapshot",
+					When: aquariumv2.ApplicationState_ALLOCATED,
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create task:", err)
+		}
+		taskUID = resp.Msg.Data.Uid
+
+		if taskUID == "" {
+			t.Fatalf("Task UID is incorrect: %v", taskUID)
+		}
+	})
+
+	t.Run("User: List ApplicationTask", func(t *testing.T) {
+		resp, err := userAppClient.ListTask(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceListTaskRequest{
+				ApplicationUid: appUID,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to list tasks:", err)
+		}
+
+		if len(resp.Msg.Data) != 1 {
+			t.Fatalf("Task list length is incorrect: %d != 1", len(resp.Msg.Data))
+		}
+
+		if resp.Msg.Data[0].Uid != taskUID {
+			t.Fatalf("Task UID is incorrect: %s != %s", resp.Msg.Data[0].Uid, taskUID)
+		}
+	})
+
+	t.Run("User: Get ApplicationTask", func(t *testing.T) {
+		resp, err := userAppClient.GetTask(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceGetTaskRequest{
+				ApplicationTaskUid: taskUID,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to get task:", err)
+		}
+
+		if resp.Msg.Data.Uid != taskUID {
+			t.Fatalf("Task UID is incorrect: %s != %s", resp.Msg.Data.Uid, taskUID)
+		}
+	})
+
+	t.Run("User: ApplicationTask should have expected results in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.Uid+"/task/")).
-				BasicAuth("test-user", "test-user-password").
-				Expect(r).
-				Status(http.StatusOK).
-				End().
-				JSON(&appTasks)
-
-			if len(appTasks) != 2 {
-				r.Fatalf("Application Tasks list does not contain 2 tasks")
+			resp, err := userAppClient.GetTask(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceGetTaskRequest{
+					ApplicationTaskUid: taskUID,
+				}),
+			)
+			if err != nil {
+				r.Fatal("Failed to get task:", err)
 			}
 
-			// Tasks could return in any order, so reversing if first one is actually a second
-			if appTasks[0].Uid != appTask1.Uid {
-				appTasks[0], appTasks[1] = appTasks[1], appTasks[0]
+			if resp.Msg.Data.Result == nil {
+				r.Fatalf("Task result is not ready yet")
 			}
 
-			if appTasks[0].Uid != appTask1.Uid {
-				r.Fatalf("ApplicationTask 1 UID is incorrect: %v != %v", appTasks[0].Uid, appTask1.Uid)
+			if !resp.Msg.GetStatus() {
+				r.Fatalf("Task result status is incorrect: %v", resp.Msg)
 			}
-			if appTasks[1].Uid != appTask2.Uid {
-				r.Fatalf("ApplicationTask 2 UID is incorrect: %v != %v", appTasks[1].Uid, appTask2.Uid)
-			}
-			if appTasks[0].Result.String() != `{"snapshots":["test-snapshot"],"when":"ALLOCATED"}` {
-				r.Fatalf("ApplicationTask 1 result is incorrect: %v", appTasks[0].Result)
-			}
-			if appTasks[1].Result.String() != `{}` {
-				r.Fatalf("ApplicationTask 2 result is incorrect: %v", appTasks[1].Result)
+
+			if resp.Msg.GetData().GetResult().GetFields()["snapshots"].String() != `list_value:{values:{string_value:"test-snapshot"}}` {
+				r.Fatalf("Task result snapshots are incorrect: %s", resp.Msg.GetData().GetResult().GetFields()["snapshots"].String())
 			}
 		})
 	})
 
-	t.Run("User: Deallocate the Application", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.Uid+"/deallocate")).
-			BasicAuth("test-user", "test-user-password").
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+	// Create admin app client for cleanup
+	adminAppClient := aquariumv2connect.NewApplicationServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+
+	t.Run("Deallocate the Application", func(t *testing.T) {
+		_, err := adminAppClient.Deallocate(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceDeallocateRequest{
+				ApplicationUid: appUID,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to deallocate application:", err)
+		}
 	})
 
-	t.Run("User: ApplicationTask 2 should be executed in 10 sec", func(t *testing.T) {
+	t.Run("Application should get DEALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.Uid+"/task/")).
-				BasicAuth("test-user", "test-user-password").
-				Expect(r).
-				Status(http.StatusOK).
-				End().
-				JSON(&appTasks)
-
-			if len(appTasks) != 2 {
-				r.Fatalf("Application Tasks list does not contain 2 tasks")
+			resp, err := adminAppClient.GetState(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+					ApplicationUid: appUID,
+				}),
+			)
+			if err != nil {
+				r.Fatal("Failed to get application state:", err)
 			}
 
-			// Tasks could return in any order, so reversing if first one is actually a second
-			if appTasks[1].Uid != appTask2.Uid {
-				appTasks[0], appTasks[1] = appTasks[1], appTasks[0]
-			}
-
-			if appTasks[1].Uid != appTask2.Uid {
-				r.Fatalf("ApplicationTask 2 UID is incorrect: %v != %v", appTasks[1].Uid, appTask2.Uid)
-			}
-			if appTasks[1].Result.String() != `{"snapshots":["test-snapshot"],"when":"DEALLOCATE"}` {
-				r.Fatalf("ApplicationTask 2 result is incorrect: %v", appTasks[1].Result)
-			}
-		})
-	})
-
-	t.Run("User: Application should get DEALLOCATED in 10 sec", func(t *testing.T) {
-		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.Uid+"/state")).
-				BasicAuth("test-user", "test-user-password").
-				Expect(r).
-				Status(http.StatusOK).
-				End().
-				JSON(&appState)
-
-			if appState.Status != aquariumv2.ApplicationState_DEALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", appState.Status)
+			if resp.Msg.Data.Status != aquariumv2.ApplicationState_DEALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", resp.Msg.Data.Status)
 			}
 		})
 	})

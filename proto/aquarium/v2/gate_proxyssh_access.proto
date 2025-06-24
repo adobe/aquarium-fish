@@ -24,7 +24,8 @@ service GateProxySSHService {
   // GetResourceAccess returns credentials to access the ApplicationResource
   rpc GetResourceAccess(GateProxySSHServiceGetResourceAccessRequest) returns (GateProxySSHServiceGetResourceAccessResponse) {
    option (access_control) = {
-     allowed_roles: ["Power"]
+     allowed_roles: ["Power"],
+     additional_actions: ["GetResourceAccessAll"],
    };
   }
 }

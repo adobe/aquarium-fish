@@ -15,17 +15,17 @@
 package tests
 
 import (
-	"crypto/tls"
+	"context"
 	"fmt"
-	"net/http"
 	"sync"
 	"testing"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/google/uuid"
-	"github.com/steinfletcher/apitest"
 
 	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
+	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
@@ -54,63 +54,87 @@ drivers:
 		}
 	}()
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	cli := &http.Client{
-		Timeout:   time.Second * 30,
-		Transport: tr,
-	}
+	// Create admin client
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
 
-	var label aquariumv2.Label
-	apitest.New().
-		EnableNetworking(cli).
-		Post(afi.APIAddress("api/v1/label/")).
-		JSON(`{"name":"test-label", "version":1, "definitions": [
-			{"driver":"test", "resources":{"cpu":1,"ram":2}}
-		]}`).
-		BasicAuth("admin", afi.AdminToken()).
-		Expect(t).
-		Status(http.StatusOK).
-		End().
-		JSON(&label)
+	// Create service clients
+	labelClient := aquariumv2connect.NewLabelServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
 
-	if label.Uid == uuid.Nil.String() {
-		t.Fatalf("Label UID is incorrect: %v", label.Uid)
+	var labelUID string
+	resp, err := labelClient.Create(
+		context.Background(),
+		connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
+			Label: &aquariumv2.Label{
+				Name:    "test-label",
+				Version: 1,
+				Definitions: []*aquariumv2.LabelDefinition{{
+					Driver: "test",
+					Resources: &aquariumv2.Resources{
+						Cpu: 1,
+						Ram: 2,
+					},
+				}},
+			},
+		}),
+	)
+	if err != nil {
+		t.Fatal("Failed to create label:", err)
+	}
+	labelUID = resp.Msg.Data.Uid
+
+	if labelUID == uuid.Nil.String() {
+		t.Fatalf("Label UID is incorrect: %v", labelUID)
 	}
 
 	// Running periodic requests to test what's the delay will be
 	wg := &sync.WaitGroup{}
 	reachedLimit := false
-	workerFunc := func(t *testing.T, wg *sync.WaitGroup, afi *h.AFInstance, cli *http.Client) {
+	workerFunc := func(t *testing.T, wg *sync.WaitGroup, afi *h.AFInstance) {
 		defer wg.Done()
 
-		var app aquariumv2.Application
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/application/")).
-			JSON(`{"label_UID":"`+label.Uid+`"}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&app)
+		// Create individual client for each goroutine
+		cli, opts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+		appClient := aquariumv2connect.NewApplicationServiceClient(
+			cli,
+			afi.APIAddress("grpc"),
+			opts...,
+		)
 
-		if app.Uid == uuid.Nil.String() {
-			t.Errorf("Application UID is incorrect: %v", app.Uid)
+		var appUID string
+		appResp, err := appClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceCreateRequest{
+				Application: &aquariumv2.Application{
+					LabelUid: labelUID,
+				},
+			}),
+		)
+		if err != nil {
+			t.Errorf("Failed to create application: %v", err)
+			return
+		}
+		appUID = appResp.Msg.Data.Uid
+
+		if appUID == uuid.Nil.String() {
+			t.Errorf("Application UID is incorrect: %v", appUID)
 		}
 
-		var appState aquariumv2.ApplicationState
 		for !reachedLimit {
 			start := time.Now()
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.Uid+"/state")).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(t).
-				Status(http.StatusOK).
-				End().
-				JSON(&appState)
+			_, err := appClient.GetState(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+					ApplicationUid: appUID,
+				}),
+			)
+			if err != nil {
+				t.Errorf("Failed to get application state: %v", err)
+				return
+			}
 
 			elapsed := time.Since(start).Milliseconds()
 			t.Logf("Request delay: %dms", elapsed)
@@ -126,7 +150,7 @@ drivers:
 		// Running 40 parallel threads at a time to simulate a big pipeline startup
 		for range 40 {
 			wg.Add(1)
-			go workerFunc(t, wg, afi, cli)
+			go workerFunc(t, wg, afi)
 			counter += 1
 		}
 		t.Logf("Client threads: %d", counter)

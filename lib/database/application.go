@@ -100,6 +100,10 @@ func (d *Database) ApplicationDeallocate(appUID typesv2.ApplicationUID, requesto
 	}
 
 	newStatus := typesv2.ApplicationState_DEALLOCATE
+	if out.Status == typesv2.ApplicationState_NEW {
+		// The Application is still NEW so just mark it as DEALLOCATED
+		newStatus = typesv2.ApplicationState_DEALLOCATED
+	}
 	as := &typesv2.ApplicationState{ApplicationUid: appUID, Status: newStatus,
 		Description: fmt.Sprintf("Requested by %s", requestor),
 	}

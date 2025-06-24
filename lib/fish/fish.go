@@ -75,7 +75,7 @@ type Fish struct {
 	storageVotesMutex sync.RWMutex
 	storageVotes      map[typesv2.VoteUID]typesv2.Vote
 
-	// Stores the currently executing Applications and their locks
+	// Stores the currently executing Applications and their state transition locks
 	applicationsMutex sync.Mutex
 	applications      map[typesv2.ApplicationUID]*sync.Mutex
 
@@ -384,7 +384,7 @@ func (f *Fish) applicationProcess() {
 				f.maybeRunExecuteApplicationStop(appState)
 			case typesv2.ApplicationState_DEALLOCATED, typesv2.ApplicationState_ERROR:
 				// Not much to do here, but maybe later in the future?
-				// In this state the Application has no Resource to deal with, so no luck for now
+				// In this state the Application has no Resource to deal with, so no tasks for now
 				//f.maybeRunApplicationTask(appState.ApplicationUid, nil)
 				log.Debugf("Fish: Application %s reached end state %s", appState.ApplicationUid, appState.Status)
 			}

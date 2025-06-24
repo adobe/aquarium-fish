@@ -16,6 +16,8 @@
 package gate
 
 import (
+	"net/http"
+
 	"github.com/adobe/aquarium-fish/lib/database"
 )
 
@@ -29,6 +31,12 @@ type DriverFactory interface {
 
 	// Generates new gate
 	New(db *database.Database) Driver
+}
+
+// RPCService represents an RPC service that can be registered
+type RPCService struct {
+	Path    string
+	Handler http.Handler
 }
 
 // Driver interface of the functions that connects each Gate to Fish
@@ -46,4 +54,8 @@ type Driver interface {
 
 	// Shutdown gracefully stops the gate
 	Shutdown() error
+
+	// GetRPCServices returns any RPC services this gate driver wants to register
+	// Returns nil if no services to register
+	GetRPCServices() []RPCService
 }

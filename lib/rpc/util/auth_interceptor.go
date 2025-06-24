@@ -12,7 +12,7 @@
 
 // Author: Sergei Parshev (@sparshev)
 
-package rpc
+package util
 
 import (
 	"context"
@@ -21,31 +21,19 @@ import (
 
 	"connectrpc.com/connect"
 
-	"github.com/adobe/aquarium-fish/lib/fish"
+	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/log"
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
-type contextKey string
-
-const userContextKey = contextKey("user")
-
-// GetUserFromContext retrieves the user from context
-func GetUserFromContext(ctx context.Context) *typesv2.User {
-	if user, ok := ctx.Value(userContextKey).(*typesv2.User); ok {
-		return user
-	}
-	return nil
-}
-
 // AuthInterceptor handles authentication for Connect RPCs
 type AuthInterceptor struct {
-	fish *fish.Fish
+	db *database.Database
 }
 
 // NewAuthInterceptor creates a new auth interceptor
-func NewAuthInterceptor(f *fish.Fish) *AuthInterceptor {
-	return &AuthInterceptor{fish: f}
+func NewAuthInterceptor(db *database.Database) *AuthInterceptor {
+	return &AuthInterceptor{db: db}
 }
 
 // WrapUnary implements the connect.Interceptor interface
@@ -70,18 +58,18 @@ func (i *AuthInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 		log.Debugf("RPC: %s: New HTTP request received: %s", username, req.Spec().Procedure)
 
 		var user *typesv2.User
-		if i.fish.GetCfg().DisableAuth {
+		/*if i.fish.GetCfg().DisableAuth {
 			// This logic executed during performance tests only
 			user, err = i.fish.DB().UserGet(username)
 			if err != nil {
 				return nil, connect.NewError(connect.CodeUnauthenticated, err)
 			}
-		} else {
-			user = i.fish.DB().UserAuth(username, password)
-			if user == nil {
-				return nil, connect.NewError(connect.CodeUnauthenticated, nil)
-			}
+		} else {*/
+		user = i.db.UserAuth(username, password)
+		if user == nil {
+			return nil, connect.NewError(connect.CodeUnauthenticated, nil)
 		}
+		//}
 
 		// Add user to context
 		ctx = context.WithValue(ctx, userContextKey, user)
@@ -118,18 +106,18 @@ func (i *AuthInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc
 		log.Debugf("RPC: %s: New gRPC request received: %s", username, conn.Spec().Procedure)
 
 		var user *typesv2.User
-		if i.fish.GetCfg().DisableAuth {
+		/*if i.fish.GetCfg().DisableAuth {
 			// This logic executed during performance tests only
 			user, err = i.fish.DB().UserGet(username)
 			if err != nil {
 				return connect.NewError(connect.CodeUnauthenticated, err)
 			}
-		} else {
-			user = i.fish.DB().UserAuth(username, password)
-			if user == nil {
-				return connect.NewError(connect.CodeUnauthenticated, nil)
-			}
+		} else {*/
+		user = i.db.UserAuth(username, password)
+		if user == nil {
+			return connect.NewError(connect.CodeUnauthenticated, nil)
 		}
+		//}
 
 		// Add user to context
 		ctx = context.WithValue(ctx, userContextKey, user)

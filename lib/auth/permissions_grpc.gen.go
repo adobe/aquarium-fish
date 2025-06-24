@@ -37,8 +37,9 @@ const (
 	ApplicationServiceListTaskAll    = "ListTaskAll"
 
 	// GateProxySSHService service constants
-	GateProxySSHService                  = "GateProxySSHService"
-	GateProxySSHServiceGetResourceAccess = "GetResourceAccess"
+	GateProxySSHService                     = "GateProxySSHService"
+	GateProxySSHServiceGetResourceAccess    = "GetResourceAccess"
+	GateProxySSHServiceGetResourceAccessAll = "GetResourceAccessAll"
 
 	// LabelService service constants
 	LabelService       = "LabelService"

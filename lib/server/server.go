@@ -24,43 +24,12 @@ import (
 	"syscall"
 	"time"
 
-	//"gopkg.in/yaml.v3"
-
+	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/rpc"
 	"github.com/adobe/aquarium-fish/lib/server/meta"
 )
-
-// TODO: Implement YAML ingestion into gRPC
-// TODO: Save original YAML/JSON requests for labels/apps/whatever in structs
-
-// YamlBinder is used to decode yaml requests
-/*type YamlBinder struct{}
-
-// Bind allows to parse Yaml request data
-func (*YamlBinder) Bind(i any, c echo.Context) (err error) {
-	db := &echo.DefaultBinder{}
-	if err = db.Bind(i, c); err != echo.ErrUnsupportedMediaType {
-		return
-	}
-
-	// Process YAML if the content is yaml
-	req := c.Request()
-	if req.ContentLength == 0 {
-		return
-	}
-
-	ctype := req.Header.Get(echo.HeaderContentType)
-
-	if strings.HasPrefix(ctype, "application/yaml") {
-		if err = yaml.NewDecoder(req.Body).Decode(i); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, err.Error()).SetInternal(err)
-		}
-	}
-
-	return
-}*/
 
 // Init startups the API server to listen for incoming requests
 func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*http.Server, error) {
@@ -71,8 +40,12 @@ func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*http.Ser
 
 	// Create meta server
 	metaServer := meta.NewV1Router(f)
-	// Create a RPC server
-	rpcServer := rpc.NewServer(f)
+
+	// Collect RPC services from gate drivers
+	gateServices := drivers.GetGateRPCServices()
+
+	// Create a RPC server with gate services
+	rpcServer := rpc.NewServer(f, gateServices)
 
 	// Create a multiplexer to handle both HTTP and gRPC traffic
 	mux := http.NewServeMux()

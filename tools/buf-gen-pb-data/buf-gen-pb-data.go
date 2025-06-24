@@ -121,6 +121,10 @@ import (
 // {{.Name}} mirrors the protobuf enum
 type {{.Name}} int32
 
+func (c {{.Name}}) String() string {
+	return pbTypes.{{.Name}}_name[int32(c)]
+}
+
 const (
 {{- $enumName := .Name }}
 {{- range $key, $value := .Values }}

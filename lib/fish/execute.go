@@ -55,6 +55,7 @@ func (f *Fish) maybeRunExecuteApplicationStart(appState *typesv2.ApplicationStat
 
 	// Cleanup for executed application
 	f.applicationsMutex.Lock()
+	f.applications[appState.ApplicationUid].Unlock()
 	delete(f.applications, appState.ApplicationUid)
 	f.applicationsMutex.Unlock()
 
@@ -82,8 +83,7 @@ func (f *Fish) maybeRunExecuteApplicationStart(appState *typesv2.ApplicationStat
 
 func (f *Fish) maybeRunExecuteApplicationStop(appState *typesv2.ApplicationState) {
 	if appState.Status != typesv2.ApplicationState_DEALLOCATE {
-		// Applications are going to execution only when they are ELECTED.
-		// ALLOCATED ones are running while the node startup so we need strictly ELECTED ones here
+		// Application stop is possible only when it's got DEALLOCATE request.
 		return
 	}
 
@@ -159,6 +159,9 @@ func (f *Fish) executeApplicationStart(appUID typesv2.ApplicationUID, defIndex i
 	}
 	// Adding the Application to the executing ones
 	f.applications[appUID] = &sync.Mutex{}
+	// Locking the application since it's in process
+	lock := f.applications[appUID]
+	lock.Lock()
 	f.applicationsMutex.Unlock()
 
 	// Make sure definition is >= 0 which means it was chosen by the node
@@ -220,6 +223,7 @@ func (f *Fish) executeApplicationStart(appUID typesv2.ApplicationUID, defIndex i
 		f.routinesMutex.Unlock()
 		defer f.routines.Done()
 		defer log.Infof("Fish: executeApplicationStart for Application %s stopped", app.Uid)
+		defer lock.Unlock()
 
 		log.Infof("Fish: Application %s: Start: Continuing executing: %s", app.Uid, appState.Status)
 
@@ -372,11 +376,14 @@ func (f *Fish) executeApplicationStart(appUID typesv2.ApplicationUID, defIndex i
 
 func (f *Fish) executeApplicationStop(appUID typesv2.ApplicationUID) error {
 	f.applicationsMutex.Lock()
-	if _, ok := f.applications[appUID]; !ok {
+	lock, ok := f.applications[appUID]
+	if !ok {
 		// Application is not running by this Node
 		f.applicationsMutex.Unlock()
 		return nil
 	}
+	lock.Lock()
+	defer lock.Unlock()
 	f.applicationsMutex.Unlock()
 
 	// Check current Application state
@@ -422,6 +429,9 @@ func (f *Fish) executeApplicationStop(appUID typesv2.ApplicationUID) error {
 		// deallocation by DEALLOCATE which is useful for `snapshot` and `image` tasks.
 		f.executeApplicationTasks(driver, &labelDef, res, appState.Status)
 
+		// Locking the application transition state
+		lock.Lock()
+		defer lock.Unlock()
 		log.Infof("Fish: Application %s: Stop: Running Deallocate of the ApplicationResource: %s", appUID, res.Identifier)
 
 		// Deallocating and destroy the resource

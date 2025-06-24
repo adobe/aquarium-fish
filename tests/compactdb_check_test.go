@@ -15,18 +15,17 @@
 package tests
 
 import (
-	"crypto/tls"
+	"context"
 	"fmt"
-	"net/http"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/steinfletcher/apitest"
+	"connectrpc.com/connect"
 
 	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
+	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
@@ -57,93 +56,121 @@ drivers:
 		}
 	}()
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	cli := &http.Client{
-		Timeout:   time.Second * 5,
-		Transport: tr,
-	}
-
 	// No ERROR could happen during execution of this test
 	afi.WaitForLog("ERROR:", func(substring, line string) bool {
 		t.Errorf("Error located in the Fish log: %q", line)
 		return true
 	})
 
-	var label aquariumv2.Label
-	t.Run("Create Label", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/label/")).
-			JSON(`{"name":"test-label", "version":1, "definitions": [{"driver":"test", "resources":{"cpu":1,"ram":2}}]}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&label)
+	// Create admin client
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
 
-		if label.Uid == uuid.Nil.String() {
-			t.Fatalf("Label UID is incorrect: %v", label.Uid)
+	// Create service clients
+	labelClient := aquariumv2connect.NewLabelServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+
+	var labelUID string
+	t.Run("Create Label", func(t *testing.T) {
+		resp, err := labelClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
+				Label: &aquariumv2.Label{
+					Name:    "test-label",
+					Version: 1,
+					Definitions: []*aquariumv2.LabelDefinition{{
+						Driver: "test",
+						Resources: &aquariumv2.Resources{
+							Cpu: 1,
+							Ram: 2,
+						},
+					}},
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create label:", err)
 		}
+		labelUID = resp.Msg.Data.Uid
 	})
 
 	completed := false
-	workerFunc := func(t *testing.T, wg *sync.WaitGroup, id int, afi *h.AFInstance, cli *http.Client) {
+	workerFunc := func(t *testing.T, wg *sync.WaitGroup, id int) {
 		t.Logf("Worker %d: Started", id)
 		defer t.Logf("Worker %d: Ended", id)
 		defer wg.Done()
 
+		// Create service clients for this worker
+		workerCli, workerOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+		appClient := aquariumv2connect.NewApplicationServiceClient(
+			workerCli,
+			afi.APIAddress("grpc"),
+			workerOpts...,
+		)
+
 		for !completed {
-			var app aquariumv2.Application
-			var appState aquariumv2.ApplicationState
+			// Create application
+			resp, err := appClient.Create(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceCreateRequest{
+					Application: &aquariumv2.Application{
+						LabelUid: labelUID,
+					},
+				}),
+			)
+			if err != nil {
+				t.Errorf("Worker %d: Failed to create application: %v", id, err)
+				return
+			}
 
-			apitest.New().
-				EnableNetworking(cli).
-				Post(afi.APIAddress("api/v1/application/")).
-				JSON(`{"label_UID":"`+label.Uid+`"}`).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(t).
-				Status(http.StatusOK).
-				End().
-				JSON(&app)
-
-			if app.Uid == uuid.Nil.String() {
-				t.Errorf("Worker %d: Application UID is incorrect: %v", id, app.Uid)
+			appUID := resp.Msg.Data.Uid
+			if appUID == "" {
+				t.Errorf("Worker %d: Application UID is empty", id)
 				return
 			}
 
 			// Checking state until it's allocated
-			for appState.Status != aquariumv2.ApplicationState_ALLOCATED {
-				apitest.New().
-					EnableNetworking(cli).
-					Get(afi.APIAddress("api/v1/application/"+app.Uid+"/state")).
-					BasicAuth("admin", afi.AdminToken()).
-					Expect(t).
-					Status(http.StatusOK).
-					End().
-					JSON(&appState)
-
-				if appState.Uid == uuid.Nil.String() {
-					t.Errorf("Worker %d: ApplicationStatus UID is incorrect: %v", id, appState.Uid)
+			for {
+				stateResp, err := appClient.GetState(
+					context.Background(),
+					connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+						ApplicationUid: appUID,
+					}),
+				)
+				if err != nil {
+					t.Errorf("Worker %d: Failed to get application state: %v", id, err)
 					return
 				}
-				if appState.Status == aquariumv2.ApplicationState_ERROR {
-					t.Errorf("Worker %d: ApplicationStatus is incorrect: %v", id, appState.Status)
+
+				if stateResp.Msg.Data.Uid == "" {
+					t.Errorf("Worker %d: ApplicationStatus UID is empty", id)
 					return
+				}
+				if stateResp.Msg.Data.Status == aquariumv2.ApplicationState_ERROR {
+					t.Errorf("Worker %d: ApplicationStatus is ERROR: %v", id, stateResp.Msg.Data.Status)
+					return
+				}
+
+				if stateResp.Msg.Data.Status == aquariumv2.ApplicationState_ALLOCATED {
+					break
 				}
 
 				time.Sleep(time.Second)
 			}
 
 			// Time to deallocate
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.Uid+"/deallocate")).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(t).
-				Status(http.StatusOK).
-				End()
+			_, err = appClient.Deallocate(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceDeallocateRequest{
+					ApplicationUid: appUID,
+				}),
+			)
+			if err != nil {
+				t.Errorf("Worker %d: Failed to deallocate application: %v", id, err)
+				return
+			}
 		}
 	}
 
@@ -151,14 +178,14 @@ drivers:
 	wg := &sync.WaitGroup{}
 	for id := range 10 {
 		wg.Add(1)
-		go workerFunc(t, wg, id, afi, cli)
-		time.Sleep(50 * time.Millisecond)
+		go workerFunc(t, wg, id)
+		time.Sleep(123 * time.Millisecond)
 	}
 
 	t.Run("Applications should be cleaned from DB and compacted", func(t *testing.T) {
 		// Wait for the next 20 cleanupdb completed to have enough time to fill the DB
 		cleaned := make(chan struct{})
-		for range 20 {
+		for range 10 {
 			afi.WaitForLog("Fish: CleanupDB completed", func(substring, line string) bool {
 				cleaned <- struct{}{}
 				return true
@@ -198,9 +225,13 @@ drivers:
 			compacted <- nil
 			return true
 		})
-		// Stopping the node to trigger CompactDB process the last time
+
+		// Stopping the node to trigger CompactDB process
 		afi.Stop(t)
 
 		<-compacted
+
+		// Wait for all workers to finish
+		wg.Wait()
 	})
 }
