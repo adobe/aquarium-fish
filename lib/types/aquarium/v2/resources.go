@@ -43,10 +43,7 @@ func (r *Resources) Validate(diskTypes []string, checkNet bool) error {
 			return fmt.Errorf("Resources: Size of the disk can't be less than 1GB")
 		}
 	}
-	if r.NodeFilter == nil {
-		// OpenAPI requires here actual array instead of nil
-		r.NodeFilter = []string{}
-	} else {
+	if r.NodeFilter != nil {
 		// Check filter patterns are correct
 		for _, pattern := range r.NodeFilter {
 			_, err := path.Match(pattern, "whatever")

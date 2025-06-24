@@ -5,7 +5,7 @@
 Main part of the [Aquarium](https://github.com/adobe/aquarium-fish/wiki/Aquarium) distributed p2p
 system to manage resources. Primarily was developed to manage the dynamic Jenkins CI agents in
 heterogeneous environment and simplify the infrastructure management, but can be used in various
-applications to have self-management resources with simple REST API to operate p2p cluster.
+applications to have self-management resources with simple gRPC/Connect API to operate p2p cluster.
 
 Eventually becomes an internal cloud or pool of resources with high availability and business
 continuity features - an essential part of the modern infrastructure in international companies. It
@@ -30,10 +30,11 @@ the environment.
 
 * Completely distributed system
 * Run and operate locally with minimal required configuration
-* Flexible to use different database engines
+* Flexible to use different database engines (currently using bitcask for high performance)
 * Simple interface for the drivers which provides resources
 * Proper sandboxing of the running resources (host only networking by default)
-* Compact API with straightforward definitions
+* Modern gRPC/Connect API with Protocol Buffers definitions
+* Role-Based Access Control (RBAC) for fine-grained permissions
 * Socks5 and other proxies to redirect the applications to nearby services
 
 ## Usage
@@ -42,7 +43,7 @@ To use the Aquarium Fish you just need to execute the next steps:
 * Ensure the dependencies for needed driver are installed
 * Run Fish node
 * Obtain the generated admin user token
-* With HTTP API:
+* With gRPC/Connect API:
    * Create Label which describes the resource you want to see
    * Create Application to request the resource
    * Use the allocated resource
@@ -138,20 +139,68 @@ To use with Jenkins - you can install [Aquarium Net Jenkins](https://github.com/
 cloud plugin to dynamically allocate the required resources. Don't forget to add the served Labels
 to the cluster and you will be ready to go.
 
-### Users policy
+### Users and RBAC
 
-For now the policy is quite simple - `admin` user can do anything, regular users can just use the
-cluster (create application, list their resources and so on). The applications & resources could
-contain sensitive information (like jenkins agent secret), so user can see just the owned
-applications and are able to control only them.
+Fish now includes a comprehensive Role-Based Access Control (RBAC) system with three default roles:
+
+#### Default Roles
+
+* **Administrator**: Full access to all system resources and operations
+  - Can manage users, roles, labels, and applications
+  - Can view and control all cluster nodes
+  - Has administrative privileges for system maintenance
+
+* **User**: Standard user with limited permissions
+  - Can create and manage their own applications
+  - Can view available labels
+  - Cannot access other users' resources or system administration
+
+* **Power**: Additional for the **User** role to have:
+  - Can create and manage application tasks
+  - Can access SSH proxy resources
+
+#### Permission System
+
+The RBAC system is defined through Protocol Buffers and automatically generates permissions based
+on gRPC service methods. Each role is granted specific permissions for resources and actions:
+
+- **Resources**: Services like `ApplicationService`, `LabelService`, `UserService`, etc.
+- **Actions**: Methods like `Create`, `Get`, `List`, `Update`, `Delete`
+- **Additional Actions**: Special permissions like `GetAll`, `UpdateAll` for cross-user operations
+
+For advanced setups, you can create custom roles with specific permission combinations using the
+Role management API.
 
 ## Implementation
 
 Go was initially chosen because of go-dqlite, but became quite useful and modern way of making a
 self-sufficient one-executable service which can cover multiple areas without performance sacrifice.
 The way it manages dependencies and subroutines, structures logic makes it much better than python
-for such purpose. Eventually we've moved away from dqlite (adobe/aquarium-fish#1) but stick with go
-for good.
+for such purpose. Eventually we've moved away from dqlite and now use bitcask for high-performance
+embedded storage that provides excellent read/write performance and data durability.
+
+### API Architecture
+
+Fish now uses a modern gRPC-first approach with Connect-RPC for maximum compatibility:
+
+* **Protocol Buffers**: All API definitions are in `proto/aquarium/v2/` directory
+* **gRPC**: Native gRPC support for high-performance applications
+* **Connect-RPC**: HTTP/1.1 and HTTP/2 compatible REST-like API
+* **JSON/YAML**: Support for both binary protobuf and JSON/YAML formats
+* **Authentication**: HTTP Basic Auth with secure token-based system
+* **RBAC**: Fine-grained permissions controlled by role assignments
+
+### Database
+
+Fish uses bitcask as the embedded database engine, providing:
+
+* **High Performance**: Optimized for high read/write throughput
+* **Durability**: Write-ahead logging ensures data consistency
+* **Compaction**: Automatic garbage collection and space reclamation
+* **Simplicity**: No external dependencies, single binary deployment
+* **Crash Recovery**: Automatic recovery from unexpected shutdowns
+
+The database automatically handles cleanup of completed applications and periodic compaction to maintain optimal performance.
 
 ### Drivers
 
@@ -166,14 +215,6 @@ In the event you need to use more than one configuration for a given driver, you
 `/<name>`. For example, `aws` and `aws/dev` will both utilize the AWS driver, but use a different
 configuration. In this example, Labels created will need to specify either `driver: aws` or
 `driver: aws/dev` to select which configuration to run.
-
-### Internal DB structure
-
-The cluster supports the internal SQL database, which provides a common storage for the node &
-cluster data. The current schema could be found in OpenAPI format here:
- * When the Fish app is running locally: https://0.0.0.0:8001/api/
- * API v1 OpenAPI specification: https://github.com/adobe/aquarium-fish/blob/main/docs/openapi.yaml
- * API v2 gRPC specifications: https://github.com/adobe/aquarium-fish/blob/main/proto/
 
 ### How the cluster choose node for resource allocation
 
@@ -265,26 +306,61 @@ workers perfromance is not stable, so it's recommended to execute the benchmarks
 
 ### Profiling
 
-Is available through pprof like that:
-```
-$ go tool pprof 'https+insecure://<USER>:<TOKEN>@localhost:8001/api/v1/node/this/profiling/heap'
-$ curl -ku "<USER>:<TOKEN>" 'https://localhost:8001/api/v1/node/this/profiling/?debug=1'
-```
-
-Or you can open https://localhost:8001/api/v1/node/this/profiling/ in browser to see the index.
+TODO: For now removed and will be available as a part of monitoring subsystem.
 
 ## API
 
-There is a number of ways to communicate with the Fish cluster, and the most important one is API.
+The API is built using modern gRPC and Connect-RPC protocols with Protocol Buffers for maximum performance and compatibility.
 
-You can use `curl`, for example, to do that:
+### Protocol Support
+
+Fish supports multiple protocols for different use cases:
+
+* **gRPC**: High-performance binary protocol for production applications
+* **Connect-RPC**: HTTP/1.1 and HTTP/2 compatible with REST-like semantics  
+* **JSON/YAML**: Human-readable formats for debugging and curl usage
+
+### API Endpoints
+
+The API is served on `/grpc/` prefix and supports all services defined in the Protocol Buffer
+specifications:
+
+* **ApplicationService**: Manage applications and their lifecycle
+* **LabelService**: Define and manage resource labels
+* **UserService**: User management and authentication
+* **RoleService**: RBAC role management
+* **NodeService**: Cluster node information and maintenance
+
+### Authentication
+
+All API calls require HTTP Basic Authentication:
+```bash
+$ curl -u "admin:YOUR_TOKEN" -X POST "https://127.0.0.1:8001/grpc/aquarium.v2.LabelService/List" \
+  -H "Content-Type: application/json" \
+  -d '{}'
 ```
-$ curl -u "admin:YOUR_TOKEN" -X GET 127.0.0.1:8001/api/v1/label/
-{...json data...}
+
+For gRPC clients, use appropriate authentication interceptors with basic auth credentials.
+
+### API Documentation
+
+* **Protocol Buffer Definitions**: `proto/aquarium/v2/` - Complete API specifications
+* **Generated Code**: `lib/rpc/proto/aquarium/v2/` - Go client and server code
+* **Connect Clients**: `lib/rpc/proto/aquarium/v2/aquariumv2connect/` - HTTP/gRPC client interfaces
+
+### Example Usage
+
+Using Connect-RPC with curl:
+```bash
+# List all labels
+$ curl -u "admin:YOUR_TOKEN" -X POST "https://127.0.0.1:8001/grpc/aquarium.v2.LabelService/List" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+
+# Create an application
+$ curl -u "admin:YOUR_TOKEN" -X POST "https://127.0.0.1:8001/grpc/aquarium.v2.ApplicationService/Create" \
+  -H "Content-Type: application/json" \
+  -d '{"application": {"label_uid": "your-label-uid"}}'
 ```
 
-The current API could be found in OpenAPI format here:
- * When the Fish app is running locally: https://0.0.0.0:8001/api/
- * YAML specification: https://github.com/adobe/aquarium-fish/blob/main/docs/openapi.yaml
-
-Also check `example` and `tests` folder to get more info about the typical API usage.
+Also check `examples` and `tests` folder to get more info about the typical API usage.
