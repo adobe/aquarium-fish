@@ -79,7 +79,7 @@ func (f *Fish) electionProcess(appUID typesv2.ApplicationUID) error {
 	// Loop to reiterate each new round
 	for {
 		// Set the round based on the time of Application creation to join the election process
-		myvote.Round = uint32(f.voteCurrentRoundGet(app.CreatedAt))
+		myvote.Round = f.voteCurrentRoundGet(app.CreatedAt)
 
 		// Calculating the end time of the round to not stuck if some nodes are not available
 		roundEndsAt := app.CreatedAt.Add(time.Duration(ElectionRoundTime*(myvote.Round+1)) * time.Second)

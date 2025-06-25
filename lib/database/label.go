@@ -36,13 +36,13 @@ func (d *Database) LabelList(filters LabelListParams) (labels []typesv2.Label, e
 
 	var filterVersion int32
 	if filters.Version != nil && *filters.Version != "last" {
-		// Try to convert to int and if fails
-		if version64, err := strconv.ParseInt(*filters.Version, 10, 32); err != nil {
+		// Try to convert to int64
+		version64, err := strconv.ParseInt(*filters.Version, 10, 32)
+		if err != nil {
 			return labels, fmt.Errorf("Unable to parse Version integer: %v", err)
-		} else {
-			// Converting to int32
-			filterVersion = int32(version64)
 		}
+		// Converting to int32
+		filterVersion = int32(version64)
 	}
 	if err == nil && (filters.Name != nil || filters.Version != nil) {
 		passed := []typesv2.Label{}

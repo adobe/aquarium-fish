@@ -17,13 +17,9 @@ package util
 import (
 	"context"
 
-	"connectrpc.com/connect"
-
 	"github.com/adobe/aquarium-fish/lib/auth"
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
-
-var interceptors connect.Option
 
 type contextKey string
 

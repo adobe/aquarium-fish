@@ -31,7 +31,7 @@ import (
 )
 
 func (d *Driver) getContainersResources(containerIDs []string) (*typesv2.Resources, error) {
-	var out *typesv2.Resources
+	out := &typesv2.Resources{}
 
 	// Getting current running containers info - will return "<ncpu>,<mem_bytes>\n..." for each one
 	dockerArgs := []string{"inspect", "--format", "{{ .HostConfig.NanoCpus }},{{ .HostConfig.Memory }}"}

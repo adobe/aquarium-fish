@@ -61,8 +61,6 @@ func (*Processor) Return(w http.ResponseWriter, r *http.Request, code int, obj m
 	w.Header().Set("Content-Type", mime)
 	w.WriteHeader(code)
 	w.Write(data)
-
-	return
 }
 
 // DataGetList returns metadata assigned to the Resource

@@ -69,7 +69,7 @@ func (s *RoleService) Get(_ /*ctx*/ context.Context, req *connect.Request[aquari
 
 // Create implements the Create RPC
 func (s *RoleService) Create(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.RoleServiceCreateRequest]) (*connect.Response[aquariumv2.RoleServiceCreateResponse], error) {
-	msgRole := req.Msg.Role
+	msgRole := req.Msg.GetRole()
 	if msgRole == nil {
 		return connect.NewResponse(&aquariumv2.RoleServiceCreateResponse{
 			Status: false, Message: "Role not provided",
@@ -108,7 +108,7 @@ func (s *RoleService) Create(_ /*ctx*/ context.Context, req *connect.Request[aqu
 
 // Update implements the Update RPC
 func (s *RoleService) Update(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.RoleServiceUpdateRequest]) (*connect.Response[aquariumv2.RoleServiceUpdateResponse], error) {
-	msgRole := req.Msg.Role
+	msgRole := req.Msg.GetRole()
 	if msgRole == nil {
 		return connect.NewResponse(&aquariumv2.RoleServiceUpdateResponse{
 			Status: false, Message: "Role not provided",

@@ -33,9 +33,14 @@ type LabelService struct {
 // List returns a list of labels
 func (s *LabelService) List(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.LabelServiceListRequest]) (*connect.Response[aquariumv2.LabelServiceListResponse], error) {
 	// Get labels from database
-	params := database.LabelListParams{
-		Name:    req.Msg.Name,
-		Version: req.Msg.Version,
+	params := database.LabelListParams{}
+	if req.Msg.Name != nil {
+		name := req.Msg.GetName()
+		params.Name = &name
+	}
+	if req.Msg.Version != nil {
+		version := req.Msg.GetVersion()
+		params.Version = &version
 	}
 	out, err := s.fish.DB().LabelList(params)
 	if err != nil {

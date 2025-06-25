@@ -588,7 +588,7 @@ func generateTypeAliasName(messageName string) string {
 }
 
 // resolveReturnType determines the appropriate return type for a UID field
-func resolveReturnType(fieldName, messageName string, allMessages map[string]bool) string {
+func resolveReturnType(fieldName, messageName string) string {
 	if fieldName == "uid" {
 		// For "uid" field, return the message's own UID type
 		return generateTypeAliasName(messageName)
@@ -607,16 +607,8 @@ func resolveReturnType(fieldName, messageName string, allMessages map[string]boo
 func processProtoFile(plugin *protogen.Plugin, file *protogen.File) {
 	var messages []DataMessage
 	var hasUUIDs, hasTime, hasJSON bool
-	var allMessages = make(map[string]bool)
 	var enumsUsed = make(map[string]*protogen.Enum) // Track used enums
 	var typeAliases = make(map[string]bool)         // Aliases for fields
-
-	// First pass: collect all message names from all files for cross-reference resolution
-	for _, f := range plugin.Files {
-		for _, message := range f.Messages {
-			allMessages[message.GoIdent.GoName] = true
-		}
-	}
 
 	// Process each message in the file
 	for _, message := range file.Messages {
@@ -684,7 +676,7 @@ func processProtoFile(plugin *protogen.Plugin, file *protogen.File) {
 
 			// Fill aliases
 			if fieldName == "uid" {
-				returnType := resolveReturnType(fieldName, message.GoIdent.GoName, allMessages)
+				returnType := resolveReturnType(fieldName, message.GoIdent.GoName)
 				typeAliases[returnType] = true
 			}
 

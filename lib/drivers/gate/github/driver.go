@@ -137,6 +137,6 @@ func (d *Driver) Shutdown() error {
 
 // GetRPCServices returns RPC services this gate driver wants to register
 // GitHub gate doesn't expose any RPC services
-func (d *Driver) GetRPCServices() []gate.RPCService {
+func (*Driver) GetRPCServices() []gate.RPCService {
 	return nil
 }

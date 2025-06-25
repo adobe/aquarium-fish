@@ -370,6 +370,8 @@ func (f *Fish) applicationProcess() {
 			return
 		case appState := <-f.applicationStateChannel:
 			switch appState.Status {
+			case typesv2.ApplicationState_UNSPECIFIED:
+				log.Errorf("Fish: Application %s has unspecified state %s", appState.ApplicationUid, appState.Status)
 			case typesv2.ApplicationState_NEW:
 				// Running election process for the new Application, if it's not already procesing
 				f.maybeRunElectionProcess(appState)

@@ -106,7 +106,7 @@ func (nd *NodeDefinition) Update() {
 				Stepping:   fmt.Sprintf("%d", info.Stepping),
 				PhysicalId: info.PhysicalID,
 				CoreId:     info.CoreID,
-				Cores:      int32(info.Cores),
+				Cores:      info.Cores,
 				ModelName:  info.ModelName,
 				Mhz:        float32(info.Mhz),
 				CacheSize:  fmt.Sprintf("%d", info.CacheSize),
