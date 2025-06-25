@@ -44,7 +44,7 @@ if ! command -v protoc-gen-connect-go >/dev/null 2>&1; then
 fi
 
 # Run code generation
-go generate -v . ./lib/...
+go generate -v .
 
 # If ONLYGEN is specified - skip the build
 [ -z "$ONLYGEN" ] || exit 0

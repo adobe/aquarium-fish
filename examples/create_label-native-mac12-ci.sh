@@ -23,8 +23,8 @@ hostport=$2
 
 label=mac12_native
 
-# It's a bit dirty, but works for now - probably better to create API call to find the latest label
-curr_label=$(curl -s -u "admin:$token" -k "https://$hostport/api/v1/label/?name=$label" | sed 's/},{/},\n{/g' | tail -1)
+curr_label=$(curl -s -u "admin:$token" -X POST --header "Content-Type: application/json" \
+    -d "{\"name\":\"$label\",\"version\":\"last\"}" -k "https://$hostport/grpc/aquarium.v2.LabelService/List" | sed 's/^.*"data":\[//' | sed 's/\]}$//')
 curr_version="$(echo "$curr_label" | grep -o '"version": *[0-9]\+' | tr -dc '0-9')"
 echo "Current label '$label:$curr_version': $curr_label"
 
@@ -63,6 +63,6 @@ definitions:
       network: Name:test-vpc
 metadata:
   JENKINS_AGENT_WORKSPACE: "{{ .Disks.ws }}"
-' "https://$hostport/api/v1/label/" | grep -o '"UID": *"[^"]\+"' | cut -d':' -f 2 | tr -d ' "')
+' "https://$hostport/grpc/aquarium.v2.LabelService/Create" | grep -o '"uid": *"[^"]\+"' | cut -d':' -f 2 | tr -d ' "')
 
 echo "Created Label ID: ${label_id}"

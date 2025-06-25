@@ -43,9 +43,13 @@ func (*UserService) GetMe(ctx context.Context, _ /*req*/ *connect.Request[aquari
 		}), connect.NewError(connect.CodeUnauthenticated, nil)
 	}
 
+	// Need to filter out Hash for security reasons
+	result := user.ToUser()
+	result.Hash = nil
+
 	return connect.NewResponse(&aquariumv2.UserServiceGetMeResponse{
 		Status: true, Message: "User details retrieved successfully",
-		Data: user.ToUser(),
+		Data: result,
 	}), nil
 }
 
@@ -84,9 +88,13 @@ func (s *UserService) Get(_ /*ctx*/ context.Context, req *connect.Request[aquari
 		}), connect.NewError(connect.CodeNotFound, err)
 	}
 
+	// Need to filter out Hash for security reasons
+	result := user.ToUser()
+	result.Hash = nil
+
 	return connect.NewResponse(&aquariumv2.UserServiceGetResponse{
 		Status: true, Message: "User retrieved successfully",
-		Data: user.ToUser(),
+		Data: result,
 	}), nil
 }
 
@@ -111,14 +119,30 @@ func (s *UserService) Create(_ /*ctx*/ context.Context, req *connect.Request[aqu
 			Status: false, Message: "Failed to create user: " + err.Error(),
 		}), connect.NewError(connect.CodeInvalidArgument, err)
 	}
+
+	// Assigning roles if they are defined
+	if msgUser.Roles != nil {
+		user.Roles = msgUser.GetRoles()
+
+		if err := s.fish.DB().UserSave(user); err != nil {
+			return connect.NewResponse(&aquariumv2.UserServiceCreateResponse{
+				Status: false, Message: "Failed to update user: " + err.Error(),
+			}), connect.NewError(connect.CodeInternal, err)
+		}
+	}
+
 	if msgUser.GetPassword() == "" {
 		// Showing the generated password to requestor
 		user.Password = &password
 	}
 
+	// Need to filter out Hash for security reasons
+	result := user.ToUser()
+	result.Hash = nil
+
 	return connect.NewResponse(&aquariumv2.UserServiceCreateResponse{
 		Status: true, Message: "User created successfully",
-		Data: user.ToUser(),
+		Data: result,
 	}), nil
 }
 
@@ -162,9 +186,13 @@ func (s *UserService) Update(ctx context.Context, req *connect.Request[aquariumv
 		}), connect.NewError(connect.CodeInternal, err)
 	}
 
+	// Need to filter out Hash for security reasons
+	result := user.ToUser()
+	result.Hash = nil
+
 	return connect.NewResponse(&aquariumv2.UserServiceUpdateResponse{
 		Status: true, Message: "User updated successfully",
-		Data: user.ToUser(),
+		Data: result,
 	}), nil
 }
 

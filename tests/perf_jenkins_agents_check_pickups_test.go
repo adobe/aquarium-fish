@@ -15,19 +15,14 @@
 package tests
 
 import (
-	"bufio"
 	"context"
-	"crypto/tls"
 	"fmt"
-	"net/http"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
-	"github.com/steinfletcher/apitest"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
@@ -79,15 +74,6 @@ drivers:
 		afi.APIAddress("grpc"),
 		adminOpts...,
 	)
-
-	// HTTP client for profiling endpoint (still needs REST)
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	cli := &http.Client{
-		Timeout:   time.Second * 30,
-		Transport: tr,
-	}
 
 	// Creating 2 labels - one for the app that can't be allocated and another one for a good app
 	var labelNoWayUID string
@@ -147,34 +133,34 @@ drivers:
 
 	// Running goroutines amount fetcher
 	exitTest := false
-	go func() {
-		var amount int
-
-		for !exitTest {
-			amount = 0
-			res := apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/node/this/profiling/goroutine")).
-				Query("debug", "2").
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(t).
-				Status(http.StatusOK).
-				End()
-
-			scanner := bufio.NewScanner(res.Response.Body)
-			for scanner.Scan() {
-				line := scanner.Text()
-				if strings.HasPrefix(line, "goroutine ") {
-					amount += 1
-				}
-			}
-			res.Response.Body.Close()
-
-			t.Log("Goroutines amount:", amount)
-
-			time.Sleep(5 * time.Second)
-		}
-	}()
+	//go func() {
+	//	var amount int
+	//
+	//	for !exitTest {
+	//		amount = 0
+	//		res := apitest.New().
+	//			EnableNetworking(cli).
+	//			Get(afi.APIAddress("api/v1/node/this/profiling/goroutine")).
+	//			Query("debug", "2").
+	//			BasicAuth("admin", afi.AdminToken()).
+	//			Expect(t).
+	//			Status(http.StatusOK).
+	//			End()
+	//
+	//		scanner := bufio.NewScanner(res.Response.Body)
+	//		for scanner.Scan() {
+	//			line := scanner.Text()
+	//			if strings.HasPrefix(line, "goroutine ") {
+	//				amount += 1
+	//			}
+	//		}
+	//		res.Response.Body.Close()
+	//
+	//		t.Log("Goroutines amount:", amount)
+	//
+	//		time.Sleep(5 * time.Second)
+	//	}
+	//}()
 
 	// Running periodic requests to test what's the delay will be
 	workerFunc := func(t *testing.T, afi *h.AFInstance) {
