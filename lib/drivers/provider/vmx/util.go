@@ -274,7 +274,7 @@ func (d *Driver) disksCreate(vmxPath string, disks map[string]typesv2.ResourcesD
 				`createType="monolithicFlat"`,
 				``,
 				`# Extent description`,
-				// Format: http://sanbarrow.com/vmdk/disktypesv2.html
+				// Format: http://sanbarrow.com/vmdk/disktypes.html
 				// <access type> <size> <vmdk-type> <path to datachunk> <offset>
 				// size, offset - number in amount of sectors
 				fmt.Sprintf(`RW %d FLAT %q 0`, disk.Size*1024*1024*2, dmgPath),

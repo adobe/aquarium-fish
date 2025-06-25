@@ -37,39 +37,40 @@ echo "Press any key to create or Ctrl-C to abort"
 read w1
 
 label_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/yaml' -d '---
-name: "'$label'"
-version: '$new_version'
-definitions:
-  - driver: docker
-    options:
-      images:  # For test purposes images are used as symlink to aquarium-bait/out so does not need checksum
-        - url: https://artifact-storage/aquarium/image/docker/ubuntu2004/ubuntu2004-VERSION.tar.xz
-        - url: https://artifact-storage/aquarium/image/docker/ubuntu2004-python3/ubuntu2004-python3-VERSION.tar.xz
-        - url: https://artifact-storage/aquarium/image/docker/ubuntu2004-python3-ci/ubuntu2004-python3-ci-VERSION.tar.xz
-    resources:
-      cpu: 4
-      ram: 8
-      disks:
-        python3:
-          type: hfs+
-          size: 10
-      network: nat
-  - driver: aws
-    options:
-      image: ami-0aab355e1bfa1e72e
-      instance_type: c6a.xlarge
-      security_group: test-sec-group
-      userdata_format: env
-    resources:
-      cpu: 4
-      ram: 8
-      disks:
-        "/dev/sdc":
-          label: Name:workspace_lin
-          size: 10
-      network: Name:test-vpc
-metadata:
-  JENKINS_AGENT_WORKSPACE: "/mnt/workspace"
+label:
+  name: "'$label'"
+  version: '$new_version'
+  definitions:
+    - driver: docker
+      options:
+        images:  # For test purposes images are used as symlink to aquarium-bait/out so does not need checksum
+          - url: https://artifact-storage/aquarium/image/docker/ubuntu2004/ubuntu2004-VERSION.tar.xz
+          - url: https://artifact-storage/aquarium/image/docker/ubuntu2004-python3/ubuntu2004-python3-VERSION.tar.xz
+          - url: https://artifact-storage/aquarium/image/docker/ubuntu2004-python3-ci/ubuntu2004-python3-ci-VERSION.tar.xz
+      resources:
+        cpu: 4
+        ram: 8
+        disks:
+          python3:
+            type: hfs+
+            size: 10
+        network: nat
+    - driver: aws
+      options:
+        image: ami-0aab355e1bfa1e72e
+        instance_type: c6a.xlarge
+        security_group: test-sec-group
+        userdata_format: env
+      resources:
+        cpu: 4
+        ram: 8
+        disks:
+          "/dev/sdc":
+            label: Name:workspace_lin
+            size: 10
+        network: Name:test-vpc
+  metadata:
+    JENKINS_AGENT_WORKSPACE: "/mnt/ws
 ' "https://$hostport/grpc/aquarium.v2.LabelService/Create" | grep -o '"uid": *"[^"]\+"' | cut -d':' -f 2 | tr -d ' "')
 
 echo "Created Label ID: ${label_id}"

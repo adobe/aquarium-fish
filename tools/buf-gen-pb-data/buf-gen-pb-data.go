@@ -150,7 +150,7 @@ func From{{.OriginalName}}(src *pbTypes.{{.OriginalName}}) {{.DataName}} {
 	if src == nil {
 		return {{.DataName}}{}
 	}
-	
+
 	result := {{.DataName}}{}
 {{- range .Fields }}
 {{- if .IsMap }}

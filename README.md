@@ -298,7 +298,7 @@ cpu: Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz
 Benchmark_hash_new         	      20	  65924472 ns/op	67122440 B/op	     180 allocs/op
 Benchmark_hash_new-2       	      33	  34709165 ns/op	67122834 B/op	     181 allocs/op
 Benchmark_hash_isequal     	      33	  64242662 ns/op	67122424 B/op	     179 allocs/op
-Benchmark_hash_isequal-2   	      32	  34741325 ns/op	67122526 B/op	     179 allocs/op$ 
+Benchmark_hash_isequal-2   	      32	  34741325 ns/op	67122526 B/op	     179 allocs/op
 ```
 
 CI stores the previous results in branch gh-pages in json format. Unfortunately GitHub actions
@@ -317,7 +317,7 @@ The API is built using modern gRPC and Connect-RPC protocols with Protocol Buffe
 Fish supports multiple protocols for different use cases:
 
 * **gRPC**: High-performance binary protocol for production applications
-* **Connect-RPC**: HTTP/1.1 and HTTP/2 compatible with REST-like semantics  
+* **Connect-RPC**: HTTP/1.1 and HTTP/2 compatible with REST-like semantics
 * **JSON/YAML**: Human-readable formats for debugging and curl usage
 
 ### API Endpoints

@@ -37,25 +37,26 @@ echo "Press any key to create or Ctrl-C to abort"
 read w1
 
 label_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/yaml' -d '---
-name: "'$label'"
-version: '$new_version'
-definitions:
-  - driver: vmx
-    options:
-      images:  # For test purposes images are used as symlink to aquarium-bait/out so does not need checksum
-        - url: https://artifact-storage/aquarium/image/vmx/macos1015-VERSION/macos1015-VERSION.tar.xz
-        - url: https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-VERSION/macos1015-xcode122-VERSION.tar.xz
-        - url: https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-ci-VERSION/macos1015-xcode122-ci-VERSION.tar.xz
-    resources:
-      cpu: 14
-      ram: 12
-      disks:
-        xcode122:
-          type: hfs+
-          size: 10
-          reuse: true
-metadata:
-  JENKINS_AGENT_WORKSPACE: "/Volumes/xcode122"
+label:
+  name: "'$label'"
+  version: '$new_version'
+  definitions:
+    - driver: vmx
+      options:
+        images:  # For test purposes images are used as symlink to aquarium-bait/out so does not need checksum
+          - url: https://artifact-storage/aquarium/image/vmx/macos1015-VERSION/macos1015-VERSION.tar.xz
+          - url: https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-VERSION/macos1015-xcode122-VERSION.tar.xz
+          - url: https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-ci-VERSION/macos1015-xcode122-ci-VERSION.tar.xz
+      resources:
+        cpu: 14
+        ram: 12
+        disks:
+          xcode122:
+            type: hfs+
+            size: 10
+            reuse: true
+  metadata:
+    JENKINS_AGENT_WORKSPACE: "/Volumes/xcode122"
 ' "https://$hostport/grpc/aquarium.v2.LabelService/Create" | grep -o '"uid": *"[^"]\+"' | cut -d':' -f 2 | tr -d ' "')
 
 echo "Created Label ID: ${label_id}"
