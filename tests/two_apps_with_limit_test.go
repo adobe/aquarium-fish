@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/google/uuid"
 
 	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
@@ -95,7 +96,7 @@ drivers:
 		}
 		labelUID = resp.Msg.Data.Uid
 
-		if labelUID == "" {
+		if labelUID == "" || labelUID == uuid.Nil.String() {
 			t.Fatalf("Label UID is incorrect: %v", labelUID)
 		}
 	})
@@ -115,7 +116,7 @@ drivers:
 		}
 		app1UID = resp.Msg.Data.Uid
 
-		if app1UID == "" {
+		if app1UID == "" || app1UID == uuid.Nil.String() {
 			t.Fatalf("Application 1 UID is incorrect: %v", app1UID)
 		}
 	})
@@ -135,7 +136,7 @@ drivers:
 		}
 		app2UID = resp.Msg.Data.Uid
 
-		if app2UID == "" {
+		if app2UID == "" || app2UID == uuid.Nil.String() {
 			t.Fatalf("Application 2 UID is incorrect: %v", app2UID)
 		}
 	})

@@ -56,6 +56,8 @@ type Config struct {
 
 	DisableAuth bool `json:"disable_auth"` // WARNING! For performance testing only
 
+	NodeDebugPprof bool `json:"node_debug_pprof"` // Enable pprof debug endpoints for performance profiling and debugging during tests execution
+
 	// Configuration for the node drivers, if defined - only the listed ones will be available.
 	// Each configuration could instantinate the same driver multiple times by adding instance name
 	// separated from driver by slash symbol (like "<driver>/prod" - will create "prod" instance).

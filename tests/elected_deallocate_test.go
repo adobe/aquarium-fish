@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
@@ -92,7 +93,7 @@ drivers:
 		}
 		labelUID = resp.Msg.Data.Uid
 
-		if labelUID == "" {
+		if labelUID == "" || labelUID == uuid.Nil.String() {
 			t.Fatalf("Label UID is incorrect: %v", labelUID)
 		}
 	})
@@ -112,7 +113,7 @@ drivers:
 		}
 		appUID = resp.Msg.Data.Uid
 
-		if appUID == "" {
+		if appUID == "" || appUID == uuid.Nil.String() {
 			t.Fatalf("Application UID is incorrect: %v", appUID)
 		}
 	})

@@ -105,10 +105,12 @@ func (f *Fish) maybeRunApplicationTask(appUID typesv2.ApplicationUID, appTask *t
 		return nil
 	}
 
-	// Getting ApplicationResource for deallocation
+	// Getting ApplicationResource to execute a task on it - if it's not here, it's not a big deal,
+	// because the Application could be not allocated yet, so have no resource and we need to skip.
 	res, err := f.db.ApplicationResourceGetByApplication(appUID)
 	if err != nil {
-		return log.Errorf("Fish: Application %s: Task: Unable to find ApplicationResource: %v", appUID, err)
+		log.Infof("Fish: Application %s: Task: Skipping since no ApplicationResource found: %v", appUID, err)
+		return nil
 	}
 
 	// Get label with the definitions
@@ -148,7 +150,7 @@ func (f *Fish) maybeRunApplicationTask(appUID typesv2.ApplicationUID, appTask *t
 // that will cause the cluster to start another round of election. Second stage is executed
 // on background and watches the Application till it's deallocated.
 func (f *Fish) executeApplicationStart(appUID typesv2.ApplicationUID, defIndex int32) (bool, error) {
-	log.Debugf("Fish: Application %s: Start: Start executing Application:", appUID.String())
+	log.Debugf("Fish: Application %s: Start: Start executing Application", appUID.String())
 
 	// Check the application is executed already
 	f.applicationsMutex.Lock()
@@ -178,6 +180,11 @@ func (f *Fish) executeApplicationStart(appUID typesv2.ApplicationUID, defIndex i
 	appState, err := f.db.ApplicationStateGetByApplication(app.Uid)
 	if err != nil {
 		return true, fmt.Errorf("Unable to get the Application state: %v", err)
+	}
+
+	// Need to check if the Application is active, otherwise just stop execution
+	if !f.db.ApplicationStateIsActive(appState.Status) {
+		return false, fmt.Errorf("Not active Application state: %s", appState.Status)
 	}
 
 	// Get label with the definitions

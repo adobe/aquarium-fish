@@ -34,7 +34,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Vote represents the current state of Applciation election process of specific node
+// Vote represents the current state of Application election process of specific node
 //
 // When Application becomes available for the node it starts to vote to notify the cluster
 // about its availability. Votes are basically "yes" or "no" and could take a number of rounds

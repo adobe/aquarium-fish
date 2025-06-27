@@ -104,14 +104,12 @@ fi
 
 
 echo
-echo '---------------------- YAML Lint ----------------------'
+echo '---------------------- Mutex check ----------------------'
 echo
-if command -v docker >/dev/null; then
-    docker run --rm -v "${root_dir}:/data" cytopia/yamllint:1.22 --strict docs lib
-    errors=$((${errors}+$?))
-else
-    # TODO: Find some useful yaml lint in go ecosystem
-    echo 'WARN: Skipping, no docker installed'
+mutex=$(go run ./tools/lint-nested-mutex/lint-nested-mutex.go -- . -exclude ./tools/lint-nested-mutex/tests)
+if [ "${mutex}" ]; then
+    echo "ERROR: Please fix the issues: \n${mutex}"
+    errors=$(( ${errors}+$(echo "${mutex}" | wc -l) ))
 fi
 
 exit ${errors}

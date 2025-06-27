@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/google/uuid"
 
 	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
@@ -89,7 +90,7 @@ drivers:
 			t.Fatalf("Nodes list count is not 1: %d", len(resp.Msg.Data))
 		}
 		node = resp.Msg.Data[0]
-		if node.Uid == "" {
+		if node.Uid == "" || node.Uid == uuid.Nil.String() {
 			t.Fatalf("Node UID is empty")
 		}
 	})
@@ -117,7 +118,7 @@ drivers:
 		}
 
 		labelUID = resp.Msg.Data.Uid
-		if labelUID == "" {
+		if labelUID == "" || labelUID == uuid.Nil.String() {
 			t.Fatalf("Label UID is empty")
 		}
 
@@ -141,7 +142,7 @@ drivers:
 		}
 
 		appUID = resp.Msg.Data.Uid
-		if appUID == "" {
+		if appUID == "" || appUID == uuid.Nil.String() {
 			t.Fatalf("Application UID is empty")
 		}
 
@@ -163,7 +164,7 @@ drivers:
 				r.Fatal("Failed to get application state:", err)
 			}
 
-			if resp.Msg.Data.Uid == "" {
+			if resp.Msg.Data.Uid == "" || resp.Msg.Data.Uid == uuid.Nil.String() {
 				r.Fatalf("ApplicationState UID is empty")
 			}
 
@@ -189,7 +190,7 @@ drivers:
 			t.Fatal("Failed to get application resource:", err)
 		}
 
-		if resp.Msg.Data.Uid == "" {
+		if resp.Msg.Data.Uid == "" || resp.Msg.Data.Uid == uuid.Nil.String() {
 			t.Fatalf("Resource UID is empty")
 		}
 

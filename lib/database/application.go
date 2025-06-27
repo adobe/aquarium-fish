@@ -39,19 +39,22 @@ func (d *Database) ApplicationCreate(a *typesv2.Application) error {
 		return fmt.Errorf("Fish: LabelUID can't be unset")
 	}
 
-	d.beMu.RLock()
-	defer d.beMu.RUnlock()
-
 	a.Uid = d.NewUID()
 	a.CreatedAt = time.Now()
+
+	d.beMu.RLock()
 	err := d.be.Collection(ObjectApplication).Add(a.Uid.String(), a)
+	d.beMu.RUnlock()
+
+	if err != nil {
+		return err
+	}
 
 	// Create ApplicationState NEW too
-	d.ApplicationStateCreate(&typesv2.ApplicationState{
+	return d.ApplicationStateCreate(&typesv2.ApplicationState{
 		ApplicationUid: a.Uid, Status: typesv2.ApplicationState_NEW,
 		Description: "Just created by Fish " + d.node.Name,
 	})
-	return err
 }
 
 // Intentionally disabled, application can't be updated

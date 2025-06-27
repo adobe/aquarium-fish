@@ -673,7 +673,7 @@ drivers:
 		}
 		labelUID = resp.Msg.Data.Uid
 
-		if labelUID == "" {
+		if labelUID == "" || labelUID == uuid.Nil.String() {
 			t.Fatalf("Label UID is incorrect: %v", labelUID)
 		}
 	})
@@ -1161,7 +1161,7 @@ drivers:
 			End().
 			JSON(&newAcc)
 
-		if newAcc.GetData().Uid == "" {
+		if newAcc.GetData().Uid == "" || newAcc.GetData().Uid == uuid.Nil.String() {
 			t.Fatalf("Unable to get access to Resource: %v", acc.Uid)
 		}
 	})

@@ -665,13 +665,19 @@ func (f *Fish) activateShutdown() {
 					return
 				case <-tickerCheck.C:
 					// Need to make sure we're not executing any workload
-					log.Debug("Fish: Shutdown: checking apps execution:", len(f.applications))
-					if len(f.applications) == 0 {
+					f.applicationsMutex.Lock()
+					appsCount := len(f.applications)
+					f.applicationsMutex.Unlock()
+					log.Debug("Fish: Shutdown: checking apps execution:", appsCount)
+					if appsCount == 0 {
 						waitApps <- true
 						return
 					}
 				case <-tickerReport.C:
-					log.Info("Fish: Shutdown: waiting for running Applications:", len(f.applications))
+					f.applicationsMutex.Lock()
+					appsCount := len(f.applications)
+					f.applicationsMutex.Unlock()
+					log.Info("Fish: Shutdown: waiting for running Applications:", appsCount)
 				}
 			}
 		}()

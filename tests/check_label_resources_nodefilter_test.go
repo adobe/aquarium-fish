@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"connectrpc.com/connect"
+	"github.com/google/uuid"
 
 	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
@@ -95,7 +96,7 @@ drivers:
 			t.Fatal("Failed to get label:", err)
 		}
 
-		if resp.Msg.Data.Uid == "" {
+		if resp.Msg.Data.Uid == "" || resp.Msg.Data.Uid == uuid.Nil.String() {
 			t.Fatalf("Label UID is empty")
 		}
 		if resp.Msg.Data.Definitions[0].Resources.NodeFilter == nil {

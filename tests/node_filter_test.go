@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/google/uuid"
 
 	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
@@ -95,7 +96,7 @@ drivers:
 		}
 		labelUID = resp.Msg.Data.Uid
 
-		if labelUID == "" {
+		if labelUID == "" || labelUID == uuid.Nil.String() {
 			t.Fatalf("Label UID is incorrect: %v", labelUID)
 		}
 	})
@@ -115,7 +116,7 @@ drivers:
 		}
 		appUID = resp.Msg.Data.Uid
 
-		if appUID == "" {
+		if appUID == "" || appUID == uuid.Nil.String() {
 			t.Fatalf("Application UID is incorrect: %v", appUID)
 		}
 	})
@@ -208,7 +209,7 @@ drivers:
 		}
 		labelUID = resp.Msg.Data.Uid
 
-		if labelUID == "" {
+		if labelUID == "" || labelUID == uuid.Nil.String() {
 			t.Fatalf("Label UID is incorrect: %v", labelUID)
 		}
 	})
@@ -228,7 +229,7 @@ drivers:
 		}
 		appUID = resp.Msg.Data.Uid
 
-		if appUID == "" {
+		if appUID == "" || appUID == uuid.Nil.String() {
 			t.Fatalf("Application UID is incorrect: %v", appUID)
 		}
 	})
@@ -320,7 +321,7 @@ drivers:
 		}
 		labelUID = resp.Msg.Data.Uid
 
-		if labelUID == "" {
+		if labelUID == "" || labelUID == uuid.Nil.String() {
 			t.Fatalf("Label UID is incorrect: %v", labelUID)
 		}
 	})
@@ -340,7 +341,7 @@ drivers:
 		}
 		appUID = resp.Msg.Data.Uid
 
-		if appUID == "" {
+		if appUID == "" || appUID == uuid.Nil.String() {
 			t.Fatalf("Application UID is incorrect: %v", appUID)
 		}
 	})
@@ -431,7 +432,7 @@ drivers:
 		}
 		labelUID = resp.Msg.Data.Uid
 
-		if labelUID == "" {
+		if labelUID == "" || labelUID == uuid.Nil.String() {
 			t.Fatalf("Label UID is incorrect: %v", labelUID)
 		}
 	})
@@ -451,7 +452,7 @@ drivers:
 		}
 		appUID = resp.Msg.Data.Uid
 
-		if appUID == "" {
+		if appUID == "" || appUID == uuid.Nil.String() {
 			t.Fatalf("Application UID is incorrect: %v", appUID)
 		}
 	})

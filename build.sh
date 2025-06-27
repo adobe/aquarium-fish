@@ -67,13 +67,22 @@ echo
 echo "--- BUILD ${BINARY_NAME} ($MAXJOBS in parallel) ---"
 
 if [ "x${RELEASE}" != "x" ]; then
+    echo "--- RELEASE ---"
     export GIN_MODE=release
     os_list='linux darwin windows freebsd openbsd'
     arch_list='amd64 arm64'
+    build_command="go build"
+    # Removing debug symbols and omitting DWARF symbol table to reduce binary size
+    ld_opts="-s -w"
 else
-    echo "--- WARNING: build DEBUG mode ---"
+    echo "--- DEBUG ---"
+    debug_suffix="-debug"
     os_list="$(go env GOOS)"
     arch_list="$(go env GOARCH)"
+    # Building with race detectors to capture them during integration testing
+    build_command="go build -race"
+    # Unsetting cgo to allow -race to work propely
+    unset CGO_ENABLED
 fi
 
 # Run parallel builds but no more than limit (gox doesn't support all the os/archs we need)
@@ -94,7 +103,7 @@ go tool dist list > /tmp/go_tool_dist_list.txt
 
 for GOOS in $os_list; do
     for GOARCH in $arch_list; do
-        name="$BINARY_NAME.${GOOS}_${GOARCH}"
+        name="$BINARY_NAME${debug_suffix}.${GOOS}_${GOARCH}"
 
         if ! grep -q "^${GOOS}/${GOARCH}$" /tmp/go_tool_dist_list.txt; then
             echo "Skipping: $name as not supported by go"
@@ -102,8 +111,11 @@ for GOOS in $os_list; do
         fi
 
         echo "Building: $name ..."
+        if [ "x${RELEASE}" != "x" ]; then
+            echo "WARNING: It's DEBUG binary with instrumentation"
+        fi
         rm -f "$name" "$name.log" "$name.zip" "$name.tar.xz"
-        GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-s -w $version_flags" -o "$name" . > "$name.log" 2>&1 &
+        GOOS=$GOOS GOARCH=$GOARCH $build_command -ldflags="$ld_opts $version_flags" -o "$name" . > "$name.log" 2>&1 &
         pwait $MAXJOBS
     done
 done
@@ -114,7 +126,7 @@ wait
 errorcount=0
 for GOOS in $os_list; do
     for GOARCH in $arch_list; do
-        name="$BINARY_NAME.${GOOS}_${GOARCH}"
+        name="$BINARY_NAME${debug_suffix}.${GOOS}_${GOARCH}"
         # Log file is not here - build was skipped
         [ -f "$name.log" ] || continue
         # Binary is not here - build error happened

@@ -88,11 +88,12 @@ func (d *Database) CompactDB() error {
 func (d *Database) Shutdown() error {
 	d.CompactDB()
 
-	d.beMu.RLock()
-	defer d.beMu.RUnlock()
+	// Waiting for all the current requests to be done by acquiring write lock and closing the DB
+	d.beMu.Lock()
+	defer d.beMu.Unlock()
 
 	if err := d.be.Close(); err != nil {
-		return log.Errorf("DB: Unable to compact backend: %v", err)
+		return log.Errorf("DB: Unable to close backend: %v", err)
 	}
 
 	return nil

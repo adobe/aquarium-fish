@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/google/uuid"
 
 	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
@@ -141,7 +142,7 @@ drivers:
 		// ApplicationTask will be created anyway even with wrong name, because input Fish node could
 		// not be able to validate it, since could have different config or lack of enabled drivers
 		appTaskUID = resp.Msg.Data.Uid
-		if appTaskUID == "" {
+		if appTaskUID == "" || appTaskUID == uuid.Nil.String() {
 			t.Fatalf("ApplicationTask UID is empty")
 		}
 	})
@@ -164,8 +165,9 @@ drivers:
 			if resp.Msg.Data[0].Uid != appTaskUID {
 				r.Fatalf("ApplicationTask UID is incorrect: %v != %v", resp.Msg.Data[0].Uid, appTaskUID)
 			}
-			if resp.Msg.Data[0].Result.String() != `fields:{key:"error" value:{string_value:"task not available in driver"}}` {
-				r.Fatalf("ApplicationTask result is incorrect: %s", resp.Msg.Data[0].Result.String())
+			jsonResult, _ := resp.Msg.Data[0].Result.MarshalJSON()
+			if string(jsonResult) != `{"error":"task not available in driver"}` {
+				r.Fatalf("ApplicationTask result is incorrect: %s", string(jsonResult))
 			}
 		})
 	})

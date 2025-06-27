@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/google/uuid"
 
 	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
@@ -35,6 +36,7 @@ func Test_compactdb_check(t *testing.T) {
 	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 default_resource_lifetime: 20s
+node_debug_pprof: true
 
 api_address: 127.0.0.1:0
 
@@ -96,6 +98,8 @@ drivers:
 		labelUID = resp.Msg.Data.Uid
 	})
 
+	workerCli, workerOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+
 	completed := false
 	workerFunc := func(t *testing.T, wg *sync.WaitGroup, id int) {
 		t.Logf("Worker %d: Started", id)
@@ -103,7 +107,6 @@ drivers:
 		defer wg.Done()
 
 		// Create service clients for this worker
-		workerCli, workerOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
 		appClient := aquariumv2connect.NewApplicationServiceClient(
 			workerCli,
 			afi.APIAddress("grpc"),
@@ -111,7 +114,8 @@ drivers:
 		)
 
 		for !completed {
-			// Create application
+			// Create new application
+			t.Logf("Worker %d: Starting new application", id)
 			resp, err := appClient.Create(
 				context.Background(),
 				connect.NewRequest(&aquariumv2.ApplicationServiceCreateRequest{
@@ -126,10 +130,11 @@ drivers:
 			}
 
 			appUID := resp.Msg.Data.Uid
-			if appUID == "" {
+			if appUID == "" || appUID == uuid.Nil.String() {
 				t.Errorf("Worker %d: Application UID is empty", id)
 				return
 			}
+			t.Logf("Worker %d: Created application %s", id, appUID)
 
 			// Checking state until it's allocated
 			for {
@@ -144,7 +149,7 @@ drivers:
 					return
 				}
 
-				if stateResp.Msg.Data.Uid == "" {
+				if stateResp.Msg.Data.Uid == "" || stateResp.Msg.Data.Uid == uuid.Nil.String() {
 					t.Errorf("Worker %d: ApplicationStatus UID is empty", id)
 					return
 				}
@@ -154,13 +159,15 @@ drivers:
 				}
 
 				if stateResp.Msg.Data.Status == aquariumv2.ApplicationState_ALLOCATED {
+					t.Logf("Worker %d: Application allocated %s", id, appUID)
 					break
 				}
 
-				time.Sleep(time.Second)
+				time.Sleep(250 * time.Millisecond)
 			}
 
 			// Time to deallocate
+			t.Logf("Worker %d: Deallocating application %s", id, appUID)
 			_, err = appClient.Deallocate(
 				context.Background(),
 				connect.NewRequest(&aquariumv2.ApplicationServiceDeallocateRequest{
@@ -171,6 +178,9 @@ drivers:
 				t.Errorf("Worker %d: Failed to deallocate application: %v", id, err)
 				return
 			}
+			t.Logf("Worker %d: Deallocation of application completed %s", id, appUID)
+
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
 
@@ -187,24 +197,49 @@ drivers:
 		cleaned := make(chan struct{})
 		for range 10 {
 			afi.WaitForLog("Fish: CleanupDB completed", func(substring, line string) bool {
+				t.Logf("Found warm up: %q", substring)
 				cleaned <- struct{}{}
 				return true
 			})
 			<-cleaned
 		}
 
-		// Now stopping the workers to calm down a bit and wait for a few more cleanups
+		t.Logf("Now stopping the workers to calm down a bit and wait for a few more cleanups")
 		completed = true
-		for range 3 {
+
+		t.Logf("Wait for all workers to finish...")
+		wg.Wait()
+
+		for range 4 {
 			afi.WaitForLog("Fish: CleanupDB completed", func(substring, line string) bool {
+				t.Logf("Found calm down: %q", substring)
 				cleaned <- struct{}{}
 				return true
 			})
 			<-cleaned
+		}
+
+		t.Logf("Looking for Applications leftovers in the database...")
+		appClient := aquariumv2connect.NewApplicationServiceClient(
+			workerCli,
+			afi.APIAddress("grpc"),
+			workerOpts...,
+		)
+		listResp, err := appClient.List(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceListRequest{}),
+		)
+		if err != nil {
+			t.Errorf("Failed to request list of applications: %v", err)
+		} else if len(listResp.Msg.Data) > 0 {
+			for _, app := range listResp.Msg.Data {
+				t.Logf("Found residue application: %s", app.String())
+			}
 		}
 
 		compacted := make(chan error)
 		afi.WaitForLog("DB: CompactDB: After compaction: ", func(substring, line string) bool {
+			t.Logf("Found compact db result: %s", line)
 			// Check the Keys get back to normal
 			spl := strings.Split(line, ", ")
 			for _, val := range spl {
@@ -226,12 +261,9 @@ drivers:
 			return true
 		})
 
-		// Stopping the node to trigger CompactDB process
+		t.Logf("Stopping the node to trigger CompactDB process")
 		afi.Stop(t)
 
 		<-compacted
-
-		// Wait for all workers to finish
-		wg.Wait()
 	})
 }

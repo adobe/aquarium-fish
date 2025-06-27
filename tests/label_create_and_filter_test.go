@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"connectrpc.com/connect"
+	"github.com/google/uuid"
 
 	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
@@ -84,7 +85,7 @@ drivers:
 		}
 		labelUID = resp.Msg.Data.Uid
 
-		if labelUID == "" {
+		if labelUID == "" || labelUID == uuid.Nil.String() {
 			t.Fatalf("Label UID is incorrect: %v", labelUID)
 		}
 	})
@@ -110,7 +111,7 @@ drivers:
 			t.Fatal("Failed to create label:", err)
 		}
 
-		if resp.Msg.Data.Uid == "" {
+		if resp.Msg.Data.Uid == "" || resp.Msg.Data.Uid == uuid.Nil.String() {
 			t.Fatalf("Label UID is incorrect: %v", resp.Msg.Data.Uid)
 		}
 	})
@@ -136,7 +137,7 @@ drivers:
 			t.Fatal("Failed to create label:", err)
 		}
 
-		if resp.Msg.Data.Uid == "" {
+		if resp.Msg.Data.Uid == "" || resp.Msg.Data.Uid == uuid.Nil.String() {
 			t.Fatalf("Label UID is incorrect: %v", resp.Msg.Data.Uid)
 		}
 	})

@@ -34,7 +34,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// ProxySSHAccess represents user accessor to connect to the ApplciationResource.
+// ProxySSHAccess represents user accessor to connect to the ApplicationResource.
 //
 // An accessor entry to be able to identify and look up different (currently running) Resource.
 //
