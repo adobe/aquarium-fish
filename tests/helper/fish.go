@@ -167,6 +167,14 @@ func (afi *AFInstance) Stop(tb testing.TB) {
 	if afi.cmd == nil || !afi.running {
 		return
 	}
+
+	// Cleaning up the node variables
+	defer func() {
+		// Not cleaning adminToken, because it's created just one time for DB
+		afi.apiEndpoint = ""
+		afi.proxysshEndpoint = ""
+	}()
+
 	// Send interrupt signal
 	afi.cmd.Process.Signal(os.Interrupt)
 
@@ -264,6 +272,7 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 			return false
 		}
 		afi.adminToken = val[1]
+		tb.Logf("Located admin user token: %q", afi.adminToken)
 
 		return true
 	})
@@ -275,6 +284,7 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 			return false
 		}
 		afi.apiEndpoint = val[1]
+		tb.Logf("Located api endpoint: %q", afi.apiEndpoint)
 
 		return true
 	})
@@ -285,6 +295,7 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 			return false
 		}
 		afi.proxysshEndpoint = val[1]
+		tb.Logf("Located proxyssh endpoint: %q", afi.proxysshEndpoint)
 
 		return true
 	})
@@ -313,7 +324,7 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 			line := scanner.Text()
 			tb.Log(afi.nodeName, line)
 
-			go func() {
+			go func(currentLine string) {
 				afi.waitForLogMu.RLock()
 				var substrings []string
 				for key := range afi.waitForLog {
@@ -322,12 +333,12 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 				afi.waitForLogMu.RUnlock()
 
 				for _, substring := range substrings {
-					if !strings.Contains(line, substring) {
+					if !strings.Contains(currentLine, substring) {
 						continue
 					}
-					afi.callWaitForLog(substring, line)
+					afi.callWaitForLog(substring, currentLine)
 				}
-			}()
+			}(line)
 		}
 		tb.Log("INFO: Reading of AquariumFish output is done:", scanner.Err())
 	}()
@@ -361,8 +372,14 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 	}
 
 	if afi.adminToken == "" || afi.apiEndpoint == "" {
-		tb.Fatalf("ERROR: Failed to get admin token or api endpoint for node %q", afi.nodeName)
+		tb.Fatalf("ERROR: Failed to get admin token or api endpoint for node %q: %q %q", afi.nodeName, afi.adminToken, afi.apiEndpoint)
 	}
 
 	tb.Log("INFO: Fish is ready:", afi.nodeName)
+
+	// Running goroutine to listen on fish node failure just in case afi.cmd.Wait will fail
+	go func() {
+		failed := <-initDone
+		fmt.Println(failed)
+	}()
 }
