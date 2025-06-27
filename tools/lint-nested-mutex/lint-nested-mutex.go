@@ -26,11 +26,11 @@ import (
 	"strings"
 )
 
-// LintContext holds the analysis context
-type LintContext struct {
+// lintContext holds the analysis context
+type lintContext struct {
 	fset            *token.FileSet
 	issues          []Issue
-	functionInfo    map[string]*FunctionInfo
+	functionInfo    map[string]*functionInfo
 	verboseMode     bool
 	deepMode        bool
 	analyzedPkgs    map[string]bool // Track analyzed packages to avoid infinite recursion
@@ -38,32 +38,32 @@ type LintContext struct {
 	excludePatterns []string        // Track exclude patterns for filtering files/directories
 }
 
-// FunctionInfo contains information about a function
-type FunctionInfo struct {
+// functionInfo contains information about a function
+type functionInfo struct {
 	name      string
-	mutexOps  []MutexOp
-	callSites []CallSite // Track where function calls are made and mutex state at that point
+	mutexOps  []mutexOp
+	callSites []callSite // Track where function calls are made and mutex state at that point
 }
 
-// MutexOp represents a mutex operation
-type MutexOp struct {
+// mutexOp represents a mutex operation
+type mutexOp struct {
 	mutexName string
 	opType    string // "Lock", "RLock", "Unlock", "RUnlock"
 	pos       token.Pos
 }
 
-// MutexState represents the state of a mutex at a given point
-type MutexState struct {
+// mutexState represents the state of a mutex at a given point
+type mutexState struct {
 	isLocked bool
 	lockType string // "Lock", "RLock"
 	lockPos  token.Pos
 }
 
-// CallSite represents a function call and the mutex state at that point
-type CallSite struct {
+// callSite represents a function call and the mutex state at that point
+type callSite struct {
 	calledFunction string
 	pos            token.Pos
-	mutexState     map[string]MutexState // snapshot of mutex state at this call site
+	mutexState     map[string]mutexState // snapshot of mutex state at this call site
 }
 
 // Issue represents a detected mutex issue
@@ -108,9 +108,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	ctx := &LintContext{
+	ctx := &lintContext{
 		fset:            token.NewFileSet(),
-		functionInfo:    make(map[string]*FunctionInfo),
+		functionInfo:    make(map[string]*functionInfo),
 		verboseMode:     verboseMode,
 		deepMode:        deepMode,
 		analyzedPkgs:    make(map[string]bool),
@@ -139,7 +139,7 @@ func main() {
 	os.Exit(criticalCount)
 }
 
-func processPath(ctx *LintContext, path string) error {
+func processPath(ctx *lintContext, path string) error {
 	info, err := os.Stat(path)
 	if err != nil {
 		return err
@@ -179,7 +179,7 @@ func processPath(ctx *LintContext, path string) error {
 }
 
 // shouldExclude checks if a path should be excluded based on exclude patterns
-func shouldExclude(ctx *LintContext, path string) bool {
+func shouldExclude(ctx *lintContext, path string) bool {
 	for _, pattern := range ctx.excludePatterns {
 		matched, err := filepath.Match(pattern, filepath.Base(path))
 		if err == nil && matched {
@@ -204,7 +204,7 @@ func isProjectFile(path string) bool {
 		!strings.Contains(path, "/node_modules/")
 }
 
-func processFile(ctx *LintContext, filename string) error {
+func processFile(ctx *lintContext, filename string) error {
 	if ctx.verboseMode {
 		fmt.Fprintf(os.Stderr, "Processing file: %s\n", filename)
 	}
@@ -226,8 +226,7 @@ func processFile(ctx *LintContext, filename string) error {
 
 	// Extract function information
 	ast.Inspect(file, func(n ast.Node) bool {
-		switch node := n.(type) {
-		case *ast.FuncDecl:
+		if node, ok := n.(*ast.FuncDecl); ok {
 			if node.Name != nil {
 				funcInfo := analyzeFunction(ctx, node)
 				ctx.functionInfo[funcInfo.name] = funcInfo
@@ -242,7 +241,7 @@ func processFile(ctx *LintContext, filename string) error {
 	return nil
 }
 
-func collectImports(ctx *LintContext, file *ast.File) {
+func collectImports(ctx *lintContext, file *ast.File) {
 	for _, imp := range file.Imports {
 		if imp.Path != nil {
 			importPath := strings.Trim(imp.Path.Value, `"`)
@@ -274,7 +273,7 @@ func isStdLibPackage(pkg string) bool {
 	return false
 }
 
-func (ctx *LintContext) processPendingImports() {
+func (ctx *lintContext) processPendingImports() {
 	if ctx.verboseMode && len(ctx.pendingImports) > 0 {
 		fmt.Fprintf(os.Stderr, "Deep mode: analyzing %d dependencies\n", len(ctx.pendingImports))
 	}
@@ -301,7 +300,7 @@ func (ctx *LintContext) processPendingImports() {
 	}
 }
 
-func (ctx *LintContext) analyzePackage(packagePath string) error {
+func (ctx *lintContext) analyzePackage(packagePath string) error {
 	// Use go list to find the package directory
 	cmd := exec.Command("go", "list", "-f", "{{.Dir}}", packagePath)
 	output, err := cmd.Output()
@@ -315,7 +314,7 @@ func (ctx *LintContext) analyzePackage(packagePath string) error {
 	}
 
 	// Process all Go files in the package directory
-	return filepath.Walk(packageDir, func(path string, info os.FileInfo, err error) error {
+	return filepath.Walk(packageDir, func(path string, _ os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -329,17 +328,17 @@ func (ctx *LintContext) analyzePackage(packagePath string) error {
 	})
 }
 
-func analyzeFunction(ctx *LintContext, fn *ast.FuncDecl) *FunctionInfo {
+func analyzeFunction(ctx *lintContext, fn *ast.FuncDecl) *functionInfo {
 	funcName := getFunctionName(fn)
 
-	funcInfo := &FunctionInfo{
+	funcInfo := &functionInfo{
 		name:      funcName,
-		callSites: make([]CallSite, 0),
+		callSites: make([]callSite, 0),
 	}
 
 	// Track control flow through the function
 	if fn.Body != nil {
-		mutexState := make(map[string]MutexState)
+		mutexState := make(map[string]mutexState)
 		analyzeBlockStatements(ctx, fn.Body.List, funcInfo, mutexState)
 	}
 
@@ -347,13 +346,13 @@ func analyzeFunction(ctx *LintContext, fn *ast.FuncDecl) *FunctionInfo {
 }
 
 // analyzeBlockStatements processes a list of statements sequentially
-func analyzeBlockStatements(ctx *LintContext, stmts []ast.Stmt, funcInfo *FunctionInfo, mutexState map[string]MutexState) {
+func analyzeBlockStatements(ctx *lintContext, stmts []ast.Stmt, funcInfo *functionInfo, mutexState map[string]mutexState) {
 	for _, stmt := range stmts {
 		analyzeStatement(ctx, stmt, funcInfo, mutexState)
 	}
 }
 
-func analyzeStatement(ctx *LintContext, stmt ast.Stmt, funcInfo *FunctionInfo, mutexState map[string]MutexState) {
+func analyzeStatement(ctx *lintContext, stmt ast.Stmt, funcInfo *functionInfo, mutexState map[string]mutexState) {
 	switch s := stmt.(type) {
 	case *ast.ExprStmt:
 		analyzeExpression(ctx, s.X, funcInfo, mutexState)
@@ -411,14 +410,14 @@ func analyzeStatement(ctx *LintContext, stmt ast.Stmt, funcInfo *FunctionInfo, m
 	}
 }
 
-func handleDeferStatement(ctx *LintContext, call *ast.CallExpr, funcInfo *FunctionInfo) {
+func handleDeferStatement(_ *lintContext, call *ast.CallExpr, funcInfo *functionInfo) {
 	// For defer statements, we just track the mutex operation but don't modify state
 	if sel, ok := call.Fun.(*ast.SelectorExpr); ok {
 		selector := sel.Sel.Name
 		if isMutexOp(selector) {
 			mutexName := getMutexName(call)
 			if mutexName != "" {
-				mutexOp := MutexOp{
+				mutexOp := mutexOp{
 					mutexName: mutexName,
 					opType:    selector,
 					pos:       call.Pos(),
@@ -429,21 +428,19 @@ func handleDeferStatement(ctx *LintContext, call *ast.CallExpr, funcInfo *Functi
 	}
 }
 
-func analyzeExpression(ctx *LintContext, expr ast.Expr, funcInfo *FunctionInfo, mutexState map[string]MutexState) {
-	switch e := expr.(type) {
-	case *ast.CallExpr:
+func analyzeExpression(ctx *lintContext, expr ast.Expr, funcInfo *functionInfo, mutexState map[string]mutexState) {
+	if e, ok := expr.(*ast.CallExpr); ok{
 		analyzeCallExpression(ctx, e, funcInfo, mutexState)
 	}
 }
 
-func analyzeCallExpression(ctx *LintContext, call *ast.CallExpr, funcInfo *FunctionInfo, mutexState map[string]MutexState) {
-	switch fun := call.Fun.(type) {
-	case *ast.SelectorExpr:
+func analyzeCallExpression(ctx *lintContext, call *ast.CallExpr, funcInfo *functionInfo, mutexState map[string]mutexState) {
+	if fun, ok := call.Fun.(*ast.SelectorExpr); ok {
 		selector := fun.Sel.Name
 
 		// Check if this is a mutex operation
 		if isMutexOp(selector) {
-			handleMutexOperation(ctx, call, funcInfo, selector, mutexState)
+			handlemutexOperation(ctx, call, funcInfo, selector, mutexState)
 		} else {
 			// This is a regular method call - record it with current mutex state
 			calledFunc := getMethodCallName(fun)
@@ -451,7 +448,7 @@ func analyzeCallExpression(ctx *LintContext, call *ast.CallExpr, funcInfo *Funct
 				// Create snapshot of current mutex state
 				mutexSnapshot := copyMutexState(mutexState)
 
-				callSite := CallSite{
+				callSite := callSite{
 					calledFunction: calledFunc,
 					pos:            call.Pos(),
 					mutexState:     mutexSnapshot,
@@ -462,13 +459,13 @@ func analyzeCallExpression(ctx *LintContext, call *ast.CallExpr, funcInfo *Funct
 	}
 }
 
-func handleMutexOperation(ctx *LintContext, call *ast.CallExpr, funcInfo *FunctionInfo, opType string, mutexState map[string]MutexState) {
+func handlemutexOperation(_ *lintContext, call *ast.CallExpr, funcInfo *functionInfo, opType string, mutexState map[string]mutexState) {
 	mutexName := getMutexName(call)
 	if mutexName == "" {
 		return
 	}
 
-	mutexOp := MutexOp{
+	mutexOp := mutexOp{
 		mutexName: mutexName,
 		opType:    opType,
 		pos:       call.Pos(),
@@ -478,7 +475,7 @@ func handleMutexOperation(ctx *LintContext, call *ast.CallExpr, funcInfo *Functi
 	// Update mutex state tracking
 	switch opType {
 	case "Lock", "RLock":
-		mutexState[mutexName] = MutexState{
+		mutexState[mutexName] = mutexState{
 			isLocked: true,
 			lockType: opType,
 			lockPos:  call.Pos(),
@@ -488,12 +485,12 @@ func handleMutexOperation(ctx *LintContext, call *ast.CallExpr, funcInfo *Functi
 	}
 }
 
-func copyMutexState(state map[string]MutexState) map[string]MutexState {
-	copy := make(map[string]MutexState)
+func copyMutexState(state map[string]mutexState) map[string]mutexState {
+	copyState := make(map[string]mutexState)
 	for k, v := range state {
-		copy[k] = v
+		copyState[k] = v
 	}
-	return copy
+	return copyState
 }
 
 func isMutexOp(name string) bool {
@@ -546,12 +543,12 @@ func getFunctionName(fn *ast.FuncDecl) string {
 	return fn.Name.Name
 }
 
-func analyzeIssues(ctx *LintContext) {
+func analyzeIssues(ctx *lintContext) {
 	// Check for cross-function mutex conflicts with proper state tracking
 	for funcName, funcInfo := range ctx.functionInfo {
 		for _, callSite := range funcInfo.callSites {
 			// Try to find the called function by matching different name formats
-			var calledFuncInfo *FunctionInfo
+			var calledFuncInfo *functionInfo
 
 			// First try exact match
 			calledFuncInfo = ctx.functionInfo[callSite.calledFunction]
@@ -701,7 +698,7 @@ func endsWithSameMethodName(fullName, callName string) bool {
 	return false
 }
 
-func reportIssues(ctx *LintContext) int {
+func reportIssues(ctx *lintContext) int {
 	if ctx.verboseMode {
 		fmt.Fprintf(os.Stderr, "\nAnalysis Summary:\n")
 		fmt.Fprintf(os.Stderr, "Found %d functions\n", len(ctx.functionInfo))

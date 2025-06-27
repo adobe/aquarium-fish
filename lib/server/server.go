@@ -20,7 +20,7 @@ import (
 	"crypto/x509"
 	"net"
 	"net/http"
-	_ "net/http/pprof"
+	"net/http/pprof"
 	"os"
 	"syscall"
 	"time"
@@ -60,7 +60,11 @@ func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*http.Ser
 	// Handle pprof debug endpoints if enabled
 	if f.GetCfg().NodeDebugPprof {
 		log.Info("API: Enabling pprof debug endpoints on /debug/pprof/")
-		mux.Handle("/debug/pprof/", http.DefaultServeMux)
+		mux.Handle("/debug/pprof/", pprof.Index)
+		mux.Handle("/debug/pprof/cmdline", pprof.Cmdline)
+		mux.Handle("/debug/pprof/profile", pprof.Profile)
+		mux.Handle("/debug/pprof/symbol", pprof.Symbol)
+		mux.Handle("/debug/pprof/trace", pprof.Trace)
 	}
 
 	s := &http.Server{

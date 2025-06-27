@@ -81,14 +81,14 @@ func (f *Fish) electionProcess(appUID typesv2.ApplicationUID) error {
 		// Set the round based on the time of Application creation to join the election process
 		// Access vote fields with proper synchronization to avoid race conditions
 		f.activeVotesMutex.Lock()
-		if activeVote := f.activeVotes[appUID]; activeVote != nil {
-			activeVote.Round = f.voteCurrentRoundGet(app.CreatedAt)
-			myvote = activeVote
-		} else {
+		activeVote := f.activeVotes[appUID]
+		if activeVote == nil {
 			// Vote was removed by another goroutine, exit
 			f.activeVotesMutex.Unlock()
 			return log.Errorf("Fish: Election %s: Active vote was removed during process", appUID)
 		}
+		activeVote.Round = f.voteCurrentRoundGet(app.CreatedAt)
+		myvote = activeVote
 		f.activeVotesMutex.Unlock()
 
 		// Calculating the end time of the round to not stuck if some nodes are not available
@@ -147,14 +147,14 @@ func (f *Fish) electionProcess(appUID typesv2.ApplicationUID) error {
 		// Determine answer for this round, it will try find the first possible definition to serve
 		// Access vote fields with proper synchronization to avoid race conditions
 		f.activeVotesMutex.Lock()
-		if activeVote := f.activeVotes[appUID]; activeVote != nil {
-			activeVote.Available = int32(f.isNodeAvailableForDefinitions(label.Definitions))
-			myvote = activeVote
-		} else {
+		activeVote := f.activeVotes[appUID]
+		if activeVote == nil {
 			// Vote was removed by another goroutine, exit
 			f.activeVotesMutex.Unlock()
 			return log.Errorf("Fish: Election %s: Active vote was removed during process", appUID)
 		}
+		activeVote.Available = int32(f.isNodeAvailableForDefinitions(label.Definitions))
+		myvote = activeVote
 		f.activeVotesMutex.Unlock()
 
 		// Create and Sync vote with the other nodes

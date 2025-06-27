@@ -301,7 +301,7 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 	})
 
 	// Detecting race conditions
-	afi.WaitForLog("WARNING: DATA RACE", func(substring, line string) bool {
+	afi.WaitForLog("WARNING: DATA RACE", func(_ /*substring*/, line string) bool {
 		tb.Error("ERROR: Race condition detected!")
 		return false
 	})

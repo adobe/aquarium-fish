@@ -83,10 +83,6 @@ jobs:
         with:
           fetch-depth: 0  # To get all the tags for versioning
 
-      - name: Unpack built binaries
-        run: |
-          tar xf aquarium-fish*.linux_amd64.tar.xz
-
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
