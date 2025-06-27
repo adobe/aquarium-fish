@@ -15,16 +15,15 @@
 package tests
 
 import (
-	"crypto/tls"
+	"context"
 	"fmt"
-	"net/http"
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/steinfletcher/apitest"
+	"connectrpc.com/connect"
 
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
+	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
@@ -32,7 +31,7 @@ import (
 // * Create Application
 // * It still NEW after 40 secs
 // * Destroy Application
-// * Should get RECALLED state
+// * Should get DEALLOCATED state
 func Test_cant_allocate_too_big_label(t *testing.T) {
 	t.Parallel()
 	afi := h.NewAquariumFish(t, "node-1", `---
@@ -57,140 +56,159 @@ drivers:
 		}
 	}()
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	cli := &http.Client{
-		Timeout:   time.Second * 5,
-		Transport: tr,
-	}
+	// Create admin client
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
 
-	var label types.Label
+	// Create service clients
+	labelClient := aquariumv2connect.NewLabelServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+	appClient := aquariumv2connect.NewApplicationServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+
+	var labelUID string
 	t.Run("Create Label", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/label/")).
-			JSON(`{"name":"test-label", "version":1, "definitions": [{"driver":"test", "resources":{"cpu":5,"ram":9}}]}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&label)
-
-		if label.UID == uuid.Nil {
-			t.Fatalf("Label UID is incorrect: %v", label.UID)
+		resp, err := labelClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
+				Label: &aquariumv2.Label{
+					Name:    "test-label",
+					Version: 1,
+					Definitions: []*aquariumv2.LabelDefinition{{
+						Driver: "test",
+						Resources: &aquariumv2.Resources{
+							Cpu: 5,
+							Ram: 9,
+						},
+					}},
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create label:", err)
 		}
+		labelUID = resp.Msg.Data.Uid
 	})
 
-	var app types.Application
+	var appUID string
 	t.Run("Create Application", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/application/")).
-			JSON(`{"label_UID":"`+label.UID.String()+`"}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&app)
-
-		if app.UID == uuid.Nil {
-			t.Fatalf("Application UID is incorrect: %v", app.UID)
+		resp, err := appClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceCreateRequest{
+				Application: &aquariumv2.Application{
+					LabelUid: labelUID,
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create application:", err)
 		}
+		appUID = resp.Msg.Data.Uid
 	})
 
 	time.Sleep(10 * time.Second)
 
-	var appState types.ApplicationState
 	t.Run("Application should have state NEW in 10 sec", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&appState)
+		resp, err := appClient.GetState(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+				ApplicationUid: appUID,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to get application state:", err)
+		}
 
-		if appState.Status != types.ApplicationStatusNEW {
-			t.Fatalf("Application Status is incorrect: %v", appState.Status)
+		if resp.Msg.Data.Status != aquariumv2.ApplicationState_NEW {
+			t.Fatalf("Application Status is incorrect: %v", resp.Msg.Data.Status)
 		}
 	})
 
 	time.Sleep(10 * time.Second)
 
 	t.Run("Application should have state NEW in 20 sec", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&appState)
+		resp, err := appClient.GetState(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+				ApplicationUid: appUID,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to get application state:", err)
+		}
 
-		if appState.Status != types.ApplicationStatusNEW {
-			t.Fatalf("Application Status is incorrect: %v", appState.Status)
+		if resp.Msg.Data.Status != aquariumv2.ApplicationState_NEW {
+			t.Fatalf("Application Status is incorrect: %v", resp.Msg.Data.Status)
 		}
 	})
 
 	time.Sleep(10 * time.Second)
 
 	t.Run("Application should have state NEW in 30 sec", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&appState)
+		resp, err := appClient.GetState(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+				ApplicationUid: appUID,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to get application state:", err)
+		}
 
-		if appState.Status != types.ApplicationStatusNEW {
-			t.Fatalf("Application Status is incorrect: %v", appState.Status)
+		if resp.Msg.Data.Status != aquariumv2.ApplicationState_NEW {
+			t.Fatalf("Application Status is incorrect: %v", resp.Msg.Data.Status)
 		}
 	})
 
 	time.Sleep(10 * time.Second)
 
 	t.Run("Application should have state NEW in 40 sec", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&appState)
+		resp, err := appClient.GetState(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+				ApplicationUid: appUID,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to get application state:", err)
+		}
 
-		if appState.Status != types.ApplicationStatusNEW {
-			t.Fatalf("Application Status is incorrect: %v", appState.Status)
+		if resp.Msg.Data.Status != aquariumv2.ApplicationState_NEW {
+			t.Fatalf("Application Status is incorrect: %v", resp.Msg.Data.Status)
 		}
 	})
 
 	t.Run("Deallocate the Application", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/deallocate")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+		_, err := appClient.Deallocate(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceDeallocateRequest{
+				ApplicationUid: appUID,
+			}),
+		)
+		if err != nil {
+			t.Error("Failed to deallocate application:", err)
+		}
 	})
 
-	t.Run("Application should get RECALLED in 10 sec", func(t *testing.T) {
+	t.Run("Application should get DEALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 5 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(r).
-				Status(http.StatusOK).
-				End().
-				JSON(&appState)
+			resp, err := appClient.GetState(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+					ApplicationUid: appUID,
+				}),
+			)
+			if err != nil {
+				r.Fatal("Failed to get application state:", err)
+			}
 
-			if appState.Status != types.ApplicationStatusRECALLED {
-				r.Fatalf("Application Status is incorrect: %v", appState.Status)
+			if resp.Msg.Data.Status != aquariumv2.ApplicationState_DEALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", resp.Msg.Data.Status)
 			}
 		})
 	})

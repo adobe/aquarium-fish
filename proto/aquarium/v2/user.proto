@@ -15,15 +15,18 @@ syntax = "proto3";
 package aquarium.v2;
 
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
 import "aquarium/v2/rbac.proto";
 
-option go_package = "github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2;aquariumv2";
+option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2";
 
 // User service handles user management operations
 service UserService {
   // Get current user information
   rpc GetMe(UserServiceGetMeRequest) returns (UserServiceGetMeResponse) {
-   option (access_control) = {};
+   option (access_control) = {
+    no_permission_needed: true,
+   };
   }
   
   // Get list of users
@@ -36,30 +39,32 @@ service UserService {
   rpc Create(UserServiceCreateRequest) returns (UserServiceCreateResponse) {}
   
   // Update existing user
-  rpc Update(UserServiceUpdateRequest) returns (UserServiceUpdateResponse) {}
+  rpc Update(UserServiceUpdateRequest) returns (UserServiceUpdateResponse) {
+   option (access_control) = {
+    additional_actions: ['UpdateAll', 'UpdatePassword', 'UpdateRoles'],
+   };
+  }
   
   // Delete user
   rpc Delete(UserServiceDeleteRequest) returns (UserServiceDeleteResponse) {}
-  
-  // Assign roles to user
-  rpc AssignRoles(UserServiceAssignRolesRequest) returns (UserServiceAssignRolesResponse) {}
 }
 
 // User represents a user in the system
+//
+// Contains user information including roles and permissions. The `admin` user is created during
+// the first cluster start and prints credentials to stderr.
+// 
+// Can be created by any node and updated by any node with appropriate permissions.
 message User {
   string name = 1;
   google.protobuf.Timestamp created_at = 2;
   google.protobuf.Timestamp updated_at = 3;
-  repeated string roles = 4;
-}
-
-// UserWithPassword includes password for create/update operations
-message UserWithPassword {
-  string name = 1;
-  google.protobuf.Timestamp created_at = 2;
-  google.protobuf.Timestamp updated_at = 3;
-  string password = 4;
-  repeated string roles = 5;
+  // Where the hashed password stored
+  optional google.protobuf.Struct hash = 4;
+  // Set when the user was generated with no password
+  optional string password = 5;
+  // List of role names assigned to the user
+  repeated string roles = 6;
 }
 
 message UserServiceGetMeRequest {}
@@ -79,7 +84,7 @@ message UserServiceListResponse {
 }
 
 message UserServiceGetRequest {
-  string name = 1;
+  string user_name = 1;
 }
 
 message UserServiceGetResponse {
@@ -89,45 +94,30 @@ message UserServiceGetResponse {
 }
 
 message UserServiceCreateRequest {
-  string name = 1;
-  optional string password = 2;
-  repeated string roles = 3;
+  User user = 1;
 }
 
 message UserServiceCreateResponse {
   bool status = 1;
   string message = 2;
-  UserWithPassword data = 3;
+  User data = 3;
 }
 
 message UserServiceUpdateRequest {
-  string name = 1;
-  optional string password = 2;
-  repeated string roles = 3;
+  User user = 1;
 }
 
 message UserServiceUpdateResponse {
   bool status = 1;
   string message = 2;
-  UserWithPassword data = 3;
+  User data = 3;
 }
 
 message UserServiceDeleteRequest {
-  string name = 1;
+  string user_name = 1;
 }
 
 message UserServiceDeleteResponse {
   bool status = 1;
   string message = 2;
 }
-
-message UserServiceAssignRolesRequest {
-  string name = 1;
-  repeated string roles = 2;
-}
-
-message UserServiceAssignRolesResponse {
-  bool status = 1;
-  string message = 2;
-} 
-

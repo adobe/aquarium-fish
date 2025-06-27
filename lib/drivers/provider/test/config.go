@@ -29,11 +29,11 @@ type Config struct {
 
 	WorkspacePath string `json:"workspace_path"` // Where to place the files of running resources
 
-	CPULimit uint `json:"cpu_limit"` // Number of available virtual CPUs, 0 - unlimited
-	RAMLimit uint `json:"ram_limit"` // Amount of available virtual RAM (GB), 0 - unlimited
+	CPULimit uint32 `json:"cpu_limit"` // Number of available virtual CPUs, 0 - unlimited
+	RAMLimit uint32 `json:"ram_limit"` // Amount of available virtual RAM (GB), 0 - unlimited
 
-	CPUOverbook uint `json:"cpu_overbook"` // How many CPUs available for overbook
-	RAMOverbook uint `json:"ram_overbook"` // How much RAM (GB) available for overbook
+	CPUOverbook uint32 `json:"cpu_overbook"` // How many CPUs available for overbook
+	RAMOverbook uint32 `json:"ram_overbook"` // How much RAM (GB) available for overbook
 
 	FailConfigApply    uint8 `json:"fail_config_apply"`    // Fail on config Apply (0 - not, 1-254 random, 255-yes)
 	FailConfigValidate uint8 `json:"fail_config_validate"` // Fail on config Validation (0 - not, 1-254 random, 255-yes)

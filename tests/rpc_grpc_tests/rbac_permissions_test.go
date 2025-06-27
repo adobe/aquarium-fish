@@ -20,8 +20,8 @@ import (
 
 	"connectrpc.com/connect"
 
-	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2"
-	"github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2/aquariumv2connect"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
+	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
@@ -52,11 +52,11 @@ drivers:
 	// Create test users
 	regularUserPass := "regular-pass"
 	powerUserPass := "power-pass"
-	regularUser := &aquariumv2.UserServiceCreateRequest{
+	regularUser := aquariumv2.User{
 		Name:     "regular-user",
 		Password: &regularUserPass,
 	}
-	powerUser := &aquariumv2.UserServiceCreateRequest{
+	powerUser := aquariumv2.User{
 		Name:     "power-user",
 		Password: &powerUserPass,
 	}
@@ -121,7 +121,7 @@ drivers:
 		// Create regular user
 		_, err := adminUserClient.Create(
 			context.Background(),
-			connect.NewRequest(regularUser),
+			connect.NewRequest(&aquariumv2.UserServiceCreateRequest{User: &regularUser}),
 		)
 		if err != nil {
 			t.Fatal("Failed to create regular user:", err)
@@ -130,7 +130,7 @@ drivers:
 		// Create power user
 		_, err = adminUserClient.Create(
 			context.Background(),
-			connect.NewRequest(powerUser),
+			connect.NewRequest(&aquariumv2.UserServiceCreateRequest{User: &powerUser}),
 		)
 		if err != nil {
 			t.Fatal("Failed to create power user:", err)
@@ -194,11 +194,13 @@ drivers:
 
 	// Assign User role to regular user
 	t.Run("Admin: Assign User role to regular user", func(t *testing.T) {
-		_, err := adminUserClient.AssignRoles(
+		_, err := adminUserClient.Update(
 			context.Background(),
-			connect.NewRequest(&aquariumv2.UserServiceAssignRolesRequest{
-				Name:  regularUser.Name,
-				Roles: []string{"User"},
+			connect.NewRequest(&aquariumv2.UserServiceUpdateRequest{
+				User: &aquariumv2.User{
+					Name:  regularUser.Name,
+					Roles: []string{"User"},
+				},
 			}),
 		)
 		if err != nil {
@@ -274,7 +276,7 @@ drivers:
 		_, err = regularAppClient.Get(
 			context.Background(),
 			connect.NewRequest(&aquariumv2.ApplicationServiceGetRequest{
-				Uid: regularUserAppUID,
+				ApplicationUid: regularUserAppUID,
 			}),
 		)
 		if err != nil {
@@ -304,7 +306,7 @@ drivers:
 		_, err := regularAppClient.Get(
 			context.Background(),
 			connect.NewRequest(&aquariumv2.ApplicationServiceGetRequest{
-				Uid: adminAppUID,
+				ApplicationUid: adminAppUID,
 			}),
 		)
 		if err == nil {
@@ -314,11 +316,13 @@ drivers:
 
 	// Assign Administrator role to power user
 	t.Run("Admin: Assign Administrator role to power user", func(t *testing.T) {
-		_, err := adminUserClient.AssignRoles(
+		_, err := adminUserClient.Update(
 			context.Background(),
-			connect.NewRequest(&aquariumv2.UserServiceAssignRolesRequest{
-				Name:  powerUser.Name,
-				Roles: []string{"Administrator"},
+			connect.NewRequest(&aquariumv2.UserServiceUpdateRequest{
+				User: &aquariumv2.User{
+					Name:  powerUser.Name,
+					Roles: []string{"Administrator"},
+				},
 			}),
 		)
 		if err != nil {
@@ -361,7 +365,7 @@ drivers:
 		_, err = powerAppClient.Get(
 			context.Background(),
 			connect.NewRequest(&aquariumv2.ApplicationServiceGetRequest{
-				Uid: regularUserAppUID,
+				ApplicationUid: regularUserAppUID,
 			}),
 		)
 		if err != nil {
@@ -372,7 +376,7 @@ drivers:
 		_, err = powerAppClient.Get(
 			context.Background(),
 			connect.NewRequest(&aquariumv2.ApplicationServiceGetRequest{
-				Uid: adminAppUID,
+				ApplicationUid: adminAppUID,
 			}),
 		)
 		if err != nil {
@@ -386,7 +390,7 @@ drivers:
 		_, err := regularAppClient.Deallocate(
 			context.Background(),
 			connect.NewRequest(&aquariumv2.ApplicationServiceDeallocateRequest{
-				Uid: regularUserAppUID,
+				ApplicationUid: regularUserAppUID,
 			}),
 		)
 		if err != nil {
@@ -397,7 +401,7 @@ drivers:
 		_, err = adminAppClient.Deallocate(
 			context.Background(),
 			connect.NewRequest(&aquariumv2.ApplicationServiceDeallocateRequest{
-				Uid: adminAppUID,
+				ApplicationUid: adminAppUID,
 			}),
 		)
 		if err != nil {

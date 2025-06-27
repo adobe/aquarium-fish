@@ -15,16 +15,16 @@
 package tests
 
 import (
-	"crypto/tls"
+	"context"
 	"fmt"
-	"net/http"
 	"testing"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/google/uuid"
-	"github.com/steinfletcher/apitest"
 
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
+	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
@@ -56,75 +56,105 @@ drivers:
 		}
 	}()
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	cli := &http.Client{
-		Timeout:   time.Second * 5,
-		Transport: tr,
-	}
+	// Create admin client
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
 
-	var label types.Label
+	// Create service clients
+	labelClient := aquariumv2connect.NewLabelServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+	appClient := aquariumv2connect.NewApplicationServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+	nodeClient := aquariumv2connect.NewNodeServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+
+	// Note: HTTP client removed as we're using RPC calls now
+
+	var labelUID string
 	t.Run("Create Label", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/label/")).
-			JSON(`{"name":"test-label", "version":1, "definitions": [{"driver":"test", "resources":{"cpu":1,"ram":2}}]}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&label)
+		resp, err := labelClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
+				Label: &aquariumv2.Label{
+					Name:    "test-label",
+					Version: 1,
+					Definitions: []*aquariumv2.LabelDefinition{{
+						Driver: "test",
+						Resources: &aquariumv2.Resources{
+							Cpu: 1,
+							Ram: 2,
+						},
+					}},
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create label:", err)
+		}
+		labelUID = resp.Msg.Data.Uid
 
-		if label.UID == uuid.Nil {
-			t.Fatalf("Label UID is incorrect: %v", label.UID)
+		if labelUID == uuid.Nil.String() {
+			t.Fatalf("Label UID is incorrect: %v", labelUID)
 		}
 	})
 
-	var app types.Application
+	var appUID string
 	t.Run("Create Application", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/application/")).
-			JSON(`{"label_UID":"`+label.UID.String()+`"}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&app)
+		resp, err := appClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceCreateRequest{
+				Application: &aquariumv2.Application{
+					LabelUid: labelUID,
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create application:", err)
+		}
+		appUID = resp.Msg.Data.Uid
 
-		if app.UID == uuid.Nil {
-			t.Fatalf("Application UID is incorrect: %v", app.UID)
+		if appUID == uuid.Nil.String() {
+			t.Fatalf("Application UID is incorrect: %v", appUID)
 		}
 	})
 
-	var appState types.ApplicationState
 	t.Run("Application should get ALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(r).
-				Status(http.StatusOK).
-				End().
-				JSON(&appState)
+			resp, err := appClient.GetState(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+					ApplicationUid: appUID,
+				}),
+			)
+			if err != nil {
+				r.Fatal("Failed to get application state:", err)
+			}
 
-			if appState.Status != types.ApplicationStatusALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", appState.Status)
+			if resp.Msg.Data.Status != aquariumv2.ApplicationState_ALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", resp.Msg.Data.Status)
 			}
 		})
 	})
 
 	t.Run("Send maintenance + shutdown request", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/node/this/maintenance")).
-			Query("shutdown", "true").
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+		shutdown := true
+		_, err := nodeClient.SetMaintenance(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.NodeServiceSetMaintenanceRequest{
+				Shutdown: &shutdown,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to set maintenance mode:", err)
+		}
 	})
 
 	t.Run("Check Fish node is still running after 10s", func(t *testing.T) {
@@ -135,13 +165,15 @@ drivers:
 	})
 
 	t.Run("Deallocate the Application", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/deallocate")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+		_, err := appClient.Deallocate(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceDeallocateRequest{
+				ApplicationUid: appUID,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to deallocate application:", err)
+		}
 	})
 
 	t.Run("Fish should stop in 10 sec", func(t *testing.T) {
@@ -179,76 +211,101 @@ drivers:
 		}
 	}()
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	// Create admin client
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+
+	// Create service clients
+	labelClient := aquariumv2connect.NewLabelServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+	appClient := aquariumv2connect.NewApplicationServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+	nodeClient := aquariumv2connect.NewNodeServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+
+	var labelUID string
+	resp, err := labelClient.Create(
+		context.Background(),
+		connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
+			Label: &aquariumv2.Label{
+				Name:    "test-label",
+				Version: 1,
+				Definitions: []*aquariumv2.LabelDefinition{{
+					Driver: "test",
+					Resources: &aquariumv2.Resources{
+						Cpu: 1,
+						Ram: 2,
+					},
+				}},
+			},
+		}),
+	)
+	if err != nil {
+		t.Fatal("Failed to create label:", err)
 	}
-	cli := &http.Client{
-		Timeout:   time.Second * 5,
-		Transport: tr,
+	labelUID = resp.Msg.Data.Uid
+
+	if labelUID == uuid.Nil.String() {
+		t.Fatalf("Label UID is incorrect: %v", labelUID)
 	}
 
-	var label types.Label
-	t.Run("Create Label", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/label/")).
-			JSON(`{"name":"test-label", "version":1, "definitions": [{"driver":"test", "resources":{"cpu":1,"ram":2}}]}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&label)
+	var appUID string
+	appResp, err := appClient.Create(
+		context.Background(),
+		connect.NewRequest(&aquariumv2.ApplicationServiceCreateRequest{
+			Application: &aquariumv2.Application{
+				LabelUid: labelUID,
+			},
+		}),
+	)
+	if err != nil {
+		t.Fatal("Failed to create application:", err)
+	}
+	appUID = appResp.Msg.Data.Uid
 
-		if label.UID == uuid.Nil {
-			t.Fatalf("Label UID is incorrect: %v", label.UID)
-		}
-	})
+	if appUID == uuid.Nil.String() {
+		t.Fatalf("Application UID is incorrect: %v", appUID)
+	}
 
-	var app types.Application
-	t.Run("Create Application", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/application/")).
-			JSON(`{"label_UID":"`+label.UID.String()+`"}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&app)
-
-		if app.UID == uuid.Nil {
-			t.Fatalf("Application UID is incorrect: %v", app.UID)
-		}
-	})
-
-	var appState types.ApplicationState
 	t.Run("Application should get ALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(r).
-				Status(http.StatusOK).
-				End().
-				JSON(&appState)
+			resp, err := appClient.GetState(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+					ApplicationUid: appUID,
+				}),
+			)
+			if err != nil {
+				r.Fatal("Failed to get application state:", err)
+			}
 
-			if appState.Status != types.ApplicationStatusALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", appState.Status)
+			if resp.Msg.Data.Status != aquariumv2.ApplicationState_ALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", resp.Msg.Data.Status)
 			}
 		})
 	})
 
 	t.Run("Send immediate shutdown request", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/node/this/maintenance")).
-			Query("enable", "false").
-			Query("shutdown", "true").
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+		maintenance := false
+		shutdown := true
+		_, err := nodeClient.SetMaintenance(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.NodeServiceSetMaintenanceRequest{
+				Maintenance: &maintenance,
+				Shutdown:    &shutdown,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to set immediate shutdown:", err)
+		}
 	})
 
 	t.Run("Fish should stop in 10 sec", func(t *testing.T) {
@@ -287,77 +344,107 @@ drivers:
 		}
 	}()
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	cli := &http.Client{
-		Timeout:   time.Second * 5,
-		Transport: tr,
-	}
+	// Create admin client
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
 
-	var label types.Label
+	// Create service clients
+	labelClient := aquariumv2connect.NewLabelServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+	appClient := aquariumv2connect.NewApplicationServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+	nodeClient := aquariumv2connect.NewNodeServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+
+	var labelUID string
 	t.Run("Create Label", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/label/")).
-			JSON(`{"name":"test-label", "version":1, "definitions": [{"driver":"test", "resources":{"cpu":1,"ram":2}}]}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&label)
+		resp, err := labelClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
+				Label: &aquariumv2.Label{
+					Name:    "test-label",
+					Version: 1,
+					Definitions: []*aquariumv2.LabelDefinition{{
+						Driver: "test",
+						Resources: &aquariumv2.Resources{
+							Cpu: 1,
+							Ram: 2,
+						},
+					}},
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create label:", err)
+		}
+		labelUID = resp.Msg.Data.Uid
 
-		if label.UID == uuid.Nil {
-			t.Fatalf("Label UID is incorrect: %v", label.UID)
+		if labelUID == uuid.Nil.String() {
+			t.Fatalf("Label UID is incorrect: %v", labelUID)
 		}
 	})
 
-	var app types.Application
+	var appUID string
 	t.Run("Create Application", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/application/")).
-			JSON(`{"label_UID":"`+label.UID.String()+`"}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&app)
+		resp, err := appClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceCreateRequest{
+				Application: &aquariumv2.Application{
+					LabelUid: labelUID,
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create application:", err)
+		}
+		appUID = resp.Msg.Data.Uid
 
-		if app.UID == uuid.Nil {
-			t.Fatalf("Application UID is incorrect: %v", app.UID)
+		if appUID == uuid.Nil.String() {
+			t.Fatalf("Application UID is incorrect: %v", appUID)
 		}
 	})
 
-	var appState types.ApplicationState
 	t.Run("Application should get ALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(r).
-				Status(http.StatusOK).
-				End().
-				JSON(&appState)
+			resp, err := appClient.GetState(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+					ApplicationUid: appUID,
+				}),
+			)
+			if err != nil {
+				r.Fatal("Failed to get application state:", err)
+			}
 
-			if appState.Status != types.ApplicationStatusALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", appState.Status)
+			if resp.Msg.Data.Status != aquariumv2.ApplicationState_ALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", resp.Msg.Data.Status)
 			}
 		})
 	})
 
-	t.Run("Send immediate shutdown request with delay", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/node/this/maintenance")).
-			Query("enable", "false").
-			Query("shutdown", "true").
-			Query("shutdown_delay", "11s").
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+	t.Run("Send immediate shutdown request with 11s delay", func(t *testing.T) {
+		maintenance := false
+		shutdown := true
+		shutdownDelay := "12s"
+		_, err := nodeClient.SetMaintenance(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.NodeServiceSetMaintenanceRequest{
+				Maintenance:   &maintenance,
+				Shutdown:      &shutdown,
+				ShutdownDelay: &shutdownDelay,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to set shutdown with delay:", err)
+		}
 	})
 
 	t.Run("Check Fish node is still running after 10s", func(t *testing.T) {
@@ -404,75 +491,103 @@ drivers:
 		}
 	}()
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	cli := &http.Client{
-		Timeout:   time.Second * 5,
-		Transport: tr,
-	}
+	// Create admin client
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
 
-	var label types.Label
+	// Create service clients
+	labelClient := aquariumv2connect.NewLabelServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+	appClient := aquariumv2connect.NewApplicationServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+	nodeClient := aquariumv2connect.NewNodeServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+
+	var labelUID string
 	t.Run("Create Label", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/label/")).
-			JSON(`{"name":"test-label", "version":1, "definitions": [{"driver":"test", "resources":{"cpu":1,"ram":2}}]}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&label)
+		resp, err := labelClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
+				Label: &aquariumv2.Label{
+					Name:    "test-label",
+					Version: 1,
+					Definitions: []*aquariumv2.LabelDefinition{{
+						Driver: "test",
+						Resources: &aquariumv2.Resources{
+							Cpu: 1,
+							Ram: 2,
+						},
+					}},
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create label:", err)
+		}
+		labelUID = resp.Msg.Data.Uid
 
-		if label.UID == uuid.Nil {
-			t.Fatalf("Label UID is incorrect: %v", label.UID)
+		if labelUID == uuid.Nil.String() {
+			t.Fatalf("Label UID is incorrect: %v", labelUID)
 		}
 	})
 
-	var app types.Application
+	var appUID string
 	t.Run("Create Application", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/application/")).
-			JSON(`{"label_UID":"`+label.UID.String()+`"}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&app)
+		resp, err := appClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceCreateRequest{
+				Application: &aquariumv2.Application{
+					LabelUid: labelUID,
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create application:", err)
+		}
+		appUID = resp.Msg.Data.Uid
 
-		if app.UID == uuid.Nil {
-			t.Fatalf("Application UID is incorrect: %v", app.UID)
+		if appUID == uuid.Nil.String() {
+			t.Fatalf("Application UID is incorrect: %v", appUID)
 		}
 	})
 
-	var appState types.ApplicationState
 	t.Run("Application should get ALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(r).
-				Status(http.StatusOK).
-				End().
-				JSON(&appState)
+			resp, err := appClient.GetState(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+					ApplicationUid: appUID,
+				}),
+			)
+			if err != nil {
+				r.Fatal("Failed to get application state:", err)
+			}
 
-			if appState.Status != types.ApplicationStatusALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", appState.Status)
+			if resp.Msg.Data.Status != aquariumv2.ApplicationState_ALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", resp.Msg.Data.Status)
 			}
 		})
 	})
 
 	t.Run("Send maintenance + shutdown request", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/node/this/maintenance")).
-			Query("shutdown", "true").
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+		shutdown := true
+		_, err := nodeClient.SetMaintenance(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.NodeServiceSetMaintenanceRequest{
+				Shutdown: &shutdown,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to set maintenance mode:", err)
+		}
 	})
 
 	t.Run("Check Fish node is still running after 10s", func(t *testing.T) {
@@ -483,40 +598,44 @@ drivers:
 	})
 
 	t.Run("Send shutdown cancel request", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/node/this/maintenance")).
-			Query("enable", "false").
-			Query("shutdown", "false").
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+		shutdown := false
+		_, err := nodeClient.SetMaintenance(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.NodeServiceSetMaintenanceRequest{
+				Shutdown: &shutdown,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to cancel shutdown:", err)
+		}
 	})
 
 	t.Run("Deallocate the Application", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/deallocate")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+		_, err := appClient.Deallocate(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceDeallocateRequest{
+				ApplicationUid: appUID,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to deallocate application:", err)
+		}
 	})
 
 	t.Run("Application should get DEALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(r).
-				Status(http.StatusOK).
-				End().
-				JSON(&appState)
+			resp, err := appClient.GetState(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+					ApplicationUid: appUID,
+				}),
+			)
+			if err != nil {
+				r.Fatal("Failed to get application state:", err)
+			}
 
-			if appState.Status != types.ApplicationStatusDEALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", appState.Status)
+			if resp.Msg.Data.Status != aquariumv2.ApplicationState_DEALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", resp.Msg.Data.Status)
 			}
 		})
 	})
@@ -557,25 +676,29 @@ drivers:
 		}
 	}()
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	cli := &http.Client{
-		Timeout:   time.Second * 5,
-		Transport: tr,
-	}
+	// Create admin client
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+
+	// Create service clients
+	nodeClient := aquariumv2connect.NewNodeServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
 
 	t.Run("Send shutdown request with delay", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/node/this/maintenance")).
-			Query("enable", "false").
-			Query("shutdown", "true").
-			Query("shutdown_delay", "15s").
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+		shutdown := true
+		shutdownDelay := "15s"
+		_, err := nodeClient.SetMaintenance(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.NodeServiceSetMaintenanceRequest{
+				Shutdown:      &shutdown,
+				ShutdownDelay: &shutdownDelay,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to set shutdown with delay:", err)
+		}
 	})
 
 	t.Run("Check Fish node is still running after 10s", func(t *testing.T) {
@@ -586,15 +709,16 @@ drivers:
 	})
 
 	t.Run("Send shutdown cancel request", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/node/this/maintenance")).
-			Query("enable", "false").
-			Query("shutdown", "false").
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+		shutdown := false
+		_, err := nodeClient.SetMaintenance(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.NodeServiceSetMaintenanceRequest{
+				Shutdown: &shutdown,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to cancel shutdown:", err)
+		}
 	})
 
 	t.Run("Check Fish node is still running after 10s", func(t *testing.T) {

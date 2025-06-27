@@ -24,28 +24,6 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
 
-  OpenAPI:
-    runs-on: ubuntu-latest
-    name: OpenAPI validation
-
-    # Service containers to run with `runner-job`
-    services:
-      # Label used to access the service container
-      swagger-editor:
-        # Docker Hub image
-        image: swaggerapi/swagger-editor
-        ports:
-          # Maps port 8080 on service container to the host 80
-          - 80:8080
-
-    steps:
-      - uses: actions/checkout@v4
-      - name: Validate OpenAPI definition
-        uses: swaggerexpert/swagger-editor-validate@e8e51dbc8c18e87f96b082b18a6a7cbd3c44abd8  # v1.4.2, Dec 31 2024
-        with:
-          swagger-editor-url: http://localhost/
-          definition-file: docs/openapi.yaml
-
   GolangCI:
     runs-on: ubuntu-latest
     name: Code Lint
@@ -99,30 +77,25 @@ jobs:
           path: aquarium-fish*.tar.xz
   
   Tests:
-    needs: Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # To get all the tags for versioning
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: binaries
-
-      - name: Unpack built binaries
-        run: |
-          tar xf aquarium-fish*.linux_amd64.tar.xz
-
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
 
+      # Build here is needed to prepare a debug race instrumented version of the binary
+      - name: Build
+        run: RELEASE=1 ./build.sh
+
       - name: Integration Tests
         run: |
           go install github.com/jstemmer/go-junit-report/v2@85bf471  # Oct 18, 2023
-          FISH_PATH="$PWD/aquarium-fish" go test -v -parallel 4 -count=1 -skip '_stress$' ./tests/... 2>&1 | go-junit-report -iocopy -set-exit-code -out report.xml
+          FISH_PATH="$PWD/$(ls -t aquarium-fish*.linux_amd64 | head -1)" go test -v -parallel 4 -count=1 -skip '_stress$' ./tests/... 2>&1 | go-junit-report -iocopy -set-exit-code -out report.xml
 
       - name: Benchmarks main
         run: go run go.bobheadxi.dev/gobenchdata@v1 action

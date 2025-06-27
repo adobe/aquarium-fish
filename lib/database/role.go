@@ -18,11 +18,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
 // RoleList returns a list of all roles
-func (d *Database) RoleList() (rs []types.Role, err error) {
+func (d *Database) RoleList() (rs []typesv2.Role, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -31,7 +31,7 @@ func (d *Database) RoleList() (rs []types.Role, err error) {
 }
 
 // RoleGet returns a role by name
-func (d *Database) RoleGet(name string) (r *types.Role, err error) {
+func (d *Database) RoleGet(name string) (r *typesv2.Role, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -40,7 +40,7 @@ func (d *Database) RoleGet(name string) (r *types.Role, err error) {
 }
 
 // RoleCreate makes a new role
-func (d *Database) RoleCreate(r *types.Role) error {
+func (d *Database) RoleCreate(r *typesv2.Role) error {
 	if r.Name == "" {
 		return fmt.Errorf("Fish: Role.Name can't be empty")
 	}
@@ -54,7 +54,7 @@ func (d *Database) RoleCreate(r *types.Role) error {
 }
 
 // RoleSave saves a role
-func (d *Database) RoleSave(r *types.Role) error {
+func (d *Database) RoleSave(r *typesv2.Role) error {
 	if r.Name == "" {
 		return fmt.Errorf("Fish: Role.Name can't be empty")
 	}

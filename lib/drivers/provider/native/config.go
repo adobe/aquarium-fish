@@ -56,8 +56,8 @@ type Config struct {
 	//   for disk caching)
 	// * Positive (>0) is also available, but you're going to put more load on the scheduler
 	//   Please be careful here - noone wants the workload to fail allocation because of that...
-	CPUAlter int `json:"cpu_alter"` // 0 do nothing, <0 reduces number available CPUs, >0 increases it (dangerous)
-	RAMAlter int `json:"ram_alter"` // 0 do nothing, <0 reduces amount of available RAM (GB), >0 increases it (dangerous)
+	CPUAlter int32 `json:"cpu_alter"` // 0 do nothing, <0 reduces number available CPUs, >0 increases it (dangerous)
+	RAMAlter int32 `json:"ram_alter"` // 0 do nothing, <0 reduces amount of available RAM (GB), >0 increases it (dangerous)
 
 	// Overbook options allows tenants to reuse the resources
 	// It will be used only when overbook is allowed by the tenants. It works by just adding those
@@ -65,8 +65,8 @@ type Config struct {
 	// and want to run 2 tenants with requirement of 14 CPUs each - you can put 12 in CPUOverbook -
 	// to have virtually 28 CPUs. 3rd will not be running because 2 tenants will eat all 28 virtual
 	// CPUs. Same applies to the RamOverbook.
-	CPUOverbook uint `json:"cpu_overbook"` // How much CPUs could be reused by multiple tenants
-	RAMOverbook uint `json:"ram_overbook"` // How much RAM (GB) could be reused by multiple tenants
+	CPUOverbook uint32 `json:"cpu_overbook"` // How much CPUs could be reused by multiple tenants
+	RAMOverbook uint32 `json:"ram_overbook"` // How much RAM (GB) could be reused by multiple tenants
 
 	DownloadUser     string `json:"download_user"`     // The user will be used to auth in download operations
 	DownloadPassword string `json:"download_password"` // The password will be used to auth in download operations
@@ -320,7 +320,7 @@ func (c *Config) Validate(drv *Driver) (err error) {
 		return err
 	}
 
-	if c.CPUAlter < 0 && cpuStat <= -c.CPUAlter {
+	if c.CPUAlter < 0 && cpuStat <= int(-c.CPUAlter) {
 		return log.Errorf("Native: |CpuAlter| can't be more or equal the available Host CPUs: |%d| > %d", c.CPUAlter, cpuStat)
 	}
 
@@ -330,7 +330,7 @@ func (c *Config) Validate(drv *Driver) (err error) {
 	}
 	ramStat := memStat.Total / 1073741824 // Getting GB from Bytes
 
-	if c.RAMAlter < 0 && int(ramStat) <= -c.RAMAlter {
+	if c.RAMAlter < 0 && ramStat <= uint64(-c.RAMAlter) {
 		return log.Errorf("Native: |RamAlter| can't be more or equal the available Host RAM: |%d| > %d", c.RAMAlter, ramStat)
 	}
 

@@ -20,16 +20,15 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
-	"github.com/adobe/aquarium-fish/lib/util"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
-func (d *Database) SubscribeApplicationTask(ch chan *types.ApplicationTask) {
+func (d *Database) SubscribeApplicationTask(ch chan *typesv2.ApplicationTask) {
 	d.subsApplicationTask = append(d.subsApplicationTask, ch)
 }
 
 // ApplicationTaskList returns all known ApplicationTasks
-func (d *Database) ApplicationTaskList() (at []types.ApplicationTask, err error) {
+func (d *Database) ApplicationTaskList() (at []typesv2.ApplicationTask, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -38,11 +37,11 @@ func (d *Database) ApplicationTaskList() (at []types.ApplicationTask, err error)
 }
 
 // ApplicationTaskFindByApplication allows to find all the ApplicationTasks by ApplicationUID
-func (d *Database) ApplicationTaskListByApplication(uid types.ApplicationUID) (at []types.ApplicationTask, err error) {
+func (d *Database) ApplicationTaskListByApplication(appUID typesv2.ApplicationUID) (at []typesv2.ApplicationTask, err error) {
 	all, err := d.ApplicationTaskList()
 	if err == nil {
 		for _, a := range all {
-			if a.ApplicationUID == uid {
+			if a.ApplicationUid == appUID {
 				at = append(at, a)
 			}
 		}
@@ -51,31 +50,25 @@ func (d *Database) ApplicationTaskListByApplication(uid types.ApplicationUID) (a
 }
 
 // ApplicationTaskCreate makes a new ApplicationTask
-func (d *Database) ApplicationTaskCreate(at *types.ApplicationTask) error {
-	if at.ApplicationUID == uuid.Nil {
+func (d *Database) ApplicationTaskCreate(at *typesv2.ApplicationTask) error {
+	if at.ApplicationUid == uuid.Nil {
 		return fmt.Errorf("Fish: ApplicationUID can't be unset")
 	}
 	if at.Task == "" {
 		return fmt.Errorf("Fish: Task can't be empty")
 	}
-	if at.Options == "" {
-		at.Options = util.UnparsedJSON("{}")
-	}
-	if at.Result == "" {
-		at.Result = util.UnparsedJSON("{}")
-	}
 
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	at.UID = d.NewUID()
+	at.Uid = d.NewUID()
 	at.CreatedAt = time.Now()
 	at.UpdatedAt = at.CreatedAt
 
-	err := d.be.Collection(ObjectApplicationTask).Add(at.UID.String(), at)
+	err := d.be.Collection(ObjectApplicationTask).Add(at.Uid.String(), at)
 
 	// Notifying the subscribers on change, doing that in goroutine to not block execution
-	go func(appTask *types.ApplicationTask) {
+	go func(appTask *typesv2.ApplicationTask) {
 		for _, ch := range d.subsApplicationTask {
 			ch <- appTask
 		}
@@ -85,19 +78,19 @@ func (d *Database) ApplicationTaskCreate(at *types.ApplicationTask) error {
 }
 
 // ApplicationTaskSave stores the ApplicationTask
-func (d *Database) ApplicationTaskSave(at *types.ApplicationTask) error {
-	if at.UID == uuid.Nil {
+func (d *Database) ApplicationTaskSave(at *typesv2.ApplicationTask) error {
+	if at.Uid == uuid.Nil {
 		return fmt.Errorf("Fish: UID can't be unset")
 	}
 
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	return d.be.Collection(ObjectApplicationTask).Add(at.UID.String(), at)
+	return d.be.Collection(ObjectApplicationTask).Add(at.Uid.String(), at)
 }
 
 // ApplicationTaskGet returns the ApplicationTask by ApplicationTaskUID
-func (d *Database) ApplicationTaskGet(uid types.ApplicationTaskUID) (at *types.ApplicationTask, err error) {
+func (d *Database) ApplicationTaskGet(uid typesv2.ApplicationTaskUID) (at *typesv2.ApplicationTask, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -106,7 +99,7 @@ func (d *Database) ApplicationTaskGet(uid types.ApplicationTaskUID) (at *types.A
 }
 
 // ApplicationTaskDelete removes the ApplicationTask
-func (d *Database) ApplicationTaskDelete(uid types.ApplicationTaskUID) (err error) {
+func (d *Database) ApplicationTaskDelete(uid typesv2.ApplicationTaskUID) (err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -114,7 +107,7 @@ func (d *Database) ApplicationTaskDelete(uid types.ApplicationTaskUID) (err erro
 }
 
 // ApplicationTaskListByApplicationAndWhen returns list of ApplicationTasks by ApplicationUID and When it need to be executed
-func (d *Database) ApplicationTaskListByApplicationAndWhen(appUID types.ApplicationUID, when types.ApplicationStatus) (at []types.ApplicationTask, err error) {
+func (d *Database) ApplicationTaskListByApplicationAndWhen(appUID typesv2.ApplicationUID, when typesv2.ApplicationState_Status) (at []typesv2.ApplicationTask, err error) {
 	all, err := d.ApplicationTaskListByApplication(appUID)
 	if err == nil {
 		for _, a := range all {

@@ -16,7 +16,7 @@ package aquarium.v2;
 
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2;aquariumv2";
+option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2";
 
 // RoleService handles role management operations
 service RoleService {
@@ -37,16 +37,24 @@ service RoleService {
 }
 
 // Role represents a role in the RBAC system
+//
+// Defines a role in the RBAC system with associated permissions.
 message Role {
+  // Unique name of the role
   string name = 1;
   google.protobuf.Timestamp created_at = 2;
   google.protobuf.Timestamp updated_at = 3;
+  // List of permissions granted to this role
   repeated Permission permissions = 4;
 }
 
 // Permission represents a permission that can be granted to roles
+//
+// Defines a permission that can be granted to roles.
 message Permission {
+  // Resource type or specific resource ID this permission applies to
   string resource = 1;
+  // Action allowed on the resource (e.g., read, write, delete)
   string action = 2;
 }
 
@@ -59,7 +67,7 @@ message RoleServiceListResponse {
 }
 
 message RoleServiceGetRequest {
-  string name = 1;
+  string role_name = 1;
 }
 
 message RoleServiceGetResponse {
@@ -69,8 +77,7 @@ message RoleServiceGetResponse {
 }
 
 message RoleServiceCreateRequest {
-  string name = 1;
-  repeated Permission permissions = 2;
+  Role role = 1;
 }
 
 message RoleServiceCreateResponse {
@@ -80,8 +87,7 @@ message RoleServiceCreateResponse {
 }
 
 message RoleServiceUpdateRequest {
-  string name = 1;
-  repeated Permission permissions = 2;
+  Role role = 1;
 }
 
 message RoleServiceUpdateResponse {
@@ -91,7 +97,7 @@ message RoleServiceUpdateResponse {
 }
 
 message RoleServiceDeleteRequest {
-  string name = 1;
+  string role_name = 1;
 }
 
 message RoleServiceDeleteResponse {

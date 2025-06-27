@@ -21,15 +21,15 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/adobe/aquarium-fish/lib/log"
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
-func (d *Database) SubscribeApplicationState(ch chan *types.ApplicationState) {
+func (d *Database) SubscribeApplicationState(ch chan *typesv2.ApplicationState) {
 	d.subsApplicationState = append(d.subsApplicationState, ch)
 }
 
 // ApplicationStateList returns list of ApplicationStates
-func (d *Database) ApplicationStateList() (ass []types.ApplicationState, err error) {
+func (d *Database) ApplicationStateList() (ass []typesv2.ApplicationState, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -38,23 +38,23 @@ func (d *Database) ApplicationStateList() (ass []types.ApplicationState, err err
 }
 
 // ApplicationStateCreate makes new ApplicationState
-func (d *Database) ApplicationStateCreate(as *types.ApplicationState) error {
-	if as.ApplicationUID == uuid.Nil {
+func (d *Database) ApplicationStateCreate(as *typesv2.ApplicationState) error {
+	if as.ApplicationUid == uuid.Nil {
 		return fmt.Errorf("Fish: ApplicationUID can't be unset")
 	}
-	if as.Status == "" {
+	if as.Status == typesv2.ApplicationState_UNSPECIFIED {
 		return fmt.Errorf("Fish: Status can't be empty")
 	}
 
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	as.UID = d.NewUID()
+	as.Uid = d.NewUID()
 	as.CreatedAt = time.Now()
-	err := d.be.Collection(ObjectApplicationState).Add(as.UID.String(), as)
+	err := d.be.Collection(ObjectApplicationState).Add(as.Uid.String(), as)
 
 	// Notifying the subscribers on change, doing that in goroutine to not block execution
-	go func(appState *types.ApplicationState) {
+	go func(appState *typesv2.ApplicationState) {
 		for _, ch := range d.subsApplicationState {
 			ch <- appState
 		}
@@ -64,7 +64,7 @@ func (d *Database) ApplicationStateCreate(as *types.ApplicationState) error {
 }
 
 // Intentionally disabled, application state can't be updated
-/*func (d *Database) ApplicationStateSave(as *types.ApplicationState) error {
+/*func (d *Database) ApplicationStateSave(as *typesv2.ApplicationState) error {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -72,7 +72,7 @@ func (d *Database) ApplicationStateCreate(as *types.ApplicationState) error {
 }*/
 
 // ApplicationStateGet returns specific ApplicationState
-func (d *Database) ApplicationStateGet(uid types.ApplicationStateUID) (as *types.ApplicationState, err error) {
+func (d *Database) ApplicationStateGet(uid typesv2.ApplicationStateUID) (as *typesv2.ApplicationState, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -81,7 +81,7 @@ func (d *Database) ApplicationStateGet(uid types.ApplicationStateUID) (as *types
 }
 
 // ApplicationStateDelete removes the ApplicationState
-func (d *Database) ApplicationStateDelete(uid types.ApplicationStateUID) (err error) {
+func (d *Database) ApplicationStateDelete(uid typesv2.ApplicationStateUID) (err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -89,13 +89,13 @@ func (d *Database) ApplicationStateDelete(uid types.ApplicationStateUID) (err er
 }
 
 // ApplicationStateListByApplication returns all ApplicationStates with ApplicationUID
-func (d *Database) ApplicationStateListByApplication(appUID types.ApplicationUID) (states []types.ApplicationState, err error) {
+func (d *Database) ApplicationStateListByApplication(appUID typesv2.ApplicationUID) (states []typesv2.ApplicationState, err error) {
 	all, err := d.ApplicationStateList()
 	if err != nil {
 		return states, err
 	}
 	for _, as := range all {
-		if as.ApplicationUID == appUID {
+		if as.ApplicationUid == appUID {
 			states = append(states, as)
 		}
 	}
@@ -103,14 +103,14 @@ func (d *Database) ApplicationStateListByApplication(appUID types.ApplicationUID
 }
 
 // ApplicationStateNewCount returns amount of NEW states of the Application, to get amount of tries
-func (d *Database) ApplicationStateNewCount(appUID types.ApplicationUID) (count uint) {
+func (d *Database) ApplicationStateNewCount(appUID typesv2.ApplicationUID) (count uint) {
 	all, err := d.ApplicationStateList()
 	if err != nil {
 		log.Errorf("Unable to get ApplicationState list: %v", err)
 		return count
 	}
 	for _, as := range all {
-		if as.ApplicationUID == appUID && as.Status == types.ApplicationStatusNEW {
+		if as.ApplicationUid == appUID && as.Status == typesv2.ApplicationState_NEW {
 			count++
 		}
 	}
@@ -118,15 +118,15 @@ func (d *Database) ApplicationStateNewCount(appUID types.ApplicationUID) (count 
 }
 
 // ApplicationStateListLatest returns list of latest ApplicationState per Application
-func (d *Database) ApplicationStateListLatest() (out []types.ApplicationState, err error) {
-	states := make(map[types.ApplicationUID]types.ApplicationState)
+func (d *Database) ApplicationStateListLatest() (out []typesv2.ApplicationState, err error) {
+	states := make(map[string]typesv2.ApplicationState)
 	all, err := d.ApplicationStateList()
 	if err != nil {
 		return out, err
 	}
 	for _, as := range all {
-		if stat, ok := states[as.ApplicationUID]; !ok || stat.CreatedAt.Before(as.CreatedAt) {
-			states[as.ApplicationUID] = as
+		if stat, ok := states[as.ApplicationUid.String()]; !ok || stat.CreatedAt.Before(as.CreatedAt) {
+			states[as.ApplicationUid.String()] = as
 		}
 	}
 	for _, as := range states {
@@ -136,13 +136,13 @@ func (d *Database) ApplicationStateListLatest() (out []types.ApplicationState, e
 }
 
 // ApplicationStateListNewElected returns new and elected Applications
-func (d *Database) ApplicationStateListNewElected() (ass []types.ApplicationState, err error) {
+func (d *Database) ApplicationStateListNewElected() (ass []typesv2.ApplicationState, err error) {
 	states, err := d.ApplicationStateListLatest()
 	if err != nil {
 		return ass, err
 	}
 	for _, stat := range states {
-		if stat.Status == types.ApplicationStatusNEW || stat.Status == types.ApplicationStatusELECTED {
+		if stat.Status == typesv2.ApplicationState_NEW || stat.Status == typesv2.ApplicationState_ELECTED {
 			ass = append(ass, stat)
 		}
 	}
@@ -150,7 +150,7 @@ func (d *Database) ApplicationStateListNewElected() (ass []types.ApplicationStat
 }
 
 // ApplicationStateGetByApplication returns latest ApplicationState of requested ApplicationUID
-func (d *Database) ApplicationStateGetByApplication(appUID types.ApplicationUID) (state *types.ApplicationState, err error) {
+func (d *Database) ApplicationStateGetByApplication(appUID typesv2.ApplicationUID) (state *typesv2.ApplicationState, err error) {
 	all, err := d.ApplicationStateListByApplication(appUID)
 	if err != nil {
 		return nil, err
@@ -166,23 +166,20 @@ func (d *Database) ApplicationStateGetByApplication(appUID types.ApplicationUID)
 	return state, err
 }
 
-// ApplicationStateIsActive returns false if Status in ERROR, RECALLED, DEALLOCATE or DEALLOCATED state
-func (d *Database) ApplicationStateIsActive(status types.ApplicationStatus) bool {
-	if status == types.ApplicationStatusDEALLOCATE {
+// ApplicationStateIsActive returns false if Status in ERROR, DEALLOCATE or DEALLOCATED state
+func (d *Database) ApplicationStateIsActive(status typesv2.ApplicationState_Status) bool {
+	if status == typesv2.ApplicationState_DEALLOCATE {
 		return false
 	}
 	return !d.ApplicationStateIsDead(status)
 }
 
-// ApplicationStateIsDead returns false if Status in ERROR, RECALLED or DEALLOCATED state
-func (*Database) ApplicationStateIsDead(status types.ApplicationStatus) bool {
-	if status == types.ApplicationStatusERROR {
+// ApplicationStateIsDead returns false if Status in ERROR or DEALLOCATED state
+func (*Database) ApplicationStateIsDead(status typesv2.ApplicationState_Status) bool {
+	if status == typesv2.ApplicationState_ERROR {
 		return true
 	}
-	if status == types.ApplicationStatusRECALLED {
-		return true
-	}
-	if status == types.ApplicationStatusDEALLOCATED {
+	if status == typesv2.ApplicationState_DEALLOCATED {
 		return true
 	}
 	return false

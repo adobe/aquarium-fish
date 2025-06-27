@@ -33,7 +33,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/drivers/provider"
 	"github.com/adobe/aquarium-fish/lib/log"
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
@@ -136,7 +136,7 @@ func (d *Driver) Prepare(config []byte) error {
 }
 
 // ValidateDefinition checks LabelDefinition is ok
-func (d *Driver) ValidateDefinition(def types.LabelDefinition) error {
+func (d *Driver) ValidateDefinition(def typesv2.LabelDefinition) error {
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
 		return err
@@ -151,7 +151,7 @@ func (d *Driver) ValidateDefinition(def types.LabelDefinition) error {
 }
 
 // AvailableCapacity allows Fish to ask the driver about it's capacity (free slots) of a specific definition
-func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ types.Resources, def types.LabelDefinition) int64 {
+func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ typesv2.Resources, def typesv2.LabelDefinition) int64 {
 	var instCount int64
 
 	var opts Options
@@ -309,7 +309,7 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ types.Resources, def types.La
 //
 // It selects the AMI and run instance
 // Uses metadata to fill EC2 instance userdata
-func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*types.ApplicationResource, error) {
+func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) (*typesv2.ApplicationResource, error) {
 	// Generate fish name
 	buf := crypt.RandBytes(6)
 	iName := fmt.Sprintf("fish-%02x%02x%02x%02x%02x%02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5])
@@ -475,58 +475,56 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 	}
 
 	// Prepare the device mapping
-	if len(def.Resources.Disks) > 0 {
-		for name, disk := range def.Resources.Disks {
-			mapping := ec2types.BlockDeviceMapping{
-				DeviceName: aws.String(name),
-				Ebs: &ec2types.EbsBlockDevice{
-					DeleteOnTermination: aws.Bool(true),
-					VolumeType:          ec2types.VolumeTypeGp3,
-				},
-			}
-			if disk.Type != "" {
-				typeData := strings.Split(disk.Type, ":")
-				if len(typeData) > 0 && typeData[0] != "" {
-					mapping.Ebs.VolumeType = ec2types.VolumeType(typeData[0])
-				}
-				if len(typeData) > 1 && typeData[1] != "" {
-					val, err := strconv.ParseInt(typeData[1], 10, 32)
-					if err != nil {
-						return nil, fmt.Errorf("AWS: %s: Unable to parse EBS IOPS int32 from '%s': %v", iName, typeData[1], err)
-					}
-					mapping.Ebs.Iops = aws.Int32(int32(val))
-				}
-				if len(typeData) > 2 && typeData[2] != "" {
-					val, err := strconv.ParseInt(typeData[2], 10, 32)
-					if err != nil {
-						return nil, fmt.Errorf("AWS: %s: Unable to parse EBS Throughput int32 from '%s': %v", iName, typeData[1], err)
-					}
-					mapping.Ebs.Throughput = aws.Int32(int32(val))
-				}
-			}
-			if disk.Clone != "" {
-				// Use snapshot as the disk source
-				vmSnapshot := disk.Clone
-				if vmSnapshot, err = d.getSnapshotID(conn, vmSnapshot); err != nil {
-					return nil, fmt.Errorf("AWS: %s: Unable to get snapshot: %v", iName, err)
-				}
-				log.Infof("AWS: %s: Selected snapshot: %q", iName, vmSnapshot)
-				mapping.Ebs.SnapshotId = aws.String(vmSnapshot)
-			} else {
-				// Just create a new disk
-				mapping.Ebs.VolumeSize = aws.Int32(int32(disk.Size))
-				if opts.EncryptKey != "" {
-					mapping.Ebs.Encrypted = aws.Bool(true)
-					keyID, err := d.getKeyID(opts.EncryptKey)
-					if err != nil {
-						return nil, fmt.Errorf("AWS: %s: Unable to get encrypt key from KMS: %v", iName, err)
-					}
-					log.Infof("AWS: %s: Selected encryption key: %q for disk: %q", iName, keyID, name)
-					mapping.Ebs.KmsKeyId = aws.String(keyID)
-				}
-			}
-			input.BlockDeviceMappings = append(input.BlockDeviceMappings, mapping)
+	for name, disk := range def.Resources.Disks {
+		mapping := ec2types.BlockDeviceMapping{
+			DeviceName: aws.String(name),
+			Ebs: &ec2types.EbsBlockDevice{
+				DeleteOnTermination: aws.Bool(true),
+				VolumeType:          ec2types.VolumeTypeGp3,
+			},
 		}
+		if disk.Type != "" {
+			typeData := strings.Split(disk.Type, ":")
+			if len(typeData) > 0 && typeData[0] != "" {
+				mapping.Ebs.VolumeType = ec2types.VolumeType(typeData[0])
+			}
+			if len(typeData) > 1 && typeData[1] != "" {
+				val, err := strconv.ParseInt(typeData[1], 10, 32)
+				if err != nil {
+					return nil, fmt.Errorf("AWS: %s: Unable to parse EBS IOPS int32 from '%s': %v", iName, typeData[1], err)
+				}
+				mapping.Ebs.Iops = aws.Int32(int32(val))
+			}
+			if len(typeData) > 2 && typeData[2] != "" {
+				val, err := strconv.ParseInt(typeData[2], 10, 32)
+				if err != nil {
+					return nil, fmt.Errorf("AWS: %s: Unable to parse EBS Throughput int32 from '%s': %v", iName, typeData[1], err)
+				}
+				mapping.Ebs.Throughput = aws.Int32(int32(val))
+			}
+		}
+		if disk.Clone != "" {
+			// Use snapshot as the disk source
+			vmSnapshot := disk.Clone
+			if vmSnapshot, err = d.getSnapshotID(conn, vmSnapshot); err != nil {
+				return nil, fmt.Errorf("AWS: %s: Unable to get snapshot: %v", iName, err)
+			}
+			log.Infof("AWS: %s: Selected snapshot: %q", iName, vmSnapshot)
+			mapping.Ebs.SnapshotId = aws.String(vmSnapshot)
+		} else {
+			// Just create a new disk
+			mapping.Ebs.VolumeSize = aws.Int32(int32(disk.Size))
+			if opts.EncryptKey != "" {
+				mapping.Ebs.Encrypted = aws.Bool(true)
+				keyID, err := d.getKeyID(opts.EncryptKey)
+				if err != nil {
+					return nil, fmt.Errorf("AWS: %s: Unable to get encrypt key from KMS: %v", iName, err)
+				}
+				log.Infof("AWS: %s: Selected encryption key: %q for disk: %q", iName, keyID, name)
+				mapping.Ebs.KmsKeyId = aws.String(keyID)
+			}
+		}
+		input.BlockDeviceMappings = append(input.BlockDeviceMappings, mapping)
 	}
 
 	// Run the instance
@@ -589,14 +587,14 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 		}
 	}
 
-	res := &types.ApplicationResource{}
+	res := &typesv2.ApplicationResource{}
 
 	if keyPem != "" && def.Authentication != nil && def.Authentication.Username != "" {
-		port := 22
+		var port int32 = 22
 		if def.Authentication.Port != 0 {
 			port = def.Authentication.Port
 		}
-		res.Authentication = &types.Authentication{
+		res.Authentication = &typesv2.Authentication{
 			Key:      keyPem,
 			Port:     port,
 			Username: def.Authentication.Username,
@@ -633,8 +631,8 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 }
 
 // Status shows status of the resource
-func (d *Driver) Status(res *types.ApplicationResource) (string, error) {
-	if res == nil || res.Identifier == "" {
+func (d *Driver) Status(res typesv2.ApplicationResource) (string, error) {
+	if res.Identifier == "" {
 		return "", fmt.Errorf("AWS: %s: Invalid resource: %v", d.name, res)
 	}
 	conn := d.newEC2Conn()
@@ -670,8 +668,8 @@ func (d *Driver) GetTask(name, options string) provider.DriverTask {
 }
 
 // Deallocate the resource
-func (d *Driver) Deallocate(res *types.ApplicationResource) error {
-	if res == nil || res.Identifier == "" {
+func (d *Driver) Deallocate(res typesv2.ApplicationResource) error {
+	if res.Identifier == "" {
 		return fmt.Errorf("AWS: %s: Invalid resource: %v", d.name, res)
 	}
 	conn := d.newEC2Conn()

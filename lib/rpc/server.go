@@ -18,14 +18,15 @@ import (
 	"context"
 	"net/http"
 
-	"connectrpc.com/connect"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
 	"github.com/adobe/aquarium-fish/lib/auth"
+	"github.com/adobe/aquarium-fish/lib/drivers/gate"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
-	"github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2/aquariumv2connect"
+	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
+	rpcutil "github.com/adobe/aquarium-fish/lib/rpc/util"
 )
 
 // Server represents the Connect server
@@ -35,55 +36,59 @@ type Server struct {
 }
 
 // NewServer creates a new Connect server
-func NewServer(f *fish.Fish) *Server {
+func NewServer(f *fish.Fish, additionalServices []gate.RPCService) *Server {
 	s := &Server{
 		fish: f,
 		mux:  http.NewServeMux(),
 	}
 
-	// Create interceptors
-	authInterceptor := NewAuthInterceptor(f)
-	rbacInterceptor := NewRBACInterceptor(auth.GetEnforcer())
-
-	// Common interceptor options
-	interceptors := connect.WithInterceptors(authInterceptor, rbacInterceptor)
-
-	// Register services
+	// Register services WITHOUT interceptors (auth/rbac is handled at HTTP level)
 	s.mux.Handle(aquariumv2connect.NewUserServiceHandler(
 		&UserService{fish: f},
-		interceptors,
 	))
 
 	s.mux.Handle(aquariumv2connect.NewRoleServiceHandler(
 		&RoleService{fish: f},
-		interceptors,
 	))
 
 	s.mux.Handle(aquariumv2connect.NewApplicationServiceHandler(
 		&ApplicationService{fish: f},
-		interceptors,
 	))
 
 	s.mux.Handle(aquariumv2connect.NewLabelServiceHandler(
 		&LabelService{fish: f},
-		interceptors,
 	))
 
 	s.mux.Handle(aquariumv2connect.NewNodeServiceHandler(
 		&NodeService{fish: f},
-		interceptors,
 	))
 
-	// Serve static files for web UI
-	s.mux.Handle("/", http.FileServer(http.Dir("web/dist")))
+	// Register additional services from gate drivers
+	for _, svc := range additionalServices {
+		log.Debugf("RPC: Registering additional service: %s", svc.Path)
+		s.mux.Handle(svc.Path, svc.Handler)
+	}
 
 	return s
 }
 
 // Handler returns the server's HTTP handler
 func (s *Server) Handler() http.Handler {
+	// Create auth and RBAC handlers
+	authHandler := rpcutil.NewAuthHandler(s.fish.DB())
+	rbacHandler := rpcutil.NewRBACHandler(auth.GetEnforcer())
+
+	// Build middleware chain: Auth -> RBAC -> YAML -> Connect RPC
+	// I found that ConnectRPC interceptors are not very good for auth needs,
+	// so moved those to the handlers even before it gets to the RPC side
+	handler := authHandler.Handler(
+		rbacHandler.Handler(
+			rpcutil.YAMLToJSONHandler(s.mux),
+		),
+	)
+
 	// Support both HTTP/1.1 and HTTP/2
-	return h2c.NewHandler(s.mux, &http2.Server{})
+	return h2c.NewHandler(handler, &http2.Server{})
 }
 
 // ListenAndServe starts the server

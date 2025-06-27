@@ -15,16 +15,16 @@
 package tests
 
 import (
-	"crypto/tls"
+	"context"
 	"fmt"
-	"net/http"
 	"testing"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/google/uuid"
-	"github.com/steinfletcher/apitest"
 
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
+	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
@@ -58,183 +58,265 @@ drivers:
 		}
 	}()
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	cli := &http.Client{
-		Timeout:   time.Second * 5,
-		Transport: tr,
-	}
+	// Create admin client
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
 
-	var label types.Label
+	// Create service clients
+	labelClient := aquariumv2connect.NewLabelServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+	appClient := aquariumv2connect.NewApplicationServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+
+	var labelUID string
 	t.Run("Create Label", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/label/")).
-			JSON(`{"name":"test-label", "version":1, "definitions": [{"driver":"test", "resources":{"cpu":2,"ram":4}}]}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&label)
+		resp, err := labelClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
+				Label: &aquariumv2.Label{
+					Name:    "test-label",
+					Version: 1,
+					Definitions: []*aquariumv2.LabelDefinition{{
+						Driver: "test",
+						Resources: &aquariumv2.Resources{
+							Cpu: 2,
+							Ram: 4,
+						},
+					}},
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create label:", err)
+		}
+		labelUID = resp.Msg.Data.Uid
 
-		if label.UID == uuid.Nil {
-			t.Fatalf("Label UID is incorrect: %v", label.UID)
+		if labelUID == uuid.Nil.String() {
+			t.Fatalf("Label UID is incorrect: %v", labelUID)
 		}
 	})
 
-	var apps []types.Application
-	for i := range 3 {
-		var app types.Application
-		t.Run(fmt.Sprintf("Create Application %d", i), func(t *testing.T) {
-			apitest.New().
-				EnableNetworking(cli).
-				Post(afi.APIAddress("api/v1/application/")).
-				JSON(`{"label_UID":"`+label.UID.String()+`"}`).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(t).
-				Status(http.StatusOK).
-				End().
-				JSON(&app)
+	var app1UID, app2UID, app3UID string
+	t.Run("Create 3 Applications", func(t *testing.T) {
+		// Create first application
+		resp, err := appClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceCreateRequest{
+				Application: &aquariumv2.Application{
+					LabelUid: labelUID,
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create application 1:", err)
+		}
+		app1UID = resp.Msg.Data.Uid
 
-			if app.UID == uuid.Nil {
-				t.Fatalf("Application %d UID is incorrect: %v", i, app.UID)
-			}
-			apps = append(apps, app)
-		})
-	}
+		// Create second application
+		resp, err = appClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceCreateRequest{
+				Application: &aquariumv2.Application{
+					LabelUid: labelUID,
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create application 2:", err)
+		}
+		app2UID = resp.Msg.Data.Uid
 
-	var appState types.ApplicationState
-	var appStates []types.ApplicationState
-	var notAllocated types.Application
-	t.Run("2 of 3 Applications should get ALLOCATED in 10 sec", func(t *testing.T) {
+		// Create third application
+		resp, err = appClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceCreateRequest{
+				Application: &aquariumv2.Application{
+					LabelUid: labelUID,
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create application 3:", err)
+		}
+		app3UID = resp.Msg.Data.Uid
+
+		if app1UID == uuid.Nil.String() || app2UID == uuid.Nil.String() || app3UID == uuid.Nil.String() {
+			t.Fatalf("One or more Application UIDs are incorrect: %v, %v, %v", app1UID, app2UID, app3UID)
+		}
+	})
+
+	t.Run("2 Applications should get ALLOCATED in 10 sec", func(t *testing.T) {
+		allocatedCount := 0
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
-			appStates = []types.ApplicationState{}
-			for i := range apps {
-				apitest.New().
-					EnableNetworking(cli).
-					Get(afi.APIAddress("api/v1/application/"+apps[i].UID.String()+"/state")).
-					BasicAuth("admin", afi.AdminToken()).
-					Expect(r).
-					Status(http.StatusOK).
-					End().
-					JSON(&appState)
+			allocatedCount = 0
+			appUIDs := []string{app1UID, app2UID, app3UID}
 
-				if appState.Status != types.ApplicationStatusALLOCATED {
-					notAllocated = apps[i]
-				} else {
-					appStates = append(appStates, appState)
+			for i, appUID := range appUIDs {
+				resp, err := appClient.GetState(
+					context.Background(),
+					connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+						ApplicationUid: appUID,
+					}),
+				)
+				if err != nil {
+					r.Fatalf("Failed to get application %d state: %v", i+1, err)
+				}
+
+				if resp.Msg.Data.Status == aquariumv2.ApplicationState_ALLOCATED {
+					allocatedCount++
 				}
 			}
 
-			if len(appStates) < 2 {
-				r.Fatalf("Allocated less then 2 Applications: %v", len(appStates))
+			if allocatedCount != 2 {
+				r.Fatalf("Expected 2 applications to be allocated, but got %d", allocatedCount)
 			}
 		})
 	})
 
-	t.Run("3rd Application should have state NEW", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+notAllocated.UID.String()+"/state")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&appState)
+	t.Run("1 Application should remain NEW", func(t *testing.T) {
+		newCount := 0
+		appUIDs := []string{app1UID, app2UID, app3UID}
 
-		if appState.Status != types.ApplicationStatusNEW {
-			t.Fatalf("3rd Application Status is incorrect: %v", appState.Status)
+		for i, appUID := range appUIDs {
+			resp, err := appClient.GetState(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+					ApplicationUid: appUID,
+				}),
+			)
+			if err != nil {
+				t.Fatalf("Failed to get application %d state: %v", i+1, err)
+			}
+
+			if resp.Msg.Data.Status == aquariumv2.ApplicationState_NEW {
+				newCount++
+			}
+		}
+
+		if newCount != 1 {
+			t.Fatalf("Expected 1 application to remain NEW, but got %d", newCount)
 		}
 	})
 
 	// Restart the fish app node
 	afi.Restart(t)
 
+	var allocatedUIDs []string
+	var notAllocatedUID string
 	t.Run("2 of 3 Applications should be ALLOCATED right after restart", func(t *testing.T) {
-		for i := range appStates {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+appStates[i].ApplicationUID.String()+"/state")).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(t).
-				Status(http.StatusOK).
-				End().
-				JSON(&appState)
+		// Need to recreate clients after restart
+		adminCli, adminOpts = h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+		appClient = aquariumv2connect.NewApplicationServiceClient(
+			adminCli,
+			afi.APIAddress("grpc"),
+			adminOpts...,
+		)
 
-			if appState.Status != types.ApplicationStatusALLOCATED {
-				t.Fatalf("Allocated Application Status is incorrect: %v", appState.Status)
+		allocatedUIDs = []string{}
+		appUIDs := []string{app1UID, app2UID, app3UID}
+
+		for i, appUID := range appUIDs {
+			resp, err := appClient.GetState(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+					ApplicationUid: appUID,
+				}),
+			)
+			if err != nil {
+				t.Fatalf("Failed to get application %d state after restart: %v", i+1, err)
 			}
+
+			if resp.Msg.Data.Status == aquariumv2.ApplicationState_ALLOCATED {
+				allocatedUIDs = append(allocatedUIDs, appUID)
+			} else {
+				notAllocatedUID = appUID
+			}
+		}
+
+		if len(allocatedUIDs) != 2 {
+			t.Fatalf("Expected 2 applications to be allocated after restart, but got %d", len(allocatedUIDs))
 		}
 	})
 
 	t.Run("3rd Application still should have state NEW", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+notAllocated.UID.String()+"/state")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&appState)
+		resp, err := appClient.GetState(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+				ApplicationUid: notAllocatedUID,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to get 3rd application state:", err)
+		}
 
-		if appState.Status != types.ApplicationStatusNEW {
-			t.Fatalf("3rd Application Status is incorrect: %v", appState.Status)
+		if resp.Msg.Data.Status != aquariumv2.ApplicationState_NEW {
+			t.Fatalf("3rd Application Status is incorrect: %v", resp.Msg.Data.Status)
 		}
 	})
 
-	t.Run("Deallocate the Applications", func(t *testing.T) {
-		for i := range appStates {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+appStates[i].ApplicationUID.String()+"/deallocate")).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(t).
-				Status(http.StatusOK).
-				End()
+	t.Run("Deallocate the first 2 Applications", func(t *testing.T) {
+		for i, appUID := range allocatedUIDs {
+			_, err := appClient.Deallocate(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceDeallocateRequest{
+					ApplicationUid: appUID,
+				}),
+			)
+			if err != nil {
+				t.Fatalf("Failed to deallocate application %d: %v", i+1, err)
+			}
 		}
 	})
 
 	t.Run("3rd Application should get ALLOCATED in 30 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 30 * time.Second, Wait: 5 * time.Second}, t, func(r *h.R) {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+notAllocated.UID.String()+"/state")).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(r).
-				Status(http.StatusOK).
-				End().
-				JSON(&appState)
+			resp, err := appClient.GetState(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+					ApplicationUid: notAllocatedUID,
+				}),
+			)
+			if err != nil {
+				r.Fatal("Failed to get 3rd application state:", err)
+			}
 
-			if appState.Status != types.ApplicationStatusALLOCATED {
-				r.Fatalf("3rd Application Status is incorrect: %v", appState.Status)
+			if resp.Msg.Data.Status != aquariumv2.ApplicationState_ALLOCATED {
+				r.Fatalf("3rd Application Status is incorrect: %v", resp.Msg.Data.Status)
 			}
 		})
 	})
 
 	t.Run("Deallocate the 3rd Application", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+notAllocated.UID.String()+"/deallocate")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+		_, err := appClient.Deallocate(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceDeallocateRequest{
+				ApplicationUid: notAllocatedUID,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to deallocate 3rd application:", err)
+		}
 	})
 
 	t.Run("3rd Application should get DEALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+notAllocated.UID.String()+"/state")).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(r).
-				Status(http.StatusOK).
-				End().
-				JSON(&appState)
+			resp, err := appClient.GetState(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+					ApplicationUid: notAllocatedUID,
+				}),
+			)
+			if err != nil {
+				r.Fatal("Failed to get 3rd application state:", err)
+			}
 
-			if appState.Status != types.ApplicationStatusDEALLOCATED {
-				r.Fatalf("3rd Application Status is incorrect: %v", appState.Status)
+			if resp.Msg.Data.Status != aquariumv2.ApplicationState_DEALLOCATED {
+				r.Fatalf("3rd Application Status is incorrect: %v", resp.Msg.Data.Status)
 			}
 		})
 	})

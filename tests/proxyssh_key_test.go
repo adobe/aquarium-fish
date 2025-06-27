@@ -17,7 +17,6 @@ package tests
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -29,11 +28,13 @@ import (
 	"testing"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/steinfletcher/apitest"
 
 	"github.com/adobe/aquarium-fish/lib/crypt"
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
+	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
 	"github.com/adobe/aquarium-fish/lib/util"
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
@@ -65,104 +66,136 @@ drivers:
 		}
 	}()
 
-	// Still need HTTPS client to request SSH access to the machine
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	cli := &http.Client{
-		Timeout:   time.Second * 5,
-		Transport: tr,
-	}
+	// Create admin client
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+
+	// Create service clients
+	labelClient := aquariumv2connect.NewLabelServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+	appClient := aquariumv2connect.NewApplicationServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+	proxySSHClient := aquariumv2connect.NewGateProxySSHServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+
+	// Note: HTTP client removed as we're using RPC calls now
 
 	// Running SSH Pty server with shell
 	_, sshdPort := h.MockSSHPtyServer(t, "testuser", "testpass", "")
 
-	var label types.Label
+	var labelUID string
 	t.Run("Create Label", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/label/")).
-			JSON(`{"name":"test-label", "version":1, "definitions": [{
-				"driver":"test",
-				"resources":{"cpu":1,"ram":2},
-				"authentication":{"username":"testuser","password":"testpass","port":`+sshdPort+`}
-			}]}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&label)
+		resp, err := labelClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
+				Label: &aquariumv2.Label{
+					Name:    "test-label",
+					Version: 1,
+					Definitions: []*aquariumv2.LabelDefinition{{
+						Driver: "test",
+						Resources: &aquariumv2.Resources{
+							Cpu: 1,
+							Ram: 2,
+						},
+						Authentication: &aquariumv2.Authentication{
+							Username: "testuser",
+							Password: "testpass",
+							Port:     func() int32 { port, _ := strconv.Atoi(sshdPort); return int32(port) }(),
+						},
+					}},
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create label:", err)
+		}
+		labelUID = resp.Msg.Data.Uid
 
-		if label.UID == uuid.Nil {
-			t.Fatalf("Label UID is incorrect: %v", label.UID)
+		if labelUID == uuid.Nil.String() {
+			t.Fatalf("Label UID is incorrect: %v", labelUID)
 		}
 	})
 
-	var app types.Application
+	var appUID string
 	t.Run("Create Application", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/application/")).
-			JSON(`{"label_UID":"`+label.UID.String()+`"}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&app)
+		resp, err := appClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceCreateRequest{
+				Application: &aquariumv2.Application{
+					LabelUid: labelUID,
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create application:", err)
+		}
+		appUID = resp.Msg.Data.Uid
 
-		if app.UID == uuid.Nil {
-			t.Fatalf("Application UID is incorrect: %v", app.UID)
+		if appUID == uuid.Nil.String() {
+			t.Fatalf("Application UID is incorrect: %v", appUID)
 		}
 	})
 
-	var appState types.ApplicationState
 	t.Run("Application should get ALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(r).
-				Status(http.StatusOK).
-				End().
-				JSON(&appState)
+			resp, err := appClient.GetState(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+					ApplicationUid: appUID,
+				}),
+			)
+			if err != nil {
+				r.Fatal("Failed to get application state:", err)
+			}
 
-			if appState.Status != types.ApplicationStatusALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", appState.Status)
+			if resp.Msg.Data.Status != aquariumv2.ApplicationState_ALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", resp.Msg.Data.Status)
 			}
 		})
 	})
 
-	var res types.ApplicationResource
+	var resUID string
 	t.Run("Resource should be created", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/resource")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&res)
+		resp, err := appClient.GetResource(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceGetResourceRequest{
+				ApplicationUid: appUID,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to get application resource:", err)
+		}
+		resUID = resp.Msg.Data.Uid
 
-		if res.Identifier == "" {
-			t.Fatalf("Resource identifier is incorrect: %v", res.Identifier)
+		if resp.Msg.Data.Identifier == "" {
+			t.Fatalf("Resource identifier is incorrect: %v", resp.Msg.Data.Identifier)
 		}
 	})
 
 	// Now working with the created Application to get access
-	var acc types.ApplicationResourceAccess
+	var acc *aquariumv2.GateProxySSHAccess
 	t.Run("Requesting access to the Application Resource", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/applicationresource/"+res.UID.String()+"/access")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&acc)
+		resp, err := proxySSHClient.GetResourceAccess(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.GateProxySSHServiceGetResourceAccessRequest{
+				ApplicationResourceUid: resUID,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to get resource access:", err)
+		}
+		acc = resp.Msg.Data
 
-		if res.Identifier == "" {
-			t.Fatalf("Unable to get access to Resource: %v", res.Identifier)
+		if acc.Key == "" {
+			t.Fatalf("Unable to get access to Resource: %v", resUID)
 		}
 	})
 
@@ -184,9 +217,12 @@ drivers:
 		}
 
 		proxyHost, proxyPort, err := net.SplitHostPort(afi.ProxySSHEndpoint())
+		if err != nil {
+			t.Fatalf("Unable to parse ProxySSH endpoint: %v", err)
+		}
 
 		// In order to emulate terminal input we using pipe to write. This allows us to keep the
-		// stdin opened while we woking with ssh app, otherwise something like
+		// stdin opened while we working with ssh app, otherwise something like
 		// input := bytes.NewBufferString("echo 'Its ALIVE!'\nexit\n") will just close the stream
 		// and test will be ok on MacOS (Sonoma 14.5, OpenSSH_9.6p1), but will close the src->dst
 		// channel on Linux (Debian 12.8, OpenSSH 9.2p1).
@@ -226,35 +262,8 @@ drivers:
 		if !strings.Contains(stdout, "Its ALIVE!\n") {
 			t.Fatalf("Incorrect response from command through PROXYSSH: %q not in %q (stderr: %s)", "Its ALIVE!\n", stdout, stderr)
 			//} else {
-			//	t.Log(fmt.Sprintf("Correct response from command through PROXYSSH: %q in %q (stderr: %s)", "Its ALIVE!\n", stdout, stderr))
+			//      t.Log(fmt.Sprintf("Correct response from command through PROXYSSH: %q in %q (stderr: %s)", "Its ALIVE!\n", stdout, stderr))
 		}
-	})
-
-	t.Run("Deallocate the Application", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/deallocate")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
-	})
-
-	t.Run("Application should get DEALLOCATED in 10 sec", func(t *testing.T) {
-		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(r).
-				Status(http.StatusOK).
-				End().
-				JSON(&appState)
-
-			if appState.Status != types.ApplicationStatusDEALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", appState.Status)
-			}
-		})
 	})
 }
 
@@ -285,14 +294,25 @@ drivers:
 		}
 	}()
 
-	// Still need HTTPS client to request SSH access to the machine
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	cli := &http.Client{
-		Timeout:   time.Second * 5,
-		Transport: tr,
-	}
+	// Create admin client
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+
+	// Create service clients
+	labelClient := aquariumv2connect.NewLabelServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+	appClient := aquariumv2connect.NewApplicationServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+	proxySSHClient := aquariumv2connect.NewGateProxySSHServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
 
 	sshdKey, err := crypt.GenerateSSHKey()
 	if err != nil {
@@ -301,10 +321,6 @@ drivers:
 	sshdPubKey, err := crypt.GetSSHPubKeyFromPem(sshdKey)
 	if err != nil {
 		t.Fatalf("Can't create ssh key for mock sshd: %v", err)
-	}
-	sshdKeyJsonStr, err := json.Marshal(string(sshdKey))
-	if err != nil {
-		t.Fatalf("Can't encode ssh key to json: %v", err)
 	}
 
 	// Running mock SSH Pty server with shell
@@ -319,7 +335,7 @@ drivers:
 			t.Fatalf("Unable to create temp sshdkey file: %v", err)
 		}
 		defer os.Remove(sshdKeyFile.Name())
-		_, err = sshdKeyFile.Write(sshdKey)
+		_, err = sshdKeyFile.WriteString(string(sshdKey))
 		if err != nil {
 			t.Fatalf("Unable to write temp sshdkey file: %v", err)
 		}
@@ -330,7 +346,7 @@ drivers:
 		}
 
 		// In order to emulate terminal input we using pipe to write. This allows us to keep the
-		// stdin opened while we woking with ssh app, otherwise something like
+		// stdin opened while we working with ssh app, otherwise something like
 		// input := bytes.NewBufferString("echo 'Its ALIVE!'\nexit\n") will just close the stream
 		// and test will be ok on MacOS (Sonoma 14.5, OpenSSH_9.6p1), but will close the src->dst
 		// channel on Linux (Debian 12.8, OpenSSH 9.2p1).
@@ -375,96 +391,114 @@ drivers:
 		sshdTestOutput = stdout
 	})
 
-	var label types.Label
+	var labelUID string
 	t.Run("Create Label", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/label/")).
-			JSON(`{"name":"test-label", "version":1, "definitions": [{
-				"driver":"test",
-				"resources":{"cpu":1,"ram":2},
-				"authentication":{"username":"testuser","key":`+string(sshdKeyJsonStr)+`,"port":`+sshdPort+`}
-			}]}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&label)
+		resp, err := labelClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
+				Label: &aquariumv2.Label{
+					Name:    "test-label",
+					Version: 1,
+					Definitions: []*aquariumv2.LabelDefinition{{
+						Driver: "test",
+						Resources: &aquariumv2.Resources{
+							Cpu: 1,
+							Ram: 2,
+						},
+						Authentication: &aquariumv2.Authentication{
+							Username: "testuser",
+							Key:      string(sshdKey),
+							Port:     func() int32 { port, _ := strconv.Atoi(sshdPort); return int32(port) }(),
+						},
+					}},
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create label:", err)
+		}
+		labelUID = resp.Msg.Data.Uid
 
-		if label.UID == uuid.Nil {
-			t.Fatalf("Label UID is incorrect: %v", label.UID)
+		if labelUID == uuid.Nil.String() {
+			t.Fatalf("Label UID is incorrect: %v", labelUID)
 		}
 	})
 
-	var app types.Application
+	var appUID string
 	t.Run("Create Application", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/application/")).
-			JSON(`{"label_UID":"`+label.UID.String()+`"}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&app)
+		resp, err := appClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceCreateRequest{
+				Application: &aquariumv2.Application{
+					LabelUid: labelUID,
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create application:", err)
+		}
+		appUID = resp.Msg.Data.Uid
 
-		if app.UID == uuid.Nil {
-			t.Fatalf("Application UID is incorrect: %v", app.UID)
+		if appUID == uuid.Nil.String() {
+			t.Fatalf("Application UID is incorrect: %v", appUID)
 		}
 	})
 
-	var appState types.ApplicationState
 	t.Run("Application should get ALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(r).
-				Status(http.StatusOK).
-				End().
-				JSON(&appState)
+			resp, err := appClient.GetState(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+					ApplicationUid: appUID,
+				}),
+			)
+			if err != nil {
+				r.Fatal("Failed to get application state:", err)
+			}
 
-			if appState.Status != types.ApplicationStatusALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", appState.Status)
+			if resp.Msg.Data.Status != aquariumv2.ApplicationState_ALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", resp.Msg.Data.Status)
 			}
 		})
 	})
 
-	var res types.ApplicationResource
+	var resUID string
 	t.Run("Resource should be created", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/resource")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&res)
+		resp, err := appClient.GetResource(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceGetResourceRequest{
+				ApplicationUid: appUID,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to get application resource:", err)
+		}
+		resUID = resp.Msg.Data.Uid
 
-		if res.Identifier == "" {
-			t.Fatalf("Resource identifier is incorrect: %v", res.Identifier)
+		if resp.Msg.Data.Identifier == "" {
+			t.Fatalf("Resource identifier is incorrect: %v", resp.Msg.Data.Identifier)
 		}
 	})
 
 	// Now working with the created Application to get access
-	var acc types.ApplicationResourceAccess
+	var acc *aquariumv2.GateProxySSHAccess
 	t.Run("Requesting access to the Application Resource", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/applicationresource/"+res.UID.String()+"/access")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&acc)
+		resp, err := proxySSHClient.GetResourceAccess(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.GateProxySSHServiceGetResourceAccessRequest{
+				ApplicationResourceUid: resUID,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to get resource access:", err)
+		}
+		acc = resp.Msg.Data
 
-		if res.Identifier == "" {
-			t.Fatalf("Unable to get access to Resource: %v", res.Identifier)
+		if acc.Key == "" {
+			t.Fatalf("Unable to get access to Resource: %v", resUID)
 		}
 	})
 
-	// Now running the same but through proxy - and we should get the identical answer
 	t.Run("Executing SSH shell through PROXYSSH", func(t *testing.T) {
 		// Writing ssh private key to temp file
 		proxyKeyFile, err := os.CreateTemp("", "proxykey")
@@ -483,9 +517,12 @@ drivers:
 		}
 
 		proxyHost, proxyPort, err := net.SplitHostPort(afi.ProxySSHEndpoint())
+		if err != nil {
+			t.Fatalf("Unable to parse ProxySSH endpoint: %v", err)
+		}
 
 		// In order to emulate terminal input we using pipe to write. This allows us to keep the
-		// stdin opened while we woking with ssh app, otherwise something like
+		// stdin opened while we working with ssh app, otherwise something like
 		// input := bytes.NewBufferString("echo 'Its ALIVE!'\nexit\n") will just close the stream
 		// and test will be ok on MacOS (Sonoma 14.5, OpenSSH_9.6p1), but will close the src->dst
 		// channel on Linux (Debian 12.8, OpenSSH 9.2p1).
@@ -530,35 +567,37 @@ drivers:
 	})
 
 	t.Run("Deallocate the Application", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/deallocate")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+		_, err := appClient.Deallocate(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceDeallocateRequest{
+				ApplicationUid: appUID,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to deallocate application:", err)
+		}
 	})
 
 	t.Run("Application should get DEALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(r).
-				Status(http.StatusOK).
-				End().
-				JSON(&appState)
+			resp, err := appClient.GetState(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+					ApplicationUid: appUID,
+				}),
+			)
+			if err != nil {
+				r.Fatal("Failed to get application state:", err)
+			}
 
-			if appState.Status != types.ApplicationStatusDEALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", appState.Status)
+			if resp.Msg.Data.Status != aquariumv2.ApplicationState_DEALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", resp.Msg.Data.Status)
 			}
 		})
 	})
 }
 
-// Checks that proxyssh can copy files back and forth by scp
-// WARN: This test requires `scp` binary to be available in PATH
+// Test ProxySSH SCP functionality with key authentication for client and password for target
 func Test_proxyssh_scp_key2password_copy(t *testing.T) {
 	t.Parallel()
 	afi := h.NewAquariumFish(t, "node-1", `---
@@ -583,104 +622,134 @@ drivers:
 		}
 	}()
 
-	// Still need HTTPS client to request SSH access to the machine
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	cli := &http.Client{
-		Timeout:   time.Second * 5,
-		Transport: tr,
-	}
+	// Create admin client
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+
+	// Create service clients
+	labelClient := aquariumv2connect.NewLabelServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+	appClient := aquariumv2connect.NewApplicationServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+	proxySSHClient := aquariumv2connect.NewGateProxySSHServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
 
 	// Running SSH Sftp server with shell
 	_, sshdPort := h.MockSSHSftpServer(t, "testuser", "testpass", "")
 
-	var label types.Label
+	var labelUID string
 	t.Run("Create Label", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/label/")).
-			JSON(`{"name":"test-label", "version":1, "definitions": [{
-				"driver":"test",
-				"resources":{"cpu":1,"ram":2},
-				"authentication":{"username":"testuser","password":"testpass","port":`+sshdPort+`}
-			}]}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&label)
+		resp, err := labelClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
+				Label: &aquariumv2.Label{
+					Name:    "test-label",
+					Version: 1,
+					Definitions: []*aquariumv2.LabelDefinition{{
+						Driver: "test",
+						Resources: &aquariumv2.Resources{
+							Cpu: 1,
+							Ram: 2,
+						},
+						Authentication: &aquariumv2.Authentication{
+							Username: "testuser",
+							Password: "testpass",
+							Port:     func() int32 { port, _ := strconv.Atoi(sshdPort); return int32(port) }(),
+						},
+					}},
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create label:", err)
+		}
+		labelUID = resp.Msg.Data.Uid
 
-		if label.UID == uuid.Nil {
-			t.Fatalf("Label UID is incorrect: %v", label.UID)
+		if labelUID == "" || labelUID == uuid.Nil.String() {
+			t.Fatalf("Label UID is incorrect: %v", labelUID)
 		}
 	})
 
-	var app types.Application
+	var appUID string
 	t.Run("Create Application", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/application/")).
-			JSON(`{"label_UID":"`+label.UID.String()+`"}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&app)
+		resp, err := appClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceCreateRequest{
+				Application: &aquariumv2.Application{
+					LabelUid: labelUID,
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create application:", err)
+		}
+		appUID = resp.Msg.Data.Uid
 
-		if app.UID == uuid.Nil {
-			t.Fatalf("Application UID is incorrect: %v", app.UID)
+		if appUID == uuid.Nil.String() {
+			t.Fatalf("Application UID is incorrect: %v", appUID)
 		}
 	})
 
-	var appState types.ApplicationState
 	t.Run("Application should get ALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(r).
-				Status(http.StatusOK).
-				End().
-				JSON(&appState)
+			resp, err := appClient.GetState(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+					ApplicationUid: appUID,
+				}),
+			)
+			if err != nil {
+				r.Fatal("Failed to get application state:", err)
+			}
 
-			if appState.Status != types.ApplicationStatusALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", appState.Status)
+			if resp.Msg.Data.Status != aquariumv2.ApplicationState_ALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", resp.Msg.Data.Status)
 			}
 		})
 	})
 
-	var res types.ApplicationResource
+	var resUID string
 	t.Run("Resource should be created", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/resource")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&res)
+		resp, err := appClient.GetResource(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceGetResourceRequest{
+				ApplicationUid: appUID,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to get application resource:", err)
+		}
+		resUID = resp.Msg.Data.Uid
 
-		if res.Identifier == "" {
-			t.Fatalf("Resource identifier is incorrect: %v", res.Identifier)
+		if resp.Msg.Data.Identifier == "" {
+			t.Fatalf("Resource identifier is incorrect: %v", resp.Msg.Data.Identifier)
 		}
 	})
 
-	// Now working with the created Application to get access
-	var acc types.ApplicationResourceAccess
+	var accUsername, accKey string
 	t.Run("Requesting access to the Application Resource", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/applicationresource/"+res.UID.String()+"/access")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&acc)
+		resp, err := proxySSHClient.GetResourceAccess(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.GateProxySSHServiceGetResourceAccessRequest{
+				ApplicationResourceUid: resUID,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to get resource access:", err)
+		}
+		accUsername = resp.Msg.Data.Username
+		accKey = resp.Msg.Data.Key
 
-		if res.Identifier == "" {
-			t.Fatalf("Unable to get access to Resource: %v", res.Identifier)
+		if accUsername == "" {
+			t.Fatalf("Unable to get access to Resource: %v", resp.Msg.Data)
 		}
 	})
 
@@ -708,7 +777,7 @@ drivers:
 			t.Fatalf("Unable to create temp proxykey file: %v", err)
 		}
 		defer os.Remove(proxyKeyFile.Name())
-		_, err = proxyKeyFile.WriteString(acc.Key)
+		_, err = proxyKeyFile.WriteString(accKey)
 		if err != nil {
 			t.Fatalf("Unable to write temp proxykey file: %v", err)
 		}
@@ -742,17 +811,20 @@ drivers:
 
 	// Re-requesting the access to copy in other direction
 	t.Run("Requesting access 2 to the Application Resource", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/applicationresource/"+res.UID.String()+"/access")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&acc)
+		resp, err := proxySSHClient.GetResourceAccess(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.GateProxySSHServiceGetResourceAccessRequest{
+				ApplicationResourceUid: resUID,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to get resource access:", err)
+		}
+		accUsername = resp.Msg.Data.Username
+		accKey = resp.Msg.Data.Key
 
-		if res.Identifier == "" {
-			t.Fatalf("Unable to get access to Resource: %v", res.Identifier)
+		if accUsername == "" {
+			t.Fatalf("Unable to get access to Resource: %v", resp.Msg.Data)
 		}
 	})
 
@@ -781,7 +853,7 @@ drivers:
 			t.Fatalf("Unable to create temp proxykey file: %v", err)
 		}
 		defer os.Remove(proxyKeyFile.Name())
-		_, err = proxyKeyFile.WriteString(acc.Key)
+		_, err = proxyKeyFile.WriteString(accKey)
 		if err != nil {
 			t.Fatalf("Unable to write temp proxykey file: %v", err)
 		}
@@ -817,36 +889,37 @@ drivers:
 	})
 
 	t.Run("Deallocate the Application", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/deallocate")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+		_, err := appClient.Deallocate(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceDeallocateRequest{
+				ApplicationUid: appUID,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to deallocate application:", err)
+		}
 	})
 
 	t.Run("Application should get DEALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(r).
-				Status(http.StatusOK).
-				End().
-				JSON(&appState)
+			resp, err := appClient.GetState(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+					ApplicationUid: appUID,
+				}),
+			)
+			if err != nil {
+				r.Fatal("Failed to get application state:", err)
+			}
 
-			if appState.Status != types.ApplicationStatusDEALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", appState.Status)
+			if resp.Msg.Data.Status != aquariumv2.ApplicationState_DEALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", resp.Msg.Data.Status)
 			}
 		})
 	})
 }
 
-// Checks that proxyssh can forward port back and forth and the API becomes available on it
-// Client will use key and proxy will connect to target by key
-// WARN: This test requires `ssh` binary to be available in PATH
+// Test ProxySSH port forwarding functionality with key-to-key authentication
 func Test_proxyssh_port_key2key(t *testing.T) {
 	t.Parallel()
 	afi := h.NewAquariumFish(t, "node-1", `---
@@ -871,7 +944,7 @@ drivers:
 		}
 	}()
 
-	// Still need HTTPS client to request SSH access to the machine
+	// Still need HTTPS client to test the port proxy working correctly
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
@@ -880,112 +953,147 @@ drivers:
 		Transport: tr,
 	}
 
-	serverkey, err := crypt.GenerateSSHKey()
+	// Create admin client
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+
+	// Create service clients
+	labelClient := aquariumv2connect.NewLabelServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+	appClient := aquariumv2connect.NewApplicationServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+	proxySSHClient := aquariumv2connect.NewGateProxySSHServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+
+	sshdKey, err := crypt.GenerateSSHKey()
 	if err != nil {
-		t.Fatalf("Can't create ssh key for mock server: %v", err)
+		t.Fatalf("Can't create ssh key for mock sshd: %v", err)
 	}
-	serverpubkey, err := crypt.GetSSHPubKeyFromPem(serverkey)
+	sshdPubKey, err := crypt.GetSSHPubKeyFromPem(sshdKey)
 	if err != nil {
-		t.Fatalf("Can't create ssh key for mock server: %v", err)
-	}
-	serverkeyjson, err := json.Marshal(string(serverkey))
-	if err != nil {
-		t.Fatalf("Can't encode ssh key to json: %v", err)
+		t.Fatalf("Can't create ssh key for mock sshd: %v", err)
 	}
 
-	// Running SSH Port server
-	_, sshdPort := h.MockSSHPortServer(t, "testuser", "", string(serverpubkey))
+	// Running SSH port server
+	_, sshdPort := h.MockSSHPortServer(t, "testuser", "", string(sshdPubKey))
 
-	var label types.Label
+	var labelUID string
 	t.Run("Create Label", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/label/")).
-			JSON(`{"name":"test-label", "version":1, "definitions": [{
-				"driver":"test",
-				"resources":{"cpu":1,"ram":2},
-				"authentication":{"username":"testuser","key":`+string(serverkeyjson)+`,"port":`+sshdPort+`}
-			}]}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&label)
+		resp, err := labelClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
+				Label: &aquariumv2.Label{
+					Name:    "test-label",
+					Version: 1,
+					Definitions: []*aquariumv2.LabelDefinition{{
+						Driver: "test",
+						Resources: &aquariumv2.Resources{
+							Cpu: 1,
+							Ram: 2,
+						},
+						Authentication: &aquariumv2.Authentication{
+							Username: "testuser",
+							Key:      string(sshdKey),
+							Port:     func() int32 { port, _ := strconv.Atoi(sshdPort); return int32(port) }(),
+						},
+					}},
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create label:", err)
+		}
+		labelUID = resp.Msg.Data.Uid
 
-		if label.UID == uuid.Nil {
-			t.Fatalf("Label UID is incorrect: %v", label.UID)
+		if labelUID == uuid.Nil.String() {
+			t.Fatalf("Label UID is incorrect: %v", labelUID)
 		}
 	})
 
-	var app types.Application
+	var appUID string
 	t.Run("Create Application", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/application/")).
-			JSON(`{"label_UID":"`+label.UID.String()+`"}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&app)
+		resp, err := appClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceCreateRequest{
+				Application: &aquariumv2.Application{
+					LabelUid: labelUID,
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create application:", err)
+		}
+		appUID = resp.Msg.Data.Uid
 
-		if app.UID == uuid.Nil {
-			t.Fatalf("Application UID is incorrect: %v", app.UID)
+		if appUID == uuid.Nil.String() {
+			t.Fatalf("Application UID is incorrect: %v", appUID)
 		}
 	})
 
-	var appState types.ApplicationState
 	t.Run("Application should get ALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(r).
-				Status(http.StatusOK).
-				End().
-				JSON(&appState)
+			resp, err := appClient.GetState(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+					ApplicationUid: appUID,
+				}),
+			)
+			if err != nil {
+				r.Fatal("Failed to get application state:", err)
+			}
 
-			if appState.Status != types.ApplicationStatusALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", appState.Status)
+			if resp.Msg.Data.Status != aquariumv2.ApplicationState_ALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", resp.Msg.Data.Status)
 			}
 		})
 	})
 
-	var res types.ApplicationResource
+	var resUID string
 	t.Run("Resource should be created", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/resource")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&res)
+		resp, err := appClient.GetResource(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceGetResourceRequest{
+				ApplicationUid: appUID,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to get application resource:", err)
+		}
+		resUID = resp.Msg.Data.Uid
 
-		if res.Identifier == "" {
-			t.Fatalf("Resource identifier is incorrect: %v", res.Identifier)
+		if resp.Msg.Data.Identifier == "" {
+			t.Fatalf("Resource identifier is incorrect: %v", resp.Msg.Data.Identifier)
 		}
 	})
 
 	// Now working with the created Application to get access
-	var acc types.ApplicationResourceAccess
+	var acc *aquariumv2.GateProxySSHAccess
 	t.Run("Requesting access to the Application Resource", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/applicationresource/"+res.UID.String()+"/access")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&acc)
+		resp, err := proxySSHClient.GetResourceAccess(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.GateProxySSHServiceGetResourceAccessRequest{
+				ApplicationResourceUid: resUID,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to get resource access:", err)
+		}
+		acc = resp.Msg.Data
 
-		if res.Identifier == "" {
-			t.Fatalf("Unable to get access to Resource: %v", res.Identifier)
+		if acc.Key == "" {
+			t.Fatalf("Unable to get access to Resource: %v", resUID)
 		}
 	})
 
-	t.Run("Executing SSH port forward pass through PROXYSSH", func(t *testing.T) {
+	t.Run("Using ProxySSH to establish local port forwarding", func(t *testing.T) {
 		// Writing ssh private key to temp file
 		proxyKeyFile, err := os.CreateTemp("", "proxykey")
 		if err != nil {
@@ -1003,10 +1111,18 @@ drivers:
 		}
 
 		proxyHost, proxyPort, err := net.SplitHostPort(afi.ProxySSHEndpoint())
+		if err != nil {
+			t.Fatalf("Unable to parse ProxySSH endpoint: %v", err)
+		}
+
 		_, apiPort, err := net.SplitHostPort(afi.APIEndpoint())
-		// Picking semi-random port to listen on
-		proxyApiPort, _ := strconv.Atoi(apiPort)
-		proxyApiPort += 10
+		// Find a free local port for forwarding
+		listener, err := net.Listen("tcp", ":0")
+		if err != nil {
+			t.Fatalf("Unable to find free port: %v", err)
+		}
+		proxyApiPort := listener.Addr().(*net.TCPAddr).Port
+		listener.Close()
 
 		// Running command with timeout in background
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -1024,7 +1140,7 @@ drivers:
 			"-L", strconv.Itoa(proxyApiPort)+":localhost:"+apiPort,
 			proxyHost,
 		)
-		t.Log("DEBUG: Executing:", strings.Join(cmd.Args, " "), acc.Password, string(serverkey))
+		t.Log("DEBUG: Executing:", strings.Join(cmd.Args, " "), acc.Password, string(sshdKey))
 
 		cmd.Stdout = os.Stderr
 		cmd.Stderr = os.Stderr
@@ -1034,102 +1150,106 @@ drivers:
 		time.Sleep(2 * time.Second)
 
 		// Requesting Fish API through proxied port for the next test
+		var newAcc aquariumv2.GateProxySSHServiceGetResourceAccessResponse
 		apitest.New().
 			EnableNetworking(cli).
-			Get("https://127.0.0.1:"+strconv.Itoa(proxyApiPort)+"/api/v1/applicationresource/"+res.UID.String()+"/access").
+			Post("https://127.0.0.1:"+strconv.Itoa(proxyApiPort)+"/grpc/aquarium.v2.GateProxySSHService/GetResourceAccess").
+			JSON(`{"application_resource_uid": "`+acc.ApplicationResourceUid+`"}`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
 			End().
-			JSON(&acc)
+			JSON(&newAcc)
 
-		if res.Identifier == "" {
-			t.Fatalf("Unable to get access to Resource: %v", res.Identifier)
+		if newAcc.GetData().Uid == "" || newAcc.GetData().Uid == uuid.Nil.String() {
+			t.Fatalf("Unable to get access to Resource: %v", acc.Uid)
 		}
 	})
 
 	// TODO: For some reason mock server does not accept reverse port forwarding, but
 	// I spent too much time on that already, so the direct forwarding enough for testing now
-	/*t.Run("Executing SSH port reverse pass through PROXYSSH", func(t *testing.T) {
-		// Writing ssh private key to temp file
-		proxyKeyFile, err := os.CreateTemp("", "proxykey")
-		if err != nil {
-			t.Fatalf("Unable to create temp proxykey file: %v", err)
-		}
-		defer os.Remove(proxyKeyFile.Name())
-		_, err = proxyKeyFile.WriteString(acc.Key)
-		if err != nil {
-			t.Fatalf("Unable to write temp proxykey file: %v", err)
-		}
-		proxyKeyFile.Close()
-		err = os.Chmod(proxyKeyFile.Name(), 0600)
-		if err != nil {
-			t.Fatalf("Unable to change temp proxykey file mod: %v", err)
-		}
-
-		proxyHost, proxyPort, err := net.SplitHostPort(afi.ProxySSHEndpoint())
-		_, apiPort, err := net.SplitHostPort(afi.APIEndpoint())
-		// Picking semi-random port to listen on
-		proxyApiPort, _ := strconv.Atoi(apiPort)
-		proxyApiPort += 10
-
-		// Running command with timeout in background
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		cmd := exec.CommandContext(ctx, "ssh", "-v",
-			// ssh -N -R 2223:localhost:2222 -p 2222 testuser@127.0.0.1
-			// ssh -N -L 2223:localhost:2222 -p 2222 testuser@127.0.0.1
-			"-i", proxyKeyFile.Name(),
-			"-p", proxyPort,
-			"-oStrictHostKeyChecking=no",
-			"-oUserKnownHostsFile=/dev/null",
-			"-oGlobalKnownHostsFile=/dev/null",
-			"-l", "admin",
-			"-N", // Don't establish ssh session
-			"-R", strconv.Itoa(proxyApiPort)+":localhost:"+apiPort,
-			proxyHost,
-		)
-		cmd.Stdout = os.Stderr
-		cmd.Stderr = os.Stderr
-		cmd.Start()
-
-		// Wait for ssh port passthrough startup
-		time.Sleep(2*time.Second)
-
-		// Requesting Fish API through proxied port
-		apitest.New().
-			EnableNetworking(cli).
-			Get("https://127.0.0.1:"+strconv.Itoa(proxyApiPort)+"/api/v1/application/"+app.UID.String()+"/resource").
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&res)
-	})*/
+	//t.Run("Executing SSH port reverse pass through PROXYSSH", func(t *testing.T) {
+	//	// Writing ssh private key to temp file
+	//	proxyKeyFile, err := os.CreateTemp("", "proxykey")
+	//	if err != nil {
+	//		t.Fatalf("Unable to create temp proxykey file: %v", err)
+	//	}
+	//	defer os.Remove(proxyKeyFile.Name())
+	//	_, err = proxyKeyFile.WriteString(acc.Key)
+	//	if err != nil {
+	//		t.Fatalf("Unable to write temp proxykey file: %v", err)
+	//	}
+	//	proxyKeyFile.Close()
+	//	err = os.Chmod(proxyKeyFile.Name(), 0600)
+	//	if err != nil {
+	//		t.Fatalf("Unable to change temp proxykey file mod: %v", err)
+	//	}
+	//	proxyHost, proxyPort, err := net.SplitHostPort(afi.ProxySSHEndpoint())
+	//	_, apiPort, err := net.SplitHostPort(afi.APIEndpoint())
+	//	// Picking semi-random port to listen on
+	//	proxyApiPort, _ := strconv.Atoi(apiPort)
+	//	proxyApiPort += 10
+	//
+	//	// Running command with timeout in background
+	//	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	//	defer cancel()
+	//	cmd := exec.CommandContext(ctx, "ssh", "-v",
+	//		// ssh -N -R 2223:localhost:2222 -p 2222 testuser@127.0.0.1
+	//		// ssh -N -L 2223:localhost:2222 -p 2222 testuser@127.0.0.1
+	//		"-i", proxyKeyFile.Name(),
+	//		"-p", proxyPort,
+	//		"-oStrictHostKeyChecking=no",
+	//		"-oUserKnownHostsFile=/dev/null",
+	//		"-oGlobalKnownHostsFile=/dev/null",
+	//		"-l", "admin",
+	//		"-N", // Don't establish ssh session
+	//		"-R", strconv.Itoa(proxyApiPort)+":localhost:"+apiPort,
+	//		proxyHost,
+	//	)
+	//	cmd.Stdout = os.Stderr
+	//	cmd.Stderr = os.Stderr
+	//	cmd.Start()
+	//
+	//	// Wait for ssh port passthrough startup
+	//	time.Sleep(2*time.Second)
+	//
+	//	// Requesting Fish API through proxied port
+	//	apitest.New().
+	//		EnableNetworking(cli).
+	//		Get("https://127.0.0.1:"+strconv.Itoa(proxyApiPort)+"/api/v1/application/"+app.Uid+"/resource").
+	//		BasicAuth("admin", afi.AdminToken()).
+	//		Expect(t).
+	//		Status(http.StatusOK).
+	//		End().
+	//		JSON(&res)
+	//})
 
 	t.Run("Deallocate the Application", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/deallocate")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+		_, err := appClient.Deallocate(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceDeallocateRequest{
+				ApplicationUid: appUID,
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to deallocate application:", err)
+		}
 	})
 
 	t.Run("Application should get DEALLOCATED in 10 sec", func(t *testing.T) {
 		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(r).
-				Status(http.StatusOK).
-				End().
-				JSON(&appState)
+			resp, err := appClient.GetState(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+					ApplicationUid: appUID,
+				}),
+			)
+			if err != nil {
+				r.Fatal("Failed to get application state:", err)
+			}
 
-			if appState.Status != types.ApplicationStatusDEALLOCATED {
-				r.Fatalf("Application Status is incorrect: %v", appState.Status)
+			if resp.Msg.Data.Status != aquariumv2.ApplicationState_DEALLOCATED {
+				r.Fatalf("Application Status is incorrect: %v", resp.Msg.Data.Status)
 			}
 		})
 	})

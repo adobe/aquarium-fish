@@ -15,8 +15,10 @@
 package util
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/alessio/shellescape"
@@ -24,6 +26,7 @@ import (
 
 // SerializeMetadata serializes dictionary to usable format
 func SerializeMetadata(format, prefix string, data map[string]any) (out []byte, err error) {
+	var lines [][]byte
 	switch format {
 	case "json": // Default json
 		return json.Marshal(data)
@@ -35,7 +38,7 @@ func SerializeMetadata(format, prefix string, data map[string]any) (out []byte, 
 				continue
 			}
 			value := []byte("=" + shellescape.Quote(val) + "\n")
-			out = append(out, append(line, value...)...)
+			lines = append(lines, append(line, value...))
 		}
 	case "export": // Format env with exports for easy usage with source
 		m := DotSerialize(prefix, data)
@@ -46,7 +49,7 @@ func SerializeMetadata(format, prefix string, data map[string]any) (out []byte, 
 			}
 			line = append([]byte("export "), line...)
 			value := []byte("=" + shellescape.Quote(val) + "\n")
-			out = append(out, append(line, value...)...)
+			lines = append(lines, append(line, value...))
 		}
 	case "ps1": // Plain format suitable to use in powershell
 		m := DotSerialize(prefix, data)
@@ -57,10 +60,19 @@ func SerializeMetadata(format, prefix string, data map[string]any) (out []byte, 
 			}
 			// Shell quote is not applicable here, so using the custom one
 			value := []byte("='" + strings.ReplaceAll(val, "'", "''") + "'\n")
-			out = append(out, append([]byte("$"), append(line, value...)...)...)
+			lines = append(lines, append([]byte("$"), append(line, value...)...))
 		}
 	default:
 		return out, fmt.Errorf("Unsupported `format`: %s", format)
+	}
+
+	// We need to sort output to present it in similar way since map is not ordered
+	sort.Slice(lines, func(i, j int) bool {
+		return bytes.Compare(lines[i], lines[j]) < 0
+	})
+
+	for _, l := range lines {
+		out = append(out, l...)
 	}
 
 	return out, nil

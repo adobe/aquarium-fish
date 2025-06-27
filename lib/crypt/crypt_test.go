@@ -20,13 +20,13 @@ import (
 )
 
 // To prevent compiler optimization
-var result1 Hash
+var result1 *Hash
 var result2 bool
 
 // Tests user password hash function performance
 func Benchmark_hash_new(b *testing.B) {
 	// To prevent compiler optimization
-	var r Hash
+	var r *Hash
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {

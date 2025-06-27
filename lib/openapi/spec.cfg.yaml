@@ -1,5 +1,0 @@
----
-package: openapi
-output: spec.gen.go
-generate:
-  embedded-spec: true

@@ -26,7 +26,7 @@ import (
 
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/log"
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
 // NOTE: This proxy was highly influenced by Remco Verhoef's ideas in
@@ -35,7 +35,7 @@ import (
 // session is stored in Driver::sessions.
 type session struct {
 	drv              *Driver
-	ResourceAccessor *types.ApplicationResourceAccess
+	ResourceAccessor *typesv2.GateProxySSHAccess
 	SrcAddr          net.Addr
 
 	// This work group used to track the routines of the session
@@ -65,9 +65,9 @@ func (d *Driver) serveConnection(clientConn net.Conn) error {
 	}
 
 	// Getting the info about the destination resource
-	resource, err := d.db.ApplicationResourceGet(session.ResourceAccessor.ApplicationResourceUID)
+	resource, err := d.db.ApplicationResourceGet(session.ResourceAccessor.ApplicationResourceUid)
 	if err != nil {
-		return log.Errorf("PROXYSSH: %s: %s: Unable to retrieve Resource %s: %v", d.name, session.SrcAddr, session.ResourceAccessor.ApplicationResourceUID, err)
+		return log.Errorf("PROXYSSH: %s: %s: Unable to retrieve Resource %s: %v", d.name, session.SrcAddr, session.ResourceAccessor.ApplicationResourceUid, err)
 	}
 	if resource.Authentication == nil || resource.Authentication.Username == "" && resource.Authentication.Password == "" {
 		return log.Errorf("PROXYSSH: %s: %s: Resource Authentication not provided", d.name, session.SrcAddr)
@@ -116,8 +116,8 @@ func (d *Driver) getSession(sessionID []byte) (*session, error) {
 	return session, nil
 }
 
-func (s *session) connectToDestination(res *types.ApplicationResource) (*ssh.Client, error) {
-	dstAddr := net.JoinHostPort(res.IpAddr, strconv.Itoa(res.Authentication.Port))
+func (s *session) connectToDestination(res *typesv2.ApplicationResource) (*ssh.Client, error) {
+	dstAddr := net.JoinHostPort(res.IpAddr, strconv.Itoa(int(res.Authentication.Port)))
 	dstConfig := &ssh.ClientConfig{
 		User:            res.Authentication.Username,
 		Auth:            []ssh.AuthMethod{},
@@ -301,7 +301,7 @@ func (d *Driver) passwordCallback(incomingConn ssh.ConnMetadata, pass []byte) (*
 	passHash := crypt.NewHash(string(pass), []byte{}).Hash
 	passHashStr := fmt.Sprintf("%x", passHash)
 
-	ra, err := d.db.ApplicationResourceAccessSingleUsePasswordHash(fishUser.Name, passHashStr)
+	ra, err := d.db.GateProxySSHAccessSingleUsePasswordHash(fishUser.Name, passHashStr)
 	if err != nil {
 		log.Errorf("PROXYSSH: %s: %s: Invalid access for user %q: %v", d.name, incomingConn.RemoteAddr(), fishUser.Name, err)
 		return nil, fmt.Errorf("Invalid access")
@@ -332,7 +332,7 @@ func (d *Driver) publicKeyCallback(incomingConn ssh.ConnMetadata, key ssh.Public
 
 	stringKey := string(ssh.MarshalAuthorizedKey(key))
 
-	ra, err := d.db.ApplicationResourceAccessSingleUseKey(fishUser.Name, stringKey)
+	ra, err := d.db.GateProxySSHAccessSingleUseKey(fishUser.Name, stringKey)
 	if err != nil {
 		log.Errorf("PROXYSSH: %s: %s: Invalid access for user %q: %v", d.name, incomingConn.RemoteAddr(), fishUser.Name, err)
 		return nil, fmt.Errorf("Invalid access")

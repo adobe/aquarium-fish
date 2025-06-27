@@ -15,8 +15,9 @@
 // Starting point for fish cmd
 package main
 
-// Generating everything from protobuf specs for RPC interface and OpenAPI specs for REST interface
+// Generating everything from protobuf specs for RPC interface
 //go:generate buf generate
+//go:generate buf generate --template buf.gen2.yaml
 
 import (
 	"context"
@@ -34,7 +35,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
-	"github.com/adobe/aquarium-fish/lib/openapi"
+	"github.com/adobe/aquarium-fish/lib/server"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
@@ -131,7 +132,7 @@ func main() {
 			}
 
 			log.Info("Fish starting API...")
-			srv, err := openapi.Init(fish, cfg.APIAddress, caPath, certPath, keyPath)
+			srv, err := server.Init(fish, cfg.APIAddress, caPath, certPath, keyPath)
 			if err != nil {
 				return err
 			}

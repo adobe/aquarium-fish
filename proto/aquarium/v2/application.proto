@@ -19,93 +19,132 @@ import "google/protobuf/struct.proto";
 import "aquarium/v2/common.proto";
 import "aquarium/v2/rbac.proto";
 
-option go_package = "github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2;aquariumv2";
+option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2";
 
 // ApplicationService handles application management operations
 service ApplicationService {
   // Get list of applications
   rpc List(ApplicationServiceListRequest) returns (ApplicationServiceListResponse) {
    option (access_control) = {
-     allowed_roles: ["User"]
+     allowed_roles: ["User"],
+     additional_actions: ["ListAll"],
    };
   }
   
   // Get application by UID
   rpc Get(ApplicationServiceGetRequest) returns (ApplicationServiceGetResponse) {
    option (access_control) = {
-     allowed_roles: ["User"]
+     allowed_roles: ["User"],
+     additional_actions: ["GetAll"],
    };
   }
   
   // Create new application
   rpc Create(ApplicationServiceCreateRequest) returns (ApplicationServiceCreateResponse) {
    option (access_control) = {
-     allowed_roles: ["User"]
+     allowed_roles: ["User"],
    };
   }
   
   // Get application state
   rpc GetState(ApplicationServiceGetStateRequest) returns (ApplicationServiceGetStateResponse) {
    option (access_control) = {
-     allowed_roles: ["User"]
+     allowed_roles: ["User"],
+     additional_actions: ["GetStateAll"],
    };
   }
   
   // Get application resource
   rpc GetResource(ApplicationServiceGetResourceRequest) returns (ApplicationServiceGetResourceResponse) {
    option (access_control) = {
-     allowed_roles: ["User"]
+     allowed_roles: ["User"],
+     additional_actions: ["GetResourceAll"],
    };
   }
   
   // List application tasks
   rpc ListTask(ApplicationServiceListTaskRequest) returns (ApplicationServiceListTaskResponse) {
    option (access_control) = {
-     allowed_roles: ["Power"]
+     allowed_roles: ["Power"],
+     additional_actions: ["ListTaskAll"],
    };
   }
   
   // Create application task
   rpc CreateTask(ApplicationServiceCreateTaskRequest) returns (ApplicationServiceCreateTaskResponse) {
    option (access_control) = {
-     allowed_roles: ["Power"]
+     allowed_roles: ["Power"],
+     additional_actions: ["CreateTaskAll"],
    };
   }
   
   // Get application task
   rpc GetTask(ApplicationServiceGetTaskRequest) returns (ApplicationServiceGetTaskResponse) {
    option (access_control) = {
-     allowed_roles: ["Power"]
+     allowed_roles: ["Power"],
+     additional_actions: ["GetTaskAll"],
    };
   }
   
   // Deallocate application
   rpc Deallocate(ApplicationServiceDeallocateRequest) returns (ApplicationServiceDeallocateResponse) {
    option (access_control) = {
-     allowed_roles: ["User"]
+     allowed_roles: ["User"],
+     additional_actions: ["DeallocateAll"],
    };
   }
 }
 
 // Application represents an allocation request
+//
+// Allocation request created by the user. Each node votes for the availability to allocate
+// the ApplicationResource and the cluster choose which one node will actually do the work.
 message Application {
   string uid = 1;
   google.protobuf.Timestamp created_at = 2;
   string owner_name = 3;
   string label_uid = 4;
+  // Additional metadata in JSON format (can't override Label metadata)
+  // example:
+  //   JENKINS_URL: 'http://172.16.1.1:8085/'
+  //   JENKINS_AGENT_SECRET: 03839eabcf945b1e780be8f9488d264c4c57bf388546da9a84588345555f29b0
+  //   JENKINS_AGENT_NAME: test-node
   google.protobuf.Struct metadata = 5;
 }
 
 // ApplicationState represents the current state of an application
+//
+// The state of the Application - it goes through graph of states, so this object stores the
+// info when the Application comes to this state and the last one describes the current state
+// of the Application.
 message ApplicationState {
+  // Enum for ApplicationState status field
+  enum Status {
+    UNSPECIFIED = 0; // Should not happen during regular operation
+    NEW = 1;         // The Application just created (active)
+    ELECTED = 2;     // Node is elected during the voting process (active)
+    ALLOCATED = 3;   // The ApplicationResource is allocated and starting up (active)
+    DEALLOCATE = 4;  // User requested the Application deallocate (not active)
+    DEALLOCATED = 5; // The ApplicationResource is deallocated (not active)
+    ERROR = 6;       // The error happened (not active)
+  }
+
   string uid = 1;
   google.protobuf.Timestamp created_at = 2;
   string application_uid = 3;
-  string status = 4;
+  // Status of the state - everything starts with new and could end in 3 states: DEALLOCATED, ERROR
+  Status status = 4;
+  // Additional information for the state
   string description = 5;
 }
 
 // ApplicationResource represents a managed instance
+//
+// Managed instance definition to be able to properly restore the state during the cluster
+// node restart. Also contains additional info about the instance, for example user requested
+// metadata, which is available for the instance through the `Meta API`.
+// 
+// Could be created and updated only by the node which won the Application execution.
 message ApplicationResource {
   string uid = 1;
   google.protobuf.Timestamp created_at = 2;
@@ -114,23 +153,51 @@ message ApplicationResource {
   string node_uid = 5;
   string label_uid = 6;
   int32 definition_index = 7;
+  // Unique for driver identifier of the instance which can be used to find it later.
   string identifier = 8;
+  // Is a weak current network IP address of the instance, usually gathered based on the `hw_addr`.
   string ip_addr = 9;
+  // MAC or any other type of network address which will allow to properly identify the node
+  // through network interaction.
   string hw_addr = 10;
+  // Combined Application and Label metadata (in this order) to make it available through
+  // `Meta API` to the instance.
+  // example:
+  //   JENKINS_URL: 'http://172.16.1.1:8085/'
+  //   JENKINS_AGENT_SECRET: 03839eabcf945b1e780be8f9488d264c4c57bf388546da9a84588345555f29b0
+  //   JENKINS_AGENT_NAME: test-node
+  //   JENKINS_AGENT_WORKSPACE: /Volumes/ws
   google.protobuf.Struct metadata = 11;
-  Authentication authentication = 12;
-  google.protobuf.Timestamp timeout = 13;
+  // Calculated during allocation time of when the Resource have to die anyway
+  optional google.protobuf.Timestamp timeout = 12;
+  // Authentication information for connection.
+  optional Authentication authentication = 13;
 }
 
 // ApplicationTask represents an async action on an application
+//
+// Is needed to execute sort of async action on the Application. For example snapshot
+// operation, because the request could get from anywhere. Usually app tasks are not a part of
+// standard Application state graph and could be not executed if the Applicationresource is
+// destroyed.
+// 
+// Results are filled by the executor of the task and really depends on what kind of operation
+// is executed and really depends on the driver - it could support the task or not.
+// 
+// It could be created by any Node but updated by the one which won the Application execution.
 message ApplicationTask {
   string uid = 1;
   google.protobuf.Timestamp created_at = 2;
   google.protobuf.Timestamp updated_at = 3;
   string application_uid = 4;
+  // Identifier of the task
   string task = 5;
-  string when = 6;
+  // Used to specify when the task should be executed, right now only
+  // ALLOCATED, DEALLOCATE (when app is already here) are supported.
+  ApplicationState.Status when = 6;
+  // Struct with additional options specific for the driver
   google.protobuf.Struct options = 7;
+  // Struct with the results of task execution
   google.protobuf.Struct result = 8;
 }
 
@@ -143,7 +210,7 @@ message ApplicationServiceListResponse {
 }
 
 message ApplicationServiceGetRequest {
-  string uid = 1;
+  string application_uid = 1;
 }
 
 message ApplicationServiceGetResponse {
@@ -163,7 +230,7 @@ message ApplicationServiceCreateResponse {
 }
 
 message ApplicationServiceGetStateRequest {
-  string uid = 1;
+  string application_uid = 1;
 }
 
 message ApplicationServiceGetStateResponse {
@@ -173,7 +240,7 @@ message ApplicationServiceGetStateResponse {
 }
 
 message ApplicationServiceGetResourceRequest {
-  string uid = 1;
+  string application_uid = 1;
 }
 
 message ApplicationServiceGetResourceResponse {
@@ -183,7 +250,7 @@ message ApplicationServiceGetResourceResponse {
 }
 
 message ApplicationServiceListTaskRequest {
-  string uid = 1;
+  string application_uid = 1;
 }
 
 message ApplicationServiceListTaskResponse {
@@ -193,7 +260,7 @@ message ApplicationServiceListTaskResponse {
 }
 
 message ApplicationServiceCreateTaskRequest {
-  string uid = 1;
+  string application_uid = 1;
   ApplicationTask task = 2;
 }
 
@@ -204,7 +271,7 @@ message ApplicationServiceCreateTaskResponse {
 }
 
 message ApplicationServiceGetTaskRequest {
-  string task_uid = 1;
+  string application_task_uid = 1;
 }
 
 message ApplicationServiceGetTaskResponse {
@@ -214,7 +281,7 @@ message ApplicationServiceGetTaskResponse {
 }
 
 message ApplicationServiceDeallocateRequest {
-  string uid = 1;
+  string application_uid = 1;
 }
 
 message ApplicationServiceDeallocateResponse {

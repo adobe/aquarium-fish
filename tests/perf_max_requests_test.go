@@ -15,17 +15,17 @@
 package tests
 
 import (
-	"crypto/tls"
+	"context"
 	"fmt"
-	"net/http"
 	"sync"
 	"testing"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/google/uuid"
-	"github.com/steinfletcher/apitest"
 
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
+	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
@@ -56,78 +56,106 @@ drivers:
 		}
 	}()
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	// Create admin client
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+
+	// Create service clients
+	labelClient := aquariumv2connect.NewLabelServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+	appClient := aquariumv2connect.NewApplicationServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+
+	var labelUID string
+	resp, err := labelClient.Create(
+		context.Background(),
+		connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
+			Label: &aquariumv2.Label{
+				Name:    "test-label",
+				Version: 1,
+				Definitions: []*aquariumv2.LabelDefinition{{
+					Driver: "test",
+					Resources: &aquariumv2.Resources{
+						Cpu: 2,
+						Ram: 4,
+					},
+				}},
+			},
+		}),
+	)
+	if err != nil {
+		t.Fatal("Failed to create label:", err)
 	}
-	cli := &http.Client{
-		Timeout:   time.Second * 10,
-		Transport: tr,
+	labelUID = resp.Msg.Data.Uid
+
+	if labelUID == uuid.Nil.String() {
+		t.Fatalf("Label UID is incorrect: %v", labelUID)
 	}
 
-	var label types.Label
-	apitest.New().
-		EnableNetworking(cli).
-		Post(afi.APIAddress("api/v1/label/")).
-		JSON(`{"name":"test-label", "version":1, "definitions": [
-			{"driver":"test", "resources":{"cpu":2,"ram":4}}
-		]}`).
-		BasicAuth("admin", afi.AdminToken()).
-		Expect(t).
-		Status(http.StatusOK).
-		End().
-		JSON(&label)
-
-	if label.UID == uuid.Nil {
-		t.Fatalf("Label UID is incorrect: %v", label.UID)
+	var appUID string
+	appResp, err := appClient.Create(
+		context.Background(),
+		connect.NewRequest(&aquariumv2.ApplicationServiceCreateRequest{
+			Application: &aquariumv2.Application{
+				LabelUid: labelUID,
+			},
+		}),
+	)
+	if err != nil {
+		t.Fatal("Failed to create application:", err)
 	}
+	appUID = appResp.Msg.Data.Uid
 
-	var app types.Application
-	apitest.New().
-		EnableNetworking(cli).
-		Post(afi.APIAddress("api/v1/application/")).
-		JSON(`{"label_UID":"`+label.UID.String()+`"}`).
-		BasicAuth("admin", afi.AdminToken()).
-		Expect(t).
-		Status(http.StatusOK).
-		End().
-		JSON(&app)
-
-	if app.UID == uuid.Nil {
-		t.Errorf("Application UID is incorrect: %v", app.UID)
+	if appUID == uuid.Nil.String() {
+		t.Errorf("Application UID is incorrect: %v", appUID)
 	}
 
 	// Here all the apps are in the queue, so let's request something with a small timeout
-	var appState types.ApplicationState
-	apitest.New().
-		EnableNetworking(cli).
-		Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
-		BasicAuth("admin", afi.AdminToken()).
-		Expect(t).
-		Status(http.StatusOK).
-		End().
-		JSON(&appState)
+	stateResp, err := appClient.GetState(
+		context.Background(),
+		connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+			ApplicationUid: appUID,
+		}),
+	)
+	if err != nil {
+		t.Fatal("Failed to get application state:", err)
+	}
 
-	if appState.Status != types.ApplicationStatusNEW {
-		t.Fatalf("Application Status is incorrect: %v", appState.Status)
+	if stateResp.Msg.Data.Status != aquariumv2.ApplicationState_NEW {
+		t.Fatalf("Application Status is incorrect: %v", stateResp.Msg.Data.Status)
 	}
 
 	// Running periodic requests to test what's the delay will be
 	wg := &sync.WaitGroup{}
 	reachedLimit := false
-	workerFunc := func(t *testing.T, wg *sync.WaitGroup, afi *h.AFInstance, cli *http.Client) {
+	workerFunc := func(t *testing.T, wg *sync.WaitGroup, afi *h.AFInstance, appUID string) {
 		defer wg.Done()
 
-		var appState types.ApplicationState
+		// Create individual client for each goroutine
+		cli, opts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+		appClient := aquariumv2connect.NewApplicationServiceClient(
+			cli,
+			afi.APIAddress("grpc"),
+			opts...,
+		)
+
 		for !reachedLimit {
 			start := time.Now()
-			apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(t).
-				Status(http.StatusOK).
-				End().
-				JSON(&appState)
+			_, err := appClient.GetState(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+					ApplicationUid: appUID,
+				}),
+			)
+			if err != nil {
+				t.Errorf("Failed to get application state: %v", err)
+				return
+			}
 
 			elapsed := time.Since(start).Milliseconds()
 			t.Logf("Request delay: %dms", elapsed)
@@ -139,9 +167,9 @@ drivers:
 	}
 	counter := 0
 	for !reachedLimit {
-		// Graduadely increase the amount of parallel threads
+		// Gradually increase the amount of parallel threads
 		wg.Add(1)
-		go workerFunc(t, wg, afi, cli)
+		go workerFunc(t, wg, afi, appUID)
 		counter += 1
 		t.Logf("Client threads: %d", counter)
 		time.Sleep(300 * time.Millisecond)

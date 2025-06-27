@@ -15,19 +15,18 @@
 package tests
 
 import (
-	"bufio"
-	"crypto/tls"
+	"context"
 	"fmt"
-	"net/http"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/google/uuid"
-	"github.com/steinfletcher/apitest"
+	"google.golang.org/protobuf/types/known/structpb"
 
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
+	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
@@ -61,96 +60,135 @@ drivers:
 		}
 	}()
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	cli := &http.Client{
-		Timeout:   time.Second * 30,
-		Transport: tr,
-	}
+	// Create admin client
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+
+	// Create service clients
+	labelClient := aquariumv2connect.NewLabelServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+	appClient := aquariumv2connect.NewApplicationServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
 
 	// Creating 2 labels - one for the app that can't be allocated and another one for a good app
-	var labelNoWay types.Label
-	apitest.New().
-		EnableNetworking(cli).
-		Post(afi.APIAddress("api/v1/label/")).
-		JSON(`{"name":"label-noway", "version":1, "definitions": [
-			{"driver":"test", "options":{"delay_available_capacity": 0.1}, "resources":{"cpu":999999,"ram":9999999}}
-		]}`).
-		BasicAuth("admin", afi.AdminToken()).
-		Expect(t).
-		Status(http.StatusOK).
-		End().
-		JSON(&labelNoWay)
+	var labelNoWayUID string
+	delayOptions, _ := structpb.NewStruct(map[string]any{"delay_available_capacity": 0.1})
+	resp, err := labelClient.Create(
+		context.Background(),
+		connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
+			Label: &aquariumv2.Label{
+				Name:    "label-noway",
+				Version: 1,
+				Definitions: []*aquariumv2.LabelDefinition{{
+					Driver:  "test",
+					Options: delayOptions,
+					Resources: &aquariumv2.Resources{
+						Cpu: 999999,
+						Ram: 9999999,
+					},
+				}},
+			},
+		}),
+	)
+	if err != nil {
+		t.Fatal("Failed to create labelNoWay:", err)
+	}
+	labelNoWayUID = resp.Msg.Data.Uid
 
-	if labelNoWay.UID == uuid.Nil {
-		t.Fatalf("LabelNoWay UID is incorrect: %v", labelNoWay.UID)
+	if labelNoWayUID == uuid.Nil.String() {
+		t.Fatalf("LabelNoWay UID is incorrect: %v", labelNoWayUID)
 	}
 
-	var labelTheWay types.Label
-	apitest.New().
-		EnableNetworking(cli).
-		Post(afi.APIAddress("api/v1/label/")).
-		JSON(`{"name":"label-theway", "version":1, "definitions": [
-			{"driver":"test", "options":{"delay_available_capacity": 0.1}, "resources":{"cpu":1,"ram":2}}
-		]}`).
-		BasicAuth("admin", afi.AdminToken()).
-		Expect(t).
-		Status(http.StatusOK).
-		End().
-		JSON(&labelTheWay)
+	var labelTheWayUID string
+	resp, err = labelClient.Create(
+		context.Background(),
+		connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
+			Label: &aquariumv2.Label{
+				Name:    "label-theway",
+				Version: 1,
+				Definitions: []*aquariumv2.LabelDefinition{{
+					Driver:  "test",
+					Options: delayOptions,
+					Resources: &aquariumv2.Resources{
+						Cpu: 1,
+						Ram: 2,
+					},
+				}},
+			},
+		}),
+	)
+	if err != nil {
+		t.Fatal("Failed to create labelTheWay:", err)
+	}
+	labelTheWayUID = resp.Msg.Data.Uid
 
-	if labelTheWay.UID == uuid.Nil {
-		t.Fatalf("LabelTheWay UID is incorrect: %v", labelTheWay.UID)
+	if labelTheWayUID == uuid.Nil.String() {
+		t.Fatalf("LabelTheWay UID is incorrect: %v", labelTheWayUID)
 	}
 
 	// Running goroutines amount fetcher
 	exitTest := false
-	go func() {
-		var amount int
-
-		for !exitTest {
-			amount = 0
-			res := apitest.New().
-				EnableNetworking(cli).
-				Get(afi.APIAddress("api/v1/node/this/profiling/goroutine")).
-				Query("debug", "2").
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(t).
-				Status(http.StatusOK).
-				End()
-
-			scanner := bufio.NewScanner(res.Response.Body)
-			for scanner.Scan() {
-				line := scanner.Text()
-				if strings.HasPrefix(line, "goroutine ") {
-					amount += 1
-				}
-			}
-			res.Response.Body.Close()
-
-			t.Log("Goroutines amount:", amount)
-
-			time.Sleep(5 * time.Second)
-		}
-	}()
+	//go func() {
+	//	var amount int
+	//
+	//	for !exitTest {
+	//		amount = 0
+	//		res := apitest.New().
+	//			EnableNetworking(cli).
+	//			Get(afi.APIAddress("api/v1/node/this/profiling/goroutine")).
+	//			Query("debug", "2").
+	//			BasicAuth("admin", afi.AdminToken()).
+	//			Expect(t).
+	//			Status(http.StatusOK).
+	//			End()
+	//
+	//		scanner := bufio.NewScanner(res.Response.Body)
+	//		for scanner.Scan() {
+	//			line := scanner.Text()
+	//			if strings.HasPrefix(line, "goroutine ") {
+	//				amount += 1
+	//			}
+	//		}
+	//		res.Response.Body.Close()
+	//
+	//		t.Log("Goroutines amount:", amount)
+	//
+	//		time.Sleep(5 * time.Second)
+	//	}
+	//}()
 
 	// Running periodic requests to test what's the delay will be
-	workerFunc := func(t *testing.T, afi *h.AFInstance, cli *http.Client) {
-		var app types.Application
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/application/")).
-			JSON(`{"label_UID":"`+labelNoWay.UID.String()+`"}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&app)
+	workerFunc := func(t *testing.T, afi *h.AFInstance) {
+		// Create individual client for each goroutine
+		cli, opts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+		appClient := aquariumv2connect.NewApplicationServiceClient(
+			cli,
+			afi.APIAddress("grpc"),
+			opts...,
+		)
 
-		if app.UID == uuid.Nil {
+		resp, err := appClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceCreateRequest{
+				Application: &aquariumv2.Application{
+					LabelUid: labelNoWayUID,
+				},
+			}),
+		)
+		if err != nil {
 			exitTest = true
-			t.Errorf("Application UID is incorrect: %v", app.UID)
+			t.Errorf("Failed to create application: %v", err)
+			return
+		}
+
+		if resp.Msg.Data.Uid == uuid.Nil.String() {
+			exitTest = true
+			t.Errorf("Application UID is incorrect: %v", resp.Msg.Data.Uid)
 		}
 	}
 
@@ -181,39 +219,46 @@ drivers:
 		// It should be no longer then 5 seconds (delay between pickups)
 		t.Logf("Running test: (bg elections: %d)", counter)
 		t.Run(fmt.Sprintf("Application should be ALLOCATED in 20 sec (bg elections: %d)", counter), func(t *testing.T) {
-			var app types.Application
+			var appUID string
 			// Keep track of applications in wg to make sure there is no more apps picked up by the Fish
 			wg.Add(1)
-			apitest.New().
-				EnableNetworking(cli).
-				Post(afi.APIAddress("api/v1/application/")).
-				JSON(`{"label_UID":"`+labelTheWay.UID.String()+`"}`).
-				BasicAuth("admin", afi.AdminToken()).
-				Expect(t).
-				Status(http.StatusOK).
-				End().
-				JSON(&app)
-
-			if app.UID == uuid.Nil {
+			resp, err := appClient.Create(
+				context.Background(),
+				connect.NewRequest(&aquariumv2.ApplicationServiceCreateRequest{
+					Application: &aquariumv2.Application{
+						LabelUid: labelTheWayUID,
+					},
+				}),
+			)
+			if err != nil {
 				exitTest = true
-				t.Errorf("Desired Application UID is incorrect: %v", app.UID)
+				t.Errorf("Failed to create desired application: %v", err)
+				return
+			}
+			appUID = resp.Msg.Data.Uid
+
+			if appUID == uuid.Nil.String() {
+				exitTest = true
+				t.Errorf("Desired Application UID is incorrect: %v", appUID)
 			}
 
 			// Wait for Allocate of the Application
-			var appState types.ApplicationState
 			h.Retry(&h.Timer{Timeout: 15 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
-				apitest.New().
-					EnableNetworking(cli).
-					Get(afi.APIAddress("api/v1/application/"+app.UID.String()+"/state")).
-					BasicAuth("admin", afi.AdminToken()).
-					Expect(r).
-					Status(http.StatusOK).
-					End().
-					JSON(&appState)
-
-				if appState.Status != types.ApplicationStatusALLOCATED {
+				stateResp, err := appClient.GetState(
+					context.Background(),
+					connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
+						ApplicationUid: appUID,
+					}),
+				)
+				if err != nil {
 					exitTest = true
-					r.Fatalf("Desired Application %s Status is incorrect: %v", appState.ApplicationUID, appState.Status)
+					r.Fatalf("Failed to get application state: %v", err)
+					return
+				}
+
+				if stateResp.Msg.Data.Status != aquariumv2.ApplicationState_ALLOCATED {
+					exitTest = true
+					r.Fatalf("Desired Application %s Status is incorrect: %v", stateResp.Msg.Data.ApplicationUid, stateResp.Msg.Data.Status)
 				} else {
 					exitTest = false
 				}
@@ -228,7 +273,7 @@ drivers:
 		// Running STEP amount of parallel applications at a time to simulate a big pipeline startup
 		wg.Add(STEP)
 		for range STEP {
-			go workerFunc(t, afi, cli)
+			go workerFunc(t, afi)
 			counter += 1
 		}
 

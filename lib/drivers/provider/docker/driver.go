@@ -19,7 +19,6 @@ package docker
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -30,7 +29,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/drivers/provider"
 	"github.com/adobe/aquarium-fish/lib/log"
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
@@ -58,11 +57,11 @@ type Driver struct {
 	// Contains the available tasks of the driver
 	tasksList []provider.DriverTask
 
-	totalCPU uint // In logical threads
-	totalRAM uint // In RAM megabytes
+	totalCPU uint32 // In logical threads
+	totalRAM uint32 // In RAM GB
 
 	dockerUsageMutex sync.Mutex
-	dockerUsage      types.Resources // Used when the docker is remote
+	dockerUsage      *typesv2.Resources // Used when the docker is remote
 
 	// We should not execute some operations at the same
 	lockOperationMutex sync.Mutex
@@ -104,21 +103,17 @@ func (d *Driver) Prepare(config []byte) error {
 		return fmt.Errorf("DOCKER: %s: Not enough info values in return: %q", d.name, cpuMem)
 	}
 
-	parsedCPU, err := strconv.ParseUint(cpuMem[0], 10, 64)
+	parsedCPU, err := strconv.ParseUint(cpuMem[0], 10, 32)
 	if err != nil {
-		return fmt.Errorf("DOCKER: %s: Unable to parse CPU uint: %v (%q)", d.name, err, cpuMem[0])
+		return fmt.Errorf("DOCKER: %s: Unable to parse CPU uint32: %v (%q)", d.name, err, cpuMem[0])
 	}
-	// Ensure parsedCPU fits within the uint range
-	if parsedCPU > uint64(math.MaxUint) {
-		return fmt.Errorf("DOCKER: %s: Parsed CPU value exceeds platform-specific uint range: %v (%q)", d.name, parsedCPU, cpuMem[0])
-	}
-	d.totalCPU = uint(parsedCPU)
+	d.totalCPU = uint32(parsedCPU)
 
-	parsedRAM, err := strconv.ParseUint(cpuMem[1], 10, 64)
+	parsedRAM, err := strconv.ParseUint(cpuMem[1], 10, 32)
 	if err != nil {
-		return fmt.Errorf("DOCKER: %s: Unable to parse RAM uint: %v (%q)", d.name, err, cpuMem[1])
+		return fmt.Errorf("DOCKER: %s: Unable to parse RAM uint32: %v (%q)", d.name, err, cpuMem[1])
 	}
-	d.totalRAM = uint(parsedRAM / 1073741824) // Get in GB
+	d.totalRAM = uint32(parsedRAM / 1073741824) // Get in GB
 
 	// Collect the current state of docker containers for validation (for example not controlled
 	// containers) purposes - it will be actively used if docker driver is remote
@@ -132,7 +127,7 @@ func (d *Driver) Prepare(config []byte) error {
 }
 
 // ValidateDefinition checks LabelDefinition is ok
-func (d *Driver) ValidateDefinition(def types.LabelDefinition) error {
+func (d *Driver) ValidateDefinition(def typesv2.LabelDefinition) error {
 	// Check resources
 	if err := def.Resources.Validate([]string{"dir", "hfs+", "exfat", "fat32"}, true); err != nil {
 		return log.Errorf("DOCKER: %s: Resources validation failed: %v", d.name, err)
@@ -144,13 +139,13 @@ func (d *Driver) ValidateDefinition(def types.LabelDefinition) error {
 }
 
 // AvailableCapacity allows Fish to ask the driver about it's capacity (free slots) of a specific definition
-func (d *Driver) AvailableCapacity(nodeUsage types.Resources, req types.LabelDefinition) int64 {
+func (d *Driver) AvailableCapacity(nodeUsage typesv2.Resources, req typesv2.LabelDefinition) int64 {
 	var outCount int64
 
 	if d.cfg.IsRemote {
 		// It's remote so use the driver-calculated usage
 		d.dockerUsageMutex.Lock()
-		nodeUsage = d.dockerUsage
+		nodeUsage = *d.dockerUsage
 		d.dockerUsageMutex.Unlock()
 	}
 
@@ -201,7 +196,7 @@ func (d *Driver) AvailableCapacity(nodeUsage types.Resources, req types.LabelDef
 //
 // It automatically download the required images, unpack them and runs the container.
 // Using metadata to create env file and pass it to the container.
-func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*types.ApplicationResource, error) {
+func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) (*typesv2.ApplicationResource, error) {
 	if d.cfg.IsRemote {
 		// It's remote so let's use docker_usage to store modificators properly
 		d.dockerUsageMutex.Lock()
@@ -271,17 +266,17 @@ func (d *Driver) Allocate(def types.LabelDefinition, metadata map[string]any) (*
 
 	if d.cfg.IsRemote {
 		// Locked in the beginning of the function
-		d.dockerUsage.Add(def.Resources)
+		d.dockerUsage.Add(&def.Resources)
 	}
 
 	log.Infof("DOCKER: %s: Allocate of Container %q completed: %s", d.name, cName, cHwaddr)
 
-	return &types.ApplicationResource{Identifier: cName, HwAddr: cHwaddr}, nil
+	return &typesv2.ApplicationResource{Identifier: cName, HwAddr: cHwaddr}, nil
 }
 
 // Status shows status of the resource
-func (d *Driver) Status(res *types.ApplicationResource) (string, error) {
-	if res == nil || res.Identifier == "" {
+func (d *Driver) Status(res typesv2.ApplicationResource) (string, error) {
+	if res.Identifier == "" {
 		return "", fmt.Errorf("DOCKER: %s: Invalid resource: %v", d.name, res)
 	}
 	if len(d.getAllocatedContainerID(res.Identifier)) > 0 {
@@ -312,8 +307,8 @@ func (d *Driver) GetTask(name, options string) provider.DriverTask {
 }
 
 // Deallocate the resource
-func (d *Driver) Deallocate(res *types.ApplicationResource) error {
-	if res == nil || res.Identifier == "" {
+func (d *Driver) Deallocate(res typesv2.ApplicationResource) error {
+	if res.Identifier == "" {
 		return fmt.Errorf("DOCKER: %s: Invalid resource: %v", d.name, res)
 	}
 	if d.cfg.IsRemote {

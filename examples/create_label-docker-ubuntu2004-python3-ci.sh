@@ -23,8 +23,8 @@ hostport=$2
 
 label=ubuntu2004-python3_docker
 
-# It's a bit dirty, but works for now - probably better to create API call to find the latest label
-curr_label=$(curl -s -u "admin:$token" -k "https://$hostport/api/v1/label/?name=$label" | sed 's/},{/},\n{/g' | tail -1)
+curr_label=$(curl -s -u "admin:$token" -X POST --header "Content-Type: application/json" \
+    -d "{\"name\":\"$label\",\"version\":\"last\"}" -k "https://$hostport/grpc/aquarium.v2.LabelService/List" | sed 's/^.*"data":\[//' | sed 's/\]}$//')
 curr_version="$(echo "$curr_label" | grep -o '"version": *[0-9]\+' | tr -dc '0-9')"
 echo "Current label '$label:$curr_version': $curr_label"
 
@@ -37,25 +37,26 @@ echo "Press any key to create or Ctrl-C to abort"
 read w1
 
 label_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/yaml' -d '---
-name: "'$label'"
-version: '$new_version'
-definitions:
-  - driver: docker
-    options:
-      images:  # For test purposes images are used as symlink to aquarium-bait/out so does not need checksum
-        - url: https://artifact-storage/aquarium/image/docker/ubuntu2004/ubuntu2004-VERSION.tar.xz
-        - url: https://artifact-storage/aquarium/image/docker/ubuntu2004-python3/ubuntu2004-python3-VERSION.tar.xz
-        - url: https://artifact-storage/aquarium/image/docker/ubuntu2004-python3-ci/ubuntu2004-python3-ci-VERSION.tar.xz
-    resources:
-      cpu: 4
-      ram: 4
-      disks:
-        python3:
-          type: hfs+
-          size: 10
-      network: nat
-metadata:
-  JENKINS_AGENT_WORKSPACE: "/mnt/python3"
-' "https://$hostport/api/v1/label/" | grep -o '"UID": *"[^"]\+"' | cut -d':' -f 2 | tr -d ' "')
+label:
+  name: "'$label'"
+  version: '$new_version'
+  definitions:
+    - driver: docker
+      options:
+        images:  # For test purposes images are used as symlink to aquarium-bait/out so does not need checksum
+          - url: https://artifact-storage/aquarium/image/docker/ubuntu2004/ubuntu2004-VERSION.tar.xz
+          - url: https://artifact-storage/aquarium/image/docker/ubuntu2004-python3/ubuntu2004-python3-VERSION.tar.xz
+          - url: https://artifact-storage/aquarium/image/docker/ubuntu2004-python3-ci/ubuntu2004-python3-ci-VERSION.tar.xz
+      resources:
+        cpu: 4
+        ram: 4
+        disks:
+          python3:
+            type: hfs+
+            size: 10
+        network: nat
+  metadata:
+    JENKINS_AGENT_WORKSPACE: "/mnt/python3"
+' "https://$hostport/grpc/aquarium.v2.LabelService/Create" | grep -o '"uid": *"[^"]\+"' | cut -d':' -f 2 | tr -d ' "')
 
 echo "Created Label ID: ${label_id}"

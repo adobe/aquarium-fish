@@ -15,17 +15,17 @@
 package tests
 
 import (
-	"crypto/tls"
+	"context"
 	"fmt"
-	"net/http"
 	"sync"
 	"testing"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/google/uuid"
-	"github.com/steinfletcher/apitest"
 
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
+	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
@@ -57,30 +57,41 @@ drivers:
 		}
 	}()
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	cli := &http.Client{
-		Timeout:   time.Second * 5,
-		Transport: tr,
-	}
+	// Create admin client
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
 
-	var label types.Label
+	// Create service clients
+	labelClient := aquariumv2connect.NewLabelServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+
+	var labelUID string
 	t.Run("Create Label", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/label/")).
-			JSON(`{"name":"test-label", "version":1, "definitions": [
-				{"driver":"test", "resources":{"cpu":1,"ram":2}}
-			]}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&label)
+		resp, err := labelClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
+				Label: &aquariumv2.Label{
+					Name:    "test-label",
+					Version: 1,
+					Definitions: []*aquariumv2.LabelDefinition{{
+						Driver: "test",
+						Resources: &aquariumv2.Resources{
+							Cpu: 1,
+							Ram: 2,
+						},
+					}},
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create label:", err)
+		}
+		labelUID = resp.Msg.Data.Uid
 
-		if label.UID == uuid.Nil {
-			t.Fatalf("Label UID is incorrect: %v", label.UID)
+		if labelUID == uuid.Nil.String() {
+			t.Fatalf("Label UID is incorrect: %v", labelUID)
 		}
 	})
 
@@ -88,34 +99,36 @@ drivers:
 	wg := &sync.WaitGroup{}
 	for i := 0; i < 50; i++ {
 		wg.Add(1)
-		go func(t *testing.T, wg *sync.WaitGroup, id int, afi *h.AFInstance, label string) {
+		go func(t *testing.T, wg *sync.WaitGroup, id int, afi *h.AFInstance, labelUID string) {
 			defer wg.Done()
 
-			tr := &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			}
-			cli := &http.Client{
-				Timeout:   time.Second * 5,
-				Transport: tr,
-			}
+			// Create individual client for each goroutine
+			cli, opts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+			appClient := aquariumv2connect.NewApplicationServiceClient(
+				cli,
+				afi.APIAddress("grpc"),
+				opts...,
+			)
 
-			var app types.Application
 			t.Run(fmt.Sprintf("%04d Create Application", id), func(t *testing.T) {
-				apitest.New().
-					EnableNetworking(cli).
-					Post(afi.APIAddress("api/v1/application/")).
-					JSON(`{"label_UID":"`+label+`"}`).
-					BasicAuth("admin", afi.AdminToken()).
-					Expect(t).
-					Status(http.StatusOK).
-					End().
-					JSON(&app)
+				resp, err := appClient.Create(
+					context.Background(),
+					connect.NewRequest(&aquariumv2.ApplicationServiceCreateRequest{
+						Application: &aquariumv2.Application{
+							LabelUid: labelUID,
+						},
+					}),
+				)
+				if err != nil {
+					t.Error("Failed to create application:", err)
+					return
+				}
 
-				if app.UID == uuid.Nil {
-					t.Errorf("Application UID is incorrect: %v", app.UID)
+				if resp.Msg.Data.Uid == uuid.Nil.String() {
+					t.Errorf("Application UID is incorrect: %v", resp.Msg.Data.Uid)
 				}
 			})
-		}(t, wg, i, afi, label.UID.String())
+		}(t, wg, i, afi, labelUID)
 	}
 	wg.Wait()
 }
@@ -148,30 +161,41 @@ drivers:
 		}
 	}()
 
-	tr := http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	cli := http.Client{
-		Timeout:   time.Second * 100,
-		Transport: &tr,
-	}
+	// Create admin client (no auth)
+	adminCli, adminOpts := h.NewRPCClient("admin", "notoken", h.RPCClientREST)
 
-	var label types.Label
+	// Create service clients
+	labelClient := aquariumv2connect.NewLabelServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+
+	var labelUID string
 	t.Run("Create Label", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(&cli).
-			Post(afi.APIAddress("api/v1/label/")).
-			JSON(`{"name":"test-label", "version":1, "definitions": [
-				{"driver":"test", "resources":{"cpu":1,"ram":2}}
-			]}`).
-			BasicAuth("admin", "notoken").
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&label)
+		resp, err := labelClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
+				Label: &aquariumv2.Label{
+					Name:    "test-label",
+					Version: 1,
+					Definitions: []*aquariumv2.LabelDefinition{{
+						Driver: "test",
+						Resources: &aquariumv2.Resources{
+							Cpu: 1,
+							Ram: 2,
+						},
+					}},
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create label:", err)
+		}
+		labelUID = resp.Msg.Data.Uid
 
-		if label.UID == uuid.Nil {
-			t.Fatalf("Label UID is incorrect: %v", label.UID)
+		if labelUID == uuid.Nil.String() {
+			t.Fatalf("Label UID is incorrect: %v", labelUID)
 		}
 	})
 
@@ -182,31 +206,39 @@ drivers:
 		afi.PrintMemUsage(t)
 		for i := 0; i < 200; i++ {
 			wg.Add(1)
-			go func(t *testing.T, wg *sync.WaitGroup, batch, id int, afi *h.AFInstance, label string) {
+			go func(t *testing.T, wg *sync.WaitGroup, batch, id int, afi *h.AFInstance, labelUID string) {
 				defer wg.Done()
 
-				var app types.Application
+				// Create individual client for each goroutine (no auth)
+				cli, opts := h.NewRPCClient("admin", "notoken", h.RPCClientREST)
+				appClient := aquariumv2connect.NewApplicationServiceClient(
+					cli,
+					afi.APIAddress("grpc"),
+					opts...,
+				)
+
 				t.Run(fmt.Sprintf("%03d-%04d Create Application", batch, id), func(t *testing.T) {
 					h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 300 * time.Millisecond}, t, func(r *h.R) {
-						apitest.New().
-							EnableNetworking(&cli).
-							Post(afi.APIAddress("api/v1/application/")).
-							JSON(`{"label_UID":"`+label+`"}`).
-							BasicAuth("admin", "notoken").
-							Expect(r).
-							Status(http.StatusOK).
-							End().
-							JSON(&app)
+						resp, err := appClient.Create(
+							context.Background(),
+							connect.NewRequest(&aquariumv2.ApplicationServiceCreateRequest{
+								Application: &aquariumv2.Application{
+									LabelUid: labelUID,
+								},
+							}),
+						)
+						if err != nil {
+							r.Error("Failed to create application:", err)
+							return
+						}
 
-						if app.UID == uuid.Nil {
-							r.Errorf("Application UID is incorrect: %v", app.UID)
+						if resp.Msg.Data.Uid == uuid.Nil.String() {
+							r.Errorf("Application UID is incorrect: %v", resp.Msg.Data.Uid)
 						}
 					})
 				})
-			}(t, wg, b, i, afi, label.UID.String())
+			}(t, wg, b, i, afi, labelUID)
 		}
 		wg.Wait()
-		time.Sleep(100 * time.Millisecond)
 	}
-	afi.PrintMemUsage(t)
 }

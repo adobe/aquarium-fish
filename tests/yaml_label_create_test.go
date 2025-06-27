@@ -24,7 +24,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/steinfletcher/apitest"
 
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
@@ -61,30 +61,36 @@ drivers:
 		Transport: tr,
 	}
 
-	var label types.Label
+	var labelResp aquariumv2.LabelServiceCreateResponse
 	t.Run("Create & check YAML Label", func(t *testing.T) {
 		apitest.New().
 			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/label/")).
+			Post(afi.APIAddress("grpc/aquarium.v2.LabelService/Create")).
 			Header("Content-Type", "application/yaml").
 			Body(`---
-name: test-label
-version: 1
-definitions:
-  - driver: test
-    options:  # To verify UnparsedJson logic of UnmarshalYAML too
-      fail_options_apply: 0
-    resources:
-      cpu: 1
-      ram: 2`).
+label:
+  name: test-label
+  version: 1
+  definitions:
+    - driver: test
+      options:  # To verify UnparsedJson logic of UnmarshalYAML too
+        fail_options_apply: 0
+      resources:
+        cpu: 1
+        ram: 2`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
 			Status(http.StatusOK).
 			End().
-			JSON(&label)
+			JSON(&labelResp)
 
-		if label.UID == uuid.Nil {
-			t.Fatalf("Label UID is incorrect: %v", label.UID)
+		if labelResp.GetStatus() != true {
+			t.Fatalf("Can't create label: %v", labelResp.Message)
+		}
+
+		label := labelResp.Data
+		if label.Uid == uuid.Nil.String() {
+			t.Fatalf("Label UID is incorrect: %v", label.Uid)
 		}
 		if label.Name != "test-label" {
 			t.Fatalf("Label Name is incorrect: %v", label.Name)

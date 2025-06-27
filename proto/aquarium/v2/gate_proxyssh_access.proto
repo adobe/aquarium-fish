@@ -1,0 +1,61 @@
+// Copyright 2025 Adobe. All rights reserved.
+// This file is licensed to you under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may obtain a copy
+// of the License at http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software distributed under
+// the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR REPRESENTATIONS
+// OF ANY KIND, either express or implied. See the License for the specific language
+// governing permissions and limitations under the License.
+
+// Author: Sergei Parshev (@sparshev)
+
+syntax = "proto3";
+
+package aquarium.v2;
+
+import "google/protobuf/timestamp.proto";
+import "aquarium/v2/rbac.proto";
+
+option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2";
+
+// GateProxySSHService handles ApplicationResource access operations
+service GateProxySSHService {
+  // GetResourceAccess returns credentials to access the ApplicationResource
+  rpc GetResourceAccess(GateProxySSHServiceGetResourceAccessRequest) returns (GateProxySSHServiceGetResourceAccessResponse) {
+   option (access_control) = {
+     allowed_roles: ["Power"],
+     additional_actions: ["GetResourceAccessAll"],
+   };
+  }
+}
+  
+
+// ProxySSHAccess represents user accessor to connect to the ApplicationResource.
+//
+// An accessor entry to be able to identify and look up different (currently running) Resource.
+//
+// Used to enable SSH pass-through in ProxySSH Gate.
+message GateProxySSHAccess {
+  string uid = 1;
+  google.protobuf.Timestamp created_at = 2;
+  string application_resource_uid = 3;
+  // Address of the closest ProxySSH node (host:port) to help user to connect.
+  string address = 4;
+  // The username to use when logging into the fish node.
+  string username = 5;
+  // The password to use when logging into the fish node.
+  string password = 6;
+  // SSH key could be used instead of password to access the system.
+  string key = 7;
+}
+
+message GateProxySSHServiceGetResourceAccessRequest {
+  string application_resource_uid = 1;
+}
+
+message GateProxySSHServiceGetResourceAccessResponse {
+  bool status = 1;
+  string message = 2;
+  GateProxySSHAccess data = 3;
+}

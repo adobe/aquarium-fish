@@ -17,16 +17,29 @@ package auth
 // Service and Method constants
 const (
 	// ApplicationService service constants
-	ApplicationService            = "ApplicationService"
-	ApplicationServiceCreate      = "Create"
-	ApplicationServiceCreateTask  = "CreateTask"
-	ApplicationServiceDeallocate  = "Deallocate"
-	ApplicationServiceGet         = "Get"
-	ApplicationServiceGetResource = "GetResource"
-	ApplicationServiceGetState    = "GetState"
-	ApplicationServiceGetTask     = "GetTask"
-	ApplicationServiceList        = "List"
-	ApplicationServiceListTask    = "ListTask"
+	ApplicationService               = "ApplicationService"
+	ApplicationServiceCreate         = "Create"
+	ApplicationServiceCreateTask     = "CreateTask"
+	ApplicationServiceCreateTaskAll  = "CreateTaskAll"
+	ApplicationServiceDeallocate     = "Deallocate"
+	ApplicationServiceDeallocateAll  = "DeallocateAll"
+	ApplicationServiceGet            = "Get"
+	ApplicationServiceGetAll         = "GetAll"
+	ApplicationServiceGetResource    = "GetResource"
+	ApplicationServiceGetResourceAll = "GetResourceAll"
+	ApplicationServiceGetState       = "GetState"
+	ApplicationServiceGetStateAll    = "GetStateAll"
+	ApplicationServiceGetTask        = "GetTask"
+	ApplicationServiceGetTaskAll     = "GetTaskAll"
+	ApplicationServiceList           = "List"
+	ApplicationServiceListAll        = "ListAll"
+	ApplicationServiceListTask       = "ListTask"
+	ApplicationServiceListTaskAll    = "ListTaskAll"
+
+	// GateProxySSHService service constants
+	GateProxySSHService                     = "GateProxySSHService"
+	GateProxySSHServiceGetResourceAccess    = "GetResourceAccess"
+	GateProxySSHServiceGetResourceAccessAll = "GetResourceAccessAll"
 
 	// LabelService service constants
 	LabelService       = "LabelService"
@@ -37,7 +50,6 @@ const (
 
 	// NodeService service constants
 	NodeService               = "NodeService"
-	NodeServiceGetProfiling   = "GetProfiling"
 	NodeServiceGetThis        = "GetThis"
 	NodeServiceList           = "List"
 	NodeServiceSetMaintenance = "SetMaintenance"
@@ -51,14 +63,16 @@ const (
 	RoleServiceUpdate = "Update"
 
 	// UserService service constants
-	UserService            = "UserService"
-	UserServiceGetMe       = "GetMe"
-	UserServiceAssignRoles = "AssignRoles"
-	UserServiceCreate      = "Create"
-	UserServiceDelete      = "Delete"
-	UserServiceGet         = "Get"
-	UserServiceList        = "List"
-	UserServiceUpdate      = "Update"
+	UserService               = "UserService"
+	UserServiceGetMe          = "GetMe"
+	UserServiceCreate         = "Create"
+	UserServiceDelete         = "Delete"
+	UserServiceGet            = "Get"
+	UserServiceList           = "List"
+	UserServiceUpdate         = "Update"
+	UserServiceUpdateAll      = "UpdateAll"
+	UserServiceUpdatePassword = "UpdatePassword"
+	UserServiceUpdateRoles    = "UpdateRoles"
 )
 
 // RBAC-excluded services and methods

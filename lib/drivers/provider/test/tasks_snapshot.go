@@ -22,16 +22,16 @@ import (
 
 	"github.com/adobe/aquarium-fish/lib/drivers/provider"
 	"github.com/adobe/aquarium-fish/lib/log"
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
 // TaskSnapshot implements test snapshot task
 type TaskSnapshot struct {
 	driver *Driver
 
-	*types.ApplicationTask     `json:"-"` // Info about the requested task
-	*types.LabelDefinition     `json:"-"` // Info about the used label definition
-	*types.ApplicationResource `json:"-"` // Info about the processed resource
+	*typesv2.ApplicationTask     `json:"-"` // Info about the requested task
+	*typesv2.LabelDefinition     `json:"-"` // Info about the used label definition
+	*typesv2.ApplicationResource `json:"-"` // Info about the processed resource
 
 	Full bool `json:"full"` // Make full (all disks including OS image), or just the additional disks snapshot
 }
@@ -48,7 +48,7 @@ func (t *TaskSnapshot) Clone() provider.DriverTask {
 }
 
 // SetInfo defines the task environment
-func (t *TaskSnapshot) SetInfo(task *types.ApplicationTask, def *types.LabelDefinition, res *types.ApplicationResource) {
+func (t *TaskSnapshot) SetInfo(task *typesv2.ApplicationTask, def *typesv2.LabelDefinition, res *typesv2.ApplicationResource) {
 	t.ApplicationTask = task
 	t.LabelDefinition = def
 	t.ApplicationResource = res

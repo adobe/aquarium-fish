@@ -26,12 +26,12 @@ import (
 
 	"github.com/adobe/aquarium-fish/lib/drivers/provider"
 	"github.com/adobe/aquarium-fish/lib/log"
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
-func (d *Driver) getContainersResources(containerIDs []string) (types.Resources, error) {
-	var out types.Resources
+func (d *Driver) getContainersResources(containerIDs []string) (*typesv2.Resources, error) {
+	out := &typesv2.Resources{}
 
 	// Getting current running containers info - will return "<ncpu>,<mem_bytes>\n..." for each one
 	dockerArgs := []string{"inspect", "--format", "{{ .HostConfig.NanoCpus }},{{ .HostConfig.Memory }}"}
@@ -58,8 +58,8 @@ func (d *Driver) getContainersResources(containerIDs []string) (types.Resources,
 		if resCPU == 0 || resRAM == 0 {
 			return out, fmt.Errorf("DOCKER: %s: The container is non-Fish controlled zero-cpu/ram ones: %q", d.name, containerIDs)
 		}
-		out.Cpu += uint(resCPU / 1000000000) // Originallly in NCPU
-		out.Ram += uint(resRAM / 1073741824) // Get in GB
+		out.Cpu += uint32(resCPU / 1000000000) // Converting from NanoCPU
+		out.Ram += uint32(resRAM / 1073741824) // Get in GB
 		// TODO: Add disks too here
 	}
 
@@ -68,8 +68,8 @@ func (d *Driver) getContainersResources(containerIDs []string) (types.Resources,
 
 // In order to recover after restart we need to find the current docker usage
 // There is some evristics to find the modifiers like Multitenancy and the others
-func (d *Driver) getInitialUsage() (types.Resources, error) {
-	var out types.Resources
+func (d *Driver) getInitialUsage() (*typesv2.Resources, error) {
+	var out *typesv2.Resources
 	// The driver is configured as remote so collecting the current remote docker usage
 	// Listing the existing containers ID's to use in inpect command later
 	stdout, _, err := util.RunAndLog("DOCKER", 5*time.Second, nil, d.cfg.DockerPath, "ps", "--format", "{{ .ID }}")
@@ -109,17 +109,17 @@ func (d *Driver) getInitialUsage() (types.Resources, error) {
 }
 
 // Collects the available resource with alteration
-func (d *Driver) getAvailResources() (availCPU, availRAM uint) {
+func (d *Driver) getAvailResources() (availCPU, availRAM uint32) {
 	if d.cfg.CPUAlter < 0 {
-		availCPU = d.totalCPU - uint(-d.cfg.CPUAlter)
+		availCPU = d.totalCPU - uint32(-d.cfg.CPUAlter)
 	} else {
-		availCPU = d.totalCPU + uint(d.cfg.CPUAlter)
+		availCPU = d.totalCPU + uint32(d.cfg.CPUAlter)
 	}
 
 	if d.cfg.RAMAlter < 0 {
-		availRAM = d.totalRAM - uint(-d.cfg.RAMAlter)
+		availRAM = d.totalRAM - uint32(-d.cfg.RAMAlter)
 	} else {
-		availRAM = d.totalRAM + uint(d.cfg.RAMAlter)
+		availRAM = d.totalRAM + uint32(d.cfg.RAMAlter)
 	}
 
 	return
@@ -292,7 +292,7 @@ func (d *Driver) isNetworkExists(name string) bool {
 }
 
 // Creates disks directories described by the disks map
-func (d *Driver) disksCreate(cName string, runArgs *[]string, disks map[string]types.ResourcesDisk) error {
+func (d *Driver) disksCreate(cName string, runArgs *[]string, disks map[string]typesv2.ResourcesDisk) error {
 	// Create disks
 	diskPaths := make(map[string]string, len(disks))
 

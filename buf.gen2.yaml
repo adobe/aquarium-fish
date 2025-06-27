@@ -1,0 +1,27 @@
+---
+# Stage 2 of generation, because custom tools are using the 1st stage generated code
+# For some reason buf starts all the plugin at the same time, so need this 2nd stage.
+version: v2
+
+# WARNING: We should not use remote plugins here - they tend to exhause buf.build rate limits
+plugins:
+  # We using this tool to generate non-pb data-only structs to safely pass to drivers,
+  # otherwise pb structs has internal mutexes which should not be copied and that forces us
+  # to pass the structs by reference which is dangerous.
+  - local:
+      - go
+      - run
+      - ./tools/buf-gen-pb-data/buf-gen-pb-data.go
+    out: lib/types
+    opt:
+      - paths=source_relative
+  - local:
+      - go
+      - run
+      - ./tools/buf-gen-permissions/buf-gen-permissions.go
+    out: lib/auth
+  - local:
+      - go
+      - run
+      - ./tools/buf-gen-objects-list/buf-gen-objects-list.go
+    out: lib/database

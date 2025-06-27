@@ -167,12 +167,20 @@ func (afi *AFInstance) Stop(tb testing.TB) {
 	if afi.cmd == nil || !afi.running {
 		return
 	}
+
+	// Cleaning up the node variables
+	defer func() {
+		// Not cleaning adminToken, because it's created just one time for DB
+		afi.apiEndpoint = ""
+		afi.proxysshEndpoint = ""
+	}()
+
 	// Send interrupt signal
 	afi.cmd.Process.Signal(os.Interrupt)
 
-	// Wait 10 seconds for process to stop
-	tb.Log("INFO: Wait 10s for fish node to stop:", afi.nodeName, afi.workspace)
-	for i := 1; i < 20; i++ {
+	// Wait 30 seconds for process to stop
+	tb.Log("INFO: Wait 30s for fish node to stop:", afi.nodeName, afi.workspace)
+	for i := 1; i < 60; i++ {
 		if !afi.running {
 			usage, ok := afi.cmd.ProcessState.SysUsage().(*syscall.Rusage)
 			if ok {
@@ -264,6 +272,7 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 			return false
 		}
 		afi.adminToken = val[1]
+		tb.Logf("Located admin user token: %q", afi.adminToken)
 
 		return true
 	})
@@ -275,6 +284,7 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 			return false
 		}
 		afi.apiEndpoint = val[1]
+		tb.Logf("Located api endpoint: %q", afi.apiEndpoint)
 
 		return true
 	})
@@ -285,6 +295,7 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 			return false
 		}
 		afi.proxysshEndpoint = val[1]
+		tb.Logf("Located proxyssh endpoint: %q", afi.proxysshEndpoint)
 
 		return true
 	})
@@ -300,6 +311,12 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 		return true
 	})
 
+	// Detecting race conditions
+	afi.WaitForLog("WARNING: DATA RACE", func(_ /*substring*/, _ /*line*/ string) bool {
+		tb.Error("ERROR: Race condition detected!")
+		return false
+	})
+
 	// TODO: Add timeout for waiting of API available
 	go func() {
 		// Listening for log and scan for token and address
@@ -307,19 +324,21 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 			line := scanner.Text()
 			tb.Log(afi.nodeName, line)
 
-			afi.waitForLogMu.RLock()
-			var substrings []string
-			for key := range afi.waitForLog {
-				substrings = append(substrings, key)
-			}
-			afi.waitForLogMu.RUnlock()
-
-			for _, substring := range substrings {
-				if !strings.Contains(line, substring) {
-					continue
+			go func(currentLine string) {
+				afi.waitForLogMu.RLock()
+				var substrings []string
+				for key := range afi.waitForLog {
+					substrings = append(substrings, key)
 				}
-				afi.callWaitForLog(substring, line)
-			}
+				afi.waitForLogMu.RUnlock()
+
+				for _, substring := range substrings {
+					if !strings.Contains(currentLine, substring) {
+						continue
+					}
+					afi.callWaitForLog(substring, currentLine)
+				}
+			}(line)
 		}
 		tb.Log("INFO: Reading of AquariumFish output is done:", scanner.Err())
 	}()
@@ -343,5 +362,24 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 	if failed != "" {
 		tb.Fatalf("ERROR: Failed to init node %q: %s", afi.nodeName, failed)
 	}
+
+	// Since waiters are executed in goroutine check for Admin password and API host:port available
+	for range 50 {
+		if afi.adminToken != "" && afi.apiEndpoint != "" {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	if afi.adminToken == "" || afi.apiEndpoint == "" {
+		tb.Fatalf("ERROR: Failed to get admin token or api endpoint for node %q: %q %q", afi.nodeName, afi.adminToken, afi.apiEndpoint)
+	}
+
 	tb.Log("INFO: Fish is ready:", afi.nodeName)
+
+	// Running goroutine to listen on fish node failure just in case afi.cmd.Wait will fail
+	go func() {
+		failed := <-initDone
+		fmt.Println(failed)
+	}()
 }

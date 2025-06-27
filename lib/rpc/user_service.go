@@ -16,13 +16,16 @@ package rpc
 
 import (
 	"context"
+	"fmt"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/adobe/aquarium-fish/lib/auth"
 	"github.com/adobe/aquarium-fish/lib/fish"
-	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2"
-	"github.com/adobe/aquarium-fish/lib/rpc/gen/proto/aquarium/v2/aquariumv2connect"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
+	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
+	rpcutil "github.com/adobe/aquarium-fish/lib/rpc/util"
 )
 
 // UserService implements the User service
@@ -33,21 +36,20 @@ type UserService struct {
 
 // GetMe implements the GetMe RPC
 func (*UserService) GetMe(ctx context.Context, _ /*req*/ *connect.Request[aquariumv2.UserServiceGetMeRequest]) (*connect.Response[aquariumv2.UserServiceGetMeResponse], error) {
-	user := GetUserFromContext(ctx)
+	user := rpcutil.GetUserFromContext(ctx)
 	if user == nil {
 		return connect.NewResponse(&aquariumv2.UserServiceGetMeResponse{
 			Status: false, Message: "User not authenticated",
 		}), connect.NewError(connect.CodeUnauthenticated, nil)
 	}
 
+	// Need to filter out Hash for security reasons
+	result := user.ToUser()
+	result.Hash = nil
+
 	return connect.NewResponse(&aquariumv2.UserServiceGetMeResponse{
 		Status: true, Message: "User details retrieved successfully",
-		Data: &aquariumv2.User{
-			Name:      user.Name,
-			CreatedAt: timestamppb.New(user.CreatedAt),
-			UpdatedAt: timestamppb.New(user.UpdatedAt),
-			Roles:     user.Roles,
-		},
+		Data: result,
 	}), nil
 }
 
@@ -79,88 +81,124 @@ func (s *UserService) List(_ /*ctx*/ context.Context, _ /*req*/ *connect.Request
 
 // Get implements the Get RPC
 func (s *UserService) Get(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.UserServiceGetRequest]) (*connect.Response[aquariumv2.UserServiceGetResponse], error) {
-	user, err := s.fish.DB().UserGet(req.Msg.GetName())
+	user, err := s.fish.DB().UserGet(req.Msg.GetUserName())
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceGetResponse{
 			Status: false, Message: "User not found: " + err.Error(),
 		}), connect.NewError(connect.CodeNotFound, err)
 	}
 
+	// Need to filter out Hash for security reasons
+	result := user.ToUser()
+	result.Hash = nil
+
 	return connect.NewResponse(&aquariumv2.UserServiceGetResponse{
 		Status: true, Message: "User retrieved successfully",
-		Data: &aquariumv2.User{
-			Name:      user.Name,
-			CreatedAt: timestamppb.New(user.CreatedAt),
-			UpdatedAt: timestamppb.New(user.UpdatedAt),
-			Roles:     user.Roles,
-		},
+		Data: result,
 	}), nil
 }
 
 // Create implements the Create RPC
 func (s *UserService) Create(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.UserServiceCreateRequest]) (*connect.Response[aquariumv2.UserServiceCreateResponse], error) {
-	password := req.Msg.GetPassword()
+	msgUser := req.Msg.GetUser()
+	if msgUser == nil {
+		return connect.NewResponse(&aquariumv2.UserServiceCreateResponse{
+			Status: false, Message: "User not provided",
+		}), connect.NewError(connect.CodeInvalidArgument, nil)
+	}
+	password := msgUser.GetPassword()
 	if password == "" {
 		// Generate random password if not provided
-		password = GenerateRandomPassword()
+		password = generateRandomPassword()
 	}
 
 	// Create new user
-	password, user, err := s.fish.DB().UserNew(req.Msg.GetName(), password)
+	password, user, err := s.fish.DB().UserNew(msgUser.GetName(), password)
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceCreateResponse{
 			Status: false, Message: "Failed to create user: " + err.Error(),
 		}), connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
+	// Assigning roles if they are defined
+	if msgUser.Roles != nil {
+		user.Roles = msgUser.GetRoles()
+
+		if err := s.fish.DB().UserSave(user); err != nil {
+			return connect.NewResponse(&aquariumv2.UserServiceCreateResponse{
+				Status: false, Message: "Failed to update user: " + err.Error(),
+			}), connect.NewError(connect.CodeInternal, err)
+		}
+	}
+
+	if msgUser.GetPassword() == "" {
+		// Showing the generated password to requestor
+		user.Password = &password
+	}
+
+	// Need to filter out Hash for security reasons
+	result := user.ToUser()
+	result.Hash = nil
+
 	return connect.NewResponse(&aquariumv2.UserServiceCreateResponse{
 		Status: true, Message: "User created successfully",
-		Data: &aquariumv2.UserWithPassword{
-			Name:      user.Name,
-			CreatedAt: timestamppb.New(user.CreatedAt),
-			UpdatedAt: timestamppb.New(user.UpdatedAt),
-			Password:  password,
-			Roles:     user.Roles,
-		},
+		Data: result,
 	}), nil
 }
 
 // Update implements the Update RPC
-func (s *UserService) Update(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.UserServiceUpdateRequest]) (*connect.Response[aquariumv2.UserServiceUpdateResponse], error) {
-	user, err := s.fish.DB().UserGet(req.Msg.GetName())
+func (s *UserService) Update(ctx context.Context, req *connect.Request[aquariumv2.UserServiceUpdateRequest]) (*connect.Response[aquariumv2.UserServiceUpdateResponse], error) {
+	msgUser := req.Msg.GetUser()
+	if msgUser == nil {
+		return connect.NewResponse(&aquariumv2.UserServiceUpdateResponse{
+			Status: false, Message: "User not provided",
+		}), connect.NewError(connect.CodeInvalidArgument, nil)
+	}
+	// Update of User allowed for the User itself & the one who has UpdateAll action
+	if !rpcutil.IsUserName(ctx, msgUser.GetName()) && !rpcutil.CheckUserPermission(ctx, auth.UserServiceUpdateAll) {
+		return connect.NewResponse(&aquariumv2.UserServiceUpdateResponse{
+			Status: false, Message: "Permission denied",
+		}), connect.NewError(connect.CodePermissionDenied, fmt.Errorf("Permission denied"))
+	}
+	user, err := s.fish.DB().UserGet(msgUser.GetName())
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceUpdateResponse{
 			Status: false, Message: "User not found: " + err.Error(),
 		}), connect.NewError(connect.CodeNotFound, err)
 	}
 
-	password := req.Msg.GetPassword()
-	if password != "" {
-		user.Hash = GeneratePasswordHash(password)
+	// Attempt to change password
+	if rpcutil.CheckUserPermission(ctx, auth.UserServiceUpdatePassword) {
+		password := msgUser.GetPassword()
+		if password != "" {
+			user.SetHash(generatePasswordHash(password))
+		}
 	}
 
-	user.Roles = req.Msg.GetRoles()
+	// Attempt to assign user roles
+	if rpcutil.CheckUserPermission(ctx, auth.UserServiceUpdateRoles) {
+		user.Roles = msgUser.GetRoles()
+	}
+
 	if err := s.fish.DB().UserSave(user); err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceUpdateResponse{
 			Status: false, Message: "Failed to update user: " + err.Error(),
 		}), connect.NewError(connect.CodeInternal, err)
 	}
 
+	// Need to filter out Hash for security reasons
+	result := user.ToUser()
+	result.Hash = nil
+
 	return connect.NewResponse(&aquariumv2.UserServiceUpdateResponse{
 		Status: true, Message: "User updated successfully",
-		Data: &aquariumv2.UserWithPassword{
-			Name:      user.Name,
-			CreatedAt: timestamppb.New(user.CreatedAt),
-			UpdatedAt: timestamppb.New(user.UpdatedAt),
-			Password:  password,
-			Roles:     user.Roles,
-		},
+		Data: result,
 	}), nil
 }
 
 // Delete implements the Delete RPC
 func (s *UserService) Delete(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.UserServiceDeleteRequest]) (*connect.Response[aquariumv2.UserServiceDeleteResponse], error) {
-	if err := s.fish.DB().UserDelete(req.Msg.GetName()); err != nil {
+	if err := s.fish.DB().UserDelete(req.Msg.GetUserName()); err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceDeleteResponse{
 			Status: false, Message: "Failed to delete user: " + err.Error(),
 		}), connect.NewError(connect.CodeNotFound, err)
@@ -168,26 +206,5 @@ func (s *UserService) Delete(_ /*ctx*/ context.Context, req *connect.Request[aqu
 
 	return connect.NewResponse(&aquariumv2.UserServiceDeleteResponse{
 		Status: true, Message: "User deleted successfully",
-	}), nil
-}
-
-// AssignRoles implements the AssignRoles RPC
-func (s *UserService) AssignRoles(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.UserServiceAssignRolesRequest]) (*connect.Response[aquariumv2.UserServiceAssignRolesResponse], error) {
-	user, err := s.fish.DB().UserGet(req.Msg.GetName())
-	if err != nil {
-		return connect.NewResponse(&aquariumv2.UserServiceAssignRolesResponse{
-			Status: false, Message: "User not found: " + err.Error(),
-		}), connect.NewError(connect.CodeNotFound, err)
-	}
-
-	user.Roles = req.Msg.GetRoles()
-	if err := s.fish.DB().UserSave(user); err != nil {
-		return connect.NewResponse(&aquariumv2.UserServiceAssignRolesResponse{
-			Status: false, Message: "Failed to assign roles: " + err.Error(),
-		}), connect.NewError(connect.CodeInternal, err)
-	}
-
-	return connect.NewResponse(&aquariumv2.UserServiceAssignRolesResponse{
-		Status: true, Message: "User roles updated successfully",
 	}), nil
 }

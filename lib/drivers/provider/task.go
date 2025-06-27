@@ -15,7 +15,7 @@
 package provider
 
 import (
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
 // DriverTask is interface for driver tasks execution
@@ -28,7 +28,7 @@ type DriverTask interface {
 	Clone() DriverTask
 
 	// Fish provides the task information about the operated items
-	SetInfo(task *types.ApplicationTask, def *types.LabelDefinition, res *types.ApplicationResource)
+	SetInfo(task *typesv2.ApplicationTask, def *typesv2.LabelDefinition, res *typesv2.ApplicationResource)
 
 	// Run the task operation
 	// <- result - json data with results of operation

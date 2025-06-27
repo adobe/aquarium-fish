@@ -23,8 +23,8 @@ hostport=$2
 
 label=ubuntu2004_aws
 
-# It's a bit dirty, but works for now - probably better to create API call to find the latest label
-curr_label=$(curl -s -u "admin:$token" -k "https://$hostport/api/v1/label/?name=$label" | sed 's/},{/},\n{/g' | tail -1)
+curr_label=$(curl -s -u "admin:$token" -X POST --header "Content-Type: application/json" \
+    -d "{\"name\":\"$label\",\"version\":\"last\"}" -k "https://$hostport/grpc/aquarium.v2.LabelService/List" | sed 's/^.*"data":\[//' | sed 's/\]}$//')
 curr_version="$(echo "$curr_label" | grep -o '"version": *[0-9]\+' | tr -dc '0-9')"
 echo "Current label '$label:$curr_version': $curr_label"
 
@@ -37,25 +37,27 @@ echo "Press any key to create or Ctrl-C to abort"
 read w1
 
 label_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/yaml' -d '---
-name: "'$label'"
-version: '$new_version'
-definitions:
-  - driver: aws
-    options:
-      image: ami-0aab355e1bfa1e72e
-      instance_type: c6a.4xlarge
-      security_group: test-sec-group
-      userdata_format: env
-    resources:
-      cpu: 16
-      ram: 32
-      disks:
-        /dev/sdc:
-          label: Name:workspace_lin
-          size: 10
-      network: Name:test-vpc
-metadata:
-  JENKINS_AGENT_WORKSPACE: /mnt/workspace
-' "https://$hostport/api/v1/label/" | grep -o '"UID": *"[^"]\+"' | cut -d':' -f 2 | tr -d ' "')
+label:
+  label:
+    name: "'$label'"
+    version: '$new_version'
+    definitions:
+      - driver: aws
+        options:
+          image: ami-0aab355e1bfa1e72e
+          instance_type: c6a.4xlarge
+          security_group: test-sec-group
+          userdata_format: env
+        resources:
+          cpu: 16
+          ram: 32
+          disks:
+            /dev/sdc:
+              label: Name:workspace_lin
+              size: 10
+          network: Name:test-vpc
+    metadata:
+      JENKINS_AGENT_WORKSPACE: /mnt/ws
+' "https://$hostport/grpc/aquarium.v2.LabelService/Create" | grep -o '"uid": *"[^"]\+"' | cut -d':' -f 2 | tr -d ' "')
 
 echo "Created Label ID: ${label_id}"

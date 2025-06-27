@@ -28,7 +28,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/crypt"
 	"github.com/adobe/aquarium-fish/lib/drivers/provider"
 	"github.com/adobe/aquarium-fish/lib/log"
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
 // Factory implements provider.DriverFactory interface
@@ -87,13 +87,13 @@ func (d *Driver) Prepare(config []byte) error {
 }
 
 // ValidateDefinition checks LabelDefinition is ok
-func (*Driver) ValidateDefinition(def types.LabelDefinition) error {
+func (*Driver) ValidateDefinition(def typesv2.LabelDefinition) error {
 	var opts Options
 	return opts.Apply(def.Options)
 }
 
 // AvailableCapacity allows Fish to ask the driver about it's capacity (free slots) of a specific definition
-func (d *Driver) AvailableCapacity(nodeUsage types.Resources, req types.LabelDefinition) int64 {
+func (d *Driver) AvailableCapacity(nodeUsage typesv2.Resources, req typesv2.LabelDefinition) int64 {
 	var outCount int64
 
 	var opts Options
@@ -159,7 +159,7 @@ func (d *Driver) AvailableCapacity(nodeUsage types.Resources, req types.LabelDef
 }
 
 // Allocate - pretends to Allocate (actually not) the Resource
-func (d *Driver) Allocate(def types.LabelDefinition, _ /*metadata*/ map[string]any) (*types.ApplicationResource, error) {
+func (d *Driver) Allocate(def typesv2.LabelDefinition, _ /*metadata*/ map[string]any) (*typesv2.ApplicationResource, error) {
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
 		return nil, log.Error("TEST: Unable to apply options:", err)
@@ -174,7 +174,7 @@ func (d *Driver) Allocate(def types.LabelDefinition, _ /*metadata*/ map[string]a
 	}
 
 	// Generate random resource id and if exists - regenerate
-	res := &types.ApplicationResource{
+	res := &typesv2.ApplicationResource{
 		IpAddr:         "127.0.0.1",
 		Authentication: def.Authentication,
 	}
@@ -198,8 +198,8 @@ func (d *Driver) Allocate(def types.LabelDefinition, _ /*metadata*/ map[string]a
 }
 
 // Status shows status of the resource
-func (d *Driver) Status(res *types.ApplicationResource) (string, error) {
-	if res == nil || res.Identifier == "" {
+func (d *Driver) Status(res typesv2.ApplicationResource) (string, error) {
+	if res.Identifier == "" {
 		return "", fmt.Errorf("TEST: Invalid resource: %v", res)
 	}
 	if err := randomFail(fmt.Sprintf("Status %s", res.Identifier), d.cfg.FailStatus); err != nil {
@@ -235,8 +235,8 @@ func (d *Driver) GetTask(name, options string) provider.DriverTask {
 }
 
 // Deallocate the resource
-func (d *Driver) Deallocate(res *types.ApplicationResource) error {
-	if res == nil || res.Identifier == "" {
+func (d *Driver) Deallocate(res typesv2.ApplicationResource) error {
+	if res.Identifier == "" {
 		return log.Error("TEST: Invalid resource:", res)
 	}
 	if err := randomFail(fmt.Sprintf("Deallocate %s", res.Identifier), d.cfg.FailDeallocate); err != nil {

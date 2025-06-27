@@ -15,15 +15,13 @@
 package tests
 
 import (
-	"crypto/tls"
-	"net/http"
+	"context"
 	"testing"
-	"time"
 
-	"github.com/google/uuid"
-	"github.com/steinfletcher/apitest"
+	"connectrpc.com/connect"
 
-	"github.com/adobe/aquarium-fish/lib/openapi/types"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
+	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
@@ -51,352 +49,351 @@ drivers:
 		afi.Cleanup(t)
 	})
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	// Create test users
+	regularUserPass := "regular-pass"
+	powerUserPass := "power-pass"
+	regularUser := aquariumv2.User{
+		Name:     "regular-user",
+		Password: &regularUserPass,
 	}
-	cli := &http.Client{
-		Timeout:   time.Second * 5,
-		Transport: tr,
+	powerUser := aquariumv2.User{
+		Name:     "power-user",
+		Password: &powerUserPass,
 	}
 
-	// Create test users
-	var regularUser, powerUser types.UserAPIPassword
-	regularUser.Name = "regular-user"
-	regularUser.Password = "regular-pass"
-	powerUser.Name = "power-user"
-	powerUser.Password = "power-pass"
+	// Create clients for different users
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+	regularCli, regularOpts := h.NewRPCClient(regularUser.Name, regularUserPass, h.RPCClientREST)
+	powerCli, powerOpts := h.NewRPCClient(powerUser.Name, powerUserPass, h.RPCClientREST)
+
+	// Create service clients for admin
+	adminUserClient := aquariumv2connect.NewUserServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+	adminLabelClient := aquariumv2connect.NewLabelServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+	adminAppClient := aquariumv2connect.NewApplicationServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+
+	// Create service clients for regular user
+	regularUserClient := aquariumv2connect.NewUserServiceClient(
+		regularCli,
+		afi.APIAddress("grpc"),
+		regularOpts...,
+	)
+	regularLabelClient := aquariumv2connect.NewLabelServiceClient(
+		regularCli,
+		afi.APIAddress("grpc"),
+		regularOpts...,
+	)
+	regularAppClient := aquariumv2connect.NewApplicationServiceClient(
+		regularCli,
+		afi.APIAddress("grpc"),
+		regularOpts...,
+	)
+
+	// Create service clients for power user
+	powerUserClient := aquariumv2connect.NewUserServiceClient(
+		powerCli,
+		afi.APIAddress("grpc"),
+		powerOpts...,
+	)
+	powerLabelClient := aquariumv2connect.NewLabelServiceClient(
+		powerCli,
+		afi.APIAddress("grpc"),
+		powerOpts...,
+	)
+	powerAppClient := aquariumv2connect.NewApplicationServiceClient(
+		powerCli,
+		afi.APIAddress("grpc"),
+		powerOpts...,
+	)
 
 	t.Run("Admin: Create test users", func(t *testing.T) {
 		// Create regular user
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/user/")).
-			JSON(regularUser).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+		_, err := adminUserClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.UserServiceCreateRequest{User: &regularUser}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create regular user:", err)
+		}
 
 		// Create power user
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/user/")).
-			JSON(powerUser).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
-	})
-
-	t.Run("Regular user without role: Can access small subset of API", func(t *testing.T) {
-		var user types.User
-		// Try to list labels
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/user/me/")).
-			BasicAuth(regularUser.Name, regularUser.Password).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&user)
-
-		if user.Name != regularUser.Name {
-			t.Error("Expected to see myself:", user.Name, "!=", regularUser.Name)
+		_, err = adminUserClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.UserServiceCreateRequest{User: &powerUser}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create power user:", err)
 		}
 	})
 
-	// Test regular user without any role
+	t.Run("Regular user without role: Can access small subset of RPC", func(t *testing.T) {
+		// Try to get own user info
+		resp, err := regularUserClient.GetMe(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.UserServiceGetMeRequest{}),
+		)
+		if err != nil {
+			t.Fatal("Failed to get user info:", err)
+		}
+
+		if resp.Msg.Data.Name != regularUser.Name {
+			t.Error("Expected to see myself:", resp.Msg.Data.Name, "!=", regularUser.Name)
+		}
+	})
+
 	t.Run("Regular user without role: Access denied", func(t *testing.T) {
 		// Try to list labels
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/label/")).
-			BasicAuth(regularUser.Name, regularUser.Password).
-			Expect(t).
-			Status(http.StatusForbidden).
-			End()
+		_, err := regularLabelClient.List(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.LabelServiceListRequest{}),
+		)
+		if err == nil {
+			t.Error("Expected access denied for label list")
+		}
 
 		// Try to create label
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/label/")).
-			JSON(map[string]string{"UID": uuid.New().String()}).
-			BasicAuth(regularUser.Name, regularUser.Password).
-			Expect(t).
-			Status(http.StatusForbidden).
-			End()
+		_, err = regularLabelClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
+				Label: &aquariumv2.Label{
+					Name:    "test-label",
+					Version: 1,
+					Definitions: []*aquariumv2.LabelDefinition{{
+						Driver: "test",
+						Resources: &aquariumv2.Resources{
+							Cpu: 1,
+							Ram: 2,
+						},
+					}},
+				},
+			}),
+		)
+		if err == nil {
+			t.Error("Expected access denied for label create")
+		}
 
 		// Try to list applications
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/")).
-			BasicAuth(regularUser.Name, regularUser.Password).
-			Expect(t).
-			Status(http.StatusForbidden).
-			End()
-
-		// Try to create application
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/application/")).
-			JSON(map[string]string{"label_UID": uuid.New().String()}).
-			BasicAuth(regularUser.Name, regularUser.Password).
-			Expect(t).
-			Status(http.StatusForbidden).
-			End()
-
-		// Try to list users
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/user/")).
-			BasicAuth(regularUser.Name, regularUser.Password).
-			Expect(t).
-			Status(http.StatusForbidden).
-			End()
-
-		// Try to list roles
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/role/")).
-			BasicAuth(regularUser.Name, regularUser.Password).
-			Expect(t).
-			Status(http.StatusForbidden).
-			End()
-
-		// Try to list votes
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/vote/")).
-			BasicAuth(regularUser.Name, regularUser.Password).
-			Expect(t).
-			Status(http.StatusForbidden).
-			End()
-
-		// Try to list nodes
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/node/")).
-			BasicAuth(regularUser.Name, regularUser.Password).
-			Expect(t).
-			Status(http.StatusForbidden).
-			End()
-
-		// Try to check current node
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/node/this/")).
-			BasicAuth(regularUser.Name, regularUser.Password).
-			Expect(t).
-			Status(http.StatusForbidden).
-			End()
+		_, err = regularAppClient.List(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceListRequest{}),
+		)
+		if err == nil {
+			t.Error("Expected access denied for application list")
+		}
 	})
 
 	// Assign User role to regular user
 	t.Run("Admin: Assign User role to regular user", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/user/"+regularUser.Name+"/roles")).
-			JSON([]string{"User"}).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+		_, err := adminUserClient.Update(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.UserServiceUpdateRequest{
+				User: &aquariumv2.User{
+					Name:  regularUser.Name,
+					Roles: []string{"User"},
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to assign role:", err)
+		}
 	})
 
 	// Create a test label
-	var label types.Label
+	var labelUID string
 	t.Run("Admin: Create test label", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/label/")).
-			JSON(`{"name":"test-label", "version":1, "definitions": [{"driver":"test", "resources":{"cpu":1,"ram":2}}]}`).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&label)
+		resp, err := adminLabelClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
+				Label: &aquariumv2.Label{
+					Name:    "test-label",
+					Version: 1,
+					Definitions: []*aquariumv2.LabelDefinition{{
+						Driver: "test",
+						Resources: &aquariumv2.Resources{
+							Cpu: 1,
+							Ram: 2,
+						},
+					}},
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create label:", err)
+		}
+		labelUID = resp.Msg.Data.Uid
 	})
 
 	// Test regular user with User role
-	var regularUserApp types.Application
+	var regularUserAppUID string
 	t.Run("Regular user with User role: Basic operations", func(t *testing.T) {
 		// Should be able to list labels
-		var labels []types.Label
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/label/")).
-			BasicAuth(regularUser.Name, regularUser.Password).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&labels)
-
-		if len(labels) == 0 {
-			t.Fatal("Expected to see labels")
+		_, err := regularLabelClient.List(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.LabelServiceListRequest{}),
+		)
+		if err != nil {
+			t.Error("Expected to be able to list labels:", err)
 		}
 
 		// Should be able to create application
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/application/")).
-			JSON(map[string]string{"label_UID": label.UID.String()}).
-			BasicAuth(regularUser.Name, regularUser.Password).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&regularUserApp)
+		resp, err := regularAppClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceCreateRequest{
+				Application: &aquariumv2.Application{
+					LabelUid: labelUID,
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Expected to be able to create application:", err)
+		}
+		regularUserAppUID = resp.Msg.Data.Uid
 
 		// Should be able to view own application
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+regularUserApp.UID.String())).
-			BasicAuth(regularUser.Name, regularUser.Password).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
-
-		// Should NOT be able to list users
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/user/")).
-			BasicAuth(regularUser.Name, regularUser.Password).
-			Expect(t).
-			Status(http.StatusForbidden).
-			End()
-
-		// Should NOT be able to create labels
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/label/")).
-			JSON(`{"name":"test-label-2", "version":1, "definitions": [{"driver":"test", "resources":{"cpu":1,"ram":2}}]}`).
-			BasicAuth(regularUser.Name, regularUser.Password).
-			Expect(t).
-			Status(http.StatusForbidden).
-			End()
-
-		// Should NOT be able to get tasks
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+regularUserApp.UID.String()+"/task/")).
-			BasicAuth(regularUser.Name, regularUser.Password).
-			Expect(t).
-			Status(http.StatusForbidden).
-			End()
-
-		// Should NOT be able to create tasks
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/application/"+regularUserApp.UID.String()+"/task/")).
-			JSON(`{}`).
-			BasicAuth(regularUser.Name, regularUser.Password).
-			Expect(t).
-			Status(http.StatusForbidden).
-			End()
+		_, err = regularAppClient.Get(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceGetRequest{
+				ApplicationUid: regularUserAppUID,
+			}),
+		)
+		if err != nil {
+			t.Error("Expected to be able to view own application:", err)
+		}
 	})
 
 	// Create another application as admin
-	var adminApp types.Application
+	var adminAppUID string
 	t.Run("Admin: Create another application", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/application/")).
-			JSON(map[string]string{"label_UID": label.UID.String()}).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End().
-			JSON(&adminApp)
+		resp, err := adminAppClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceCreateRequest{
+				Application: &aquariumv2.Application{
+					LabelUid: labelUID,
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to create admin application:", err)
+		}
+		adminAppUID = resp.Msg.Data.Uid
 	})
 
 	t.Run("Regular user: Cannot access admin's application", func(t *testing.T) {
 		// Should NOT be able to view admin's application
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+adminApp.UID.String())).
-			BasicAuth(regularUser.Name, regularUser.Password).
-			Expect(t).
-			Status(http.StatusBadRequest).
-			End()
-
-		// Should NOT be able to deallocate admin's application
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+adminApp.UID.String()+"/deallocate")).
-			BasicAuth(regularUser.Name, regularUser.Password).
-			Expect(t).
-			Status(http.StatusBadRequest).
-			End()
+		_, err := regularAppClient.Get(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceGetRequest{
+				ApplicationUid: adminAppUID,
+			}),
+		)
+		if err == nil {
+			t.Error("Expected to be denied access to admin's application")
+		}
 	})
 
 	// Assign Administrator role to power user
 	t.Run("Admin: Assign Administrator role to power user", func(t *testing.T) {
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/user/"+powerUser.Name+"/roles")).
-			JSON([]string{"Administrator"}).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+		_, err := adminUserClient.Update(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.UserServiceUpdateRequest{
+				User: &aquariumv2.User{
+					Name:  powerUser.Name,
+					Roles: []string{"Administrator"},
+				},
+			}),
+		)
+		if err != nil {
+			t.Fatal("Failed to assign role:", err)
+		}
 	})
 
 	t.Run("Power user with Administrator role: Full access", func(t *testing.T) {
 		// Should be able to list users
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/user/")).
-			BasicAuth(powerUser.Name, powerUser.Password).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+		_, err := powerUserClient.List(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.UserServiceListRequest{}),
+		)
+		if err != nil {
+			t.Error("Expected to be able to list users:", err)
+		}
 
 		// Should be able to create labels
-		apitest.New().
-			EnableNetworking(cli).
-			Post(afi.APIAddress("api/v1/label/")).
-			JSON(`{"name":"admin-label", "version":1, "definitions": [{"driver":"test", "resources":{"cpu":1,"ram":2}}]}`).
-			BasicAuth(powerUser.Name, powerUser.Password).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+		_, err = powerLabelClient.Create(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.LabelServiceCreateRequest{
+				Label: &aquariumv2.Label{
+					Name:    "admin-label",
+					Version: 1,
+					Definitions: []*aquariumv2.LabelDefinition{{
+						Driver: "test",
+						Resources: &aquariumv2.Resources{
+							Cpu: 1,
+							Ram: 2,
+						},
+					}},
+				},
+			}),
+		)
+		if err != nil {
+			t.Error("Expected to be able to create labels:", err)
+		}
 
 		// Should be able to view regular user's application
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+regularUserApp.UID.String())).
-			BasicAuth(powerUser.Name, powerUser.Password).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+		_, err = powerAppClient.Get(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceGetRequest{
+				ApplicationUid: regularUserAppUID,
+			}),
+		)
+		if err != nil {
+			t.Error("Expected to be able to view regular user's application:", err)
+		}
 
 		// Should be able to view admin's application
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+adminApp.UID.String())).
-			BasicAuth(powerUser.Name, powerUser.Password).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+		_, err = powerAppClient.Get(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceGetRequest{
+				ApplicationUid: adminAppUID,
+			}),
+		)
+		if err != nil {
+			t.Error("Expected to be able to view admin's application:", err)
+		}
 	})
 
 	// Test application cleanup
 	t.Run("Cleanup: Deallocate applications", func(t *testing.T) {
 		// Regular user deallocates their application
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+regularUserApp.UID.String()+"/deallocate")).
-			BasicAuth(regularUser.Name, regularUser.Password).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+		_, err := regularAppClient.Deallocate(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceDeallocateRequest{
+				ApplicationUid: regularUserAppUID,
+			}),
+		)
+		if err != nil {
+			t.Error("Failed to deallocate regular user's application:", err)
+		}
 
 		// Admin deallocates their application
-		apitest.New().
-			EnableNetworking(cli).
-			Get(afi.APIAddress("api/v1/application/"+adminApp.UID.String()+"/deallocate")).
-			BasicAuth("admin", afi.AdminToken()).
-			Expect(t).
-			Status(http.StatusOK).
-			End()
+		_, err = adminAppClient.Deallocate(
+			context.Background(),
+			connect.NewRequest(&aquariumv2.ApplicationServiceDeallocateRequest{
+				ApplicationUid: adminAppUID,
+			}),
+		)
+		if err != nil {
+			t.Error("Failed to deallocate admin's application:", err)
+		}
 	})
 }
