@@ -19,7 +19,6 @@ package docker
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -104,19 +103,15 @@ func (d *Driver) Prepare(config []byte) error {
 		return fmt.Errorf("DOCKER: %s: Not enough info values in return: %q", d.name, cpuMem)
 	}
 
-	parsedCPU, err := strconv.ParseUint(cpuMem[0], 10, 64)
+	parsedCPU, err := strconv.ParseUint(cpuMem[0], 10, 32)
 	if err != nil {
-		return fmt.Errorf("DOCKER: %s: Unable to parse CPU uint: %v (%q)", d.name, err, cpuMem[0])
-	}
-	// Ensure parsedCPU fits within the uint range
-	if parsedCPU > uint64(math.MaxUint) {
-		return fmt.Errorf("DOCKER: %s: Parsed CPU value exceeds platform-specific uint range: %v (%q)", d.name, parsedCPU, cpuMem[0])
+		return fmt.Errorf("DOCKER: %s: Unable to parse CPU uint32: %v (%q)", d.name, err, cpuMem[0])
 	}
 	d.totalCPU = uint32(parsedCPU)
 
-	parsedRAM, err := strconv.ParseUint(cpuMem[1], 10, 64)
+	parsedRAM, err := strconv.ParseUint(cpuMem[1], 10, 32)
 	if err != nil {
-		return fmt.Errorf("DOCKER: %s: Unable to parse RAM uint: %v (%q)", d.name, err, cpuMem[1])
+		return fmt.Errorf("DOCKER: %s: Unable to parse RAM uint32: %v (%q)", d.name, err, cpuMem[1])
 	}
 	d.totalRAM = uint32(parsedRAM / 1073741824) // Get in GB
 
