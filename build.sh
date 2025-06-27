@@ -80,7 +80,7 @@ else
     os_list="$(go env GOOS)"
     arch_list="$(go env GOARCH)"
     # Building with race detectors to capture them during integration testing
-    build_command="go build -race"
+    build_command="go build -race -tags debug"
     # Unsetting cgo to allow -race to work propely
     unset CGO_ENABLED
 fi

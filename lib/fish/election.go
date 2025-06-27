@@ -147,7 +147,7 @@ func (f *Fish) electionProcess(appUID typesv2.ApplicationUID) error {
 		// Determine answer for this round, it will try find the first possible definition to serve
 		// Access vote fields with proper synchronization to avoid race conditions
 		f.activeVotesMutex.Lock()
-		activeVote := f.activeVotes[appUID]
+		activeVote = f.activeVotes[appUID]
 		if activeVote == nil {
 			// Vote was removed by another goroutine, exit
 			f.activeVotesMutex.Unlock()

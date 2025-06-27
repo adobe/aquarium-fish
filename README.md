@@ -306,9 +306,8 @@ workers perfromance is not stable, so it's recommended to execute the benchmarks
 
 ### Profiling
 
-You can enable standard golang pprof by setting `node_debug_pprof: true` in fish config. After that
-the profiling will be available on unauthorized endpoint https://localhost:8001/debug/pprof/. So
-it's very not recommended to enable pprof in production.
+Standard go pprof profiling is enabled only in debug builds. It's available on unauthorized
+endpoint https://localhost:8001/debug/pprof/ - so please don't use in production.
 
 You can reach pprof data like that:
 ```

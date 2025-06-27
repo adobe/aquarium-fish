@@ -52,8 +52,8 @@ type mutexOp struct {
 	pos       token.Pos
 }
 
-// mutexState represents the state of a mutex at a given point
-type mutexState struct {
+// MutexState represents the state of a mutex at a given point
+type MutexState struct {
 	isLocked bool
 	lockType string // "Lock", "RLock"
 	lockPos  token.Pos
@@ -63,7 +63,7 @@ type mutexState struct {
 type callSite struct {
 	calledFunction string
 	pos            token.Pos
-	mutexState     map[string]mutexState // snapshot of mutex state at this call site
+	mutexState     map[string]MutexState // snapshot of mutex state at this call site
 }
 
 // Issue represents a detected mutex issue
@@ -338,7 +338,7 @@ func analyzeFunction(ctx *lintContext, fn *ast.FuncDecl) *functionInfo {
 
 	// Track control flow through the function
 	if fn.Body != nil {
-		mutexState := make(map[string]mutexState)
+		mutexState := make(map[string]MutexState)
 		analyzeBlockStatements(ctx, fn.Body.List, funcInfo, mutexState)
 	}
 
@@ -346,13 +346,13 @@ func analyzeFunction(ctx *lintContext, fn *ast.FuncDecl) *functionInfo {
 }
 
 // analyzeBlockStatements processes a list of statements sequentially
-func analyzeBlockStatements(ctx *lintContext, stmts []ast.Stmt, funcInfo *functionInfo, mutexState map[string]mutexState) {
+func analyzeBlockStatements(ctx *lintContext, stmts []ast.Stmt, funcInfo *functionInfo, mutexState map[string]MutexState) {
 	for _, stmt := range stmts {
 		analyzeStatement(ctx, stmt, funcInfo, mutexState)
 	}
 }
 
-func analyzeStatement(ctx *lintContext, stmt ast.Stmt, funcInfo *functionInfo, mutexState map[string]mutexState) {
+func analyzeStatement(ctx *lintContext, stmt ast.Stmt, funcInfo *functionInfo, mutexState map[string]MutexState) {
 	switch s := stmt.(type) {
 	case *ast.ExprStmt:
 		analyzeExpression(ctx, s.X, funcInfo, mutexState)
@@ -428,13 +428,13 @@ func handleDeferStatement(_ *lintContext, call *ast.CallExpr, funcInfo *function
 	}
 }
 
-func analyzeExpression(ctx *lintContext, expr ast.Expr, funcInfo *functionInfo, mutexState map[string]mutexState) {
-	if e, ok := expr.(*ast.CallExpr); ok{
+func analyzeExpression(ctx *lintContext, expr ast.Expr, funcInfo *functionInfo, mutexState map[string]MutexState) {
+	if e, ok := expr.(*ast.CallExpr); ok {
 		analyzeCallExpression(ctx, e, funcInfo, mutexState)
 	}
 }
 
-func analyzeCallExpression(ctx *lintContext, call *ast.CallExpr, funcInfo *functionInfo, mutexState map[string]mutexState) {
+func analyzeCallExpression(ctx *lintContext, call *ast.CallExpr, funcInfo *functionInfo, mutexState map[string]MutexState) {
 	if fun, ok := call.Fun.(*ast.SelectorExpr); ok {
 		selector := fun.Sel.Name
 
@@ -459,7 +459,7 @@ func analyzeCallExpression(ctx *lintContext, call *ast.CallExpr, funcInfo *funct
 	}
 }
 
-func handlemutexOperation(_ *lintContext, call *ast.CallExpr, funcInfo *functionInfo, opType string, mutexState map[string]mutexState) {
+func handlemutexOperation(_ *lintContext, call *ast.CallExpr, funcInfo *functionInfo, opType string, mutexState map[string]MutexState) {
 	mutexName := getMutexName(call)
 	if mutexName == "" {
 		return
@@ -475,7 +475,7 @@ func handlemutexOperation(_ *lintContext, call *ast.CallExpr, funcInfo *function
 	// Update mutex state tracking
 	switch opType {
 	case "Lock", "RLock":
-		mutexState[mutexName] = mutexState{
+		mutexState[mutexName] = MutexState{
 			isLocked: true,
 			lockType: opType,
 			lockPos:  call.Pos(),
@@ -485,8 +485,8 @@ func handlemutexOperation(_ *lintContext, call *ast.CallExpr, funcInfo *function
 	}
 }
 
-func copyMutexState(state map[string]mutexState) map[string]mutexState {
-	copyState := make(map[string]mutexState)
+func copyMutexState(state map[string]MutexState) map[string]MutexState {
+	copyState := make(map[string]MutexState)
 	for k, v := range state {
 		copyState[k] = v
 	}
