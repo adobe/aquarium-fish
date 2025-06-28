@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"golang.org/x/net/http2"
 )
 
 // RPCClientType represents the type of ConnectRPC client to create
@@ -45,27 +46,40 @@ func basicAuth(username, password string) string {
 // NewRPCClient creates a new HTTP client and returns it along with the appropriate connect options
 // for the specified client type and authentication credentials.
 func NewRPCClient(username, password string, clientType RPCClientType) (*http.Client, []connect.ClientOption) {
-	// Create transport with TLS config
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // G402 - used in tests, so not big deal
-	}
+	var cli *http.Client
 
-	// Create HTTP client
-	cli := &http.Client{
-		Timeout:   time.Second * 5,
-		Transport: tr,
+	// For gRPC client type, we need HTTP/2 support for bidirectional streaming
+	if clientType == RPCClientGRPC {
+		// Create TLS config for HTTP/2 support
+		tlsConfig := &tls.Config{
+			InsecureSkipVerify: true,                       //nolint:gosec // G402 - used in tests, so not big deal
+			NextProtos:         []string{"h2", "http/1.1"}, // Prefer HTTP/2
+		}
+
+		// Create HTTP/2 transport over TLS
+		tr := &http2.Transport{
+			TLSClientConfig: tlsConfig,
+		}
+
+		cli = &http.Client{
+			Transport: tr,
+			Timeout:   30 * time.Second, // Longer timeout for streaming operations
+		}
+	} else {
+		// For REST and gRPC-Web, use regular HTTP transport
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // G402 - used in tests, so not big deal
+		}
+
+		cli = &http.Client{
+			Timeout:   time.Second * 5,
+			Transport: tr,
+		}
 	}
 
 	// Create base options with authentication
 	baseOptions := []connect.ClientOption{
-		connect.WithInterceptors(
-			connect.UnaryInterceptorFunc(func(next connect.UnaryFunc) connect.UnaryFunc {
-				return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-					req.Header().Set("Authorization", "Basic "+basicAuth(username, password))
-					return next(ctx, req)
-				}
-			}),
-		),
+		connect.WithInterceptors(newStreamingAuthInterceptor(username, password)),
 	}
 
 	// Add client type specific options
@@ -79,4 +93,39 @@ func NewRPCClient(username, password string, clientType RPCClientType) (*http.Cl
 	}
 
 	return cli, baseOptions
+}
+
+// streamingAuthInterceptor implements the full Interceptor interface for streaming auth
+type streamingAuthInterceptor struct {
+	username string
+	password string
+}
+
+func newStreamingAuthInterceptor(username, password string) *streamingAuthInterceptor {
+	return &streamingAuthInterceptor{
+		username: username,
+		password: password,
+	}
+}
+
+func (i *streamingAuthInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
+	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+		req.Header().Set("Authorization", "Basic "+basicAuth(i.username, i.password))
+		return next(ctx, req)
+	}
+}
+
+func (i *streamingAuthInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
+	return func(ctx context.Context, spec connect.Spec) connect.StreamingClientConn {
+		conn := next(ctx, spec)
+		conn.RequestHeader().Set("Authorization", "Basic "+basicAuth(i.username, i.password))
+		return conn
+	}
+}
+
+func (i *streamingAuthInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
+	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
+		// Server-side streaming handler (not needed for client test)
+		return next(ctx, conn)
+	}
 }

@@ -36,6 +36,7 @@ const (
 	ObjectNetworkInterface       = "NetworkInterface"
 	ObjectRole                   = "Role"
 	ObjectPermission             = "Permission"
+	ObjectStreamError            = "StreamError"
 	ObjectUser                   = "User"
 	ObjectVote                   = "Vote"
 )

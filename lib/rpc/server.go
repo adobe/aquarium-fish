@@ -63,6 +63,10 @@ func NewServer(f *fish.Fish, additionalServices []gate.RPCService) *Server {
 		&NodeService{fish: f},
 	))
 
+	s.mux.Handle(aquariumv2connect.NewStreamingServiceHandler(
+		NewStreamingService(f),
+	))
+
 	// Register additional services from gate drivers
 	for _, svc := range additionalServices {
 		log.Debugf("RPC: Registering additional service: %s", svc.Path)
