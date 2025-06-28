@@ -30,7 +30,7 @@ service ApplicationService {
      additional_actions: ["ListAll"],
    };
   }
-  
+
   // Get application by UID
   rpc Get(ApplicationServiceGetRequest) returns (ApplicationServiceGetResponse) {
    option (access_control) = {
@@ -38,14 +38,14 @@ service ApplicationService {
      additional_actions: ["GetAll"],
    };
   }
-  
+
   // Create new application
   rpc Create(ApplicationServiceCreateRequest) returns (ApplicationServiceCreateResponse) {
    option (access_control) = {
      allowed_roles: ["User"],
    };
   }
-  
+
   // Get application state
   rpc GetState(ApplicationServiceGetStateRequest) returns (ApplicationServiceGetStateResponse) {
    option (access_control) = {
@@ -53,7 +53,7 @@ service ApplicationService {
      additional_actions: ["GetStateAll"],
    };
   }
-  
+
   // Get application resource
   rpc GetResource(ApplicationServiceGetResourceRequest) returns (ApplicationServiceGetResourceResponse) {
    option (access_control) = {
@@ -61,7 +61,7 @@ service ApplicationService {
      additional_actions: ["GetResourceAll"],
    };
   }
-  
+
   // List application tasks
   rpc ListTask(ApplicationServiceListTaskRequest) returns (ApplicationServiceListTaskResponse) {
    option (access_control) = {
@@ -69,7 +69,7 @@ service ApplicationService {
      additional_actions: ["ListTaskAll"],
    };
   }
-  
+
   // Create application task
   rpc CreateTask(ApplicationServiceCreateTaskRequest) returns (ApplicationServiceCreateTaskResponse) {
    option (access_control) = {
@@ -77,7 +77,7 @@ service ApplicationService {
      additional_actions: ["CreateTaskAll"],
    };
   }
-  
+
   // Get application task
   rpc GetTask(ApplicationServiceGetTaskRequest) returns (ApplicationServiceGetTaskResponse) {
    option (access_control) = {
@@ -85,7 +85,7 @@ service ApplicationService {
      additional_actions: ["GetTaskAll"],
    };
   }
-  
+
   // Deallocate application
   rpc Deallocate(ApplicationServiceDeallocateRequest) returns (ApplicationServiceDeallocateResponse) {
    option (access_control) = {
@@ -143,7 +143,7 @@ message ApplicationState {
 // Managed instance definition to be able to properly restore the state during the cluster
 // node restart. Also contains additional info about the instance, for example user requested
 // metadata, which is available for the instance through the `Meta API`.
-// 
+//
 // Could be created and updated only by the node which won the Application execution.
 message ApplicationResource {
   string uid = 1;
@@ -180,10 +180,10 @@ message ApplicationResource {
 // operation, because the request could get from anywhere. Usually app tasks are not a part of
 // standard Application state graph and could be not executed if the Applicationresource is
 // destroyed.
-// 
+//
 // Results are filled by the executor of the task and really depends on what kind of operation
 // is executed and really depends on the driver - it could support the task or not.
-// 
+//
 // It could be created by any Node but updated by the one which won the Application execution.
 message ApplicationTask {
   string uid = 1;
@@ -287,4 +287,4 @@ message ApplicationServiceDeallocateRequest {
 message ApplicationServiceDeallocateResponse {
   bool status = 1;
   string message = 2;
-} 
+}

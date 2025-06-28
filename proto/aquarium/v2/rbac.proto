@@ -43,4 +43,4 @@ message RoleBasedAccessControl {
 extend google.protobuf.MethodOptions {
   // Access control options for the method
   optional RoleBasedAccessControl access_control = 50000;
-} 
+}
