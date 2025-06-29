@@ -28,12 +28,97 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/adobe/aquarium-fish/lib/auth"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
 	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	rpcutil "github.com/adobe/aquarium-fish/lib/rpc/util"
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
+
+// SubscriptionPermissionCache manages user permissions for applications
+type SubscriptionPermissionCache struct {
+	mu            sync.RWMutex
+	userAppAccess map[string]map[typesv2.ApplicationUID]bool // userName -> appUID -> hasAccess
+	lastCleanup   time.Time
+}
+
+// NewSubscriptionPermissionCache creates a new permission cache
+func NewSubscriptionPermissionCache() *SubscriptionPermissionCache {
+	return &SubscriptionPermissionCache{
+		userAppAccess: make(map[string]map[typesv2.ApplicationUID]bool),
+		lastCleanup:   time.Now(),
+	}
+}
+
+// GrantAccess grants a user access to an application UID
+func (spc *SubscriptionPermissionCache) GrantAccess(userName string, appUID typesv2.ApplicationUID) {
+	spc.mu.Lock()
+	defer spc.mu.Unlock()
+
+	if spc.userAppAccess[userName] == nil {
+		spc.userAppAccess[userName] = make(map[typesv2.ApplicationUID]bool)
+	}
+	spc.userAppAccess[userName][appUID] = true
+	log.Debugf("Streaming: Cache granted access to user %s for app %s", userName, appUID)
+}
+
+// HasAccess checks if a user has cached access to an application UID
+func (spc *SubscriptionPermissionCache) HasAccess(userName string, appUID typesv2.ApplicationUID) bool {
+	spc.mu.RLock()
+	defer spc.mu.RUnlock()
+
+	userApps, exists := spc.userAppAccess[userName]
+	if !exists {
+		return false
+	}
+	return userApps[appUID]
+}
+
+// RevokeAccess removes a user's access to an application UID
+func (spc *SubscriptionPermissionCache) RevokeAccess(userName string, appUID typesv2.ApplicationUID) {
+	spc.mu.Lock()
+	defer spc.mu.Unlock()
+
+	if userApps, exists := spc.userAppAccess[userName]; exists {
+		delete(userApps, appUID)
+		log.Debugf("Streaming: Cache revoked access for user %s from app %s", userName, appUID)
+	}
+}
+
+// CleanupStaleEntries removes entries for applications that no longer exist
+func (spc *SubscriptionPermissionCache) CleanupStaleEntries(fish *fish.Fish) {
+	spc.mu.Lock()
+	defer spc.mu.Unlock()
+
+	now := time.Now()
+	// Only cleanup every 5 minutes to avoid excessive database calls
+	if now.Sub(spc.lastCleanup) < 5*time.Minute {
+		return
+	}
+	spc.lastCleanup = now
+
+	log.Debugf("Streaming: Starting permission cache cleanup")
+	removedCount := 0
+
+	for userName, userApps := range spc.userAppAccess {
+		for appUID := range userApps {
+			// Check if application still exists
+			_, err := fish.DB().ApplicationGet(appUID)
+			if err != nil {
+				// Application doesn't exist anymore, remove from cache
+				delete(userApps, appUID)
+				removedCount++
+			}
+		}
+		// Remove empty user entries
+		if len(userApps) == 0 {
+			delete(spc.userAppAccess, userName)
+		}
+	}
+
+	log.Debugf("Streaming: Permission cache cleanup completed, removed %d stale entries", removedCount)
+}
 
 // StreamingService implements the streaming service
 type StreamingService struct {
@@ -49,6 +134,9 @@ type StreamingService struct {
 	// Active subscriptions
 	subscriptionsMutex sync.RWMutex
 	subscriptions      map[string]*subscription
+
+	// Permission cache for subscription filtering
+	permissionCache *SubscriptionPermissionCache
 }
 
 // subscription represents an active database subscription
@@ -74,7 +162,53 @@ func NewStreamingService(f *fish.Fish) *StreamingService {
 		userService:        &UserService{fish: f},
 		roleService:        &RoleService{fish: f},
 		subscriptions:      make(map[string]*subscription),
+		permissionCache:    NewSubscriptionPermissionCache(),
 	}
+}
+
+// requestTypeMapping maps request types to service and method names for RBAC
+type serviceMethodInfo struct {
+	service string
+	method  string
+}
+
+var requestTypeMapping = map[string]serviceMethodInfo{
+	// ApplicationService
+	"ApplicationServiceListRequest":        {auth.ApplicationService, auth.ApplicationServiceList},
+	"ApplicationServiceGetRequest":         {auth.ApplicationService, auth.ApplicationServiceGet},
+	"ApplicationServiceCreateRequest":      {auth.ApplicationService, auth.ApplicationServiceCreate},
+	"ApplicationServiceGetStateRequest":    {auth.ApplicationService, auth.ApplicationServiceGetState},
+	"ApplicationServiceGetResourceRequest": {auth.ApplicationService, auth.ApplicationServiceGetResource},
+	"ApplicationServiceListTaskRequest":    {auth.ApplicationService, auth.ApplicationServiceListTask},
+	"ApplicationServiceCreateTaskRequest":  {auth.ApplicationService, auth.ApplicationServiceCreateTask},
+	"ApplicationServiceGetTaskRequest":     {auth.ApplicationService, auth.ApplicationServiceGetTask},
+	"ApplicationServiceDeallocateRequest":  {auth.ApplicationService, auth.ApplicationServiceDeallocate},
+
+	// LabelService
+	"LabelServiceListRequest":   {auth.LabelService, auth.LabelServiceList},
+	"LabelServiceGetRequest":    {auth.LabelService, auth.LabelServiceGet},
+	"LabelServiceCreateRequest": {auth.LabelService, auth.LabelServiceCreate},
+	"LabelServiceDeleteRequest": {auth.LabelService, auth.LabelServiceDelete},
+
+	// NodeService
+	"NodeServiceListRequest":           {auth.NodeService, auth.NodeServiceList},
+	"NodeServiceGetThisRequest":        {auth.NodeService, auth.NodeServiceGetThis},
+	"NodeServiceSetMaintenanceRequest": {auth.NodeService, auth.NodeServiceSetMaintenance},
+
+	// UserService
+	"UserServiceGetMeRequest":  {auth.UserService, auth.UserServiceGetMe},
+	"UserServiceListRequest":   {auth.UserService, auth.UserServiceList},
+	"UserServiceGetRequest":    {auth.UserService, auth.UserServiceGet},
+	"UserServiceCreateRequest": {auth.UserService, auth.UserServiceCreate},
+	"UserServiceUpdateRequest": {auth.UserService, auth.UserServiceUpdate},
+	"UserServiceDeleteRequest": {auth.UserService, auth.UserServiceDelete},
+
+	// RoleService
+	"RoleServiceListRequest":   {auth.RoleService, auth.RoleServiceList},
+	"RoleServiceGetRequest":    {auth.RoleService, auth.RoleServiceGet},
+	"RoleServiceCreateRequest": {auth.RoleService, auth.RoleServiceCreate},
+	"RoleServiceUpdateRequest": {auth.RoleService, auth.RoleServiceUpdate},
+	"RoleServiceDeleteRequest": {auth.RoleService, auth.RoleServiceDelete},
 }
 
 // Connect handles bidirectional streaming for RPC requests
@@ -108,8 +242,27 @@ func (s *StreamingService) Connect(ctx context.Context, stream *connect.BidiStre
 func (s *StreamingService) processStreamRequest(ctx context.Context, stream *connect.BidiStream[aquariumv2.StreamingServiceConnectRequest, aquariumv2.StreamingServiceConnectResponse], req *aquariumv2.StreamingServiceConnectRequest) {
 	log.Debugf("Streaming: Processing request - ID: %s, Type: %s", req.RequestId, req.RequestType)
 
-	// Route the request to the appropriate service handler
-	responseData, err := s.routeRequest(ctx, req.RequestType, req.RequestData)
+	// Check RBAC permissions and set proper context for target service
+	targetCtx, err := s.prepareTargetServiceContext(ctx, req.RequestType)
+	if err != nil {
+		log.Errorf("Streaming: RBAC permission denied for request %s: %v", req.RequestId, err)
+		// Create error response
+		response := &aquariumv2.StreamingServiceConnectResponse{
+			RequestId:    req.RequestId,
+			ResponseType: s.getResponseType(req.RequestType),
+			Error: &aquariumv2.StreamError{
+				Code:    connect.CodePermissionDenied.String(),
+				Message: fmt.Sprintf("Permission denied: %v", err),
+			},
+		}
+		if sendErr := stream.Send(response); sendErr != nil {
+			log.Errorf("Streaming: Error sending permission denied response for request %s: %v", req.RequestId, sendErr)
+		}
+		return
+	}
+
+	// Route the request to the appropriate service handler using the target service context
+	responseData, err := s.routeRequest(targetCtx, req.RequestType, req.RequestData)
 
 	var response *aquariumv2.StreamingServiceConnectResponse
 	if err != nil {
@@ -140,6 +293,55 @@ func (s *StreamingService) processStreamRequest(ctx context.Context, stream *con
 	} else {
 		log.Debugf("Streaming: Successfully sent response for request %s", req.RequestId)
 	}
+}
+
+// prepareTargetServiceContext checks RBAC permissions and sets the proper context for the target service
+func (s *StreamingService) prepareTargetServiceContext(ctx context.Context, requestType string) (context.Context, error) {
+	// Get service and method from request type
+	serviceMethod, exists := requestTypeMapping[requestType]
+	if !exists {
+		return ctx, fmt.Errorf("unknown request type: %s", requestType)
+	}
+
+	service := serviceMethod.service
+	method := serviceMethod.method
+
+	log.Debugf("Streaming: Checking RBAC permission for %s.%s", service, method)
+
+	// Check if this service/method is excluded from RBAC
+	if auth.IsEcludedFromRBAC(service, method) {
+		log.Debugf("Streaming: Service/method %s.%s is excluded from RBAC", service, method)
+		// Still set the context for consistency
+		return s.setServiceMethodContext(ctx, service, method), nil
+	}
+
+	// Get user from context
+	user := rpcutil.GetUserFromContext(ctx)
+	if user == nil {
+		return ctx, fmt.Errorf("no user found in context")
+	}
+
+	// Check RBAC permission for the target service and method
+	enforcer := auth.GetEnforcer()
+	if enforcer == nil {
+		return ctx, fmt.Errorf("RBAC enforcer not available")
+	}
+
+	if !enforcer.CheckPermission(user.Roles, service, method) {
+		return ctx, fmt.Errorf("user %s with roles %v does not have permission for %s.%s",
+			user.Name, user.Roles, service, method)
+	}
+
+	log.Debugf("Streaming: RBAC permission granted for user %s: %s.%s", user.Name, service, method)
+
+	// Set the target service and method in context (like RBACHandler does)
+	return s.setServiceMethodContext(ctx, service, method), nil
+}
+
+// setServiceMethodContext sets the service and method in context for RBAC
+func (s *StreamingService) setServiceMethodContext(ctx context.Context, service, method string) context.Context {
+	// Use the proper utility function to set RBAC context
+	return rpcutil.SetRBACContext(ctx, service, method)
 }
 
 // routeRequest routes a request to the appropriate service handler
@@ -250,6 +452,15 @@ func (s *StreamingService) routeApplicationRequest(ctx context.Context, requestT
 		if err != nil {
 			return nil, err
 		}
+
+		// Cache permission for the owner (creator) of the application
+		if resp.Msg.Status && resp.Msg.Data != nil {
+			userName := rpcutil.GetUserName(ctx)
+			appUID := stringToUUID(resp.Msg.Data.Uid)
+			s.permissionCache.GrantAccess(userName, appUID)
+			log.Debugf("Streaming: Cached permission for app creator %s -> %s", userName, appUID)
+		}
+
 		return anypb.New(resp.Msg)
 
 	case "ApplicationServiceGetStateRequest":
@@ -716,6 +927,46 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 	}
 }
 
+// checkApplicationAccess checks if a user has access to an application (owner or RBAC permission)
+func (s *StreamingService) checkApplicationAccess(sub *subscription, appUID typesv2.ApplicationUID, rbacMethod string) bool {
+	userName := sub.userName
+
+	// First check cache for quick lookup
+	if s.permissionCache.HasAccess(userName, appUID) {
+		return true
+	}
+
+	// Not in cache, need to validate through database + RBAC
+	app, err := s.fish.DB().ApplicationGet(appUID)
+	if err != nil {
+		log.Debugf("Streaming: Failed to get application %s for permission check: %v", appUID, err)
+		return false
+	}
+
+	// Check if user is the owner
+	isOwner := app.OwnerName == userName
+
+	// Check if user has "All" permission for this operation type
+	hasRBACPermission := false
+	if rbacMethod != "" {
+		// Set proper RBAC context for permission checking
+		rbacCtx := s.setServiceMethodContext(sub.ctx, auth.ApplicationService, rbacMethod)
+		hasRBACPermission = rpcutil.CheckUserPermission(rbacCtx, rbacMethod)
+	}
+
+	hasAccess := isOwner || hasRBACPermission
+
+	log.Debugf("Streaming: Permission check for user %s -> app %s: owner=%t, rbac=%t, access=%t",
+		userName, appUID, isOwner, hasRBACPermission, hasAccess)
+
+	// Cache the result for future use
+	if hasAccess {
+		s.permissionCache.GrantAccess(userName, appUID)
+	}
+
+	return hasAccess
+}
+
 // shouldSendObject checks if an object should be sent to the subscriber based on filters and permissions
 func (s *StreamingService) shouldSendObject(sub *subscription, objectType aquariumv2.SubscriptionType, obj interface{}) bool {
 	// Check if this subscription type is requested
@@ -734,23 +985,23 @@ func (s *StreamingService) shouldSendObject(sub *subscription, objectType aquari
 	switch objectType {
 	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE:
 		if state, ok := obj.(*typesv2.ApplicationState); ok {
-			return s.shouldSendApplicationObject(sub, state.ApplicationUid)
+			return s.shouldSendApplicationObject(sub, state.ApplicationUid, objectType)
 		}
 	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK:
 		if task, ok := obj.(*typesv2.ApplicationTask); ok {
-			return s.shouldSendApplicationObject(sub, task.ApplicationUid)
+			return s.shouldSendApplicationObject(sub, task.ApplicationUid, objectType)
 		}
 	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE:
 		if resource, ok := obj.(*typesv2.ApplicationResource); ok {
-			return s.shouldSendApplicationObject(sub, resource.ApplicationUid)
+			return s.shouldSendApplicationObject(sub, resource.ApplicationUid, objectType)
 		}
 	}
 
 	return true
 }
 
-// shouldSendApplicationObject checks if application-related object should be sent based on ownership and filters
-func (s *StreamingService) shouldSendApplicationObject(sub *subscription, appUID typesv2.ApplicationUID) bool {
+// shouldSendApplicationObject checks if application-related object should be sent based on ownership and RBAC permissions
+func (s *StreamingService) shouldSendApplicationObject(sub *subscription, appUID typesv2.ApplicationUID, objectType aquariumv2.SubscriptionType) bool {
 	log.Debugf("Streaming: Checking if should send object for app %s to user %s", appUID, sub.userName)
 
 	// Check application filters
@@ -761,21 +1012,26 @@ func (s *StreamingService) shouldSendApplicationObject(sub *subscription, appUID
 		}
 	}
 
-	// Check ownership - only send objects for applications owned by the user
-	// unless user has permission to see all
-	app, err := s.fish.DB().ApplicationGet(appUID)
-	if err != nil {
-		log.Debugf("Streaming: Failed to get application %s: %v", appUID, err)
-		return false
+	// Determine the appropriate RBAC method based on subscription type
+	var rbacMethod string
+	switch objectType {
+	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE:
+		rbacMethod = auth.ApplicationServiceGetStateAll
+	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK:
+		rbacMethod = auth.ApplicationServiceListTaskAll
+	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE:
+		rbacMethod = auth.ApplicationServiceGetResourceAll
 	}
 
-	log.Debugf("Streaming: Application %s owned by %s, subscriber is %s", appUID, app.OwnerName, sub.userName)
+	// Check if user has access (owner or RBAC permission)
+	hasAccess := s.checkApplicationAccess(sub, appUID, rbacMethod)
 
-	// For now, only send updates for applications owned by the subscriber
-	// In a real implementation, you'd check RBAC permissions here
-	result := app.OwnerName == sub.userName
-	log.Debugf("Streaming: Ownership check result: %t", result)
-	return result
+	log.Debugf("Streaming: Permission check result for app %s: %t", appUID, hasAccess)
+
+	// Trigger cache cleanup periodically during permission checks
+	s.permissionCache.CleanupStaleEntries(s.fish)
+
+	return hasAccess
 }
 
 // sendSubscriptionResponse sends a subscription response to the client

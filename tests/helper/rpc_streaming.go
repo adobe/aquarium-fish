@@ -321,6 +321,39 @@ func (sc *StreamingClient) WaitForApplicationTask(timeout time.Duration) (*aquar
 	return &appTask, nil
 }
 
+// GetStateNotifications returns the channel for application state notifications
+func (sc *StreamingClient) GetStateNotifications() <-chan *aquariumv2.StreamingServiceSubscribeResponse {
+	if channel, exists := sc.subscriptions[aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE]; exists {
+		return channel
+	}
+	// Return empty channel if not subscribed
+	empty := make(chan *aquariumv2.StreamingServiceSubscribeResponse)
+	close(empty)
+	return empty
+}
+
+// GetResourceNotifications returns the channel for application resource notifications
+func (sc *StreamingClient) GetResourceNotifications() <-chan *aquariumv2.StreamingServiceSubscribeResponse {
+	if channel, exists := sc.subscriptions[aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE]; exists {
+		return channel
+	}
+	// Return empty channel if not subscribed
+	empty := make(chan *aquariumv2.StreamingServiceSubscribeResponse)
+	close(empty)
+	return empty
+}
+
+// GetTaskNotifications returns the channel for application task notifications
+func (sc *StreamingClient) GetTaskNotifications() <-chan *aquariumv2.StreamingServiceSubscribeResponse {
+	if channel, exists := sc.subscriptions[aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK]; exists {
+		return channel
+	}
+	// Return empty channel if not subscribed
+	empty := make(chan *aquariumv2.StreamingServiceSubscribeResponse)
+	close(empty)
+	return empty
+}
+
 // Close gracefully closes all streaming connections
 func (sc *StreamingClient) Close() {
 	sc.t.Log("Closing streaming connections...")
