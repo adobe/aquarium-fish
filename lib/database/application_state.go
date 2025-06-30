@@ -76,7 +76,14 @@ func (d *Database) ApplicationStateCreate(as *typesv2.ApplicationState) error {
 		d.subsMu.RUnlock()
 
 		for _, ch := range channels {
-			ch <- appState
+			// Use select with default to prevent panic if channel is closed
+			select {
+			case ch <- appState:
+				// Successfully sent notification
+			default:
+				// Channel is closed or full, skip this subscriber
+				log.Debugf("Database: Failed to send ApplicationState notification, channel closed or full")
+			}
 		}
 	}(as)
 

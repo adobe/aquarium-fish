@@ -56,14 +56,18 @@ func NewRPCClient(username, password string, clientType RPCClientType) (*http.Cl
 			NextProtos:         []string{"h2", "http/1.1"}, // Prefer HTTP/2
 		}
 
-		// Create HTTP/2 transport over TLS
+		// Create HTTP/2 transport over TLS with streaming-friendly settings
 		tr := &http2.Transport{
 			TLSClientConfig: tlsConfig,
+			// Streaming-friendly HTTP/2 settings
+			ReadIdleTimeout: 300 * time.Second, // 5 minutes for streaming read idle
+			PingTimeout:     30 * time.Second,  // Keep connection alive with pings
 		}
 
 		cli = &http.Client{
 			Transport: tr,
-			Timeout:   30 * time.Second, // Longer timeout for streaming operations
+			// No timeout for streaming operations - let context handle timeouts instead
+			Timeout: 0,
 		}
 	} else {
 		// For REST and gRPC-Web, use regular HTTP transport

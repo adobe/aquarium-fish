@@ -119,6 +119,14 @@ type AFInstance struct {
 
 	waitForLog   map[string]func(string, string) bool
 	waitForLogMu sync.RWMutex
+
+	// Mutex to protect running state and process state access
+	processMu sync.RWMutex
+	// Store process state after cmd.Wait() completes to avoid race conditions
+	processState *os.ProcessState
+
+	// Mutex to protect configuration fields set during initialization
+	configMu sync.RWMutex
 }
 
 // NewAquariumFish simple creates and run the fish node
@@ -184,11 +192,15 @@ func (afi *AFInstance) NewAfInstanceCluster(tb testing.TB, name, cfg string) *AF
 
 // APIEndpoint will return IP:PORT
 func (afi *AFInstance) APIEndpoint() string {
+	afi.configMu.RLock()
+	defer afi.configMu.RUnlock()
 	return afi.apiEndpoint
 }
 
 // ProxySSHEndpoint will return IP:PORT
 func (afi *AFInstance) ProxySSHEndpoint() string {
+	afi.configMu.RLock()
+	defer afi.configMu.RUnlock()
 	return afi.proxysshEndpoint
 }
 
@@ -204,11 +216,15 @@ func (afi *AFInstance) Workspace() string {
 
 // AdminToken returns admin token
 func (afi *AFInstance) AdminToken() string {
+	afi.configMu.RLock()
+	defer afi.configMu.RUnlock()
 	return afi.adminToken
 }
 
 // IsRunning checks the fish instance is running
 func (afi *AFInstance) IsRunning() bool {
+	afi.processMu.RLock()
+	defer afi.processMu.RUnlock()
 	return afi.running
 }
 
@@ -236,7 +252,13 @@ func (afi *AFInstance) Cleanup(tb testing.TB) {
 // Stop the fish node executable
 func (afi *AFInstance) Stop(tb testing.TB) {
 	tb.Helper()
-	if afi.cmd == nil || !afi.running {
+
+	// Check if we need to stop at all
+	afi.processMu.RLock()
+	shouldStop := afi.cmd != nil && afi.running
+	afi.processMu.RUnlock()
+
+	if !shouldStop {
 		return
 	}
 
@@ -253,10 +275,17 @@ func (afi *AFInstance) Stop(tb testing.TB) {
 	// Wait 30 seconds for process to stop
 	tb.Log("INFO: Wait 30s for fish node to stop:", afi.nodeName, afi.workspace)
 	for i := 1; i < 60; i++ {
-		if !afi.running {
-			usage, ok := afi.cmd.ProcessState.SysUsage().(*syscall.Rusage)
-			if ok {
-				tb.Log("INFO: MaxRSS:", usage.Maxrss)
+		afi.processMu.RLock()
+		isRunning := afi.running
+		processState := afi.processState
+		afi.processMu.RUnlock()
+
+		if !isRunning {
+			// Process has stopped, safely read process state
+			if processState != nil {
+				if usage, ok := processState.SysUsage().(*syscall.Rusage); ok {
+					tb.Log("INFO: MaxRSS:", usage.Maxrss)
+				}
 			}
 			return
 		}
@@ -264,12 +293,20 @@ func (afi *AFInstance) Stop(tb testing.TB) {
 	}
 
 	// Hard killing the process
+	tb.Errorf("I had to hard-kill Fish after 30s of Interrupt waiting - it's not good...")
 	afi.fishKill()
 	for i := 1; i < 20; i++ {
-		if !afi.running {
-			usage, ok := afi.cmd.ProcessState.SysUsage().(*syscall.Rusage)
-			if ok {
-				tb.Log("INFO: MaxRSS:", usage.Maxrss)
+		afi.processMu.RLock()
+		isRunning := afi.running
+		processState := afi.processState
+		afi.processMu.RUnlock()
+
+		if !isRunning {
+			// Process has stopped, safely read process state
+			if processState != nil {
+				if usage, ok := processState.SysUsage().(*syscall.Rusage); ok {
+					tb.Log("INFO: MaxRSS:", usage.Maxrss)
+				}
 			}
 			return
 		}
@@ -279,14 +316,25 @@ func (afi *AFInstance) Stop(tb testing.TB) {
 
 func (afi *AFInstance) PrintMemUsage(tb testing.TB) {
 	tb.Helper()
-	proc, err := process.NewProcess(int32(afi.cmd.Process.Pid))
+
+	afi.processMu.RLock()
+	cmd := afi.cmd
+	isRunning := afi.running
+	afi.processMu.RUnlock()
+
+	if !isRunning || cmd == nil || cmd.Process == nil {
+		tb.Log("ERROR: Process not running or not available for memory usage check")
+		return
+	}
+
+	proc, err := process.NewProcess(int32(cmd.Process.Pid))
 	if err != nil {
-		tb.Log("ERROR: Unable to read process for PID", afi.cmd.Process.Pid, err)
+		tb.Log("ERROR: Unable to read process for PID", cmd.Process.Pid, err)
 		return
 	}
 	mem, err := proc.MemoryInfo()
 	if err != nil {
-		tb.Log("ERROR: Unable to read process memory info for PID", afi.cmd.Process.Pid, err)
+		tb.Log("ERROR: Unable to read process memory info for PID", cmd.Process.Pid, err)
 		return
 	}
 	tb.Log("INFO: node", afi.nodeName, "memory usage:", mem.String())
@@ -314,7 +362,13 @@ func (afi *AFInstance) callWaitForLog(substring, line string) {
 // Start the fish node executable
 func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 	tb.Helper()
-	if afi.running {
+
+	// Check if already running
+	afi.processMu.RLock()
+	alreadyRunning := afi.running
+	afi.processMu.RUnlock()
+
+	if alreadyRunning {
 		tb.Fatalf("ERROR: Fish node %q can't be started since already started", afi.nodeName)
 		return
 	}
@@ -345,8 +399,10 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 			initDone <- fmt.Sprintf("ERROR: No token after %q", substring)
 			return false
 		}
+		afi.configMu.Lock()
 		afi.adminToken = val[1]
-		tb.Logf("Located admin user token: %q", afi.adminToken)
+		afi.configMu.Unlock()
+		tb.Logf("Located admin user token: %q", val[1])
 
 		return true
 	})
@@ -357,8 +413,10 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 			initDone <- fmt.Sprintf("ERROR: No address after %q", substring)
 			return false
 		}
+		afi.configMu.Lock()
 		afi.apiEndpoint = val[1]
-		tb.Logf("Located api endpoint: %q", afi.apiEndpoint)
+		afi.configMu.Unlock()
+		tb.Logf("Located api endpoint: %q", val[1])
 
 		return true
 	})
@@ -368,8 +426,10 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 			initDone <- fmt.Sprintf("ERROR: No address after %q", substring)
 			return false
 		}
+		afi.configMu.Lock()
 		afi.proxysshEndpoint = val[1]
-		tb.Logf("Located proxyssh endpoint: %q", afi.proxysshEndpoint)
+		afi.configMu.Unlock()
+		tb.Logf("Located proxyssh endpoint: %q", val[1])
 
 		return true
 	})
@@ -420,11 +480,19 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 	afi.cmd.Start()
 
 	go func() {
+		afi.processMu.Lock()
 		afi.running = true
+		afi.processMu.Unlock()
+
 		defer func() {
 			r.Close()
+			afi.processMu.Lock()
 			afi.running = false
+			// Store process state after cmd.Wait() completes
+			afi.processState = afi.cmd.ProcessState
+			afi.processMu.Unlock()
 		}()
+
 		if err := afi.cmd.Wait(); err != nil {
 			tb.Log("WARN: AquariumFish process was stopped:", err)
 			initDone <- fmt.Sprintf("ERROR: Fish was stopped with exit code: %v", err)
@@ -439,14 +507,24 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 
 	// Since waiters are executed in goroutine check for Admin password and API host:port available
 	for range 50 {
-		if afi.adminToken != "" && afi.apiEndpoint != "" {
+		afi.configMu.RLock()
+		hasAdminToken := afi.adminToken != ""
+		hasAPIEndpoint := afi.apiEndpoint != ""
+		afi.configMu.RUnlock()
+
+		if hasAdminToken && hasAPIEndpoint {
 			break
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	if afi.adminToken == "" || afi.apiEndpoint == "" {
-		tb.Fatalf("ERROR: Failed to get admin token or api endpoint for node %q: %q %q", afi.nodeName, afi.adminToken, afi.apiEndpoint)
+	afi.configMu.RLock()
+	adminToken := afi.adminToken
+	apiEndpoint := afi.apiEndpoint
+	afi.configMu.RUnlock()
+
+	if adminToken == "" || apiEndpoint == "" {
+		tb.Fatalf("ERROR: Failed to get admin token or api endpoint for node %q: %q %q", afi.nodeName, adminToken, apiEndpoint)
 	}
 
 	tb.Log("INFO: Fish is ready:", afi.nodeName)

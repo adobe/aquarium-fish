@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -135,8 +136,16 @@ type StreamingService struct {
 	subscriptionsMutex sync.RWMutex
 	subscriptions      map[string]*subscription
 
+	// Active bidirectional connections
+	connectionsMutex sync.RWMutex
+	connections      map[string]*bidirectionalConnection
+
 	// Permission cache for subscription filtering
 	permissionCache *SubscriptionPermissionCache
+
+	// Shutdown coordination
+	shutdownMutex  sync.RWMutex
+	isShuttingDown bool
 }
 
 // subscription represents an active database subscription
@@ -150,6 +159,229 @@ type subscription struct {
 	stateChannel  chan *typesv2.ApplicationState
 	taskChannel   chan *typesv2.ApplicationTask
 	resourceChan  chan *typesv2.ApplicationResource
+
+	// Buffer overflow protection
+	overflowMutex    sync.RWMutex
+	overflowCount    int  // Count of consecutive buffer overflows
+	isOverflowing    bool // Flag to indicate client is struggling
+	lastOverflowTime time.Time
+}
+
+// Buffer overflow protection constants
+const (
+	maxOverflowCount  = 5                      // Max consecutive overflows before disconnection
+	overflowTimeout   = 100 * time.Millisecond // Max time to wait for channel send
+	overflowResetTime = 30 * time.Second       // Time after which overflow count resets
+)
+
+// recordOverflow tracks buffer overflow events for this subscription
+func (sub *subscription) recordOverflow() bool {
+	sub.overflowMutex.Lock()
+	defer sub.overflowMutex.Unlock()
+
+	now := time.Now()
+
+	// Reset overflow count if enough time has passed since last overflow
+	if now.Sub(sub.lastOverflowTime) > overflowResetTime {
+		sub.overflowCount = 0
+		sub.isOverflowing = false
+	}
+
+	sub.overflowCount++
+	sub.lastOverflowTime = now
+
+	// Mark as overflowing if we hit the threshold
+	if sub.overflowCount >= maxOverflowCount {
+		sub.isOverflowing = true
+		return true // Signal that client should be disconnected
+	}
+
+	return false
+}
+
+// resetOverflow resets the overflow tracking (called on successful sends)
+func (sub *subscription) resetOverflow() {
+	sub.overflowMutex.Lock()
+	defer sub.overflowMutex.Unlock()
+
+	// Only reset if we had recent overflow issues
+	if time.Since(sub.lastOverflowTime) < overflowResetTime {
+		sub.overflowCount = 0
+		sub.isOverflowing = false
+	}
+}
+
+// isClientOverflowing checks if client is currently struggling with buffer overflow
+func (sub *subscription) isClientOverflowing() bool {
+	sub.overflowMutex.RLock()
+	defer sub.overflowMutex.RUnlock()
+	return sub.isOverflowing
+}
+
+// safeSendToStateChannel attempts to send to state channel with overflow detection
+func (sub *subscription) safeSendToStateChannel(state *typesv2.ApplicationState) bool {
+	select {
+	case sub.stateChannel <- state:
+		sub.resetOverflow()
+		return true
+	case <-time.After(overflowTimeout):
+		log.Warnf("Subscription %s: State channel send timeout (buffer overflow)", sub.userName)
+		return sub.recordOverflow()
+	default:
+		log.Warnf("Subscription %s: State channel full (buffer overflow)", sub.userName)
+		return sub.recordOverflow()
+	}
+}
+
+// safeSendToTaskChannel attempts to send to task channel with overflow detection
+func (sub *subscription) safeSendToTaskChannel(task *typesv2.ApplicationTask) bool {
+	select {
+	case sub.taskChannel <- task:
+		sub.resetOverflow()
+		return true
+	case <-time.After(overflowTimeout):
+		log.Warnf("Subscription %s: Task channel send timeout (buffer overflow)", sub.userName)
+		return sub.recordOverflow()
+	default:
+		log.Warnf("Subscription %s: Task channel full (buffer overflow)", sub.userName)
+		return sub.recordOverflow()
+	}
+}
+
+// safeSendToResourceChannel attempts to send to resource channel with overflow detection
+func (sub *subscription) safeSendToResourceChannel(resource *typesv2.ApplicationResource) bool {
+	select {
+	case sub.resourceChan <- resource:
+		sub.resetOverflow()
+		return true
+	case <-time.After(overflowTimeout):
+		log.Warnf("Subscription %s: Resource channel send timeout (buffer overflow)", sub.userName)
+		return sub.recordOverflow()
+	default:
+		log.Warnf("Subscription %s: Resource channel full (buffer overflow)", sub.userName)
+		return sub.recordOverflow()
+	}
+}
+
+// relayStateNotifications safely relays state notifications with buffer overflow protection
+func (s *StreamingService) relayStateNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan *typesv2.ApplicationState) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("Subscription %s: State relay goroutine panic: %v", subscriptionID, r)
+		}
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Debugf("Subscription %s: State relay stopping due to context cancellation", subscriptionID)
+			return
+		case state, ok := <-dbChannel:
+			if !ok {
+				log.Debugf("Subscription %s: State relay stopping due to closed database channel", subscriptionID)
+				return
+			}
+
+			// Check if client is already overflowing - skip notification to prevent further overflow
+			if sub.isClientOverflowing() {
+				log.Debugf("Subscription %s: Skipping state notification due to client overflow", subscriptionID)
+				continue
+			}
+
+			// Try to send safely - if this returns true, client should be disconnected
+			if shouldDisconnect := !sub.safeSendToStateChannel(state); shouldDisconnect {
+				log.Errorf("Subscription %s: Disconnecting client due to excessive buffer overflow", subscriptionID)
+				sub.cancel() // This will cause the main subscription loop to exit
+				return
+			}
+		}
+	}
+}
+
+// relayTaskNotifications safely relays task notifications with buffer overflow protection
+func (s *StreamingService) relayTaskNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan *typesv2.ApplicationTask) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("Subscription %s: Task relay goroutine panic: %v", subscriptionID, r)
+		}
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Debugf("Subscription %s: Task relay stopping due to context cancellation", subscriptionID)
+			return
+		case task, ok := <-dbChannel:
+			if !ok {
+				log.Debugf("Subscription %s: Task relay stopping due to closed database channel", subscriptionID)
+				return
+			}
+
+			// Check if client is already overflowing - skip notification to prevent further overflow
+			if sub.isClientOverflowing() {
+				log.Debugf("Subscription %s: Skipping task notification due to client overflow", subscriptionID)
+				continue
+			}
+
+			// Try to send safely - if this returns true, client should be disconnected
+			if shouldDisconnect := !sub.safeSendToTaskChannel(task); shouldDisconnect {
+				log.Errorf("Subscription %s: Disconnecting client due to excessive buffer overflow", subscriptionID)
+				sub.cancel() // This will cause the main subscription loop to exit
+				return
+			}
+		}
+	}
+}
+
+// relayResourceNotifications safely relays resource notifications with buffer overflow protection
+func (s *StreamingService) relayResourceNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan *typesv2.ApplicationResource) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("Subscription %s: Resource relay goroutine panic: %v", subscriptionID, r)
+		}
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Debugf("Subscription %s: Resource relay stopping due to context cancellation", subscriptionID)
+			return
+		case resource, ok := <-dbChannel:
+			if !ok {
+				log.Debugf("Subscription %s: Resource relay stopping due to closed database channel", subscriptionID)
+				return
+			}
+
+			// Check if client is already overflowing - skip notification to prevent further overflow
+			if sub.isClientOverflowing() {
+				log.Debugf("Subscription %s: Skipping resource notification due to client overflow", subscriptionID)
+				continue
+			}
+
+			// Try to send safely - if this returns true, client should be disconnected
+			if shouldDisconnect := !sub.safeSendToResourceChannel(resource); shouldDisconnect {
+				log.Errorf("Subscription %s: Disconnecting client due to excessive buffer overflow", subscriptionID)
+				sub.cancel() // This will cause the main subscription loop to exit
+				return
+			}
+		}
+	}
+}
+
+// bidirectionalConnection represents an active bidirectional streaming connection
+type bidirectionalConnection struct {
+	stream      *connect.BidiStream[aquariumv2.StreamingServiceConnectRequest, aquariumv2.StreamingServiceConnectResponse]
+	streamMutex sync.Mutex // Protects concurrent access to stream.Send()
+	userName    string
+	ctx         context.Context
+	cancel      context.CancelFunc
+}
+
+// safeSend safely sends a response through the bidirectional stream with proper synchronization
+func (conn *bidirectionalConnection) safeSend(response *aquariumv2.StreamingServiceConnectResponse) error {
+	conn.streamMutex.Lock()
+	defer conn.streamMutex.Unlock()
+	return conn.stream.Send(response)
 }
 
 // NewStreamingService creates a new streaming service
@@ -162,6 +394,7 @@ func NewStreamingService(f *fish.Fish) *StreamingService {
 		userService:        &UserService{fish: f},
 		roleService:        &RoleService{fish: f},
 		subscriptions:      make(map[string]*subscription),
+		connections:        make(map[string]*bidirectionalConnection),
 		permissionCache:    NewSubscriptionPermissionCache(),
 	}
 }
@@ -213,33 +446,112 @@ var requestTypeMapping = map[string]serviceMethodInfo{
 
 // Connect handles bidirectional streaming for RPC requests
 func (s *StreamingService) Connect(ctx context.Context, stream *connect.BidiStream[aquariumv2.StreamingServiceConnectRequest, aquariumv2.StreamingServiceConnectResponse]) error {
-	log.Debugf("Streaming: NEW BIDIRECTIONAL CONNECTION ESTABLISHED - Connect method called!")
-
 	userName := rpcutil.GetUserName(ctx)
-	log.Debugf("Streaming: Bidirectional connection for user: %s", userName)
+	connectionID := fmt.Sprintf("%s-%s", userName, uuid.NewString())
+	log.Debugf("Streaming: New bidirectional connection for user: %s (ID: %s)", userName, connectionID)
+
+	// Check if server is shutting down
+	s.shutdownMutex.RLock()
+	if s.isShuttingDown {
+		s.shutdownMutex.RUnlock()
+		log.Debugf("Streaming: Rejecting new connection during shutdown: %s", connectionID)
+		return connect.NewError(connect.CodeUnavailable, fmt.Errorf("server is shutting down"))
+	}
+	s.shutdownMutex.RUnlock()
+
+	// Create connection context
+	connCtx, cancel := context.WithCancel(ctx)
+
+	// Create and register connection
+	conn := &bidirectionalConnection{
+		stream:   stream,
+		userName: userName,
+		ctx:      connCtx,
+		cancel:   cancel,
+	}
+
+	s.connectionsMutex.Lock()
+	s.connections[connectionID] = conn
+	s.connectionsMutex.Unlock()
+
+	defer func() {
+		// Clean up connection
+		s.connectionsMutex.Lock()
+		delete(s.connections, connectionID)
+		s.connectionsMutex.Unlock()
+		cancel()
+		log.Debugf("Streaming: Cleaned up bidirectional connection: %s", connectionID)
+	}()
+
+	// Create a channel to handle incoming requests
+	requestChan := make(chan *aquariumv2.StreamingServiceConnectRequest, 10)
+
+	// Start goroutine to read requests
+	go func() {
+		defer close(requestChan)
+		for {
+			req, err := stream.Receive()
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					log.Debugf("Streaming: Client closed bidirectional connection gracefully")
+					return
+				}
+				// Check if context was cancelled (expected during shutdown)
+				if connCtx.Err() != nil {
+					log.Debugf("Streaming: Connection context cancelled, stopping receive loop")
+					return
+				}
+				log.Errorf("Streaming: Error receiving request: %v", err)
+				return
+			}
+
+			select {
+			case requestChan <- req:
+			case <-connCtx.Done():
+				return
+			}
+		}
+	}()
+
+	// Create keep-alive ticker to prevent connection timeouts
+	keepAliveTicker := time.NewTicker(30 * time.Second)
+	defer keepAliveTicker.Stop()
 
 	for {
-		log.Debugf("Streaming: Waiting for next request from client...")
-		req, err := stream.Receive()
-		if err != nil {
-			// Check for wrapped EOF (common in streaming connections)
-			if errors.Is(err, io.EOF) {
-				log.Debugf("Streaming: Client closed bidirectional connection gracefully")
+		select {
+		case <-connCtx.Done():
+			log.Debugf("Streaming: Bidirectional connection context cancelled for user: %s (ID: %s)", userName, connectionID)
+			return nil
+
+		case <-keepAliveTicker.C:
+			// Send keep-alive ping to prevent connection timeout
+			log.Debugf("Streaming: Sending keep-alive ping to client")
+			// We can send a special keep-alive response that clients can ignore
+			keepAliveResp := &aquariumv2.StreamingServiceConnectResponse{
+				RequestId:    "keep-alive",
+				ResponseType: "KeepAliveResponse",
+			}
+			if err := conn.safeSend(keepAliveResp); err != nil {
+				log.Errorf("Streaming: Error sending keep-alive: %v", err)
+				return connect.NewError(connect.CodeInternal, fmt.Errorf("failed to send keep-alive: %w", err))
+			}
+
+		case req, ok := <-requestChan:
+			if !ok {
+				// Channel closed, connection ended
 				return nil
 			}
-			log.Errorf("Streaming: Error receiving request: %v", err)
-			return connect.NewError(connect.CodeInternal, fmt.Errorf("failed to receive request: %w", err))
+
+			log.Debugf("Streaming: Received request - ID: %s, Type: %s", req.RequestId, req.RequestType)
+
+			// Process request asynchronously using the connection context
+			go s.processStreamRequest(connCtx, conn, req)
 		}
-
-		log.Debugf("Streaming: Received request - ID: %s, Type: %s", req.RequestId, req.RequestType)
-
-		// Process request asynchronously using the authenticated context from initial connection
-		go s.processStreamRequest(ctx, stream, req)
 	}
 }
 
 // processStreamRequest processes a single streaming request asynchronously
-func (s *StreamingService) processStreamRequest(ctx context.Context, stream *connect.BidiStream[aquariumv2.StreamingServiceConnectRequest, aquariumv2.StreamingServiceConnectResponse], req *aquariumv2.StreamingServiceConnectRequest) {
+func (s *StreamingService) processStreamRequest(ctx context.Context, conn *bidirectionalConnection, req *aquariumv2.StreamingServiceConnectRequest) {
 	log.Debugf("Streaming: Processing request - ID: %s, Type: %s", req.RequestId, req.RequestType)
 
 	// Check RBAC permissions and set proper context for target service
@@ -255,7 +567,7 @@ func (s *StreamingService) processStreamRequest(ctx context.Context, stream *con
 				Message: fmt.Sprintf("Permission denied: %v", err),
 			},
 		}
-		if sendErr := stream.Send(response); sendErr != nil {
+		if sendErr := conn.safeSend(response); sendErr != nil {
 			log.Errorf("Streaming: Error sending permission denied response for request %s: %v", req.RequestId, sendErr)
 		}
 		return
@@ -288,7 +600,7 @@ func (s *StreamingService) processStreamRequest(ctx context.Context, stream *con
 
 	log.Debugf("Streaming: Sending response for request %s", req.RequestId)
 	// Send response back to client
-	if err := stream.Send(response); err != nil {
+	if err := conn.safeSend(response); err != nil {
 		log.Errorf("Streaming: Error sending response for request %s: %v", req.RequestId, err)
 	} else {
 		log.Debugf("Streaming: Successfully sent response for request %s", req.RequestId)
@@ -772,9 +1084,19 @@ func (s *StreamingService) getResponseType(requestType string) string {
 // Subscribe handles server streaming for database change notifications
 func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[aquariumv2.StreamingServiceSubscribeRequest], stream *connect.ServerStream[aquariumv2.StreamingServiceSubscribeResponse]) error {
 	userName := rpcutil.GetUserName(ctx)
-	subscriptionID := fmt.Sprintf("%s-%d", userName, time.Now().UnixNano())
+	// Generating SubscriptionID with NodeUID prefix to later figure out where the user come from
+	subscriptionID := fmt.Sprintf("%s-%s", userName, s.fish.DB().NewUID())
 
-	log.Debugf("Streaming: New subscription from user %s: %s", userName, subscriptionID)
+	log.Debugf("Subscription %s: New subscription from user %s", subscriptionID, userName)
+
+	// Check if server is shutting down
+	s.shutdownMutex.RLock()
+	if s.isShuttingDown {
+		s.shutdownMutex.RUnlock()
+		log.Debugf("Subscription %s: Rejecting new subscription during shutdown", subscriptionID)
+		return connect.NewError(connect.CodeUnavailable, fmt.Errorf("server is shutting down"))
+	}
+	s.shutdownMutex.RUnlock()
 
 	// Create subscription context
 	subCtx, cancel := context.WithCancel(ctx)
@@ -802,41 +1124,42 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 	s.subscriptions[subscriptionID] = sub
 	s.subscriptionsMutex.Unlock()
 
-	// Track which subscriptions were actually made for proper cleanup
-	var subscribedToState, subscribedToTask, subscribedToResource bool
-
-	// Subscribe to database changes based on requested types
+	// Subscribe to database changes based on requested types with buffer overflow protection
 	for _, subType := range req.Msg.SubscriptionTypes {
 		switch subType {
 		case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE:
-			s.fish.DB().SubscribeApplicationState(stateChannel)
-			subscribedToState = true
-			log.Debugf("Streaming: Subscribed to ApplicationState changes")
+			// Create a safe wrapper channel for database notifications
+			dbStateChannel := make(chan *typesv2.ApplicationState, 100)
+			s.fish.DB().SubscribeApplicationState(dbStateChannel)
+			log.Debugf("Streaming: Subscribed to ApplicationState changes with overflow protection")
+
+			// Start goroutine to safely relay notifications to subscription
+			go s.relayStateNotifications(subCtx, subscriptionID, sub, dbStateChannel)
+
 		case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK:
-			s.fish.DB().SubscribeApplicationTask(taskChannel)
-			subscribedToTask = true
-			log.Debugf("Streaming: Subscribed to ApplicationTask changes")
+			// Create a safe wrapper channel for database notifications
+			dbTaskChannel := make(chan *typesv2.ApplicationTask, 100)
+			s.fish.DB().SubscribeApplicationTask(dbTaskChannel)
+			log.Debugf("Streaming: Subscribed to ApplicationTask changes with overflow protection")
+
+			// Start goroutine to safely relay notifications to subscription
+			go s.relayTaskNotifications(subCtx, subscriptionID, sub, dbTaskChannel)
+
 		case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE:
-			s.fish.DB().SubscribeApplicationResource(resourceChannel)
-			subscribedToResource = true
-			log.Debugf("Streaming: Subscribed to ApplicationResource changes")
+			// Create a safe wrapper channel for database notifications
+			dbResourceChannel := make(chan *typesv2.ApplicationResource, 100)
+			s.fish.DB().SubscribeApplicationResource(dbResourceChannel)
+			log.Debugf("Streaming: Subscribed to ApplicationResource changes with overflow protection")
+
+			// Start goroutine to safely relay notifications to subscription
+			go s.relayResourceNotifications(subCtx, subscriptionID, sub, dbResourceChannel)
 		}
 	}
 
 	defer func() {
-		// Unsubscribe from database BEFORE closing channels to avoid "send on closed channel" panic
-		if subscribedToState {
-			s.fish.DB().UnsubscribeApplicationState(stateChannel)
-			log.Debugf("Streaming: Unsubscribed from ApplicationState changes")
-		}
-		if subscribedToTask {
-			s.fish.DB().UnsubscribeApplicationTask(taskChannel)
-			log.Debugf("Streaming: Unsubscribed from ApplicationTask changes")
-		}
-		if subscribedToResource {
-			s.fish.DB().UnsubscribeApplicationResource(resourceChannel)
-			log.Debugf("Streaming: Unsubscribed from ApplicationResource changes")
-		}
+		// Note: Database channels are now handled by relay goroutines
+		// The database unsubscription will happen automatically when channels are closed
+		// by the relay goroutines when the context is cancelled
 
 		// Clean up subscription
 		s.subscriptionsMutex.Lock()
@@ -844,84 +1167,110 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 		s.subscriptionsMutex.Unlock()
 		cancel()
 
-		// Now safe to close channels since database no longer has references
+		// Close subscription channels (relay goroutines will handle database channels)
 		close(stateChannel)
 		close(taskChannel)
 		close(resourceChannel)
-		log.Debugf("Streaming: Subscription %s cleaned up", subscriptionID)
+		log.Debugf("Subscription %s: Cleaned up", subscriptionID)
 	}()
 
 	// Send initial heartbeat to confirm subscription is active
-	log.Debugf("Streaming: Subscription %s established and ready for events", subscriptionID)
+	log.Debugf("Subscription %s: Established and ready for events", subscriptionID)
 
 	// Send initial confirmation message to client to confirm subscription is active
 	confirmationResponse := &aquariumv2.StreamingServiceSubscribeResponse{
 		ObjectType: aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED, // Special type for control messages
-		ChangeType: aquariumv2.ChangeType_CHANGE_TYPE_UNSPECIFIED,             // Special type for control messages
+		ChangeType: aquariumv2.ChangeType_CHANGE_TYPE_CREATED,                 // Use CREATED to indicate subscription confirmation
 		Timestamp:  timestamppb.Now(),
 		ObjectData: nil, // No object data for confirmation message
 	}
 
 	log.Debugf("Streaming: About to send subscription confirmation to client")
 	if err := stream.Send(confirmationResponse); err != nil {
-		log.Errorf("Streaming: Error sending subscription confirmation: %v", err)
+		log.Errorf("Subscription %s: Error sending subscription confirmation: %v", subscriptionID, err)
 		return err
 	}
 	log.Debugf("Streaming: Sent subscription confirmation to client")
 
-	// Create a ticker for periodic keepalives (optional, for debugging)
-	keepAliveTicker := time.NewTicker(10 * time.Second)
+	// Create a ticker for periodic keepalives
+	keepAliveTicker := time.NewTicker(60 * time.Second)
 	defer keepAliveTicker.Stop()
 
 	// Process subscription events
 	for {
 		select {
 		case <-subCtx.Done():
-			log.Debugf("Streaming: Subscription %s cancelled", subscriptionID)
+			log.Debugf("Subscription %s: Cancelled", subscriptionID)
+
+			// Check if cancellation was due to buffer overflow
+			if sub.isClientOverflowing() {
+				log.Warnf("Subscription %s: Client disconnected due to buffer overflow", subscriptionID)
+				// Send buffer overflow error notification
+				overflowNotification := &aquariumv2.StreamingServiceSubscribeResponse{
+					ObjectType: aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED,
+					ChangeType: aquariumv2.ChangeType_CHANGE_TYPE_DELETED, // Use DELETED to indicate error/disconnection
+					Timestamp:  timestamppb.Now(),
+					ObjectData: nil,
+				}
+				if err := stream.Send(overflowNotification); err != nil {
+					log.Debugf("Subscription %s: Failed to send buffer overflow notification: %v", subscriptionID, err)
+				}
+				// Return error to signal client disconnect due to overflow
+				return connect.NewError(connect.CodeResourceExhausted,
+					fmt.Errorf("client disconnected due to buffer overflow - unable to keep up with notification rate"))
+			} else {
+				// Normal shutdown notification
+				shutdownNotification := &aquariumv2.StreamingServiceSubscribeResponse{
+					ObjectType: aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED,
+					ChangeType: aquariumv2.ChangeType_CHANGE_TYPE_UNSPECIFIED,
+					Timestamp:  timestamppb.Now(),
+					ObjectData: nil,
+				}
+				if err := stream.Send(shutdownNotification); err != nil {
+					log.Debugf("Subscription %s: Failed to send subscription shutdown notification: %v", subscriptionID, err)
+				}
+			}
 			return nil
 
 		case <-ctx.Done():
-			log.Debugf("Streaming: Subscription %s context cancelled", subscriptionID)
+			log.Debugf("Subscription %s: Context cancelled", subscriptionID)
 			return nil
 
 		case <-keepAliveTicker.C:
 			// Periodic keepalive logging
-			log.Debugf("Streaming: Subscription %s still active, waiting for events...", subscriptionID)
+			log.Debugf("Subscription %s: Still active, waiting for events...", subscriptionID)
 
 		case appState := <-stateChannel:
-			log.Debugf("Streaming: Received ApplicationState notification for app %s, status %s", appState.ApplicationUid, appState.Status)
 			if s.shouldSendObject(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE, appState) {
-				log.Debugf("Streaming: Sending ApplicationState notification to client")
+				log.Debugf("Subscription %s: Sending ApplicationState notification for app %s, status %s", subscriptionID, appState.ApplicationUid, appState.Status)
 				if err := s.sendSubscriptionResponse(stream, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE, aquariumv2.ChangeType_CHANGE_TYPE_CREATED, appState.ToApplicationState()); err != nil {
-					log.Errorf("Streaming: Error sending ApplicationState update: %v", err)
+					log.Errorf("Subscription %s: Error sending ApplicationState update: %v", subscriptionID, err)
 					return err
 				}
 			} else {
-				log.Debugf("Streaming: ApplicationState notification filtered out for user %s", sub.userName)
+				log.Debugf("Subscription %s: Skipping ApplicationState notification for user %s", subscriptionID, sub.userName)
 			}
 
 		case appTask := <-taskChannel:
-			log.Debugf("Streaming: Received ApplicationTask notification for app %s", appTask.ApplicationUid)
 			if s.shouldSendObject(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK, appTask) {
-				log.Debugf("Streaming: Sending ApplicationTask notification to client")
+				log.Debugf("Subscription %s: Sending ApplicationTask notification for app %s", subscriptionID, appTask.ApplicationUid)
 				if err := s.sendSubscriptionResponse(stream, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK, aquariumv2.ChangeType_CHANGE_TYPE_CREATED, appTask.ToApplicationTask()); err != nil {
-					log.Errorf("Streaming: Error sending ApplicationTask update: %v", err)
+					log.Errorf("Subscription %s: Error sending ApplicationTask update: %v", subscriptionID, err)
 					return err
 				}
 			} else {
-				log.Debugf("Streaming: ApplicationTask notification filtered out for user %s", sub.userName)
+				log.Debugf("Subscription %s: Skipping ApplicationTask notification for user %s", subscriptionID, sub.userName)
 			}
 
 		case appResource := <-resourceChannel:
-			log.Debugf("Streaming: Received ApplicationResource notification for app %s", appResource.ApplicationUid)
 			if s.shouldSendObject(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE, appResource) {
-				log.Debugf("Streaming: Sending ApplicationResource notification to client")
+				log.Debugf("Subscription %s: Sending ApplicationResource notification for app %s", subscriptionID, appResource.ApplicationUid)
 				if err := s.sendSubscriptionResponse(stream, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE, aquariumv2.ChangeType_CHANGE_TYPE_CREATED, appResource.ToApplicationResource()); err != nil {
-					log.Errorf("Streaming: Error sending ApplicationResource update: %v", err)
+					log.Errorf("Subscription %s: Error sending ApplicationResource update: %v", subscriptionID, err)
 					return err
 				}
 			} else {
-				log.Debugf("Streaming: ApplicationResource notification filtered out for user %s", sub.userName)
+				log.Debugf("Subscription %s: Skipping ApplicationResource notification for user %s", subscriptionID, sub.userName)
 			}
 		}
 	}
@@ -1002,8 +1351,6 @@ func (s *StreamingService) shouldSendObject(sub *subscription, objectType aquari
 
 // shouldSendApplicationObject checks if application-related object should be sent based on ownership and RBAC permissions
 func (s *StreamingService) shouldSendApplicationObject(sub *subscription, appUID typesv2.ApplicationUID, objectType aquariumv2.SubscriptionType) bool {
-	log.Debugf("Streaming: Checking if should send object for app %s to user %s", appUID, sub.userName)
-
 	// Check application filters
 	if appUIDFilter, exists := sub.filters["application_uid"]; exists {
 		if appUID.String() != appUIDFilter {
@@ -1026,8 +1373,6 @@ func (s *StreamingService) shouldSendApplicationObject(sub *subscription, appUID
 	// Check if user has access (owner or RBAC permission)
 	hasAccess := s.checkApplicationAccess(sub, appUID, rbacMethod)
 
-	log.Debugf("Streaming: Permission check result for app %s: %t", appUID, hasAccess)
-
 	// Trigger cache cleanup periodically during permission checks
 	s.permissionCache.CleanupStaleEntries(s.fish)
 
@@ -1049,4 +1394,125 @@ func (s *StreamingService) sendSubscriptionResponse(stream *connect.ServerStream
 	}
 
 	return stream.Send(response)
+}
+
+// GracefulShutdown initiates graceful shutdown of all streaming connections
+func (s *StreamingService) GracefulShutdown(timeout time.Duration) {
+	log.Info("Streaming: Starting graceful shutdown of all connections...")
+
+	// Set shutdown flag to reject new connections
+	s.shutdownMutex.Lock()
+	s.isShuttingDown = true
+	s.shutdownMutex.Unlock()
+
+	// Create a timeout context
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	// Channel to wait for all connections to close
+	done := make(chan struct{})
+
+	go func() {
+		defer close(done)
+
+		// Send shutdown signal to all bidirectional connections
+		s.connectionsMutex.RLock()
+		connections := make([]*bidirectionalConnection, 0, len(s.connections))
+		for _, conn := range s.connections {
+			connections = append(connections, conn)
+		}
+		s.connectionsMutex.RUnlock()
+
+		log.Debugf("Streaming: Signaling %d bidirectional connections to shutdown", len(connections))
+		for _, conn := range connections {
+			// Send shutdown message to client
+			shutdownMsg := &aquariumv2.StreamingServiceConnectResponse{
+				RequestId:    "server-shutdown",
+				ResponseType: "ServerShutdownNotification",
+				Error: &aquariumv2.StreamError{
+					Code:    connect.CodeUnavailable.String(),
+					Message: "Server is shutting down, please disconnect",
+				},
+			}
+
+			if err := conn.stream.Send(shutdownMsg); err != nil {
+				log.Debugf("Streaming: Failed to send shutdown message: %v", err)
+			}
+
+			// Cancel the connection context to trigger graceful closure
+			conn.cancel()
+		}
+
+		// Send shutdown signal to all subscriptions
+		s.subscriptionsMutex.RLock()
+		subscriptions := make([]*subscription, 0, len(s.subscriptions))
+		for _, sub := range s.subscriptions {
+			subscriptions = append(subscriptions, sub)
+		}
+		s.subscriptionsMutex.RUnlock()
+
+		log.Debugf("Streaming: Signaling %d subscriptions to shutdown", len(subscriptions))
+		for _, sub := range subscriptions {
+			// Cancel subscription context - this will trigger the subscription goroutine
+			// to send the shutdown notification itself, avoiding race conditions
+			sub.cancel()
+		}
+
+		// Wait for all connections to actually close
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return // Timeout reached
+			case <-ticker.C:
+				s.connectionsMutex.RLock()
+				connCount := len(s.connections)
+				s.connectionsMutex.RUnlock()
+
+				s.subscriptionsMutex.RLock()
+				subCount := len(s.subscriptions)
+				s.subscriptionsMutex.RUnlock()
+
+				if connCount == 0 && subCount == 0 {
+					log.Info("Streaming: All connections closed gracefully")
+					return
+				}
+				log.Debugf("Streaming: Waiting for %d connections and %d subscriptions to close", connCount, subCount)
+			}
+		}
+	}()
+
+	// Wait for graceful shutdown or timeout
+	select {
+	case <-done:
+		log.Info("Streaming: Graceful shutdown completed")
+	case <-ctx.Done():
+		s.forceCloseAllConnections()
+		log.Warn("Streaming: Graceful shutdown timeout, forced closure of remaining connections")
+	}
+}
+
+// forceCloseAllConnections forcefully closes all remaining streaming connections
+func (s *StreamingService) forceCloseAllConnections() {
+	// Force close all bidirectional connections
+	s.connectionsMutex.Lock()
+	for id, conn := range s.connections {
+		log.Debugf("Streaming: Force closing bidirectional connection: %s", id)
+		conn.cancel()
+		delete(s.connections, id)
+	}
+	s.connectionsMutex.Unlock()
+
+	// Force close all subscriptions
+	s.subscriptionsMutex.Lock()
+	for id, sub := range s.subscriptions {
+		log.Debugf("Streaming: Force closing subscription: %s", id)
+		sub.cancel()
+		delete(s.subscriptions, id)
+	}
+	s.subscriptionsMutex.Unlock()
+
+	log.Info("Streaming: All connections forcefully closed")
 }

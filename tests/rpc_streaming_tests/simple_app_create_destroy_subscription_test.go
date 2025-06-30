@@ -62,7 +62,7 @@ drivers:
 	defer cancel()
 
 	// Setup streaming helper with all subscription types
-	streamingHelper := h.NewStreamingTestHelper(t, ctx, streamingClient)
+	streamingHelper := h.NewStreamingTestHelper(t, "common", ctx, streamingClient)
 	defer streamingHelper.Close()
 
 	// Setup both bidirectional and subscription streaming in one call
@@ -154,6 +154,7 @@ drivers:
 	t.Run("Wait for ALLOCATED state (real-time subscription)", func(t *testing.T) {
 		// This demonstrates real-time streaming - no polling required!
 		_, err := streamingHelper.GetStreamingClient().WaitForApplicationState(
+			appUID,
 			aquariumv2.ApplicationState_ALLOCATED,
 			15*time.Second,
 		)
@@ -199,6 +200,7 @@ drivers:
 	t.Run("Wait for DEALLOCATED state (real-time subscription)", func(t *testing.T) {
 		// Wait for final state through subscription
 		_, err := streamingHelper.GetStreamingClient().WaitForApplicationState(
+			appUID,
 			aquariumv2.ApplicationState_DEALLOCATED,
 			15*time.Second,
 		)

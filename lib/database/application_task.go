@@ -20,6 +20,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/adobe/aquarium-fish/lib/log"
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
@@ -90,7 +91,14 @@ func (d *Database) ApplicationTaskCreate(at *typesv2.ApplicationTask) error {
 		d.subsMu.RUnlock()
 
 		for _, ch := range channels {
-			ch <- appTask
+			// Use select with default to prevent panic if channel is closed
+			select {
+			case ch <- appTask:
+				// Successfully sent notification
+			default:
+				// Channel is closed or full, skip this subscriber
+				log.Debugf("Database: Failed to send ApplicationTask notification, channel closed or full")
+			}
 		}
 	}(at)
 

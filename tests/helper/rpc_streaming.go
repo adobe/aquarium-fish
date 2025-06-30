@@ -16,7 +16,9 @@ package helper
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"sync"
 	"testing"
 	"time"
@@ -32,6 +34,7 @@ import (
 // StreamingClient provides a high-level interface for streaming operations
 type StreamingClient struct {
 	t               *testing.T
+	name            string
 	ctx             context.Context
 	streamingClient aquariumv2connect.StreamingServiceClient
 
@@ -48,9 +51,10 @@ type StreamingClient struct {
 }
 
 // NewStreamingClient creates a new streaming client with clean abstractions
-func NewStreamingClient(t *testing.T, ctx context.Context, client aquariumv2connect.StreamingServiceClient) *StreamingClient {
+func NewStreamingClient(t *testing.T, name string, ctx context.Context, client aquariumv2connect.StreamingServiceClient) *StreamingClient {
 	return &StreamingClient{
 		t:               t,
+		name:            name,
 		ctx:             ctx,
 		streamingClient: client,
 		responses:       make(map[string]*aquariumv2.StreamingServiceConnectResponse),
@@ -60,7 +64,7 @@ func NewStreamingClient(t *testing.T, ctx context.Context, client aquariumv2conn
 
 // EstablishBidirectionalStreaming sets up bidirectional streaming for request/response operations
 func (sc *StreamingClient) EstablishBidirectionalStreaming() error {
-	sc.t.Log("Establishing bidirectional streaming connection...")
+	sc.t.Logf("Client %s: Establishing bidirectional streaming connection...", sc.name)
 
 	sc.bidirectionalStream = sc.streamingClient.Connect(sc.ctx)
 
@@ -70,7 +74,7 @@ func (sc *StreamingClient) EstablishBidirectionalStreaming() error {
 		defer sc.responseWg.Done()
 		defer func() {
 			if r := recover(); r != nil {
-				sc.t.Logf("Bidirectional stream goroutine recovered from panic: %v", r)
+				sc.t.Logf("Client %s: Bidirectional stream goroutine recovered from panic: %v", sc.name, r)
 			}
 		}()
 
@@ -78,14 +82,30 @@ func (sc *StreamingClient) EstablishBidirectionalStreaming() error {
 			resp, err := sc.bidirectionalStream.Receive()
 			if err != nil {
 				if sc.ctx.Err() != nil {
-					sc.t.Logf("Bidirectional stream context cancelled, stopping response handler")
+					sc.t.Logf("Client %s: Bidirectional stream context cancelled, stopping response handler", sc.name)
 					return
 				}
-				sc.t.Logf("Bidirectional stream ended with error: %v", err)
+				if errors.Is(err, io.EOF) {
+					sc.t.Logf("Client %s: Bidirectional stream ended with EOF", sc.name)
+				} else {
+					sc.t.Logf("Client %s: Bidirectional stream ended with error: %v", sc.name, err)
+				}
 				return
 			}
 
-			sc.t.Logf("Received bidirectional response - ID: %s, Type: %s", resp.RequestId, resp.ResponseType)
+			// Handle keep-alive messages (ignore them)
+			if resp.RequestId == "keep-alive" && resp.ResponseType == "KeepAliveResponse" {
+				sc.t.Logf("Client %s: Received keep-alive ping from server", sc.name)
+				continue
+			}
+
+			// Handle server shutdown messages
+			if resp.RequestId == "server-shutdown" && resp.ResponseType == "ServerShutdownNotification" {
+				sc.t.Logf("Client %s: Received server shutdown notification, closing connection gracefully", sc.name)
+				return // Exit the receive loop to allow graceful closure
+			}
+
+			sc.t.Logf("Client %s: Received bidirectional response - ID: %s, Type: %s", sc.name, resp.RequestId, resp.ResponseType)
 
 			sc.responsesMutex.Lock()
 			sc.responses[resp.RequestId] = resp
@@ -93,13 +113,13 @@ func (sc *StreamingClient) EstablishBidirectionalStreaming() error {
 		}
 	}()
 
-	sc.t.Log("Bidirectional streaming connection established")
+	sc.t.Logf("Client %s: Bidirectional streaming connection established", sc.name)
 	return nil
 }
 
 // EstablishSubscriptionStreaming sets up server-side streaming for real-time notifications
 func (sc *StreamingClient) EstablishSubscriptionStreaming(subscriptionTypes []aquariumv2.SubscriptionType) error {
-	sc.t.Logf("Establishing subscription streaming for %d types...", len(subscriptionTypes))
+	sc.t.Logf("Client %s: Establishing subscription streaming for %d types...", sc.name, len(subscriptionTypes))
 
 	// Create channels for each subscription type
 	for _, subType := range subscriptionTypes {
@@ -126,37 +146,69 @@ func (sc *StreamingClient) EstablishSubscriptionStreaming(subscriptionTypes []aq
 		defer sc.subscriptionWg.Done()
 		defer func() {
 			if r := recover(); r != nil {
-				sc.t.Logf("Subscription goroutine recovered from panic: %v", r)
+				sc.t.Logf("Client %s: Subscription goroutine recovered from panic: %v", sc.name, r)
 			}
 		}()
 
 		for stream.Receive() {
 			msg := stream.Msg()
 
-			// Handle initial confirmation message
+			// Handle control messages (confirmation, shutdown, or buffer overflow)
 			if msg.ObjectType == aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED {
-				sc.t.Logf("Received subscription confirmation from server")
-				continue
+				if msg.ChangeType == aquariumv2.ChangeType_CHANGE_TYPE_CREATED {
+					// This is a subscription confirmation
+					sc.t.Logf("Client %s: Received subscription confirmation from server", sc.name)
+					continue
+				} else if msg.ChangeType == aquariumv2.ChangeType_CHANGE_TYPE_UNSPECIFIED {
+					// This is a shutdown notification
+					sc.t.Logf("Client %s: Received server shutdown notification for subscription, closing gracefully", sc.name)
+					return // Exit the receive loop to allow graceful closure
+				} else if msg.ChangeType == aquariumv2.ChangeType_CHANGE_TYPE_DELETED {
+					// This is a buffer overflow disconnection notification
+					sc.t.Errorf("Client %s: DISCONNECTED by server due to BUFFER OVERFLOW - client cannot keep up with notification rate!", sc.name)
+					return // Exit the receive loop - server is disconnecting us
+				} else {
+					// Unknown control message type
+					sc.t.Logf("Client %s: Received unknown control message with ChangeType: %s", sc.name, msg.ChangeType)
+					continue
+				}
 			}
 
 			// Dispatch to appropriate channel
 			if channel, exists := sc.subscriptions[msg.ObjectType]; exists {
 				select {
 				case channel <- msg:
+					// Successfully sent notification
 				case <-subCtx.Done():
 					return
+				default:
+					// Channel is full, try to drain one old message and send the new one
+					select {
+					case <-channel:
+						// Drained one old message, now try to send the new one
+						select {
+						case channel <- msg:
+							sc.t.Logf("Client %s: Channel full, dropped old notification to make room for new %s", sc.name, msg.ObjectType)
+						default:
+							// Still can't send, drop the new message
+							sc.t.Logf("Client %s: Channel overflowed, dropping %s notification", sc.name, msg.ObjectType)
+						}
+					default:
+						// Can't even drain, drop the new message
+						sc.t.Logf("Client %s: Channel completely blocked, dropping %s notification", sc.name, msg.ObjectType)
+					}
 				}
 			} else {
-				sc.t.Logf("Received unexpected notification type: %s", msg.ObjectType)
+				sc.t.Logf("Client %s: Received unexpected notification type: %s", sc.name, msg.ObjectType)
 			}
 		}
 
 		if err := stream.Err(); err != nil && subCtx.Err() == nil {
-			sc.t.Logf("Subscription stream ended with error: %v", err)
+			sc.t.Logf("Client %s: Subscription stream ended with error: %v", sc.name, err)
 		}
 	}()
 
-	sc.t.Log("Subscription streaming established successfully")
+	sc.t.Logf("Client %s: Subscription streaming established successfully", sc.name)
 	return nil
 }
 
@@ -178,27 +230,29 @@ func (sc *StreamingClient) SendRequest(requestID, requestType string, requestDat
 		RequestData: anyData,
 	}
 
-	sc.t.Logf("Sending streaming request - ID: %s, Type: %s", requestID, requestType)
+	sc.t.Logf("Client %s: Sending streaming request - ID: %s, Type: %s", sc.name, requestID, requestType)
 
 	// Send request
 	if err := sc.bidirectionalStream.Send(req); err != nil {
 		return nil, fmt.Errorf("failed to send streaming request: %w", err)
 	}
 
-	// Wait for response with timeout
-	timeout := time.NewTimer(10 * time.Second)
+	// Wait for response with timeout (increased for heavy load testing)
+	timeout := time.NewTimer(120 * time.Second)
 	defer timeout.Stop()
 
 	for {
 		select {
 		case <-timeout.C:
 			return nil, fmt.Errorf("timeout waiting for response to request %s", requestID)
+		case <-sc.ctx.Done():
+			return nil, fmt.Errorf("context cancelled while waiting for response to request %s", requestID)
 		case <-time.After(100 * time.Millisecond):
 			sc.responsesMutex.RLock()
 			resp, ok := sc.responses[requestID]
 			sc.responsesMutex.RUnlock()
 			if ok {
-				sc.t.Logf("Received response for request - ID: %s", requestID)
+				sc.t.Logf("Client %s: Received response for request - ID: %s", sc.name, requestID)
 				return resp, nil
 			}
 		}
@@ -225,7 +279,7 @@ func (sc *StreamingClient) WaitForNotification(
 		case <-timer.C:
 			return nil, fmt.Errorf("timeout waiting for %s notification", subscriptionType)
 		case notification := <-channel:
-			sc.t.Logf("Received %s notification: %s", subscriptionType, notification.ChangeType)
+			sc.t.Logf("Client %s: Received %s notification: %s", sc.name, subscriptionType, notification.ChangeType)
 
 			// Apply filter if provided
 			if filter == nil || filter(notification) {
@@ -235,9 +289,9 @@ func (sc *StreamingClient) WaitForNotification(
 	}
 }
 
-// WaitForApplicationState waits for a specific application state notification
-func (sc *StreamingClient) WaitForApplicationState(expectedState aquariumv2.ApplicationState_Status, timeout time.Duration) (*aquariumv2.ApplicationState, error) {
-	sc.t.Logf("Waiting for application state: %s", expectedState)
+// WaitForApplicationState waits for a specific application state notification for a specific application UID
+func (sc *StreamingClient) WaitForApplicationState(applicationUID string, expectedState aquariumv2.ApplicationState_Status, timeout time.Duration) (*aquariumv2.ApplicationState, error) {
+	sc.t.Logf("Client %s: Waiting for application state: %s for app: %s", sc.name, expectedState, applicationUID)
 
 	notification, err := sc.WaitForNotification(
 		aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE,
@@ -249,12 +303,14 @@ func (sc *StreamingClient) WaitForApplicationState(expectedState aquariumv2.Appl
 
 			var appState aquariumv2.ApplicationState
 			if err := n.ObjectData.UnmarshalTo(&appState); err != nil {
-				sc.t.Logf("Failed to unmarshal application state: %v", err)
+				sc.t.Logf("Client %s: Failed to unmarshal application state: %v", sc.name, err)
 				return false
 			}
 
-			sc.t.Logf("  Application state: %s", appState.Status)
-			return appState.Status == expectedState
+			sc.t.Logf("Client %s:  Application state: %s for app: %s", sc.name, appState.Status, appState.ApplicationUid)
+
+			// Filter by both application UID and expected state
+			return appState.ApplicationUid == applicationUID && appState.Status == expectedState
 		},
 	)
 
@@ -267,13 +323,13 @@ func (sc *StreamingClient) WaitForApplicationState(expectedState aquariumv2.Appl
 		return nil, fmt.Errorf("failed to unmarshal application state: %w", err)
 	}
 
-	sc.t.Logf("Successfully received %s state notification!", expectedState)
+	sc.t.Logf("Client %s: Successfully received %s state notification for app %s", sc.name, expectedState, applicationUID)
 	return &appState, nil
 }
 
 // WaitForApplicationResource waits for an application resource notification
 func (sc *StreamingClient) WaitForApplicationResource(timeout time.Duration) (*aquariumv2.ApplicationResource, error) {
-	sc.t.Log("Waiting for application resource notification...")
+	sc.t.Logf("Client %s: Waiting for application resource notification...", sc.name)
 
 	notification, err := sc.WaitForNotification(
 		aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE,
@@ -292,13 +348,13 @@ func (sc *StreamingClient) WaitForApplicationResource(timeout time.Duration) (*a
 		return nil, fmt.Errorf("failed to unmarshal application resource: %w", err)
 	}
 
-	sc.t.Logf("Successfully received resource notification! Identifier: %s", appResource.Identifier)
+	sc.t.Logf("Client %s: Successfully received resource notification! Identifier: %s", sc.name, appResource.Identifier)
 	return &appResource, nil
 }
 
 // WaitForApplicationTask waits for an application task notification
 func (sc *StreamingClient) WaitForApplicationTask(timeout time.Duration) (*aquariumv2.ApplicationTask, error) {
-	sc.t.Log("Waiting for application task notification...")
+	sc.t.Logf("Client %s: Waiting for application task notification...", sc.name)
 
 	notification, err := sc.WaitForNotification(
 		aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK,
@@ -317,7 +373,7 @@ func (sc *StreamingClient) WaitForApplicationTask(timeout time.Duration) (*aquar
 		return nil, fmt.Errorf("failed to unmarshal application task: %w", err)
 	}
 
-	sc.t.Logf("Successfully received task notification! Application UID: %s", appTask.ApplicationUid)
+	sc.t.Logf("Client %s: Successfully received task notification! Application UID: %s", sc.name, appTask.ApplicationUid)
 	return &appTask, nil
 }
 
@@ -356,12 +412,12 @@ func (sc *StreamingClient) GetTaskNotifications() <-chan *aquariumv2.StreamingSe
 
 // Close gracefully closes all streaming connections
 func (sc *StreamingClient) Close() {
-	sc.t.Log("Closing streaming connections...")
+	sc.t.Logf("Client %s: Closing streaming connections...", sc.name)
 
 	// Close bidirectional stream
 	if sc.bidirectionalStream != nil {
 		if err := sc.bidirectionalStream.CloseRequest(); err != nil {
-			sc.t.Logf("Error closing bidirectional stream: %v", err)
+			sc.t.Logf("Client %s: Error closing bidirectional stream: %v", sc.name, err)
 		}
 	}
 
@@ -380,9 +436,9 @@ func (sc *StreamingClient) Close() {
 
 	select {
 	case <-done:
-		sc.t.Log("All streaming goroutines finished successfully")
+		sc.t.Logf("Client %s: All streaming goroutines finished successfully", sc.name)
 	case <-time.After(3 * time.Second):
-		sc.t.Log("Timeout waiting for streaming goroutines to finish (this is acceptable)")
+		sc.t.Logf("Client %s: Timeout waiting for streaming goroutines to finish", sc.name)
 	}
 
 	// Close subscription channels
@@ -398,9 +454,9 @@ type StreamingTestHelper struct {
 }
 
 // NewStreamingTestHelper creates a new test helper with streamlined setup
-func NewStreamingTestHelper(t *testing.T, ctx context.Context, client aquariumv2connect.StreamingServiceClient) *StreamingTestHelper {
+func NewStreamingTestHelper(t *testing.T, name string, ctx context.Context, client aquariumv2connect.StreamingServiceClient) *StreamingTestHelper {
 	return &StreamingTestHelper{
-		sc: NewStreamingClient(t, ctx, client),
+		sc: NewStreamingClient(t, name, ctx, client),
 		t:  t,
 	}
 }

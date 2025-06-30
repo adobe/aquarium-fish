@@ -65,7 +65,7 @@ drivers:
 	defer cancel()
 
 	// Setup streaming helper for bidirectional streaming only (no subscriptions)
-	streamingHelper := h.NewStreamingTestHelper(t, ctx, streamingClient)
+	streamingHelper := h.NewStreamingTestHelper(t, "common", ctx, streamingClient)
 	defer streamingHelper.Close()
 
 	// Setup only bidirectional streaming

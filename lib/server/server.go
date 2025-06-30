@@ -16,6 +16,7 @@
 package server
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"net"
@@ -31,8 +32,30 @@ import (
 	"github.com/adobe/aquarium-fish/lib/server/meta"
 )
 
+// ServerWrapper wraps both HTTP and RPC servers for coordinated shutdown
+type ServerWrapper struct {
+	httpServer *http.Server
+	rpcServer  *rpc.Server
+}
+
+// Shutdown gracefully shuts down both RPC and HTTP servers
+func (sw *ServerWrapper) Shutdown(ctx context.Context) error {
+	// First shutdown RPC server (which handles streaming connections)
+	if err := sw.rpcServer.Shutdown(ctx); err != nil {
+		log.Errorf("API: Error during RPC server shutdown: %v", err)
+	}
+
+	// Then shutdown HTTP server
+	if err := sw.httpServer.Shutdown(ctx); err != nil {
+		log.Errorf("API: Error during HTTP server shutdown: %v", err)
+		return err
+	}
+
+	return nil
+}
+
 // Init startups the API server to listen for incoming requests
-func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*http.Server, error) {
+func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*ServerWrapper, error) {
 	caPool := x509.NewCertPool()
 	if caBytes, err := os.ReadFile(caPath); err == nil {
 		caPool.AppendCertsFromPEM(caBytes)
@@ -67,15 +90,20 @@ func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*http.Ser
 			ClientCAs:  caPool,                // Verify client certificate with the cluster CA
 		},
 
-		// Security settings
-		ReadHeaderTimeout: 5 * time.Second,
+		// Security settings - optimized for streaming operations
+		ReadHeaderTimeout: 30 * time.Second,
+		// For streaming operations, we need much longer timeouts or no timeout at all
+		// ReadTimeout: 0 means no timeout (infinite), which is appropriate for streaming
+		ReadTimeout:  0,                 // No timeout for streaming operations
+		WriteTimeout: 300 * time.Second, // 5 minutes for streaming responses
+		IdleTimeout:  600 * time.Second, // 10 minutes to prevent connection close on inactivity
 	}
 
 	errChan := make(chan error)
 
 	tlsListener, err := net.Listen("tcp", s.Addr)
 	if err != nil {
-		return s, log.Error("API: Unable to start listener:", err)
+		return &ServerWrapper{httpServer: s, rpcServer: rpcServer}, log.Error("API: Unable to start listener:", err)
 	}
 
 	// There is a bit of chance that API server will not startup properly,
@@ -92,5 +120,5 @@ func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*http.Ser
 
 	log.Info("API listening on:", tlsListener.Addr())
 
-	return s, nil
+	return &ServerWrapper{httpServer: s, rpcServer: rpcServer}, nil
 }

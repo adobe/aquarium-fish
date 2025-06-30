@@ -135,8 +135,9 @@ drivers:
 			}
 			t.Logf("Worker %d: Created application %s", id, appUID)
 
-			// Checking state until it's allocated
-			for {
+			// Checking state for 20 times until it's allocated - duratin ~5 seconds total
+			var appStatus aquariumv2.ApplicationState_Status
+			for range 20 {
 				stateResp, err := appClient.GetState(
 					context.Background(),
 					connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
@@ -152,17 +153,24 @@ drivers:
 					t.Errorf("Worker %d: ApplicationStatus UID is empty", id)
 					return
 				}
-				if stateResp.Msg.Data.Status == aquariumv2.ApplicationState_ERROR {
-					t.Errorf("Worker %d: ApplicationStatus is ERROR: %v", id, stateResp.Msg.Data.Status)
+
+				appStatus = stateResp.Msg.Data.Status
+				if appStatus == aquariumv2.ApplicationState_ERROR {
+					t.Errorf("Worker %d: ApplicationStatus is ERROR: %v", id, appStatus)
 					return
 				}
 
-				if stateResp.Msg.Data.Status == aquariumv2.ApplicationState_ALLOCATED {
+				if appStatus == aquariumv2.ApplicationState_ALLOCATED {
 					t.Logf("Worker %d: Application allocated %s", id, appUID)
 					break
 				}
 
 				time.Sleep(250 * time.Millisecond)
+			}
+
+			if appStatus != aquariumv2.ApplicationState_ALLOCATED {
+				t.Errorf("Worker %d: Did not receive ALLOCATED ApplicationStatus in 5 seconds: %s", id, appStatus)
+				return
 			}
 
 			// Time to deallocate

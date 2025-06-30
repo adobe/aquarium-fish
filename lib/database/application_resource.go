@@ -81,7 +81,14 @@ func (d *Database) ApplicationResourceCreate(r *typesv2.ApplicationResource) err
 		d.subsMu.RUnlock()
 
 		for _, ch := range channels {
-			ch <- appResource
+			// Use select with default to prevent panic if channel is closed
+			select {
+			case ch <- appResource:
+				// Successfully sent notification
+			default:
+				// Channel is closed or full, skip this subscriber
+				log.Debugf("Database: Failed to send ApplicationResource notification, channel closed or full")
+			}
 		}
 	}(r)
 

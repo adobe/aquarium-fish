@@ -111,11 +111,11 @@ func (f *Fish) Init() error {
 	signal.Notify(f.Quit, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 
 	// Init channel for ApplicationState changes
-	f.applicationStateChannel = make(chan *typesv2.ApplicationState)
+	f.applicationStateChannel = make(chan *typesv2.ApplicationState, 100)
 	f.db.SubscribeApplicationState(f.applicationStateChannel)
 
 	// Init channel for ApplicationTask changes
-	f.applicationTaskChannel = make(chan *typesv2.ApplicationTask)
+	f.applicationTaskChannel = make(chan *typesv2.ApplicationTask, 100)
 	f.db.SubscribeApplicationTask(f.applicationTaskChannel)
 
 	// Init variables
