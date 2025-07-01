@@ -328,6 +328,7 @@ func ({{.ReceiverVar}} {{.DataName}}) To{{.OriginalName}}() *pbTypes.{{.Original
 		var mapData map[string]any
 		{{- $mapDataNotDefined = false }}
 		{{- end }}
+		mapData = make(map[string]any)
 		if err := json.Unmarshal([]byte(*{{$receiverVar}}.{{.Name}}), &mapData); err == nil {
 			if structData, err := structpb.NewStruct(mapData); err == nil {
 				result.{{toCamelCase .OriginalName}} = structData
@@ -339,6 +340,7 @@ func ({{.ReceiverVar}} {{.DataName}}) To{{.OriginalName}}() *pbTypes.{{.Original
 	var mapData map[string]any
 	{{- $mapDataNotDefined = false }}
 	{{- end }}
+	mapData = make(map[string]any)
 	if err := json.Unmarshal([]byte({{$receiverVar}}.{{.Name}}), &mapData); err == nil {
 		if structData, err := structpb.NewStruct(mapData); err == nil {
 			result.{{toCamelCase .OriginalName}} = structData

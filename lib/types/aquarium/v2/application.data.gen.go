@@ -96,6 +96,7 @@ func (a Application) ToApplication() *pbTypes.Application {
 	result.CreatedAt = timestamppb.New(a.CreatedAt)
 	result.LabelUid = a.LabelUid.String()
 	var mapData map[string]any
+	mapData = make(map[string]any)
 	if err := json.Unmarshal([]byte(a.Metadata), &mapData); err == nil {
 		if structData, err := structpb.NewStruct(mapData); err == nil {
 			result.Metadata = structData
@@ -185,6 +186,7 @@ func (a ApplicationResource) ToApplicationResource() *pbTypes.ApplicationResourc
 	result.IpAddr = a.IpAddr
 	result.LabelUid = a.LabelUid.String()
 	var mapData map[string]any
+	mapData = make(map[string]any)
 	if err := json.Unmarshal([]byte(a.Metadata), &mapData); err == nil {
 		if structData, err := structpb.NewStruct(mapData); err == nil {
 			result.Metadata = structData
@@ -301,11 +303,13 @@ func (a ApplicationTask) ToApplicationTask() *pbTypes.ApplicationTask {
 	result.ApplicationUid = a.ApplicationUid.String()
 	result.CreatedAt = timestamppb.New(a.CreatedAt)
 	var mapData map[string]any
+	mapData = make(map[string]any)
 	if err := json.Unmarshal([]byte(a.Options), &mapData); err == nil {
 		if structData, err := structpb.NewStruct(mapData); err == nil {
 			result.Options = structData
 		}
 	}
+	mapData = make(map[string]any)
 	if err := json.Unmarshal([]byte(a.Result), &mapData); err == nil {
 		if structData, err := structpb.NewStruct(mapData); err == nil {
 			result.Result = structData

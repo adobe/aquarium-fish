@@ -97,12 +97,8 @@ func (d *Database) ApplicationResourceCreate(r *typesv2.ApplicationResource) err
 
 // ApplicationResourceDelete removes Resource
 func (d *Database) ApplicationResourceDelete(uid typesv2.ApplicationResourceUID) error {
-	// First delete any references to this resource.
-	err := d.GateProxySSHAccessDeleteByResource(uid)
-	if err != nil {
-		// This issue is not a big deal, because most of the time there is no access to delete
-		log.Debugf("Unable to delete GateProxySSHAccess associated with ApplicationResourceUID %s: %v", uid, err)
-	}
+	// First delete any references to this resource. We don't care about the error if it's happened.
+	_ = d.GateProxySSHAccessDeleteByResource(uid)
 
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
