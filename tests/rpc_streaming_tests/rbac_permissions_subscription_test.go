@@ -451,13 +451,13 @@ drivers:
 		t.Logf("User1 notifications: own=%d, user2=%d, admin=%d", user1OwnNotifs, user1User2Notifs, user1AdminNotifs)
 
 		if user1OwnNotifs == 0 {
-			t.Error("User1 should receive notifications for their own application")
+			t.Error("ERROR: User1 should receive notifications for their own application")
 		}
 		if user1User2Notifs > 0 {
-			t.Errorf("User1 should NOT receive notifications for user2's application, but got %d", user1User2Notifs)
+			t.Errorf("ERROR: User1 should NOT receive notifications for user2's application, but got %d", user1User2Notifs)
 		}
 		if user1AdminNotifs > 0 {
-			t.Errorf("User1 should NOT receive notifications for admin's application, but got %d", user1AdminNotifs)
+			t.Errorf("ERROR: User1 should NOT receive notifications for admin's application, but got %d", user1AdminNotifs)
 		}
 
 		// Verify user2 only receives notifications for their own application
@@ -468,13 +468,13 @@ drivers:
 		t.Logf("User2 notifications: own=%d, user1=%d, admin=%d", user2OwnNotifs, user2User1Notifs, user2AdminNotifs)
 
 		if user2OwnNotifs == 0 {
-			t.Error("User2 should receive notifications for their own application")
+			t.Error("ERROR: User2 should receive notifications for their own application")
 		}
 		if user2User1Notifs > 0 {
-			t.Errorf("User2 should NOT receive notifications for user1's application, but got %d", user2User1Notifs)
+			t.Errorf("ERROR: User2 should NOT receive notifications for user1's application, but got %d", user2User1Notifs)
 		}
 		if user2AdminNotifs > 0 {
-			t.Errorf("User2 should NOT receive notifications for admin's application, but got %d", user2AdminNotifs)
+			t.Errorf("ERROR: User2 should NOT receive notifications for admin's application, but got %d", user2AdminNotifs)
 		}
 
 		// Verify adminUser (with Administrator role) receives notifications for ALL applications
@@ -485,13 +485,13 @@ drivers:
 		t.Logf("AdminUser notifications: user1=%d, user2=%d, admin=%d", adminUserUser1Notifs, adminUserUser2Notifs, adminUserAdminNotifs)
 
 		if adminUserUser1Notifs == 0 {
-			t.Error("AdminUser should receive notifications for user1's application (has Administrator role)")
+			t.Error("ERROR: AdminUser should receive notifications for user1's application (has Administrator role)")
 		}
 		if adminUserUser2Notifs == 0 {
-			t.Error("AdminUser should receive notifications for user2's application (has Administrator role)")
+			t.Error("ERROR: AdminUser should receive notifications for user2's application (has Administrator role)")
 		}
 		if adminUserAdminNotifs == 0 {
-			t.Error("AdminUser should receive notifications for admin's application (has Administrator role)")
+			t.Error("ERROR: AdminUser should receive notifications for admin's application (has Administrator role)")
 		}
 
 		// Verify admin (system admin) receives notifications for ALL applications
@@ -502,13 +502,13 @@ drivers:
 		t.Logf("Admin notifications: user1=%d, user2=%d, admin=%d", adminUser1Notifs, adminUser2Notifs, adminAdminNotifs)
 
 		if adminUser1Notifs == 0 {
-			t.Error("Admin should receive notifications for user1's application (system admin)")
+			t.Error("ERROR: Admin should receive notifications for user1's application (system admin)")
 		}
 		if adminUser2Notifs == 0 {
-			t.Error("Admin should receive notifications for user2's application (system admin)")
+			t.Error("ERROR: Admin should receive notifications for user2's application (system admin)")
 		}
 		if adminAdminNotifs == 0 {
-			t.Error("Admin should receive notifications for their own application (system admin)")
+			t.Error("ERROR: Admin should receive notifications for their own application (system admin)")
 		}
 	})
 

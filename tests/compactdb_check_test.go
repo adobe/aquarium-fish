@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -99,7 +100,7 @@ drivers:
 
 	workerCli, workerOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
 
-	completed := false
+	var completed int32 // Use atomic int32: 0=false, 1=true
 	workerFunc := func(t *testing.T, wg *sync.WaitGroup, id int) {
 		t.Logf("Worker %d: Started", id)
 		defer t.Logf("Worker %d: Ended", id)
@@ -112,7 +113,7 @@ drivers:
 			workerOpts...,
 		)
 
-		for !completed {
+		for atomic.LoadInt32(&completed) == 0 {
 			// Create new application
 			t.Logf("Worker %d: Starting new application", id)
 			resp, err := appClient.Create(
@@ -212,7 +213,7 @@ drivers:
 		}
 
 		t.Logf("Now stopping the workers to calm down a bit and wait for a few more cleanups")
-		completed = true
+		atomic.StoreInt32(&completed, 1)
 
 		t.Logf("Wait for all workers to finish...")
 		wg.Wait()

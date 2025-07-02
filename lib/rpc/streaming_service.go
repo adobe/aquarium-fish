@@ -150,21 +150,25 @@ type StreamingService struct {
 
 // subscription represents an active database subscription
 type subscription struct {
+	id            string
+	streamMutex   sync.Mutex // Protects concurrent access to stream.Send()
 	stream        *connect.ServerStream[aquariumv2.StreamingServiceSubscribeResponse]
 	subscriptions []aquariumv2.SubscriptionType
 	filters       map[string]string
 	userName      string
 	ctx           context.Context
 	cancel        context.CancelFunc
-	stateChannel  chan *typesv2.ApplicationState
-	taskChannel   chan *typesv2.ApplicationTask
-	resourceChan  chan *typesv2.ApplicationResource
+	channels      *subChannels
 
 	// Buffer overflow protection
 	overflowMutex    sync.RWMutex
 	overflowCount    int  // Count of consecutive buffer overflows
 	isOverflowing    bool // Flag to indicate client is struggling
 	lastOverflowTime time.Time
+
+	// Goroutine coordination
+	relayWg          sync.WaitGroup // WaitGroup to coordinate relay goroutine shutdown
+	listenChannelsWg sync.WaitGroup // WaitGroup to coordinate listenChannels goroutine shutdown
 }
 
 // Buffer overflow protection constants
@@ -218,156 +222,6 @@ func (sub *subscription) isClientOverflowing() bool {
 	return sub.isOverflowing
 }
 
-// safeSendToStateChannel attempts to send to state channel with overflow detection
-func (sub *subscription) safeSendToStateChannel(state *typesv2.ApplicationState) bool {
-	select {
-	case sub.stateChannel <- state:
-		sub.resetOverflow()
-		return true
-	case <-time.After(overflowTimeout):
-		log.Warnf("Subscription %s: State channel send timeout (buffer overflow)", sub.userName)
-		return sub.recordOverflow()
-	default:
-		log.Warnf("Subscription %s: State channel full (buffer overflow)", sub.userName)
-		return sub.recordOverflow()
-	}
-}
-
-// safeSendToTaskChannel attempts to send to task channel with overflow detection
-func (sub *subscription) safeSendToTaskChannel(task *typesv2.ApplicationTask) bool {
-	select {
-	case sub.taskChannel <- task:
-		sub.resetOverflow()
-		return true
-	case <-time.After(overflowTimeout):
-		log.Warnf("Subscription %s: Task channel send timeout (buffer overflow)", sub.userName)
-		return sub.recordOverflow()
-	default:
-		log.Warnf("Subscription %s: Task channel full (buffer overflow)", sub.userName)
-		return sub.recordOverflow()
-	}
-}
-
-// safeSendToResourceChannel attempts to send to resource channel with overflow detection
-func (sub *subscription) safeSendToResourceChannel(resource *typesv2.ApplicationResource) bool {
-	select {
-	case sub.resourceChan <- resource:
-		sub.resetOverflow()
-		return true
-	case <-time.After(overflowTimeout):
-		log.Warnf("Subscription %s: Resource channel send timeout (buffer overflow)", sub.userName)
-		return sub.recordOverflow()
-	default:
-		log.Warnf("Subscription %s: Resource channel full (buffer overflow)", sub.userName)
-		return sub.recordOverflow()
-	}
-}
-
-// relayStateNotifications safely relays state notifications with buffer overflow protection
-func (s *StreamingService) relayStateNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan *typesv2.ApplicationState) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Errorf("Subscription %s: State relay goroutine panic: %v", subscriptionID, r)
-		}
-	}()
-
-	for {
-		select {
-		case <-ctx.Done():
-			log.Debugf("Subscription %s: State relay stopping due to context cancellation", subscriptionID)
-			return
-		case state, ok := <-dbChannel:
-			if !ok {
-				log.Debugf("Subscription %s: State relay stopping due to closed database channel", subscriptionID)
-				return
-			}
-
-			// Check if client is already overflowing - skip notification to prevent further overflow
-			if sub.isClientOverflowing() {
-				log.Debugf("Subscription %s: Skipping state notification due to client overflow", subscriptionID)
-				continue
-			}
-
-			// Try to send safely - if this returns true, client should be disconnected
-			if shouldDisconnect := !sub.safeSendToStateChannel(state); shouldDisconnect {
-				log.Errorf("Subscription %s: Disconnecting client due to excessive buffer overflow", subscriptionID)
-				sub.cancel() // This will cause the main subscription loop to exit
-				return
-			}
-		}
-	}
-}
-
-// relayTaskNotifications safely relays task notifications with buffer overflow protection
-func (s *StreamingService) relayTaskNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan *typesv2.ApplicationTask) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Errorf("Subscription %s: Task relay goroutine panic: %v", subscriptionID, r)
-		}
-	}()
-
-	for {
-		select {
-		case <-ctx.Done():
-			log.Debugf("Subscription %s: Task relay stopping due to context cancellation", subscriptionID)
-			return
-		case task, ok := <-dbChannel:
-			if !ok {
-				log.Debugf("Subscription %s: Task relay stopping due to closed database channel", subscriptionID)
-				return
-			}
-
-			// Check if client is already overflowing - skip notification to prevent further overflow
-			if sub.isClientOverflowing() {
-				log.Debugf("Subscription %s: Skipping task notification due to client overflow", subscriptionID)
-				continue
-			}
-
-			// Try to send safely - if this returns true, client should be disconnected
-			if shouldDisconnect := !sub.safeSendToTaskChannel(task); shouldDisconnect {
-				log.Errorf("Subscription %s: Disconnecting client due to excessive buffer overflow", subscriptionID)
-				sub.cancel() // This will cause the main subscription loop to exit
-				return
-			}
-		}
-	}
-}
-
-// relayResourceNotifications safely relays resource notifications with buffer overflow protection
-func (s *StreamingService) relayResourceNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan *typesv2.ApplicationResource) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Errorf("Subscription %s: Resource relay goroutine panic: %v", subscriptionID, r)
-		}
-	}()
-
-	for {
-		select {
-		case <-ctx.Done():
-			log.Debugf("Subscription %s: Resource relay stopping due to context cancellation", subscriptionID)
-			return
-		case resource, ok := <-dbChannel:
-			if !ok {
-				log.Debugf("Subscription %s: Resource relay stopping due to closed database channel", subscriptionID)
-				return
-			}
-
-			// Check if client is already overflowing - skip notification to prevent further overflow
-			if sub.isClientOverflowing() {
-				log.Debugf("Subscription %s: Skipping resource notification due to client overflow", subscriptionID)
-				continue
-			}
-
-			// Try to send safely - if this returns true, client should be disconnected
-			if shouldDisconnect := !sub.safeSendToResourceChannel(resource); shouldDisconnect {
-				log.Errorf("Subscription %s: Disconnecting client due to excessive buffer overflow", subscriptionID)
-				sub.cancel() // This will cause the main subscription loop to exit
-				return
-			}
-		}
-	}
-}
-
 // bidirectionalConnection represents an active bidirectional streaming connection
 type bidirectionalConnection struct {
 	stream      *connect.BidiStream[aquariumv2.StreamingServiceConnectRequest, aquariumv2.StreamingServiceConnectResponse]
@@ -397,51 +251,6 @@ func NewStreamingService(f *fish.Fish) *StreamingService {
 		connections:        make(map[string]*bidirectionalConnection),
 		permissionCache:    NewSubscriptionPermissionCache(),
 	}
-}
-
-// requestTypeMapping maps request types to service and method names for RBAC
-type serviceMethodInfo struct {
-	service string
-	method  string
-}
-
-var requestTypeMapping = map[string]serviceMethodInfo{
-	// ApplicationService
-	"ApplicationServiceListRequest":        {auth.ApplicationService, auth.ApplicationServiceList},
-	"ApplicationServiceGetRequest":         {auth.ApplicationService, auth.ApplicationServiceGet},
-	"ApplicationServiceCreateRequest":      {auth.ApplicationService, auth.ApplicationServiceCreate},
-	"ApplicationServiceGetStateRequest":    {auth.ApplicationService, auth.ApplicationServiceGetState},
-	"ApplicationServiceGetResourceRequest": {auth.ApplicationService, auth.ApplicationServiceGetResource},
-	"ApplicationServiceListTaskRequest":    {auth.ApplicationService, auth.ApplicationServiceListTask},
-	"ApplicationServiceCreateTaskRequest":  {auth.ApplicationService, auth.ApplicationServiceCreateTask},
-	"ApplicationServiceGetTaskRequest":     {auth.ApplicationService, auth.ApplicationServiceGetTask},
-	"ApplicationServiceDeallocateRequest":  {auth.ApplicationService, auth.ApplicationServiceDeallocate},
-
-	// LabelService
-	"LabelServiceListRequest":   {auth.LabelService, auth.LabelServiceList},
-	"LabelServiceGetRequest":    {auth.LabelService, auth.LabelServiceGet},
-	"LabelServiceCreateRequest": {auth.LabelService, auth.LabelServiceCreate},
-	"LabelServiceDeleteRequest": {auth.LabelService, auth.LabelServiceDelete},
-
-	// NodeService
-	"NodeServiceListRequest":           {auth.NodeService, auth.NodeServiceList},
-	"NodeServiceGetThisRequest":        {auth.NodeService, auth.NodeServiceGetThis},
-	"NodeServiceSetMaintenanceRequest": {auth.NodeService, auth.NodeServiceSetMaintenance},
-
-	// UserService
-	"UserServiceGetMeRequest":  {auth.UserService, auth.UserServiceGetMe},
-	"UserServiceListRequest":   {auth.UserService, auth.UserServiceList},
-	"UserServiceGetRequest":    {auth.UserService, auth.UserServiceGet},
-	"UserServiceCreateRequest": {auth.UserService, auth.UserServiceCreate},
-	"UserServiceUpdateRequest": {auth.UserService, auth.UserServiceUpdate},
-	"UserServiceDeleteRequest": {auth.UserService, auth.UserServiceDelete},
-
-	// RoleService
-	"RoleServiceListRequest":   {auth.RoleService, auth.RoleServiceList},
-	"RoleServiceGetRequest":    {auth.RoleService, auth.RoleServiceGet},
-	"RoleServiceCreateRequest": {auth.RoleService, auth.RoleServiceCreate},
-	"RoleServiceUpdateRequest": {auth.RoleService, auth.RoleServiceUpdate},
-	"RoleServiceDeleteRequest": {auth.RoleService, auth.RoleServiceDelete},
 }
 
 // Connect handles bidirectional streaming for RPC requests
@@ -656,426 +465,6 @@ func (s *StreamingService) setServiceMethodContext(ctx context.Context, service,
 	return rpcutil.SetRBACContext(ctx, service, method)
 }
 
-// routeRequest routes a request to the appropriate service handler
-func (s *StreamingService) routeRequest(ctx context.Context, requestType string, requestData *anypb.Any) (*anypb.Any, error) {
-	log.Debugf("Streaming: Routing request type: %s", requestType)
-
-	switch requestType {
-	// Application Service
-	case "ApplicationServiceListRequest":
-		return s.routeApplicationRequest(ctx, requestType, requestData)
-	case "ApplicationServiceGetRequest":
-		return s.routeApplicationRequest(ctx, requestType, requestData)
-	case "ApplicationServiceCreateRequest":
-		return s.routeApplicationRequest(ctx, requestType, requestData)
-	case "ApplicationServiceGetStateRequest":
-		return s.routeApplicationRequest(ctx, requestType, requestData)
-	case "ApplicationServiceGetResourceRequest":
-		return s.routeApplicationRequest(ctx, requestType, requestData)
-	case "ApplicationServiceListTaskRequest":
-		return s.routeApplicationRequest(ctx, requestType, requestData)
-	case "ApplicationServiceCreateTaskRequest":
-		return s.routeApplicationRequest(ctx, requestType, requestData)
-	case "ApplicationServiceGetTaskRequest":
-		return s.routeApplicationRequest(ctx, requestType, requestData)
-	case "ApplicationServiceDeallocateRequest":
-		return s.routeApplicationRequest(ctx, requestType, requestData)
-
-	// Label Service
-	case "LabelServiceListRequest":
-		return s.routeLabelRequest(ctx, requestType, requestData)
-	case "LabelServiceGetRequest":
-		return s.routeLabelRequest(ctx, requestType, requestData)
-	case "LabelServiceCreateRequest":
-		return s.routeLabelRequest(ctx, requestType, requestData)
-	case "LabelServiceDeleteRequest":
-		return s.routeLabelRequest(ctx, requestType, requestData)
-
-	// Node Service
-	case "NodeServiceListRequest":
-		return s.routeNodeRequest(ctx, requestType, requestData)
-	case "NodeServiceGetThisRequest":
-		return s.routeNodeRequest(ctx, requestType, requestData)
-	case "NodeServiceSetMaintenanceRequest":
-		return s.routeNodeRequest(ctx, requestType, requestData)
-
-	// User Service
-	case "UserServiceGetMeRequest":
-		return s.routeUserRequest(ctx, requestType, requestData)
-	case "UserServiceListRequest":
-		return s.routeUserRequest(ctx, requestType, requestData)
-	case "UserServiceGetRequest":
-		return s.routeUserRequest(ctx, requestType, requestData)
-	case "UserServiceCreateRequest":
-		return s.routeUserRequest(ctx, requestType, requestData)
-	case "UserServiceUpdateRequest":
-		return s.routeUserRequest(ctx, requestType, requestData)
-	case "UserServiceDeleteRequest":
-		return s.routeUserRequest(ctx, requestType, requestData)
-
-	// Role Service
-	case "RoleServiceListRequest":
-		return s.routeRoleRequest(ctx, requestType, requestData)
-	case "RoleServiceGetRequest":
-		return s.routeRoleRequest(ctx, requestType, requestData)
-	case "RoleServiceCreateRequest":
-		return s.routeRoleRequest(ctx, requestType, requestData)
-	case "RoleServiceUpdateRequest":
-		return s.routeRoleRequest(ctx, requestType, requestData)
-	case "RoleServiceDeleteRequest":
-		return s.routeRoleRequest(ctx, requestType, requestData)
-
-	default:
-		return nil, connect.NewError(connect.CodeUnimplemented, fmt.Errorf("unsupported request type: %s", requestType))
-	}
-}
-
-// routeApplicationRequest routes application service requests
-func (s *StreamingService) routeApplicationRequest(ctx context.Context, requestType string, requestData *anypb.Any) (*anypb.Any, error) {
-	switch requestType {
-	case "ApplicationServiceListRequest":
-		var req aquariumv2.ApplicationServiceListRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.applicationService.List(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	case "ApplicationServiceGetRequest":
-		var req aquariumv2.ApplicationServiceGetRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.applicationService.Get(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	case "ApplicationServiceCreateRequest":
-		var req aquariumv2.ApplicationServiceCreateRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.applicationService.Create(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-
-		// Cache permission for the owner (creator) of the application
-		if resp.Msg.Status && resp.Msg.Data != nil {
-			userName := rpcutil.GetUserName(ctx)
-			appUID := stringToUUID(resp.Msg.Data.Uid)
-			s.permissionCache.GrantAccess(userName, appUID)
-			log.Debugf("Streaming: Cached permission for app creator %s -> %s", userName, appUID)
-		}
-
-		return anypb.New(resp.Msg)
-
-	case "ApplicationServiceGetStateRequest":
-		var req aquariumv2.ApplicationServiceGetStateRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.applicationService.GetState(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	case "ApplicationServiceGetResourceRequest":
-		var req aquariumv2.ApplicationServiceGetResourceRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.applicationService.GetResource(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	case "ApplicationServiceListTaskRequest":
-		var req aquariumv2.ApplicationServiceListTaskRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.applicationService.ListTask(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	case "ApplicationServiceCreateTaskRequest":
-		var req aquariumv2.ApplicationServiceCreateTaskRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.applicationService.CreateTask(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	case "ApplicationServiceGetTaskRequest":
-		var req aquariumv2.ApplicationServiceGetTaskRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.applicationService.GetTask(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	case "ApplicationServiceDeallocateRequest":
-		var req aquariumv2.ApplicationServiceDeallocateRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.applicationService.Deallocate(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	default:
-		return nil, connect.NewError(connect.CodeUnimplemented, fmt.Errorf("unsupported application request type: %s", requestType))
-	}
-}
-
-// routeLabelRequest routes label service requests
-func (s *StreamingService) routeLabelRequest(ctx context.Context, requestType string, requestData *anypb.Any) (*anypb.Any, error) {
-	switch requestType {
-	case "LabelServiceListRequest":
-		var req aquariumv2.LabelServiceListRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.labelService.List(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	case "LabelServiceGetRequest":
-		var req aquariumv2.LabelServiceGetRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.labelService.Get(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	case "LabelServiceCreateRequest":
-		var req aquariumv2.LabelServiceCreateRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.labelService.Create(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	case "LabelServiceDeleteRequest":
-		var req aquariumv2.LabelServiceDeleteRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.labelService.Delete(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	default:
-		return nil, connect.NewError(connect.CodeUnimplemented, fmt.Errorf("unsupported label request type: %s", requestType))
-	}
-}
-
-// routeNodeRequest routes node service requests
-func (s *StreamingService) routeNodeRequest(ctx context.Context, requestType string, requestData *anypb.Any) (*anypb.Any, error) {
-	switch requestType {
-	case "NodeServiceListRequest":
-		var req aquariumv2.NodeServiceListRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.nodeService.List(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	case "NodeServiceGetThisRequest":
-		var req aquariumv2.NodeServiceGetThisRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.nodeService.GetThis(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	case "NodeServiceSetMaintenanceRequest":
-		var req aquariumv2.NodeServiceSetMaintenanceRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.nodeService.SetMaintenance(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	default:
-		return nil, connect.NewError(connect.CodeUnimplemented, fmt.Errorf("unsupported node request type: %s", requestType))
-	}
-}
-
-// routeUserRequest routes user service requests
-func (s *StreamingService) routeUserRequest(ctx context.Context, requestType string, requestData *anypb.Any) (*anypb.Any, error) {
-	switch requestType {
-	case "UserServiceGetMeRequest":
-		var req aquariumv2.UserServiceGetMeRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.userService.GetMe(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	case "UserServiceListRequest":
-		var req aquariumv2.UserServiceListRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.userService.List(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	case "UserServiceGetRequest":
-		var req aquariumv2.UserServiceGetRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.userService.Get(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	case "UserServiceCreateRequest":
-		var req aquariumv2.UserServiceCreateRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.userService.Create(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	case "UserServiceUpdateRequest":
-		var req aquariumv2.UserServiceUpdateRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.userService.Update(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	case "UserServiceDeleteRequest":
-		var req aquariumv2.UserServiceDeleteRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.userService.Delete(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	default:
-		return nil, connect.NewError(connect.CodeUnimplemented, fmt.Errorf("unsupported user request type: %s", requestType))
-	}
-}
-
-// routeRoleRequest routes role service requests
-func (s *StreamingService) routeRoleRequest(ctx context.Context, requestType string, requestData *anypb.Any) (*anypb.Any, error) {
-	switch requestType {
-	case "RoleServiceListRequest":
-		var req aquariumv2.RoleServiceListRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.roleService.List(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	case "RoleServiceGetRequest":
-		var req aquariumv2.RoleServiceGetRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.roleService.Get(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	case "RoleServiceCreateRequest":
-		var req aquariumv2.RoleServiceCreateRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.roleService.Create(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	case "RoleServiceUpdateRequest":
-		var req aquariumv2.RoleServiceUpdateRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.roleService.Update(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	case "RoleServiceDeleteRequest":
-		var req aquariumv2.RoleServiceDeleteRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.roleService.Delete(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(resp.Msg)
-
-	default:
-		return nil, connect.NewError(connect.CodeUnimplemented, fmt.Errorf("unsupported role request type: %s", requestType))
-	}
-}
-
 // getResponseType returns the response type for a given request type
 func (s *StreamingService) getResponseType(requestType string) string {
 	return strings.Replace(requestType, "Request", "Response", 1)
@@ -1101,22 +490,16 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 	// Create subscription context
 	subCtx, cancel := context.WithCancel(ctx)
 
-	// Create channels for database changes
-	stateChannel := make(chan *typesv2.ApplicationState, 100)
-	taskChannel := make(chan *typesv2.ApplicationTask, 100)
-	resourceChannel := make(chan *typesv2.ApplicationResource, 100)
-
 	// Create subscription
 	sub := &subscription{
+		id:            subscriptionID,
 		stream:        stream,
 		subscriptions: req.Msg.SubscriptionTypes,
 		filters:       req.Msg.Filters,
 		userName:      userName,
 		ctx:           subCtx,
 		cancel:        cancel,
-		stateChannel:  stateChannel,
-		taskChannel:   taskChannel,
-		resourceChan:  resourceChannel,
+		channels:      s.setupChannels(),
 	}
 
 	// Register subscription
@@ -1124,53 +507,28 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 	s.subscriptions[subscriptionID] = sub
 	s.subscriptionsMutex.Unlock()
 
-	// Subscribe to database changes based on requested types with buffer overflow protection
-	for _, subType := range req.Msg.SubscriptionTypes {
-		switch subType {
-		case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE:
-			// Create a safe wrapper channel for database notifications
-			dbStateChannel := make(chan *typesv2.ApplicationState, 100)
-			s.fish.DB().SubscribeApplicationState(dbStateChannel)
-			log.Debugf("Streaming: Subscribed to ApplicationState changes with overflow protection")
-
-			// Start goroutine to safely relay notifications to subscription
-			go s.relayStateNotifications(subCtx, subscriptionID, sub, dbStateChannel)
-
-		case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK:
-			// Create a safe wrapper channel for database notifications
-			dbTaskChannel := make(chan *typesv2.ApplicationTask, 100)
-			s.fish.DB().SubscribeApplicationTask(dbTaskChannel)
-			log.Debugf("Streaming: Subscribed to ApplicationTask changes with overflow protection")
-
-			// Start goroutine to safely relay notifications to subscription
-			go s.relayTaskNotifications(subCtx, subscriptionID, sub, dbTaskChannel)
-
-		case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE:
-			// Create a safe wrapper channel for database notifications
-			dbResourceChannel := make(chan *typesv2.ApplicationResource, 100)
-			s.fish.DB().SubscribeApplicationResource(dbResourceChannel)
-			log.Debugf("Streaming: Subscribed to ApplicationResource changes with overflow protection")
-
-			// Start goroutine to safely relay notifications to subscription
-			go s.relayResourceNotifications(subCtx, subscriptionID, sub, dbResourceChannel)
-		}
-	}
+	// Subscribe to database changes using generated setup function
+	s.setupSubscriptions(subCtx, subscriptionID, sub, req.Msg.SubscriptionTypes)
 
 	defer func() {
-		// Note: Database channels are now handled by relay goroutines
-		// The database unsubscription will happen automatically when channels are closed
-		// by the relay goroutines when the context is cancelled
-
 		// Clean up subscription
 		s.subscriptionsMutex.Lock()
 		delete(s.subscriptions, subscriptionID)
 		s.subscriptionsMutex.Unlock()
+
 		cancel()
 
-		// Close subscription channels (relay goroutines will handle database channels)
-		close(stateChannel)
-		close(taskChannel)
-		close(resourceChannel)
+		// Wait for all relay goroutines to finish before closing channels
+		log.Debugf("Subscription %s: Waiting for relay goroutines to finish", subscriptionID)
+		sub.relayWg.Wait()
+		log.Debugf("Subscription %s: All relay goroutines finished, waiting for listenChannels", subscriptionID)
+
+		// Wait for listenChannels goroutine to finish
+		sub.listenChannelsWg.Wait()
+		log.Debugf("Subscription %s: All goroutines finished, closing channels", subscriptionID)
+
+		// Close subscription channels (relay goroutines have finished)
+		sub.channels.Close()
 		log.Debugf("Subscription %s: Cleaned up", subscriptionID)
 	}()
 
@@ -1178,23 +536,21 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 	log.Debugf("Subscription %s: Established and ready for events", subscriptionID)
 
 	// Send initial confirmation message to client to confirm subscription is active
-	confirmationResponse := &aquariumv2.StreamingServiceSubscribeResponse{
-		ObjectType: aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED, // Special type for control messages
-		ChangeType: aquariumv2.ChangeType_CHANGE_TYPE_CREATED,                 // Use CREATED to indicate subscription confirmation
-		Timestamp:  timestamppb.Now(),
-		ObjectData: nil, // No object data for confirmation message
-	}
-
-	log.Debugf("Streaming: About to send subscription confirmation to client")
-	if err := stream.Send(confirmationResponse); err != nil {
+	log.Debugf("Subscription %s: About to send subscription confirmation to client", subscriptionID)
+	if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED, aquariumv2.ChangeType_CHANGE_TYPE_CREATED, nil); err != nil {
 		log.Errorf("Subscription %s: Error sending subscription confirmation: %v", subscriptionID, err)
 		return err
 	}
-	log.Debugf("Streaming: Sent subscription confirmation to client")
+	log.Debugf("Subscription %s: Sent subscription confirmation to client", subscriptionID)
 
 	// Create a ticker for periodic keepalives
 	keepAliveTicker := time.NewTicker(60 * time.Second)
 	defer keepAliveTicker.Stop()
+
+	// Add to WaitGroup before starting listenChannels goroutine
+	sub.listenChannelsWg.Add(1)
+	// Running background process to listen for the channels
+	go s.listenChannels(sub, ctx, subCtx)
 
 	// Process subscription events
 	for {
@@ -1206,13 +562,7 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 			if sub.isClientOverflowing() {
 				log.Warnf("Subscription %s: Client disconnected due to buffer overflow", subscriptionID)
 				// Send buffer overflow error notification
-				overflowNotification := &aquariumv2.StreamingServiceSubscribeResponse{
-					ObjectType: aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED,
-					ChangeType: aquariumv2.ChangeType_CHANGE_TYPE_DELETED, // Use DELETED to indicate error/disconnection
-					Timestamp:  timestamppb.Now(),
-					ObjectData: nil,
-				}
-				if err := stream.Send(overflowNotification); err != nil {
+				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED, aquariumv2.ChangeType_CHANGE_TYPE_DELETED, nil); err != nil {
 					log.Debugf("Subscription %s: Failed to send buffer overflow notification: %v", subscriptionID, err)
 				}
 				// Return error to signal client disconnect due to overflow
@@ -1220,13 +570,7 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 					fmt.Errorf("client disconnected due to buffer overflow - unable to keep up with notification rate"))
 			} else {
 				// Normal shutdown notification
-				shutdownNotification := &aquariumv2.StreamingServiceSubscribeResponse{
-					ObjectType: aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED,
-					ChangeType: aquariumv2.ChangeType_CHANGE_TYPE_UNSPECIFIED,
-					Timestamp:  timestamppb.Now(),
-					ObjectData: nil,
-				}
-				if err := stream.Send(shutdownNotification); err != nil {
+				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED, aquariumv2.ChangeType_CHANGE_TYPE_UNSPECIFIED, nil); err != nil {
 					log.Debugf("Subscription %s: Failed to send subscription shutdown notification: %v", subscriptionID, err)
 				}
 			}
@@ -1239,39 +583,6 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 		case <-keepAliveTicker.C:
 			// Periodic keepalive logging
 			log.Debugf("Subscription %s: Still active, waiting for events...", subscriptionID)
-
-		case appState := <-stateChannel:
-			if s.shouldSendObject(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE, appState) {
-				log.Debugf("Subscription %s: Sending ApplicationState notification for app %s, status %s", subscriptionID, appState.ApplicationUid, appState.Status)
-				if err := s.sendSubscriptionResponse(stream, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE, aquariumv2.ChangeType_CHANGE_TYPE_CREATED, appState.ToApplicationState()); err != nil {
-					log.Errorf("Subscription %s: Error sending ApplicationState update: %v", subscriptionID, err)
-					return err
-				}
-			} else {
-				log.Debugf("Subscription %s: Skipping ApplicationState notification for user %s", subscriptionID, sub.userName)
-			}
-
-		case appTask := <-taskChannel:
-			if s.shouldSendObject(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK, appTask) {
-				log.Debugf("Subscription %s: Sending ApplicationTask notification for app %s", subscriptionID, appTask.ApplicationUid)
-				if err := s.sendSubscriptionResponse(stream, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK, aquariumv2.ChangeType_CHANGE_TYPE_CREATED, appTask.ToApplicationTask()); err != nil {
-					log.Errorf("Subscription %s: Error sending ApplicationTask update: %v", subscriptionID, err)
-					return err
-				}
-			} else {
-				log.Debugf("Subscription %s: Skipping ApplicationTask notification for user %s", subscriptionID, sub.userName)
-			}
-
-		case appResource := <-resourceChannel:
-			if s.shouldSendObject(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE, appResource) {
-				log.Debugf("Subscription %s: Sending ApplicationResource notification for app %s", subscriptionID, appResource.ApplicationUid)
-				if err := s.sendSubscriptionResponse(stream, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE, aquariumv2.ChangeType_CHANGE_TYPE_CREATED, appResource.ToApplicationResource()); err != nil {
-					log.Errorf("Subscription %s: Error sending ApplicationResource update: %v", subscriptionID, err)
-					return err
-				}
-			} else {
-				log.Debugf("Subscription %s: Skipping ApplicationResource notification for user %s", subscriptionID, sub.userName)
-			}
 		}
 	}
 }
@@ -1316,39 +627,6 @@ func (s *StreamingService) checkApplicationAccess(sub *subscription, appUID type
 	return hasAccess
 }
 
-// shouldSendObject checks if an object should be sent to the subscriber based on filters and permissions
-func (s *StreamingService) shouldSendObject(sub *subscription, objectType aquariumv2.SubscriptionType, obj interface{}) bool {
-	// Check if this subscription type is requested
-	found := false
-	for _, subType := range sub.subscriptions {
-		if subType == objectType {
-			found = true
-			break
-		}
-	}
-	if !found {
-		return false
-	}
-
-	// Apply filters based on object type
-	switch objectType {
-	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE:
-		if state, ok := obj.(*typesv2.ApplicationState); ok {
-			return s.shouldSendApplicationObject(sub, state.ApplicationUid, objectType)
-		}
-	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK:
-		if task, ok := obj.(*typesv2.ApplicationTask); ok {
-			return s.shouldSendApplicationObject(sub, task.ApplicationUid, objectType)
-		}
-	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE:
-		if resource, ok := obj.(*typesv2.ApplicationResource); ok {
-			return s.shouldSendApplicationObject(sub, resource.ApplicationUid, objectType)
-		}
-	}
-
-	return true
-}
-
 // shouldSendApplicationObject checks if application-related object should be sent based on ownership and RBAC permissions
 func (s *StreamingService) shouldSendApplicationObject(sub *subscription, appUID typesv2.ApplicationUID, objectType aquariumv2.SubscriptionType) bool {
 	// Check application filters
@@ -1359,16 +637,8 @@ func (s *StreamingService) shouldSendApplicationObject(sub *subscription, appUID
 		}
 	}
 
-	// Determine the appropriate RBAC method based on subscription type
-	var rbacMethod string
-	switch objectType {
-	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE:
-		rbacMethod = auth.ApplicationServiceGetStateAll
-	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK:
-		rbacMethod = auth.ApplicationServiceListTaskAll
-	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE:
-		rbacMethod = auth.ApplicationServiceGetResourceAll
-	}
+	// Get the appropriate RBAC method from the generated helper
+	rbacMethod := s.getSubscriptionPermissionMethod(objectType)
 
 	// Check if user has access (owner or RBAC permission)
 	hasAccess := s.checkApplicationAccess(sub, appUID, rbacMethod)
@@ -1380,10 +650,23 @@ func (s *StreamingService) shouldSendApplicationObject(sub *subscription, appUID
 }
 
 // sendSubscriptionResponse sends a subscription response to the client
-func (s *StreamingService) sendSubscriptionResponse(stream *connect.ServerStream[aquariumv2.StreamingServiceSubscribeResponse], objectType aquariumv2.SubscriptionType, changeType aquariumv2.ChangeType, obj proto.Message) error {
-	objectData, err := anypb.New(obj)
-	if err != nil {
-		return fmt.Errorf("failed to marshal object data: %w", err)
+func (s *StreamingService) sendSubscriptionResponse(sub *subscription, objectType aquariumv2.SubscriptionType, changeType aquariumv2.ChangeType, obj proto.Message) error {
+	// Check if context is cancelled
+	select {
+	case <-sub.ctx.Done():
+		return fmt.Errorf("subscription context cancelled")
+	default:
+	}
+
+	var objectData *anypb.Any
+	var err error
+
+	// Only marshal object data if obj is not nil
+	if obj != nil {
+		objectData, err = anypb.New(obj)
+		if err != nil {
+			return fmt.Errorf("failed to marshal object data: %w", err)
+		}
 	}
 
 	response := &aquariumv2.StreamingServiceSubscribeResponse{
@@ -1393,7 +676,10 @@ func (s *StreamingService) sendSubscriptionResponse(stream *connect.ServerStream
 		ObjectData: objectData,
 	}
 
-	return stream.Send(response)
+	sub.streamMutex.Lock()
+	defer sub.streamMutex.Unlock()
+
+	return sub.stream.Send(response)
 }
 
 // GracefulShutdown initiates graceful shutdown of all streaming connections

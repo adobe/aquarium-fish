@@ -18,6 +18,7 @@ import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 import "aquarium/v2/common.proto";
 import "aquarium/v2/rbac.proto";
+import "aquarium/v2/streaming_options.proto";
 
 option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2";
 
@@ -118,6 +119,10 @@ message Application {
 // info when the Application comes to this state and the last one describes the current state
 // of the Application.
 message ApplicationState {
+  option (aquarium.v2.subscribe_config) = {
+    permission_check: "ApplicationServiceGetStateAll"
+  };
+
   // Enum for ApplicationState status field
   enum Status {
     UNSPECIFIED = 0; // Should not happen during regular operation
@@ -146,6 +151,10 @@ message ApplicationState {
 //
 // Could be created and updated only by the node which won the Application execution.
 message ApplicationResource {
+  option (aquarium.v2.subscribe_config) = {
+    permission_check: "ApplicationServiceGetResourceAll"
+  };
+
   string uid = 1;
   google.protobuf.Timestamp created_at = 2;
   google.protobuf.Timestamp updated_at = 3;
@@ -186,6 +195,10 @@ message ApplicationResource {
 //
 // It could be created by any Node but updated by the one which won the Application execution.
 message ApplicationTask {
+  option (aquarium.v2.subscribe_config) = {
+    permission_check: "ApplicationServiceListTaskAll"
+  };
+
   string uid = 1;
   google.protobuf.Timestamp created_at = 2;
   google.protobuf.Timestamp updated_at = 3;
