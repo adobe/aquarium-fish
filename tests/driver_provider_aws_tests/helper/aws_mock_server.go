@@ -40,12 +40,12 @@ type MockAWSServer struct {
 	// State management
 	mutex          sync.RWMutex
 	instances      map[string]*MockInstance
-	images         map[string]*MockImage
-	subnets        map[string]*MockSubnet
-	vpcs           map[string]*MockVPC
-	securityGroups map[string]*MockSecurityGroup
-	snapshots      map[string]*MockSnapshot
-	keyPairs       map[string]*MockKeyPair
+	images         map[string]*mockImage
+	subnets        map[string]*mockSubnet
+	vpcs           map[string]*mockVPC
+	securityGroups map[string]*mockSecurityGroup
+	snapshots      map[string]*mockSnapshot
+	keyPairs       map[string]*mockKeyPair
 	hosts          map[string]*MockHost
 	quotas         map[string]float64
 	account        string
@@ -64,23 +64,23 @@ type MockInstance struct {
 	UserData         string
 	Tags             map[string]string
 	LaunchTime       time.Time
-	BlockDevices     []*MockBlockDevice
-	CpuOptions       *MockCpuOptions
+	BlockDevices     []*mockBlockDevice
+	CPUOptions       *mockCPUOptions
 }
 
-type MockBlockDevice struct {
+type mockBlockDevice struct {
 	DeviceName string
 	VolumeID   string
 	Size       int32
 }
 
-type MockCpuOptions struct {
+type mockCPUOptions struct {
 	CoreCount      int32
 	ThreadsPerCore int32
 }
 
-// MockImage represents a mock AMI
-type MockImage struct {
+// mockImage represents a mock AMI
+type mockImage struct {
 	ImageID      string
 	Name         string
 	State        string
@@ -89,8 +89,8 @@ type MockImage struct {
 	OwnerID      string
 }
 
-// MockSubnet represents a mock subnet
-type MockSubnet struct {
+// mockSubnet represents a mock subnet
+type mockSubnet struct {
 	SubnetID                string
 	VpcID                   string
 	AvailabilityZone        string
@@ -98,30 +98,30 @@ type MockSubnet struct {
 	Tags                    map[string]string
 }
 
-// MockVPC represents a mock VPC
-type MockVPC struct {
+// mockVPC represents a mock VPC
+type mockVPC struct {
 	VpcID     string
 	IsDefault bool
 	Tags      map[string]string
 }
 
-// MockSecurityGroup represents a mock security group
-type MockSecurityGroup struct {
+// mockSecurityGroup represents a mock security group
+type mockSecurityGroup struct {
 	GroupID   string
 	GroupName string
 	OwnerID   string
 }
 
-// MockSnapshot represents a mock EBS snapshot
-type MockSnapshot struct {
+// mockSnapshot represents a mock EBS snapshot
+type mockSnapshot struct {
 	SnapshotID string
 	State      string
 	StartTime  time.Time
 	Tags       map[string]string
 }
 
-// MockKeyPair represents a mock key pair
-type MockKeyPair struct {
+// mockKeyPair represents a mock key pair
+type mockKeyPair struct {
 	KeyName     string
 	KeyMaterial string
 }
@@ -141,12 +141,12 @@ type MockHost struct {
 func NewMockAWSServer() *MockAWSServer {
 	mock := &MockAWSServer{
 		instances:      make(map[string]*MockInstance),
-		images:         make(map[string]*MockImage),
-		subnets:        make(map[string]*MockSubnet),
-		vpcs:           make(map[string]*MockVPC),
-		securityGroups: make(map[string]*MockSecurityGroup),
-		snapshots:      make(map[string]*MockSnapshot),
-		keyPairs:       make(map[string]*MockKeyPair),
+		images:         make(map[string]*mockImage),
+		subnets:        make(map[string]*mockSubnet),
+		vpcs:           make(map[string]*mockVPC),
+		securityGroups: make(map[string]*mockSecurityGroup),
+		snapshots:      make(map[string]*mockSnapshot),
+		keyPairs:       make(map[string]*mockKeyPair),
 		hosts:          make(map[string]*MockHost),
 		quotas:         make(map[string]float64),
 		account:        "123456789012",
@@ -220,7 +220,7 @@ func (m *MockAWSServer) AddDedicatedHost(hostID, instanceType, zone, state strin
 }
 
 // SetAllocateHostsError sets an error response for AllocateHosts requests
-func (m *MockAWSServer) SetAllocateHostsError(errorCode, errorMessage string) {
+func (m *MockAWSServer) SetAllocateHostsError(errorCode, _ string) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	// Store error state in quotas map for simplicity
@@ -231,14 +231,14 @@ func (m *MockAWSServer) SetAllocateHostsError(errorCode, errorMessage string) {
 
 func (m *MockAWSServer) initializeDefaults() {
 	// Default VPC
-	m.vpcs["vpc-12345678"] = &MockVPC{
+	m.vpcs["vpc-12345678"] = &mockVPC{
 		VpcID:     "vpc-12345678",
 		IsDefault: true,
 		Tags:      make(map[string]string),
 	}
 
 	// Default subnet
-	m.subnets["subnet-12345678"] = &MockSubnet{
+	m.subnets["subnet-12345678"] = &mockSubnet{
 		SubnetID:                "subnet-12345678",
 		VpcID:                   "vpc-12345678",
 		AvailabilityZone:        "us-west-2a",
@@ -247,14 +247,14 @@ func (m *MockAWSServer) initializeDefaults() {
 	}
 
 	// Default security group
-	m.securityGroups["sg-12345678"] = &MockSecurityGroup{
+	m.securityGroups["sg-12345678"] = &mockSecurityGroup{
 		GroupID:   "sg-12345678",
 		GroupName: "default",
 		OwnerID:   m.account,
 	}
 
 	// Sample AMI
-	m.images["ami-12345678"] = &MockImage{
+	m.images["ami-12345678"] = &mockImage{
 		ImageID:      "ami-12345678",
 		Name:         "test-image",
 		State:        "available",
@@ -330,7 +330,7 @@ func (m *MockAWSServer) handleRequest(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Unknown service"))
 }
 
-func (m *MockAWSServer) handleSTS(w http.ResponseWriter, r *http.Request, action string) {
+func (m *MockAWSServer) handleSTS(w http.ResponseWriter, _ *http.Request, action string) {
 	if action == "GetCallerIdentity" {
 		response := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <GetCallerIdentityResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/">
@@ -350,33 +350,35 @@ func (m *MockAWSServer) handleSTS(w http.ResponseWriter, r *http.Request, action
 	}
 }
 
-func (m *MockAWSServer) handleServiceQuotas(w http.ResponseWriter, r *http.Request, target string) {
+func (m *MockAWSServer) handleServiceQuotas(w http.ResponseWriter, _ *http.Request, target string) {
 	if strings.Contains(target, "ListServiceQuotas") {
-		quotas := []map[string]interface{}{}
+		quotas := []map[string]any{}
 
 		m.mutex.RLock()
 		for name, value := range m.quotas {
-			quotas = append(quotas, map[string]interface{}{
+			quotas = append(quotas, map[string]any{
 				"QuotaName": name,
 				"Value":     value,
 			})
 		}
 		m.mutex.RUnlock()
 
-		response := map[string]interface{}{
+		response := map[string]any{
 			"Quotas": quotas,
 		}
 
 		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			fmt.Printf("ERROR: Mock AWS server: Unable to encode ServiceQuotas json: %v\n", err)
+		}
 	}
 }
 
-func (m *MockAWSServer) handleKMS(w http.ResponseWriter, r *http.Request, target string) {
+func (*MockAWSServer) handleKMS(w http.ResponseWriter, _ *http.Request, target string) {
 	if strings.Contains(target, "ListAliases") {
-		response := map[string]interface{}{
-			"Aliases": []map[string]interface{}{
+		response := map[string]any{
+			"Aliases": []map[string]any{
 				{
 					"AliasName":   "alias/test-key",
 					"TargetKeyId": "arn:aws:kms:us-west-2:123456789012:key/12345678-1234-1234-1234-123456789012",
@@ -386,7 +388,9 @@ func (m *MockAWSServer) handleKMS(w http.ResponseWriter, r *http.Request, target
 
 		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			fmt.Printf("ERROR: Mock AWS server: Unable to encode KMS json: %v\n", err)
+		}
 	}
 }
 
@@ -441,7 +445,7 @@ func (m *MockAWSServer) handleEC2(w http.ResponseWriter, r *http.Request, action
 	}
 }
 
-func (m *MockAWSServer) handleRunInstances(w http.ResponseWriter, r *http.Request, body string) {
+func (m *MockAWSServer) handleRunInstances(w http.ResponseWriter, _ *http.Request, body string) {
 	values, _ := url.ParseQuery(body)
 
 	instanceID := "i-" + uuid.New().String()[:8]
@@ -462,19 +466,19 @@ func (m *MockAWSServer) handleRunInstances(w http.ResponseWriter, r *http.Reques
 		UserData:         userData,
 		Tags:             make(map[string]string),
 		LaunchTime:       time.Now(),
-		CpuOptions: &MockCpuOptions{
+		CPUOptions: &mockCPUOptions{
 			CoreCount:      2,
 			ThreadsPerCore: 2,
 		},
 	}
 
 	// Handle dedicated host placement
-	hostId := values.Get("Placement.HostId")
+	hostID := values.Get("Placement.HostId")
 	tenancy := values.Get("Placement.Tenancy")
 
-	if hostId != "" || tenancy == "host" {
+	if hostID != "" || tenancy == "host" {
 		// For Mac instances or when host ID is specified, use dedicated hosts
-		if hostId == "" {
+		if hostID == "" {
 			// Auto-allocate a host for Mac instances
 			if strings.Contains(instanceType, "mac") {
 				// Find or create a Mac dedicated host
@@ -488,9 +492,9 @@ func (m *MockAWSServer) handleRunInstances(w http.ResponseWriter, r *http.Reques
 
 				if availableHost == nil {
 					// Create new dedicated host
-					hostId = "h-" + uuid.New().String()[:8]
-					m.hosts[hostId] = &MockHost{
-						HostID:           hostId,
+					hostID = "h-" + uuid.New().String()[:8]
+					m.hosts[hostID] = &MockHost{
+						HostID:           hostID,
 						InstanceType:     instanceType + ".metal",
 						State:            "available",
 						AvailabilityZone: "us-west-2a",
@@ -498,9 +502,9 @@ func (m *MockAWSServer) handleRunInstances(w http.ResponseWriter, r *http.Reques
 						Instances:        []*MockInstance{},
 						Capacity:         1,
 					}
-					availableHost = m.hosts[hostId]
+					availableHost = m.hosts[hostID]
 				} else {
-					hostId = availableHost.HostID
+					hostID = availableHost.HostID
 				}
 
 				// Add instance to the host
@@ -508,7 +512,7 @@ func (m *MockAWSServer) handleRunInstances(w http.ResponseWriter, r *http.Reques
 			}
 		} else {
 			// Use specified host ID
-			if host, exists := m.hosts[hostId]; exists {
+			if host, exists := m.hosts[hostID]; exists {
 				host.Instances = append(host.Instances, instance)
 			}
 		}
@@ -532,7 +536,7 @@ func (m *MockAWSServer) handleRunInstances(w http.ResponseWriter, r *http.Reques
 		sizeStr := values.Get(fmt.Sprintf("BlockDeviceMapping.%d.Ebs.VolumeSize", i))
 		size, _ := strconv.ParseInt(sizeStr, 10, 32)
 
-		instance.BlockDevices = append(instance.BlockDevices, &MockBlockDevice{
+		instance.BlockDevices = append(instance.BlockDevices, &mockBlockDevice{
 			DeviceName: deviceName,
 			VolumeID:   "vol-" + uuid.New().String()[:8],
 			Size:       int32(size),
@@ -576,8 +580,8 @@ func (m *MockAWSServer) handleRunInstances(w http.ResponseWriter, r *http.Reques
 		instance.PrivateIPAddress,
 		instanceType,
 		instance.LaunchTime.Format("2006-01-02T15:04:05.000Z"),
-		instance.CpuOptions.CoreCount,
-		instance.CpuOptions.ThreadsPerCore,
+		instance.CPUOptions.CoreCount,
+		instance.CPUOptions.ThreadsPerCore,
 	)
 
 	w.Header().Set("Content-Type", "text/xml")
@@ -585,7 +589,7 @@ func (m *MockAWSServer) handleRunInstances(w http.ResponseWriter, r *http.Reques
 	w.Write([]byte(response))
 }
 
-func (m *MockAWSServer) handleDescribeInstances(w http.ResponseWriter, r *http.Request, body string) {
+func (m *MockAWSServer) handleDescribeInstances(w http.ResponseWriter, _ *http.Request, body string) {
 	values, _ := url.ParseQuery(body)
 
 	// Handle filtering by instance ID
@@ -639,8 +643,8 @@ func (m *MockAWSServer) handleDescribeInstances(w http.ResponseWriter, r *http.R
 				instance.PrivateIPAddress,
 				instance.InstanceType,
 				instance.LaunchTime.Format("2006-01-02T15:04:05.000Z"),
-				instance.CpuOptions.CoreCount,
-				instance.CpuOptions.ThreadsPerCore,
+				instance.CPUOptions.CoreCount,
+				instance.CPUOptions.ThreadsPerCore,
 				blockDevicesXML,
 			)
 		}
@@ -669,7 +673,7 @@ func (m *MockAWSServer) handleDescribeInstances(w http.ResponseWriter, r *http.R
 	w.Write([]byte(response))
 }
 
-func (m *MockAWSServer) handleTerminateInstances(w http.ResponseWriter, r *http.Request, body string) {
+func (m *MockAWSServer) handleTerminateInstances(w http.ResponseWriter, _ *http.Request, body string) {
 	values, _ := url.ParseQuery(body)
 	instanceID := values.Get("InstanceId.1")
 
@@ -904,7 +908,7 @@ func (m *MockAWSServer) handleDescribeSecurityGroups(w http.ResponseWriter, r *h
 	w.Write([]byte(response))
 }
 
-func (m *MockAWSServer) handleDescribeInstanceTypes(w http.ResponseWriter, r *http.Request, body string) {
+func (*MockAWSServer) handleDescribeInstanceTypes(w http.ResponseWriter, r *http.Request, body string) {
 	values, _ := url.ParseQuery(body)
 
 	// Parse requested instance types
@@ -1017,11 +1021,12 @@ func (m *MockAWSServer) handleCreateKeyPair(w http.ResponseWriter, r *http.Reque
 	values, _ := url.ParseQuery(body)
 	keyName := values.Get("KeyName")
 
+	//nolint:gosec  // G101 - this private key is just an example for tests
 	keyMaterial := `-----BEGIN RSA PRIVATE KEY-----
 MIIEpAIBAAKCAQEA2Z3QX0EXAMPLE...
 -----END RSA PRIVATE KEY-----`
 
-	m.keyPairs[keyName] = &MockKeyPair{
+	m.keyPairs[keyName] = &mockKeyPair{
 		KeyName:     keyName,
 		KeyMaterial: keyMaterial,
 	}
@@ -1066,7 +1071,7 @@ func (m *MockAWSServer) handleCreateSnapshots(w http.ResponseWriter, r *http.Req
 	_ = values.Get("InstanceSpecification.InstanceId") // instanceID not used in mock
 
 	snapshotID := "snap-" + uuid.New().String()[:8]
-	snapshot := &MockSnapshot{
+	snapshot := &mockSnapshot{
 		SnapshotID: snapshotID,
 		State:      "completed",
 		StartTime:  time.Now(),
@@ -1133,7 +1138,7 @@ func (m *MockAWSServer) handleCreateImage(w http.ResponseWriter, r *http.Request
 	name := values.Get("Name")
 
 	imageID := "ami-" + uuid.New().String()[:8]
-	image := &MockImage{
+	image := &mockImage{
 		ImageID:      imageID,
 		Name:         name,
 		State:        "available",
@@ -1195,7 +1200,7 @@ func (m *MockAWSServer) handleStopInstances(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-func (m *MockAWSServer) handleCreateTags(w http.ResponseWriter, r *http.Request, body string) {
+func (*MockAWSServer) handleCreateTags(w http.ResponseWriter, r *http.Request, body string) {
 	response := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <CreateTagsResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
     <requestId>%s</requestId>

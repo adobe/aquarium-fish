@@ -179,7 +179,7 @@ drivers:
 			if !exists {
 				r.Fatalf("No snapshots field found in the result: %v", resultMap)
 			}
-			snapshots, ok := snapshotsInterface.([]interface{})
+			snapshots, ok := snapshotsInterface.([]any)
 			if !ok {
 				r.Fatalf("Snapshots field is not an array: %v", snapshotsInterface)
 			}

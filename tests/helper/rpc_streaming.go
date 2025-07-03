@@ -51,7 +51,7 @@ type StreamingClient struct {
 }
 
 // NewStreamingClient creates a new streaming client with clean abstractions
-func NewStreamingClient(t *testing.T, name string, ctx context.Context, client aquariumv2connect.StreamingServiceClient) *StreamingClient {
+func NewStreamingClient(ctx context.Context, t *testing.T, name string, client aquariumv2connect.StreamingServiceClient) *StreamingClient {
 	return &StreamingClient{
 		t:               t,
 		name:            name,
@@ -155,23 +155,25 @@ func (sc *StreamingClient) EstablishSubscriptionStreaming(subscriptionTypes []aq
 
 			// Handle control messages (confirmation, shutdown, or buffer overflow)
 			if msg.ObjectType == aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED {
-				if msg.ChangeType == aquariumv2.ChangeType_CHANGE_TYPE_CREATED {
+				switch msg.ChangeType {
+				case aquariumv2.ChangeType_CHANGE_TYPE_CREATED:
 					// This is a subscription confirmation
 					sc.t.Logf("Client %s: Received subscription confirmation from server", sc.name)
 					continue
-				} else if msg.ChangeType == aquariumv2.ChangeType_CHANGE_TYPE_UNSPECIFIED {
+				case aquariumv2.ChangeType_CHANGE_TYPE_UNSPECIFIED:
 					// This is a shutdown notification
 					sc.t.Logf("Client %s: Received server shutdown notification for subscription, closing gracefully", sc.name)
 					return // Exit the receive loop to allow graceful closure
-				} else if msg.ChangeType == aquariumv2.ChangeType_CHANGE_TYPE_DELETED {
+				case aquariumv2.ChangeType_CHANGE_TYPE_DELETED:
 					// This is a buffer overflow disconnection notification
 					sc.t.Errorf("Client %s: DISCONNECTED by server due to BUFFER OVERFLOW - client cannot keep up with notification rate!", sc.name)
 					return // Exit the receive loop - server is disconnecting us
-				} else {
+				default:
 					// Unknown control message type
 					sc.t.Logf("Client %s: Received unknown control message with ChangeType: %s", sc.name, msg.ChangeType)
 					continue
 				}
+
 			}
 
 			// Dispatch to appropriate channel
@@ -265,7 +267,6 @@ func (sc *StreamingClient) WaitForNotification(
 	timeout time.Duration,
 	filter func(*aquariumv2.StreamingServiceSubscribeResponse) bool,
 ) (*aquariumv2.StreamingServiceSubscribeResponse, error) {
-
 	channel, exists := sc.subscriptions[subscriptionType]
 	if !exists {
 		return nil, fmt.Errorf("subscription type %s not established", subscriptionType)
@@ -454,9 +455,9 @@ type StreamingTestHelper struct {
 }
 
 // NewStreamingTestHelper creates a new test helper with streamlined setup
-func NewStreamingTestHelper(t *testing.T, name string, ctx context.Context, client aquariumv2connect.StreamingServiceClient) *StreamingTestHelper {
+func NewStreamingTestHelper(ctx context.Context, t *testing.T, name string, client aquariumv2connect.StreamingServiceClient) *StreamingTestHelper {
 	return &StreamingTestHelper{
-		sc: NewStreamingClient(t, name, ctx, client),
+		sc: NewStreamingClient(ctx, t, name, client),
 		t:  t,
 	}
 }

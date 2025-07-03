@@ -127,7 +127,7 @@ func (i *streamingAuthInterceptor) WrapStreamingClient(next connect.StreamingCli
 	}
 }
 
-func (i *streamingAuthInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
+func (*streamingAuthInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
 	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
 		// Server-side streaming handler (not needed for client test)
 		return next(ctx, conn)

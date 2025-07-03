@@ -111,7 +111,7 @@ for GOOS in $os_list; do
         fi
 
         echo "Building: $name ..."
-        if [ "x${RELEASE}" != "x" ]; then
+        if [ "x${RELEASE}" = "x" ]; then
             echo "WARNING: It's DEBUG binary with instrumentation"
         fi
         rm -f "$name" "$name.log" "$name.zip" "$name.tar.xz"

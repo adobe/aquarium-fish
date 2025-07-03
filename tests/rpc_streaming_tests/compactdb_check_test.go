@@ -82,7 +82,7 @@ drivers:
 	defer cancel()
 
 	// Setup streaming helper for admin operations
-	adminStreamingHelper := h.NewStreamingTestHelper(t, "common", ctx, streamingClient)
+	adminStreamingHelper := h.NewStreamingTestHelper(ctx, t, "common", streamingClient)
 	defer adminStreamingHelper.Close()
 
 	// Setup streaming with all subscription types
@@ -153,7 +153,7 @@ drivers:
 		defer workerCancel()
 
 		// Setup streaming helper for this worker
-		workerStreamingHelper := h.NewStreamingTestHelper(t, fmt.Sprintf("worker%d", id), workerCtx, workerStreamingClient)
+		workerStreamingHelper := h.NewStreamingTestHelper(workerCtx, t, fmt.Sprintf("worker%d", id), workerStreamingClient)
 		defer workerStreamingHelper.Close()
 
 		// Setup streaming for this worker

@@ -136,7 +136,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 
 	log.Infof("RPC: Shutting down streaming connections with %v timeout...", streamingTimeout)
 	if s.streamingService != nil {
-		s.streamingService.GracefulShutdown(streamingTimeout)
+		// Create a timeout context
+		streamingCtx, cancel := context.WithTimeout(ctx, streamingTimeout)
+		defer cancel()
+
+		s.streamingService.GracefulShutdown(streamingCtx)
 	}
 
 	log.Info("RPC: Server shutdown completed")

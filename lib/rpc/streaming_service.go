@@ -88,7 +88,7 @@ func (spc *SubscriptionPermissionCache) RevokeAccess(userName string, appUID typ
 }
 
 // CleanupStaleEntries removes entries for applications that no longer exist
-func (spc *SubscriptionPermissionCache) CleanupStaleEntries(fish *fish.Fish) {
+func (spc *SubscriptionPermissionCache) CleanupStaleEntries(f *fish.Fish) {
 	spc.mu.Lock()
 	defer spc.mu.Unlock()
 
@@ -105,7 +105,7 @@ func (spc *SubscriptionPermissionCache) CleanupStaleEntries(fish *fish.Fish) {
 	for userName, userApps := range spc.userAppAccess {
 		for appUID := range userApps {
 			// Check if application still exists
-			_, err := fish.DB().ApplicationGet(appUID)
+			_, err := f.DB().ApplicationGet(appUID)
 			if err != nil {
 				// Application doesn't exist anymore, remove from cache
 				delete(userApps, appUID)
@@ -460,13 +460,13 @@ func (s *StreamingService) prepareTargetServiceContext(ctx context.Context, requ
 }
 
 // setServiceMethodContext sets the service and method in context for RBAC
-func (s *StreamingService) setServiceMethodContext(ctx context.Context, service, method string) context.Context {
+func (*StreamingService) setServiceMethodContext(ctx context.Context, service, method string) context.Context {
 	// Use the proper utility function to set RBAC context
 	return rpcutil.SetRBACContext(ctx, service, method)
 }
 
 // getResponseType returns the response type for a given request type
-func (s *StreamingService) getResponseType(requestType string) string {
+func (*StreamingService) getResponseType(requestType string) string {
 	return strings.Replace(requestType, "Request", "Response", 1)
 }
 
@@ -650,7 +650,7 @@ func (s *StreamingService) shouldSendApplicationObject(sub *subscription, appUID
 }
 
 // sendSubscriptionResponse sends a subscription response to the client
-func (s *StreamingService) sendSubscriptionResponse(sub *subscription, objectType aquariumv2.SubscriptionType, changeType aquariumv2.ChangeType, obj proto.Message) error {
+func (*StreamingService) sendSubscriptionResponse(sub *subscription, objectType aquariumv2.SubscriptionType, changeType aquariumv2.ChangeType, obj proto.Message) error {
 	// Check if context is cancelled
 	select {
 	case <-sub.ctx.Done():
@@ -683,17 +683,13 @@ func (s *StreamingService) sendSubscriptionResponse(sub *subscription, objectTyp
 }
 
 // GracefulShutdown initiates graceful shutdown of all streaming connections
-func (s *StreamingService) GracefulShutdown(timeout time.Duration) {
+func (s *StreamingService) GracefulShutdown(ctx context.Context) {
 	log.Info("Streaming: Starting graceful shutdown of all connections...")
 
 	// Set shutdown flag to reject new connections
 	s.shutdownMutex.Lock()
 	s.isShuttingDown = true
 	s.shutdownMutex.Unlock()
-
-	// Create a timeout context
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
 
 	// Channel to wait for all connections to close
 	done := make(chan struct{})

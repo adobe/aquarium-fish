@@ -87,13 +87,13 @@ drivers:
 	defer cancel()
 
 	// Setup streaming helpers for each user
-	adminHelper := h.NewStreamingTestHelper(t, "admin", ctx, adminStreamingClient)
+	adminHelper := h.NewStreamingTestHelper(ctx, t, "admin", adminStreamingClient)
 	defer adminHelper.Close()
 
-	regularHelper := h.NewStreamingTestHelper(t, "regularUser", ctx, regularStreamingClient)
+	regularHelper := h.NewStreamingTestHelper(ctx, t, "regularUser", regularStreamingClient)
 	defer regularHelper.Close()
 
-	powerHelper := h.NewStreamingTestHelper(t, "powerUser", ctx, powerStreamingClient)
+	powerHelper := h.NewStreamingTestHelper(ctx, t, "powerUser", powerStreamingClient)
 	defer powerHelper.Close()
 
 	// Setup bidirectional streaming for admin only (others will be set up after role assignment)

@@ -661,7 +661,7 @@ func (s *StreamingService) setupSubscriptions(subCtx context.Context, subscripti
 }
 
 // shouldSendObject checks if an object should be sent to the subscriber based on filters and permissions
-func (s *StreamingService) shouldSendObject(sub *subscription, objectType aquariumv2.SubscriptionType, obj interface{}) bool {
+func (s *StreamingService) shouldSendObject(sub *subscription, objectType aquariumv2.SubscriptionType, obj any) bool {
 	// Check if this subscription type is requested
 	found := false
 	for _, subType := range sub.subscriptions {

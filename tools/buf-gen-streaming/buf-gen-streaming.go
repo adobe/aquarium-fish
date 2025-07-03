@@ -294,7 +294,7 @@ func (s *StreamingService) setupSubscriptions(subCtx context.Context, subscripti
 }
 
 // shouldSendObject checks if an object should be sent to the subscriber based on filters and permissions
-func (s *StreamingService) shouldSendObject(sub *subscription, objectType aquariumv2.SubscriptionType, obj interface{}) bool {
+func (s *StreamingService) shouldSendObject(sub *subscription, objectType aquariumv2.SubscriptionType, obj any) bool {
 	// Check if this subscription type is requested
 	found := false
 	for _, subType := range sub.subscriptions {
@@ -504,7 +504,7 @@ func toSnake(camel string) (snake string) {
 
 func toLowerFirst(s string) string {
 	if len(s) != 0 && (s[0] <= 'Z' && s[0] >= 'A') {
-		return string(s[0]+32) + string(s[1:])
+		return string(s[0]+32) + s[1:]
 	}
 
 	return s

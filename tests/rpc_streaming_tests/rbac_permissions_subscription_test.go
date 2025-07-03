@@ -100,16 +100,16 @@ drivers:
 	defer cancel()
 
 	// Create streaming helpers but don't setup streaming yet (users don't exist)
-	adminHelper := h.NewStreamingTestHelper(t, "admin", ctx, adminStreamingClient)
+	adminHelper := h.NewStreamingTestHelper(ctx, t, "admin", adminStreamingClient)
 	defer adminHelper.Close()
 
-	user1Helper := h.NewStreamingTestHelper(t, "user1", ctx, user1StreamingClient)
+	user1Helper := h.NewStreamingTestHelper(ctx, t, "user1", user1StreamingClient)
 	defer user1Helper.Close()
 
-	user2Helper := h.NewStreamingTestHelper(t, "user2", ctx, user2StreamingClient)
+	user2Helper := h.NewStreamingTestHelper(ctx, t, "user2", user2StreamingClient)
 	defer user2Helper.Close()
 
-	adminUserHelper := h.NewStreamingTestHelper(t, "adminUser", ctx, adminUserStreamingClient)
+	adminUserHelper := h.NewStreamingTestHelper(ctx, t, "adminUser", adminUserStreamingClient)
 	defer adminUserHelper.Close()
 
 	// Setup streaming for admin (who already exists)
