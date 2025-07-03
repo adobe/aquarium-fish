@@ -35,6 +35,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
+	"github.com/adobe/aquarium-fish/lib/monitoring"
 	"github.com/adobe/aquarium-fish/lib/server"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
@@ -130,6 +131,40 @@ func main() {
 			if err != nil {
 				return err
 			}
+
+			log.Info("Fish initializing monitoring...")
+			// Initialize monitoring configuration
+			monitoringConfig := &cfg.Monitoring
+			if monitoringConfig.ServiceName == "" {
+				monitoringConfig.ServiceName = "aquarium-fish"
+			}
+			if monitoringConfig.ServiceVersion == "" {
+				monitoringConfig.ServiceVersion = build.Version
+			}
+			if monitoringConfig.NodeName == "" {
+				monitoringConfig.NodeName = cfg.NodeName
+			}
+			if monitoringConfig.NodeLocation == "" {
+				monitoringConfig.NodeLocation = cfg.NodeLocation
+			}
+
+			// Initialize monitoring
+			monitor, err := monitoring.Initialize(context.Background(), monitoringConfig)
+			if err != nil {
+				return log.Errorf("Fish: Unable to initialize monitoring: %v", err)
+			}
+			defer func() {
+				if monitor != nil {
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+					if err := monitor.Shutdown(ctx); err != nil {
+						log.Error("Fish: Error shutting down monitoring:", err)
+					}
+				}
+			}()
+
+			// Set the monitor on the Fish instance
+			fish.SetMonitor(monitor)
 
 			log.Info("Fish starting API...")
 			srv, err := server.Init(fish, cfg.APIAddress, caPath, certPath, keyPath)

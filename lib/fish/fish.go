@@ -31,6 +31,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/log"
+	"github.com/adobe/aquarium-fish/lib/monitoring"
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
@@ -45,6 +46,7 @@ type Fish struct {
 	db      *database.Database
 	cfg     *Config
 	cluster ClusterInterface
+	monitor *monitoring.Monitor
 
 	// When the fish was started
 	startup time.Time
@@ -685,4 +687,14 @@ func (f *Fish) activateShutdown() {
 		// Sending signal since no need to wait for the apps
 		waitApps <- true
 	}
+}
+
+// SetMonitor sets the monitoring instance for the Fish node
+func (f *Fish) SetMonitor(monitor *monitoring.Monitor) {
+	f.monitor = monitor
+}
+
+// GetMonitor returns the monitoring instance for instrumentation
+func (f *Fish) GetMonitor() *monitoring.Monitor {
+	return f.monitor
 }

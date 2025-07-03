@@ -21,11 +21,15 @@ import (
 	"github.com/ghodss/yaml"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
+	"github.com/adobe/aquarium-fish/lib/monitoring"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 const DefaultDBCleanupInterval = 10 * time.Minute
 const DefaultDBCompactInterval = time.Hour
+
+// MonitoringConfig is an alias for monitoring.Config
+type MonitoringConfig = monitoring.Config
 
 // Config defines Fish node configuration
 type Config struct {
@@ -60,6 +64,9 @@ type Config struct {
 	// Each configuration could instantinate the same driver multiple times by adding instance name
 	// separated from driver by slash symbol (like "<driver>/prod" - will create "prod" instance).
 	Drivers drivers.ConfigDrivers `json:"drivers"`
+
+	// Monitoring configuration for OpenTelemetry observability
+	Monitoring MonitoringConfig `json:"monitoring"`
 }
 
 // ReadConfigFile needed to read the config file

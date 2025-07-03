@@ -25,6 +25,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+
 	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
@@ -79,12 +82,27 @@ func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*Wrapper,
 	// Handle metadata requests on /meta/v1/data
 	mux.Handle("/meta/", http.StripPrefix("/meta", metaServer))
 
+	// Handle Prometheus metrics endpoint if monitoring is enabled
+	if monitor := f.GetMonitor(); monitor != nil && monitor.IsEnabled() {
+		if promExporter := monitor.GetPrometheusHandler(); promExporter != nil {
+			mux.Handle("/metrics", promhttp.Handler())
+			log.Info("API: Prometheus metrics endpoint enabled at /metrics")
+		}
+	}
+
 	// Handle pprof debug endpoints if compiled as debug
 	serverConnectPprofIfDebug(mux)
 
+	// Wrap with OpenTelemetry HTTP instrumentation if monitoring is enabled
+	var handler http.Handler = mux
+	if monitor := f.GetMonitor(); monitor != nil && monitor.IsEnabled() {
+		handler = otelhttp.NewHandler(handler, "aquarium-fish-api")
+		log.Info("API: OpenTelemetry HTTP instrumentation enabled")
+	}
+
 	s := &http.Server{
 		Addr:    apiAddress,
-		Handler: mux,
+		Handler: handler,
 		TLSConfig: &tls.Config{ // #nosec G402 , keep the compatibility high since not public access
 			ClientAuth: tls.RequestClientCert, // Need for the client certificate auth
 			ClientCAs:  caPool,                // Verify client certificate with the cluster CA

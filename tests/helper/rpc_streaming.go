@@ -193,6 +193,7 @@ func (sc *StreamingClient) EstablishSubscriptionStreaming(subscriptionTypes []aq
 					sc.logf("Received unknown control message with ChangeType: %s", msg.GetChangeType())
 					continue
 				}
+
 			}
 
 			// Dispatch to appropriate channel

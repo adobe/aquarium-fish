@@ -16,12 +16,18 @@
 package database
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"go.mills.io/bitcask/v2"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/adobe/aquarium-fish/lib/log"
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
@@ -48,6 +54,17 @@ type Database struct {
 	subsApplicationState    []chan *typesv2.ApplicationState
 	subsApplicationTask     []chan *typesv2.ApplicationTask
 	subsApplicationResource []chan *typesv2.ApplicationResource
+
+	// OpenTelemetry instrumentation
+	tracer trace.Tracer
+	meter  metric.Meter
+
+	// Metrics
+	dbOperationDuration metric.Float64Histogram
+	dbOperationCounter  metric.Int64Counter
+	dbSizeGauge         metric.Int64Gauge
+	dbKeysGauge         metric.Int64Gauge
+	dbReclaimableGauge  metric.Int64Gauge
 }
 
 // Init creates the database object by provided path
@@ -61,11 +78,63 @@ func New(path string) (*Database, error) {
 		return nil, log.Errorf("DB: Unable to initialize database: %v", err)
 	}
 
-	return &Database{be: be}, nil
+	db := &Database{be: be}
+
+	// Initialize OpenTelemetry instrumentation
+	db.tracer = otel.Tracer("aquarium-fish-database")
+	db.meter = otel.Meter("aquarium-fish-database")
+
+	// Create metrics
+	db.dbOperationDuration, _ = db.meter.Float64Histogram(
+		"aquarium_fish_db_operation_duration_seconds",
+		metric.WithDescription("Duration of database operations"),
+		metric.WithUnit("s"),
+	)
+
+	db.dbOperationCounter, _ = db.meter.Int64Counter(
+		"aquarium_fish_db_operations_total",
+		metric.WithDescription("Total number of database operations"),
+	)
+
+	db.dbSizeGauge, _ = db.meter.Int64Gauge(
+		"aquarium_fish_db_size_bytes",
+		metric.WithDescription("Current database size in bytes"),
+	)
+
+	db.dbKeysGauge, _ = db.meter.Int64Gauge(
+		"aquarium_fish_db_keys_total",
+		metric.WithDescription("Total number of keys in database"),
+	)
+
+	db.dbReclaimableGauge, _ = db.meter.Int64Gauge(
+		"aquarium_fish_db_reclaimable_bytes",
+		metric.WithDescription("Reclaimable space in database"),
+	)
+
+	return db, nil
 }
 
 // CompactDB runs stale Applications and data removing
 func (d *Database) CompactDB() error {
+	return d.CompactDBWithContext(context.Background())
+}
+
+// CompactDBWithContext runs stale Applications and data removing with context
+func (d *Database) CompactDBWithContext(ctx context.Context) error {
+	ctx, span := d.tracer.Start(ctx, "database.compact")
+	defer span.End()
+
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start).Seconds()
+		d.dbOperationDuration.Record(ctx, duration, metric.WithAttributes(
+			attribute.String("operation", "compact"),
+		))
+		d.dbOperationCounter.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("operation", "compact"),
+		))
+	}()
+
 	log.Debug("DB: CompactDB locking...")
 	defer log.Debug("Fish: CompactDB done")
 
@@ -77,12 +146,44 @@ func (d *Database) CompactDB() error {
 	s, _ := d.be.Stats()
 	log.Debugf("DB: CompactDB: Before compaction: Datafiles: %d, Keys: %d, Size: %d, Reclaimable: %d", s.Datafiles, s.Keys, s.Size, s.Reclaimable)
 
+	// Record metrics before compaction
+	d.dbSizeGauge.Record(ctx, int64(s.Size))
+	d.dbKeysGauge.Record(ctx, int64(s.Keys))
+	d.dbReclaimableGauge.Record(ctx, int64(s.Reclaimable))
+
+	span.SetAttributes(
+		attribute.Int64("db.size_before", int64(s.Size)),
+		attribute.Int64("db.keys_before", int64(s.Keys)),
+		attribute.Int64("db.reclaimable_before", int64(s.Reclaimable)),
+	)
+
 	if err := d.be.Merge(); err != nil {
+		span.RecordError(err)
+		d.dbOperationCounter.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("operation", "compact"),
+			attribute.String("result", "error"),
+		))
 		return log.Errorf("DB: CompactDB: Merge operation failed: %v", err)
 	}
 
 	s, _ = d.be.Stats()
 	log.Debugf("DB: CompactDB: After compaction: Datafiles: %d, Keys: %d, Size: %d, Reclaimable: %d", s.Datafiles, s.Keys, s.Size, s.Reclaimable)
+
+	// Record metrics after compaction
+	d.dbSizeGauge.Record(ctx, int64(s.Size))
+	d.dbKeysGauge.Record(ctx, int64(s.Keys))
+	d.dbReclaimableGauge.Record(ctx, int64(s.Reclaimable))
+
+	span.SetAttributes(
+		attribute.Int64("db.size_after", int64(s.Size)),
+		attribute.Int64("db.keys_after", int64(s.Keys)),
+		attribute.Int64("db.reclaimable_after", int64(s.Reclaimable)),
+	)
+
+	d.dbOperationCounter.Add(ctx, 1, metric.WithAttributes(
+		attribute.String("operation", "compact"),
+		attribute.String("result", "success"),
+	))
 
 	return nil
 }
