@@ -37,7 +37,6 @@ import (
 // 3. Database cleanup and compaction function properly with streaming operations
 // 4. Final database state contains exactly 6 keys after compaction
 func Test_compactdb_check(t *testing.T) {
-	t.Parallel()
 	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 default_resource_lifetime: 20s

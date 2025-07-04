@@ -33,7 +33,6 @@ import (
 
 // Check the database compaction works correctly in constant flow of applications
 func Test_compactdb_check(t *testing.T) {
-	t.Parallel()
 	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 default_resource_lifetime: 20s
