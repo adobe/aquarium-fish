@@ -235,6 +235,11 @@ type bidirectionalConnection struct {
 func (conn *bidirectionalConnection) safeSend(response *aquariumv2.StreamingServiceConnectResponse) error {
 	conn.streamMutex.Lock()
 	defer conn.streamMutex.Unlock()
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("Recovered from panic: %v\n", r)
+		}
+	}()
 	return conn.stream.Send(response)
 }
 
