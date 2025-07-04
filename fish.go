@@ -133,7 +133,7 @@ func main() {
 			}
 
 			log.Info("Fish initializing monitoring...")
-			// Initialize monitoring configuration
+			// Initialize monitoring configuration and overriding values from fish info
 			monitoringConfig := &cfg.Monitoring
 			if monitoringConfig.ServiceName == "" {
 				monitoringConfig.ServiceName = "aquarium-fish"
@@ -141,12 +141,9 @@ func main() {
 			if monitoringConfig.ServiceVersion == "" {
 				monitoringConfig.ServiceVersion = build.Version
 			}
-			if monitoringConfig.NodeName == "" {
-				monitoringConfig.NodeName = cfg.NodeName
-			}
-			if monitoringConfig.NodeLocation == "" {
-				monitoringConfig.NodeLocation = cfg.NodeLocation
-			}
+			monitoringConfig.NodeUID = db.GetNodeUID()
+			monitoringConfig.NodeName = cfg.NodeName
+			monitoringConfig.NodeLocation = cfg.NodeLocation
 
 			// Initialize monitoring
 			monitor, err := monitoring.Initialize(context.Background(), monitoringConfig)

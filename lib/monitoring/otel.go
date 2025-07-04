@@ -30,16 +30,17 @@ import (
 	"go.opentelemetry.io/otel/log/global"
 	otelmetric "go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/sdk/log"
+	otellog "go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.34.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	fishlog "github.com/adobe/aquarium-fish/lib/log"
+	"github.com/adobe/aquarium-fish/lib/log"
+	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 const (
@@ -54,10 +55,11 @@ type Config struct {
 	PyroscopeURL    string        `json:"pyroscope_url"`    // Pyroscope URL for profiling
 	ServiceName     string        `json:"service_name"`     // Service name for telemetry
 	ServiceVersion  string        `json:"service_version"`  // Service version
+	NodeUID         string        `json:"node_uid"`         // Node UID for resource attributes
 	NodeName        string        `json:"node_name"`        // Node name for resource attributes
 	NodeLocation    string        `json:"node_location"`    // Node location for resource attributes
 	SampleRate      float64       `json:"sample_rate"`      // Trace sampling rate (0.0 to 1.0)
-	MetricsInterval time.Duration `json:"metrics_interval"` // Metrics collection interval
+	MetricsInterval util.Duration `json:"metrics_interval"` // Metrics collection interval
 	EnableProfiling bool          `json:"enable_profiling"` // Enable profiling
 	EnableTracing   bool          `json:"enable_tracing"`   // Enable tracing
 	EnableMetrics   bool          `json:"enable_metrics"`   // Enable metrics
@@ -73,7 +75,7 @@ func DefaultConfig() *Config {
 		ServiceName:     serviceName,
 		ServiceVersion:  serviceVersion,
 		SampleRate:      1.0, // 100% sampling for development
-		MetricsInterval: 15 * time.Second,
+		MetricsInterval: util.Duration(15 * time.Second),
 		EnableProfiling: true,
 		EnableTracing:   true,
 		EnableMetrics:   true,
@@ -86,7 +88,7 @@ type Monitor struct {
 	config         *Config
 	tracerProvider *trace.TracerProvider
 	meterProvider  *metric.MeterProvider
-	loggerProvider *log.LoggerProvider
+	loggerProvider *otellog.LoggerProvider
 	promExporter   *prometheus.Exporter
 	pyroscope      *pyroscope.Profiler
 	tracer         oteltrace.Tracer
@@ -98,11 +100,11 @@ type Monitor struct {
 // Initialize sets up OpenTelemetry monitoring
 func Initialize(ctx context.Context, config *Config) (*Monitor, error) {
 	if !config.Enabled {
-		fishlog.Info("Monitoring: Disabled")
+		log.Info("Monitoring: Disabled")
 		return &Monitor{config: config}, nil
 	}
 
-	fishlog.Info("Monitoring: Initializing OpenTelemetry...")
+	log.Info("Monitoring: Initializing OpenTelemetry...")
 
 	m := &Monitor{
 		config:        config,
@@ -120,7 +122,7 @@ func Initialize(ctx context.Context, config *Config) (*Monitor, error) {
 		if err := m.initTracing(ctx, res); err != nil {
 			return nil, fmt.Errorf("failed to initialize tracing: %w", err)
 		}
-		fishlog.Info("Monitoring: Tracing initialized")
+		log.Info("Monitoring: Tracing initialized")
 	}
 
 	// Initialize metrics
@@ -128,7 +130,7 @@ func Initialize(ctx context.Context, config *Config) (*Monitor, error) {
 		if err := m.initMetrics(ctx, res); err != nil {
 			return nil, fmt.Errorf("failed to initialize metrics: %w", err)
 		}
-		fishlog.Info("Monitoring: Metrics initialized")
+		log.Info("Monitoring: Metrics initialized")
 	}
 
 	// Initialize logging
@@ -136,7 +138,7 @@ func Initialize(ctx context.Context, config *Config) (*Monitor, error) {
 		if err := m.initLogging(ctx, res); err != nil {
 			return nil, fmt.Errorf("failed to initialize logging: %w", err)
 		}
-		fishlog.Info("Monitoring: Logging initialized")
+		log.Info("Monitoring: Logging initialized")
 	}
 
 	// Initialize profiling
@@ -144,7 +146,7 @@ func Initialize(ctx context.Context, config *Config) (*Monitor, error) {
 		if err := m.initProfiling(); err != nil {
 			return nil, fmt.Errorf("failed to initialize profiling: %w", err)
 		}
-		fishlog.Info("Monitoring: Profiling initialized")
+		log.Info("Monitoring: Profiling initialized")
 	}
 
 	// Initialize metrics collection
@@ -152,25 +154,26 @@ func Initialize(ctx context.Context, config *Config) (*Monitor, error) {
 		if err := m.initMetricsCollection(); err != nil {
 			return nil, fmt.Errorf("failed to initialize metrics collection: %w", err)
 		}
-		fishlog.Info("Monitoring: Metrics collection initialized")
+		log.Info("Monitoring: Metrics collection initialized")
 	}
 
-	fishlog.Info("Monitoring: OpenTelemetry initialization complete")
+	log.Info("Monitoring: OpenTelemetry initialization complete")
 	return m, nil
 }
 
 // createResource creates an OpenTelemetry resource with service information
 func (m *Monitor) createResource() (*resource.Resource, error) {
-	return resource.Merge(
-		resource.Default(),
-		resource.NewWithAttributes(
-			semconv.SchemaURL,
-			semconv.ServiceName(m.config.ServiceName),
-			semconv.ServiceVersion(m.config.ServiceVersion),
-			attribute.String("node.name", m.config.NodeName),
-			attribute.String("node.location", m.config.NodeLocation),
-		),
+	res1 := resource.Default()
+	res2 := resource.NewWithAttributes(
+		semconv.SchemaURL,
+		semconv.ServiceName(m.config.ServiceName),
+		semconv.ServiceVersion(m.config.ServiceVersion),
+		attribute.String("node.name", m.config.NodeName),
+		attribute.String("node.uid", m.config.NodeUID),
+		attribute.String("node.location", m.config.NodeLocation),
 	)
+	log.Debugf("Monitoring: Merging 2 resources: %s and %s", res1, res2)
+	return resource.Merge(res1, res2)
 }
 
 // initTracing initializes OpenTelemetry tracing
@@ -230,7 +233,7 @@ func (m *Monitor) initMetrics(ctx context.Context, res *resource.Resource) error
 	meterProvider := metric.NewMeterProvider(
 		metric.WithResource(res),
 		metric.WithReader(metric.NewPeriodicReader(metricExporter,
-			metric.WithInterval(m.config.MetricsInterval))),
+			metric.WithInterval(time.Duration(m.config.MetricsInterval)))),
 		metric.WithReader(promExporter),
 	)
 
@@ -258,9 +261,9 @@ func (m *Monitor) initLogging(ctx context.Context, res *resource.Resource) error
 	}
 
 	// Create logger provider
-	loggerProvider := log.NewLoggerProvider(
-		log.WithProcessor(log.NewBatchProcessor(logExporter)),
-		log.WithResource(res),
+	loggerProvider := otellog.NewLoggerProvider(
+		otellog.WithProcessor(otellog.NewBatchProcessor(logExporter)),
+		otellog.WithResource(res),
 	)
 
 	global.SetLoggerProvider(loggerProvider)
@@ -277,8 +280,9 @@ func (m *Monitor) initProfiling() error {
 		ApplicationName: m.config.ServiceName,
 		ServerAddress:   m.config.PyroscopeURL,
 		Tags: map[string]string{
-			"node.name":     m.config.NodeName,
-			"node.location": m.config.NodeLocation,
+			"node_name":     m.config.NodeName,
+			"node_uid":      m.config.NodeUID,
+			"node_location": m.config.NodeLocation,
 			"version":       m.config.ServiceVersion,
 		},
 		ProfileTypes: []pyroscope.ProfileType{
@@ -355,7 +359,7 @@ func (m *Monitor) RecordMetric(ctx context.Context, name string, value float64, 
 
 // Shutdown gracefully shuts down the monitoring system
 func (m *Monitor) Shutdown(ctx context.Context) error {
-	fishlog.Info("Monitoring: Shutting down...")
+	log.Info("Monitoring: Shutting down...")
 
 	var errs []error
 	for _, shutdown := range m.shutdownFuncs {
@@ -368,7 +372,7 @@ func (m *Monitor) Shutdown(ctx context.Context) error {
 		return fmt.Errorf("shutdown errors: %v", errs)
 	}
 
-	fishlog.Info("Monitoring: Shutdown complete")
+	log.Info("Monitoring: Shutdown complete")
 	return nil
 }
 
