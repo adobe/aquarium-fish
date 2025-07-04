@@ -90,8 +90,8 @@ drivers:
 			t.Fatalf("Failed to execute command via PROXYSSH: %v", err)
 		}
 		// SSH output is full of special symbols, so looking just for the desired output
-		if !strings.Contains(string(response), "\nIts ALIVE!") {
-			t.Fatalf("Incorrect response from command through PROXYSSH: %q not in %q", "\nIts ALIVE!", string(response))
+		if !strings.Contains(string(response), "Its ALIVE!\n") {
+			t.Fatalf("Incorrect response from command through PROXYSSH: %q not in %q", "Its ALIVE!\n", string(response))
 		}
 		//sshdTestOutput = stdout
 	})

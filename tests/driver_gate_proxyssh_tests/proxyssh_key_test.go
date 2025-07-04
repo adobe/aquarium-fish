@@ -385,10 +385,10 @@ drivers:
 		}
 
 		// SSH output is full of special symbols, so looking just for the desired output
-		if !strings.Contains(stdout, "\nIts ALIVE!") {
-			t.Fatalf("Incorrect response from command on mock sshd: %q not in %q (stderr: %s)", "\nIts ALIVE!", stdout, stderr)
+		if !strings.Contains(stdout, "Its ALIVE!\n") {
+			t.Fatalf("Incorrect response from command on mock sshd: %q not in %q (stderr: %s)", "Its ALIVE!\n", stdout, stderr)
 			//} else {
-			//	t.Log(fmt.Sprintf("Correct response from command on mock sshd: %q in %q (stderr: %s)", "\nIts ALIVE!", stdout, stderr))
+			//	t.Log(fmt.Sprintf("Correct response from command on mock sshd: %q in %q (stderr: %s)", "Its ALIVE!\n", stdout, stderr))
 		}
 		//sshdTestOutput = stdout
 	})

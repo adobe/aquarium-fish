@@ -88,9 +88,9 @@ jobs:
         with:
           go-version-file: go.mod
 
-      # Build here is needed to prepare a debug race instrumented version of the binary
+      # Debug build here is needed to prepare a debug race instrumented version of the binary
       - name: Build
-        run: RELEASE=1 ./build.sh
+        run: ./build.sh
 
       - name: Integration Tests
         run: |
