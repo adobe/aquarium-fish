@@ -25,7 +25,22 @@ import (
 )
 
 func (d *Database) SubscribeApplicationState(ch chan *typesv2.ApplicationState) {
+	d.subsMu.Lock()
+	defer d.subsMu.Unlock()
 	d.subsApplicationState = append(d.subsApplicationState, ch)
+}
+
+// UnsubscribeApplicationState removes a channel from the subscription list
+func (d *Database) UnsubscribeApplicationState(ch chan *typesv2.ApplicationState) {
+	d.subsMu.Lock()
+	defer d.subsMu.Unlock()
+	for i, existing := range d.subsApplicationState {
+		if existing == ch {
+			// Remove channel from slice
+			d.subsApplicationState = append(d.subsApplicationState[:i], d.subsApplicationState[i+1:]...)
+			break
+		}
+	}
 }
 
 // ApplicationStateList returns list of ApplicationStates
@@ -55,8 +70,20 @@ func (d *Database) ApplicationStateCreate(as *typesv2.ApplicationState) error {
 
 	// Notifying the subscribers on change, doing that in goroutine to not block execution
 	go func(appState *typesv2.ApplicationState) {
-		for _, ch := range d.subsApplicationState {
-			ch <- appState
+		d.subsMu.RLock()
+		channels := make([]chan *typesv2.ApplicationState, len(d.subsApplicationState))
+		copy(channels, d.subsApplicationState)
+		d.subsMu.RUnlock()
+
+		for _, ch := range channels {
+			// Use select with default to prevent panic if channel is closed
+			select {
+			case ch <- appState:
+				// Successfully sent notification
+			default:
+				// Channel is closed or full, skip this subscriber
+				log.Debugf("Database: Failed to send ApplicationState notification, channel closed or full")
+			}
 		}
 	}(as)
 

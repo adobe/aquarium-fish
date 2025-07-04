@@ -45,6 +45,9 @@ func (d *Driver) newEC2Conn() *ec2.Client {
 		// https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/retry-backoff.html
 		RetryMaxAttempts: 5,
 		RetryMode:        aws.RetryModeStandard,
+
+		// Used in tests for mock server
+		BaseEndpoint: aws.String(d.cfg.BaseEndpoint),
 	})
 }
 
@@ -63,6 +66,9 @@ func (d *Driver) newKMSConn() *kms.Client {
 		// https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/retry-backoff.html
 		RetryMaxAttempts: 5,
 		RetryMode:        aws.RetryModeStandard,
+
+		// Used in tests for mock server
+		BaseEndpoint: aws.String(d.cfg.BaseEndpoint),
 	})
 }
 
@@ -81,6 +87,9 @@ func (d *Driver) newServiceQuotasConn() *servicequotas.Client {
 		// https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/retry-backoff.html
 		RetryMaxAttempts: 5,
 		RetryMode:        aws.RetryModeStandard,
+
+		// Used in tests for mock server
+		BaseEndpoint: aws.String(d.cfg.BaseEndpoint),
 	})
 }
 

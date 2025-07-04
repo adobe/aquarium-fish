@@ -62,6 +62,11 @@ const (
 	RoleServiceList   = "List"
 	RoleServiceUpdate = "Update"
 
+	// StreamingService service constants
+	StreamingService          = "StreamingService"
+	StreamingServiceConnect   = "Connect"
+	StreamingServiceSubscribe = "Subscribe"
+
 	// UserService service constants
 	UserService               = "UserService"
 	UserServiceGetMe          = "GetMe"

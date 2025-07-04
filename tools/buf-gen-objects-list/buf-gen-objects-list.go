@@ -17,6 +17,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strings"
 
 	"google.golang.org/protobuf/compiler/protogen"
@@ -51,6 +52,7 @@ func main() {
 
 		seenMessages := make(map[string]bool)
 
+		var objects []string
 		for _, f := range plugin.Files {
 			if !f.Generate {
 				continue
@@ -70,10 +72,14 @@ func main() {
 
 				// Convert PascalCase to snake_case
 				constName := fmt.Sprintf("Object%s", messageName)
-				buf.WriteString(fmt.Sprintf("\t%s = %q\n", constName, messageName))
+				objects = append(objects, fmt.Sprintf("\t%s = %q\n", constName, messageName))
 			}
 		}
 
+		sort.Strings(objects)
+		for _, line := range objects {
+			buf.WriteString(line)
+		}
 		buf.WriteString(")\n")
 
 		outputFile := "object_list.gen.go"

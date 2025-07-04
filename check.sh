@@ -61,6 +61,13 @@ for f in `git diff --name-only main`; do
     fi
 done
 
+# Check for spaces in the end of the line
+blank_char_end=$(git grep -l '[[:blank:]]$')
+if [ "${blank_char_end}" ]; then
+    echo "ERROR: Please fix line end blank chars in: \n${blank_char_end}"
+    errors=$((${errors}+$(echo "${blank_char_end}" | wc -l)))
+fi
+
 echo
 echo '---------------------- GoFmt verify ----------------------'
 echo

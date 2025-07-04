@@ -25,3 +25,8 @@ plugins:
       - run
       - ./tools/buf-gen-objects-list/buf-gen-objects-list.go
     out: lib/database
+  - local:
+      - go
+      - run
+      - ./tools/buf-gen-streaming/buf-gen-streaming.go
+    out: lib/rpc

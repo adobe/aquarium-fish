@@ -5,7 +5,7 @@ A comprehensive Go static analysis tool for detecting mutex-related deadlock iss
 ## Features
 
 - **Cross-function mutex conflict detection**: Identifies when a function holding a mutex calls another function that also locks the same mutex
-- **Multiple mutex operation types**: Detects conflicts with Lock, RLock, Unlock, and RUnlock operations  
+- **Multiple mutex operation types**: Detects conflicts with Lock, RLock, Unlock, and RUnlock operations
 - **Accurate mutex instance tracking**: Only reports conflicts when mutexes actually belong to the same object instance
 - **Control flow analysis**: Tracks mutex state through sequential statements, conditionals, and defer statements
 - **Deep dependency analysis**: Optional analysis of Go module dependencies via `-deep` flag
@@ -74,7 +74,7 @@ This tool analyzes Go source code to detect various mutex-related issues that ca
 ### Errors (Critical)
 
 1. **nested-rlock**: Nested RLock on the same mutex within a single function
-2. **nested-lock**: Nested Lock on the same mutex within a single function  
+2. **nested-lock**: Nested Lock on the same mutex within a single function
 3. **cross-function-nested-rlock**: RLock in caller, RLock in callee on same mutex
 4. **cross-function-nested-lock**: Lock in caller, Lock in callee on same mutex
 5. **cross-function-lock-conflict**: RLock in caller, Lock in callee on same mutex
@@ -115,11 +115,11 @@ The tool successfully detected the deadlock issue in your `ApplicationCreate` fu
 func (d *Database) ApplicationCreate(a *typesv2.Application) error {
     d.beMu.RLock()              // First RLock
     defer d.beMu.RUnlock()
-    
+
     // ... code ...
-    
+
     d.ApplicationStateCreate(&typesv2.ApplicationState{  // Calls function that also RLocks
-        ApplicationUid: a.Uid, 
+        ApplicationUid: a.Uid,
         Status: typesv2.ApplicationState_NEW,
         Description: "Just created by Fish " + d.node.Name,
     })
@@ -164,4 +164,4 @@ fi
 The tool can be extended to detect additional mutex-related patterns by:
 1. Adding new issue categories to the `Issue` struct
 2. Implementing detection logic in the analysis functions
-3. Adding corresponding test cases 
+3. Adding corresponding test cases

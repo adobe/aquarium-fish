@@ -243,6 +243,8 @@ func (t *TaskImage) Execute() (result []byte, err error) {
 		return []byte(`{"error":"internal: timeout on await for the image availability"}`), log.Errorf("AWS: %s: Error during wait for the image availability %s %s: %v", t.driver.name, imageID, aws.ToString(input.Name), err)
 	}
 
+	log.Infof("AWS: %s: Image was created on AWS side %s: %s %q", t.driver.name, t.ApplicationResource.Identifier, imageID, imageName)
+
 	// If TaskImageEncryptKey is set - we need to copy the image with enabled encryption and delete the temp one
 	if opts.TaskImageEncryptKey != "" {
 		copyInput := ec2.CopyImageInput{

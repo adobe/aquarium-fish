@@ -71,17 +71,34 @@ func (d *Database) ApplicationResourceCreate(r *typesv2.ApplicationResource) err
 	r.Uid = d.NewUID()
 	r.CreatedAt = time.Now()
 	r.UpdatedAt = r.CreatedAt
-	return d.be.Collection(ObjectApplicationResource).Add(r.Uid.String(), r)
+	err := d.be.Collection(ObjectApplicationResource).Add(r.Uid.String(), r)
+
+	// Notifying the subscribers on change, doing that in goroutine to not block execution
+	go func(appResource *typesv2.ApplicationResource) {
+		d.subsMu.RLock()
+		channels := make([]chan *typesv2.ApplicationResource, len(d.subsApplicationResource))
+		copy(channels, d.subsApplicationResource)
+		d.subsMu.RUnlock()
+
+		for _, ch := range channels {
+			// Use select with default to prevent panic if channel is closed
+			select {
+			case ch <- appResource:
+				// Successfully sent notification
+			default:
+				// Channel is closed or full, skip this subscriber
+				log.Debugf("Database: Failed to send ApplicationResource notification, channel closed or full")
+			}
+		}
+	}(r)
+
+	return err
 }
 
 // ApplicationResourceDelete removes Resource
 func (d *Database) ApplicationResourceDelete(uid typesv2.ApplicationResourceUID) error {
-	// First delete any references to this resource.
-	err := d.GateProxySSHAccessDeleteByResource(uid)
-	if err != nil {
-		// This issue is not a big deal, because most of the time there is no access to delete
-		log.Debugf("Unable to delete GateProxySSHAccess associated with ApplicationResourceUID %s: %v", uid, err)
-	}
+	// First delete any references to this resource. We don't care about the error if it's happened.
+	_ = d.GateProxySSHAccessDeleteByResource(uid)
 
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
@@ -230,4 +247,24 @@ func (d *Database) ApplicationResourceGetByApplication(appUID typesv2.Applicatio
 		}
 	}
 	return res, fmt.Errorf("Fish: Unable to find ApplicationResource with requested Application UID: %s", appUID.String())
+}
+
+// SubscribeApplicationResource adds a channel to the subscription list
+func (d *Database) SubscribeApplicationResource(ch chan *typesv2.ApplicationResource) {
+	d.subsMu.Lock()
+	defer d.subsMu.Unlock()
+	d.subsApplicationResource = append(d.subsApplicationResource, ch)
+}
+
+// UnsubscribeApplicationResource removes a channel from the subscription list
+func (d *Database) UnsubscribeApplicationResource(ch chan *typesv2.ApplicationResource) {
+	d.subsMu.Lock()
+	defer d.subsMu.Unlock()
+	for i, existing := range d.subsApplicationResource {
+		if existing == ch {
+			// Remove channel from slice
+			d.subsApplicationResource = append(d.subsApplicationResource[:i], d.subsApplicationResource[i+1:]...)
+			break
+		}
+	}
 }

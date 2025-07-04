@@ -55,9 +55,10 @@ func (f *Fish) maybeRunExecuteApplicationStart(appState *typesv2.ApplicationStat
 
 	// Cleanup for executed application
 	f.applicationsMutex.Lock()
-	f.applications[appState.ApplicationUid].Unlock()
+	lock := f.applications[appState.ApplicationUid]
 	delete(f.applications, appState.ApplicationUid)
 	f.applicationsMutex.Unlock()
+	lock.Unlock()
 
 	// If we have retries left for Application - trying to elect the node again
 	if retry && f.db.ApplicationStateNewCount(appState.ApplicationUid) <= f.cfg.AllocationRetry {
@@ -161,10 +162,12 @@ func (f *Fish) executeApplicationStart(appUID typesv2.ApplicationUID, defIndex i
 	}
 	// Adding the Application to the executing ones
 	f.applications[appUID] = &sync.Mutex{}
-	// Locking the application since it's in process
 	lock := f.applications[appUID]
-	lock.Lock()
 	f.applicationsMutex.Unlock()
+
+	// Locking the application since it's in process
+	// It will be unlocked in maybeRunExecuteApplicationStart function
+	lock.Lock()
 
 	// Make sure definition is >= 0 which means it was chosen by the node
 	if defIndex < 0 {
@@ -389,9 +392,11 @@ func (f *Fish) executeApplicationStop(appUID typesv2.ApplicationUID) error {
 		f.applicationsMutex.Unlock()
 		return nil
 	}
+	f.applicationsMutex.Unlock()
+
+	// Locking Application in transition state
 	lock.Lock()
 	defer lock.Unlock()
-	f.applicationsMutex.Unlock()
 
 	// Check current Application state
 	log.Debugf("Fish: Application %s: Stop: Stopping the Application", appUID)
@@ -500,9 +505,11 @@ func (f *Fish) executeApplicationTasks(drv provider.Driver, def *typesv2.LabelDe
 		f.applicationsMutex.Unlock()
 		return nil
 	}
+	f.applicationsMutex.Unlock()
+
+	// Locking Application in task execution
 	lock.Lock()
 	defer lock.Unlock()
-	f.applicationsMutex.Unlock()
 
 	// Execute the associated ApplicationTasks if there is some
 	tasks, err := f.db.ApplicationTaskListByApplicationAndWhen(res.ApplicationUid, appStatus)
@@ -519,6 +526,7 @@ func (f *Fish) executeApplicationTasks(drv provider.Driver, def *typesv2.LabelDe
 			log.Errorf("Fish: Application %s: Task: Unable to get associated driver task type for Task %q: %v", res.ApplicationUid, task.Uid, task.Task)
 			task.Result = util.UnparsedJSON(`{"error":"task not available in driver"}`)
 		} else {
+			log.Debugf("Fish: Application %s: Executing task %s: %s", res.ApplicationUid, task.Task, task.Uid)
 			// Executing the task
 			t.SetInfo(&task, def, res)
 			result, err := t.Execute()
@@ -527,6 +535,7 @@ func (f *Fish) executeApplicationTasks(drv provider.Driver, def *typesv2.LabelDe
 				log.Error("Fish: Error happened during executing the task:", task.Uid, err)
 			}
 			task.Result = util.UnparsedJSON(result)
+			log.Debugf("Fish: Application %s: Executing task completed %s: %s", res.ApplicationUid, task.Task, task.Uid)
 		}
 		if err := f.db.ApplicationTaskSave(&task); err != nil {
 			log.Errorf("Fish: Application %s: Task: Error during update the task %s with result: %v", res.ApplicationUid, task.Uid, err)

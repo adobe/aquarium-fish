@@ -20,11 +20,27 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/adobe/aquarium-fish/lib/log"
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
 func (d *Database) SubscribeApplicationTask(ch chan *typesv2.ApplicationTask) {
+	d.subsMu.Lock()
+	defer d.subsMu.Unlock()
 	d.subsApplicationTask = append(d.subsApplicationTask, ch)
+}
+
+// UnsubscribeApplicationTask removes a channel from the subscription list
+func (d *Database) UnsubscribeApplicationTask(ch chan *typesv2.ApplicationTask) {
+	d.subsMu.Lock()
+	defer d.subsMu.Unlock()
+	for i, existing := range d.subsApplicationTask {
+		if existing == ch {
+			// Remove channel from slice
+			d.subsApplicationTask = append(d.subsApplicationTask[:i], d.subsApplicationTask[i+1:]...)
+			break
+		}
+	}
 }
 
 // ApplicationTaskList returns all known ApplicationTasks
@@ -69,8 +85,20 @@ func (d *Database) ApplicationTaskCreate(at *typesv2.ApplicationTask) error {
 
 	// Notifying the subscribers on change, doing that in goroutine to not block execution
 	go func(appTask *typesv2.ApplicationTask) {
-		for _, ch := range d.subsApplicationTask {
-			ch <- appTask
+		d.subsMu.RLock()
+		channels := make([]chan *typesv2.ApplicationTask, len(d.subsApplicationTask))
+		copy(channels, d.subsApplicationTask)
+		d.subsMu.RUnlock()
+
+		for _, ch := range channels {
+			// Use select with default to prevent panic if channel is closed
+			select {
+			case ch <- appTask:
+				// Successfully sent notification
+			default:
+				// Channel is closed or full, skip this subscriber
+				log.Debugf("Database: Failed to send ApplicationTask notification, channel closed or full")
+			}
 		}
 	}(at)
 

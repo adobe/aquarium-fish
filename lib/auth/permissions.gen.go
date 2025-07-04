@@ -62,6 +62,10 @@ var rolePermissions = map[string][]typesv2.Permission{
 		{Resource: RoleService, Action: RoleServiceList},   // gRPC
 		{Resource: RoleService, Action: RoleServiceUpdate}, // gRPC
 
+		// StreamingService
+		{Resource: StreamingService, Action: StreamingServiceConnect},   // gRPC
+		{Resource: StreamingService, Action: StreamingServiceSubscribe}, // gRPC
+
 		// UserService
 		{Resource: UserService, Action: UserServiceCreate},         // gRPC
 		{Resource: UserService, Action: UserServiceDelete},         // gRPC
@@ -92,6 +96,10 @@ var rolePermissions = map[string][]typesv2.Permission{
 
 		// LabelService
 		{Resource: LabelService, Action: LabelServiceList}, // gRPC
+
+		// StreamingService
+		{Resource: StreamingService, Action: StreamingServiceConnect},   // gRPC
+		{Resource: StreamingService, Action: StreamingServiceSubscribe}, // gRPC
 	},
 }
 

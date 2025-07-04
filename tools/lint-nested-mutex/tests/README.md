@@ -10,7 +10,7 @@ This directory contains test cases for the nested mutex linting tool. Each test 
 - **Description**: ParentFunction holds RLock and calls ChildFunction which also uses RLock on the same mutex
 
 ### `test2_nested_lock.go`
-- **Issue Type**: Nested Lock across functions  
+- **Issue Type**: Nested Lock across functions
 - **Expected Result**: 2 errors (nested Lock + Lock/Unlock conflict)
 - **Description**: WriteData holds Lock and calls InternalWrite which also uses Lock on the same mutex
 
@@ -49,7 +49,7 @@ go run ../lint-nested-mutex.go -- -verbose .
 ## Expected Total
 When running on all test files: **6 total errors**
 - test1: 2 errors
-- test2: 2 errors  
+- test2: 2 errors
 - test3: 2 errors
 - test4: 0 errors
 - test5: 0 errors
@@ -58,4 +58,4 @@ When running on all test files: **6 total errors**
 The tool exits with the number of errors found:
 - Single file tests: Exit code equals number of errors in that file
 - All files: Exit code 6 (total errors across all files)
-- Clean files: Exit code 0 
+- Clean files: Exit code 0

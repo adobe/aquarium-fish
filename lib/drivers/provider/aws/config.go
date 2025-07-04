@@ -39,6 +39,7 @@ type Config struct {
 	InstanceTags      map[string]string `json:"instance_tags"`       // AWS Instance tags to use when this node provision them
 	InstanceKey       string            `json:"instance_key"`        // AWS Instance Key Pair name to use while creating of the instance
 	InstanceKeyPrefix string            `json:"instance_key_prefix"` // AWS prefix for auto-generated Instance Key
+	BaseEndpoint      string            `json:"base_url"`            // AWS endpoint to redirect the requests to custom server, useful for mocks
 
 	// Manage the AWS dedicated hosts to keep them busy and deallocate when not needed
 	// Key of the map is name of the pool - will be used for identification of the pool
@@ -141,6 +142,9 @@ func (c *Config) Validate() (err error) {
 		// https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/retry-backoff.html
 		RetryMaxAttempts: 3,
 		RetryMode:        aws.RetryModeStandard,
+
+		// Used in tests for mock server
+		BaseEndpoint: aws.String(c.BaseEndpoint),
 	})
 	input := &sts.GetCallerIdentityInput{}
 

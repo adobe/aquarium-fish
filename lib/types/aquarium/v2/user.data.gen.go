@@ -74,6 +74,7 @@ func (u User) ToUser() *pbTypes.User {
 	result.CreatedAt = timestamppb.New(u.CreatedAt)
 	if u.Hash != nil {
 		var mapData map[string]any
+		mapData = make(map[string]any)
 		if err := json.Unmarshal([]byte(*u.Hash), &mapData); err == nil {
 			if structData, err := structpb.NewStruct(mapData); err == nil {
 				result.Hash = structData

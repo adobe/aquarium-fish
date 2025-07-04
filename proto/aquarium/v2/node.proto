@@ -22,10 +22,10 @@ option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aq
 service NodeService {
   // Get list of nodes
   rpc List(NodeServiceListRequest) returns (NodeServiceListResponse) {}
-  
+
   // Get this node information
   rpc GetThis(NodeServiceGetThisRequest) returns (NodeServiceGetThisResponse) {}
-  
+
   // Set maintenance mode
   //
   // In maintenance mode the node still a part of the cluster, but not taking any new App to
@@ -38,7 +38,7 @@ service NodeService {
 //
 // Each node need to report it's status and ensure there is no duplications and to perform the
 // cluster worker election process properly.
-// 
+//
 // Could be created by the node itself and updated by the same node.
 message Node {
   string uid = 1;

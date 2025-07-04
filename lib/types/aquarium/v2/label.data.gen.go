@@ -82,6 +82,7 @@ func (l Label) ToLabel() *pbTypes.Label {
 		result.Definitions = append(result.Definitions, item.ToLabelDefinition())
 	}
 	var mapData map[string]any
+	mapData = make(map[string]any)
 	if err := json.Unmarshal([]byte(l.Metadata), &mapData); err == nil {
 		if structData, err := structpb.NewStruct(mapData); err == nil {
 			result.Metadata = structData
@@ -135,6 +136,7 @@ func (l LabelDefinition) ToLabelDefinition() *pbTypes.LabelDefinition {
 	}
 	result.Driver = l.Driver
 	var mapData map[string]any
+	mapData = make(map[string]any)
 	if err := json.Unmarshal([]byte(l.Options), &mapData); err == nil {
 		if structData, err := structpb.NewStruct(mapData); err == nil {
 			result.Options = structData

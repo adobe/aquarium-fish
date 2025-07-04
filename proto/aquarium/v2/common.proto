@@ -20,13 +20,13 @@ option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aq
 message Authentication {
   // The username to login into the ApplicationResource.
   string username = 1;
-  
+
   // The password to login into the ApplicationResource.
   string password = 2;
-  
+
   // SSH private key to use instead of password to login into the ApplicationResource.
   string key = 3;
-  
+
   // TCP port to connect with SSH client.
   int32 port = 4;
 }
@@ -35,7 +35,7 @@ message Authentication {
 message Response {
   // Operation status (true = success, false = failure)
   bool status = 1;
-  
+
   // Human readable message about the operation result
   string message = 2;
-} 
+}
