@@ -294,7 +294,7 @@ func (m *MockAWSServer) handleRequest(w http.ResponseWriter, r *http.Request) {
 	action := ""
 
 	// Parse form data for action
-	if r.Method == "POST" {
+	if r.Method == http.MethodPost {
 		values, err := url.ParseQuery(string(body))
 		if err == nil {
 			action = values.Get("Action")
@@ -503,8 +503,6 @@ func (m *MockAWSServer) handleRunInstances(w http.ResponseWriter, _ *http.Reques
 						Capacity:         1,
 					}
 					availableHost = m.hosts[hostID]
-				} else {
-					hostID = availableHost.HostID
 				}
 
 				// Add instance to the host
@@ -738,7 +736,7 @@ func (m *MockAWSServer) handleTerminateInstances(w http.ResponseWriter, _ *http.
 	}
 }
 
-func (m *MockAWSServer) handleDescribeImages(w http.ResponseWriter, r *http.Request, body string) {
+func (m *MockAWSServer) handleDescribeImages(w http.ResponseWriter, _ *http.Request, body string) {
 	values, _ := url.ParseQuery(body)
 
 	// Parse requested image IDs (if any)
@@ -811,7 +809,7 @@ func (m *MockAWSServer) handleDescribeImages(w http.ResponseWriter, r *http.Requ
 	w.Write([]byte(response))
 }
 
-func (m *MockAWSServer) handleDescribeSubnets(w http.ResponseWriter, r *http.Request, body string) {
+func (m *MockAWSServer) handleDescribeSubnets(w http.ResponseWriter, _ *http.Request, _ /*body*/ string) {
 	subnetsXML := ""
 	for _, subnet := range m.subnets {
 		subnetsXML += fmt.Sprintf(`
@@ -844,7 +842,7 @@ func (m *MockAWSServer) handleDescribeSubnets(w http.ResponseWriter, r *http.Req
 	w.Write([]byte(response))
 }
 
-func (m *MockAWSServer) handleDescribeVpcs(w http.ResponseWriter, r *http.Request, body string) {
+func (m *MockAWSServer) handleDescribeVpcs(w http.ResponseWriter, _ *http.Request, _ /*body*/ string) {
 	vpcsXML := ""
 	for _, vpc := range m.vpcs {
 		isDefaultStr := "false"
@@ -878,7 +876,7 @@ func (m *MockAWSServer) handleDescribeVpcs(w http.ResponseWriter, r *http.Reques
 	w.Write([]byte(response))
 }
 
-func (m *MockAWSServer) handleDescribeSecurityGroups(w http.ResponseWriter, r *http.Request, body string) {
+func (m *MockAWSServer) handleDescribeSecurityGroups(w http.ResponseWriter, _ *http.Request, _ /*body*/ string) {
 	groupsXML := ""
 	for _, sg := range m.securityGroups {
 		groupsXML += fmt.Sprintf(`
@@ -908,7 +906,7 @@ func (m *MockAWSServer) handleDescribeSecurityGroups(w http.ResponseWriter, r *h
 	w.Write([]byte(response))
 }
 
-func (*MockAWSServer) handleDescribeInstanceTypes(w http.ResponseWriter, r *http.Request, body string) {
+func (*MockAWSServer) handleDescribeInstanceTypes(w http.ResponseWriter, _ *http.Request, body string) {
 	values, _ := url.ParseQuery(body)
 
 	// Parse requested instance types
@@ -1017,7 +1015,7 @@ func (*MockAWSServer) handleDescribeInstanceTypes(w http.ResponseWriter, r *http
 	w.Write([]byte(response))
 }
 
-func (m *MockAWSServer) handleCreateKeyPair(w http.ResponseWriter, r *http.Request, body string) {
+func (m *MockAWSServer) handleCreateKeyPair(w http.ResponseWriter, _ *http.Request, body string) {
 	values, _ := url.ParseQuery(body)
 	keyName := values.Get("KeyName")
 
@@ -1047,7 +1045,7 @@ MIIEpAIBAAKCAQEA2Z3QX0EXAMPLE...
 	w.Write([]byte(response))
 }
 
-func (m *MockAWSServer) handleDeleteKeyPair(w http.ResponseWriter, r *http.Request, body string) {
+func (m *MockAWSServer) handleDeleteKeyPair(w http.ResponseWriter, _ *http.Request, body string) {
 	values, _ := url.ParseQuery(body)
 	keyName := values.Get("KeyName")
 
@@ -1066,7 +1064,7 @@ func (m *MockAWSServer) handleDeleteKeyPair(w http.ResponseWriter, r *http.Reque
 	w.Write([]byte(response))
 }
 
-func (m *MockAWSServer) handleCreateSnapshots(w http.ResponseWriter, r *http.Request, body string) {
+func (m *MockAWSServer) handleCreateSnapshots(w http.ResponseWriter, _ *http.Request, body string) {
 	values, _ := url.ParseQuery(body)
 	_ = values.Get("InstanceSpecification.InstanceId") // instanceID not used in mock
 
@@ -1102,7 +1100,7 @@ func (m *MockAWSServer) handleCreateSnapshots(w http.ResponseWriter, r *http.Req
 	w.Write([]byte(response))
 }
 
-func (m *MockAWSServer) handleDescribeSnapshots(w http.ResponseWriter, r *http.Request, body string) {
+func (m *MockAWSServer) handleDescribeSnapshots(w http.ResponseWriter, _ *http.Request, _ /*body*/ string) {
 	snapshotsXML := ""
 	for _, snapshot := range m.snapshots {
 		snapshotsXML += fmt.Sprintf(`
@@ -1132,7 +1130,7 @@ func (m *MockAWSServer) handleDescribeSnapshots(w http.ResponseWriter, r *http.R
 	w.Write([]byte(response))
 }
 
-func (m *MockAWSServer) handleCreateImage(w http.ResponseWriter, r *http.Request, body string) {
+func (m *MockAWSServer) handleCreateImage(w http.ResponseWriter, _ *http.Request, body string) {
 	values, _ := url.ParseQuery(body)
 	_ = values.Get("InstanceId") // instanceID not used in mock
 	name := values.Get("Name")
@@ -1163,7 +1161,7 @@ func (m *MockAWSServer) handleCreateImage(w http.ResponseWriter, r *http.Request
 	w.Write([]byte(response))
 }
 
-func (m *MockAWSServer) handleStopInstances(w http.ResponseWriter, r *http.Request, body string) {
+func (m *MockAWSServer) handleStopInstances(w http.ResponseWriter, _ *http.Request, body string) {
 	values, _ := url.ParseQuery(body)
 	instanceID := values.Get("InstanceId.1")
 
@@ -1200,7 +1198,7 @@ func (m *MockAWSServer) handleStopInstances(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-func (*MockAWSServer) handleCreateTags(w http.ResponseWriter, r *http.Request, body string) {
+func (*MockAWSServer) handleCreateTags(w http.ResponseWriter, _ *http.Request, _ /*body*/ string) {
 	response := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <CreateTagsResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
     <requestId>%s</requestId>
@@ -1214,7 +1212,7 @@ func (*MockAWSServer) handleCreateTags(w http.ResponseWriter, r *http.Request, b
 	w.Write([]byte(response))
 }
 
-func (m *MockAWSServer) handleDescribeHosts(w http.ResponseWriter, r *http.Request, body string) {
+func (m *MockAWSServer) handleDescribeHosts(w http.ResponseWriter, _ *http.Request, _ /*body*/ string) {
 	hostsXML := ""
 	for _, host := range m.hosts {
 		instancesXML := ""
@@ -1273,7 +1271,7 @@ func (m *MockAWSServer) handleDescribeHosts(w http.ResponseWriter, r *http.Reque
 	w.Write([]byte(response))
 }
 
-func (m *MockAWSServer) handleAllocateHosts(w http.ResponseWriter, r *http.Request, body string) {
+func (m *MockAWSServer) handleAllocateHosts(w http.ResponseWriter, _ *http.Request, body string) {
 	// Check if we should simulate an error
 	if m.quotas["AllocateHostsError"] == 1 {
 		errorResponse := `<?xml version="1.0" encoding="UTF-8"?>
@@ -1326,7 +1324,7 @@ func (m *MockAWSServer) handleAllocateHosts(w http.ResponseWriter, r *http.Reque
 	w.Write([]byte(response))
 }
 
-func (m *MockAWSServer) handleReleaseHosts(w http.ResponseWriter, r *http.Request, body string) {
+func (m *MockAWSServer) handleReleaseHosts(w http.ResponseWriter, _ *http.Request, body string) {
 	values, _ := url.ParseQuery(body)
 
 	successfulXML := ""
@@ -1370,7 +1368,7 @@ func (m *MockAWSServer) handleReleaseHosts(w http.ResponseWriter, r *http.Reques
 	w.Write([]byte(response))
 }
 
-func (m *MockAWSServer) handleDescribeInstanceAttribute(w http.ResponseWriter, r *http.Request, body string) {
+func (m *MockAWSServer) handleDescribeInstanceAttribute(w http.ResponseWriter, _ *http.Request, body string) {
 	values, _ := url.ParseQuery(body)
 	instanceID := values.Get("InstanceId")
 	attribute := values.Get("Attribute")
@@ -1480,7 +1478,7 @@ func (m *MockAWSServer) handleDescribeInstanceAttribute(w http.ResponseWriter, r
 	w.Write([]byte(response))
 }
 
-func (m *MockAWSServer) handleDescribeVolumes(w http.ResponseWriter, r *http.Request, body string) {
+func (*MockAWSServer) handleDescribeVolumes(w http.ResponseWriter, _ *http.Request, body string) {
 	values, _ := url.ParseQuery(body)
 
 	var volumesXML string

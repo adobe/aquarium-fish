@@ -88,6 +88,7 @@ func findLatestAquariumFishBinary() (string, error) {
 
 // initFishPath initializes the fish binary path, either from FISH_PATH env var or by auto-detection
 func initFishPath(tb testing.TB) string {
+	tb.Helper()
 	// First, try environment variable
 	if envPath := os.Getenv("FISH_PATH"); envPath != "" {
 		tb.Logf("Using aquarium-fish binary from FISH_PATH: %s", envPath)

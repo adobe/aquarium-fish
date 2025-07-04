@@ -77,7 +77,7 @@ type Driver struct {
 	webhooksMutex sync.Mutex
 
 	// Keeping track of running routines to gracefully shutdown the gate
-	running       context.Context //nolint:containedctx
+	running       context.Context //nolint:containedctx // Is used for sending stop for goroutines
 	runningCancel context.CancelFunc
 	routines      sync.WaitGroup
 	routinesMutex sync.Mutex

@@ -53,7 +53,7 @@ type Fish struct {
 	Quit chan os.Signal
 
 	// Allows us to gracefully close all the subroutines
-	running       context.Context //nolint:containedctx
+	running       context.Context //nolint:containedctx // Is used for sending stop for goroutines
 	runningCancel context.CancelFunc
 	routines      sync.WaitGroup
 	routinesMutex sync.Mutex

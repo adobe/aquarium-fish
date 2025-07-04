@@ -156,7 +156,7 @@ type subscription struct {
 	subscriptions []aquariumv2.SubscriptionType
 	filters       map[string]string
 	userName      string
-	ctx           context.Context
+	ctx           context.Context //nolint:containedctx // Is used for sending stop for goroutines
 	cancel        context.CancelFunc
 	channels      *subChannels
 
@@ -227,7 +227,7 @@ type bidirectionalConnection struct {
 	stream      *connect.BidiStream[aquariumv2.StreamingServiceConnectRequest, aquariumv2.StreamingServiceConnectResponse]
 	streamMutex sync.Mutex // Protects concurrent access to stream.Send()
 	userName    string
-	ctx         context.Context
+	ctx         context.Context //nolint:containedctx // Is used for sending stop for goroutines
 	cancel      context.CancelFunc
 }
 
@@ -351,7 +351,7 @@ func (s *StreamingService) Connect(ctx context.Context, stream *connect.BidiStre
 				return nil
 			}
 
-			log.Debugf("Streaming: Received request - ID: %s, Type: %s", req.RequestId, req.RequestType)
+			log.Debugf("Streaming: Received request - ID: %s, Type: %s", req.GetRequestId(), req.GetRequestType())
 
 			// Process request asynchronously using the connection context
 			go s.processStreamRequest(connCtx, conn, req)
@@ -361,58 +361,58 @@ func (s *StreamingService) Connect(ctx context.Context, stream *connect.BidiStre
 
 // processStreamRequest processes a single streaming request asynchronously
 func (s *StreamingService) processStreamRequest(ctx context.Context, conn *bidirectionalConnection, req *aquariumv2.StreamingServiceConnectRequest) {
-	log.Debugf("Streaming: Processing request - ID: %s, Type: %s", req.RequestId, req.RequestType)
+	log.Debugf("Streaming: Processing request - ID: %s, Type: %s", req.GetRequestId(), req.GetRequestType())
 
 	// Check RBAC permissions and set proper context for target service
-	targetCtx, err := s.prepareTargetServiceContext(ctx, req.RequestType)
+	targetCtx, err := s.prepareTargetServiceContext(ctx, req.GetRequestType())
 	if err != nil {
-		log.Errorf("Streaming: RBAC permission denied for request %s: %v", req.RequestId, err)
+		log.Errorf("Streaming: RBAC permission denied for request %s: %v", req.GetRequestId(), err)
 		// Create error response
 		response := &aquariumv2.StreamingServiceConnectResponse{
-			RequestId:    req.RequestId,
-			ResponseType: s.getResponseType(req.RequestType),
+			RequestId:    req.GetRequestId(),
+			ResponseType: s.getResponseType(req.GetRequestType()),
 			Error: &aquariumv2.StreamError{
 				Code:    connect.CodePermissionDenied.String(),
 				Message: fmt.Sprintf("Permission denied: %v", err),
 			},
 		}
 		if sendErr := conn.safeSend(response); sendErr != nil {
-			log.Errorf("Streaming: Error sending permission denied response for request %s: %v", req.RequestId, sendErr)
+			log.Errorf("Streaming: Error sending permission denied response for request %s: %v", req.GetRequestId(), sendErr)
 		}
 		return
 	}
 
 	// Route the request to the appropriate service handler using the target service context
-	responseData, err := s.routeRequest(targetCtx, req.RequestType, req.RequestData)
+	responseData, err := s.routeRequest(targetCtx, req.GetRequestType(), req.GetRequestData())
 
 	var response *aquariumv2.StreamingServiceConnectResponse
 	if err != nil {
-		log.Errorf("Streaming: Error processing request %s: %v", req.RequestId, err)
+		log.Errorf("Streaming: Error processing request %s: %v", req.GetRequestId(), err)
 		// Create error response
 		response = &aquariumv2.StreamingServiceConnectResponse{
-			RequestId:    req.RequestId,
-			ResponseType: s.getResponseType(req.RequestType),
+			RequestId:    req.GetRequestId(),
+			ResponseType: s.getResponseType(req.GetRequestType()),
 			Error: &aquariumv2.StreamError{
 				Code:    connect.CodeOf(err).String(),
 				Message: err.Error(),
 			},
 		}
 	} else {
-		log.Debugf("Streaming: Successfully processed request %s", req.RequestId)
+		log.Debugf("Streaming: Successfully processed request %s", req.GetRequestId())
 		// Create success response
 		response = &aquariumv2.StreamingServiceConnectResponse{
-			RequestId:    req.RequestId,
-			ResponseType: s.getResponseType(req.RequestType),
+			RequestId:    req.GetRequestId(),
+			ResponseType: s.getResponseType(req.GetRequestType()),
 			ResponseData: responseData,
 		}
 	}
 
-	log.Debugf("Streaming: Sending response for request %s", req.RequestId)
+	log.Debugf("Streaming: Sending response for request %s", req.GetRequestId())
 	// Send response back to client
 	if err := conn.safeSend(response); err != nil {
-		log.Errorf("Streaming: Error sending response for request %s: %v", req.RequestId, err)
+		log.Errorf("Streaming: Error sending response for request %s: %v", req.GetRequestId(), err)
 	} else {
-		log.Debugf("Streaming: Successfully sent response for request %s", req.RequestId)
+		log.Debugf("Streaming: Successfully sent response for request %s", req.GetRequestId())
 	}
 }
 
@@ -494,8 +494,8 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 	sub := &subscription{
 		id:            subscriptionID,
 		stream:        stream,
-		subscriptions: req.Msg.SubscriptionTypes,
-		filters:       req.Msg.Filters,
+		subscriptions: req.Msg.GetSubscriptionTypes(),
+		filters:       req.Msg.GetFilters(),
 		userName:      userName,
 		ctx:           subCtx,
 		cancel:        cancel,
@@ -508,7 +508,7 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 	s.subscriptionsMutex.Unlock()
 
 	// Subscribe to database changes using generated setup function
-	s.setupSubscriptions(subCtx, subscriptionID, sub, req.Msg.SubscriptionTypes)
+	s.setupSubscriptions(subCtx, subscriptionID, sub, req.Msg.GetSubscriptionTypes())
 
 	defer func() {
 		// Clean up subscription
