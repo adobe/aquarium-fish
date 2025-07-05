@@ -31,11 +31,11 @@ import (
 
 // Global logger instance
 var (
-	Logger zerolog.Logger
+	loggerMu   sync.RWMutex
+	zeroLogger zerolog.Logger
 
 	// OpenTelemetry integration
-	otelLoggerMu sync.Mutex
-	otelLogger   otellog.Logger
+	otelLogger otellog.Logger
 )
 
 // Initialize with default configuration on package load
@@ -202,7 +202,9 @@ func Initialize(config *Config) error {
 	}
 
 	// Set global logger
-	Logger = logger
+	loggerMu.Lock()
+	zeroLogger = logger
+	loggerMu.Unlock()
 
 	// Set up OpenTelemetry integration if enabled
 	if config.OtelEnabled {
@@ -217,8 +219,8 @@ func Initialize(config *Config) error {
 // SetupOtelIntegration sets up OpenTelemetry integration for logging
 // This is called from the monitoring package when OpenTelemetry is initialized
 func SetupOtelIntegration(minLevel string) error {
-	otelLoggerMu.Lock()
-	defer otelLoggerMu.Unlock()
+	loggerMu.Lock()
+	defer loggerMu.Unlock()
 	if otelLogger == nil {
 		otelMinLevel, err := zerolog.ParseLevel(minLevel)
 		if err != nil {
@@ -229,14 +231,16 @@ func SetupOtelIntegration(minLevel string) error {
 
 		// Add OpenTelemetry hook
 		hook := newOtelHook(otelLogger, otelMinLevel)
-		Logger = Logger.Hook(hook)
+		zeroLogger = zeroLogger.Hook(hook)
 	}
 	return nil
 }
 
 // Context-aware logging functions
 func WithContext(ctx context.Context) *zerolog.Logger {
-	logger := Logger
+	loggerMu.RLock()
+	defer loggerMu.RUnlock()
+	logger := zeroLogger
 	if span := trace.SpanFromContext(ctx); span.SpanContext().IsValid() {
 		logger = logger.With().
 			Str("trace_id", span.SpanContext().TraceID().String()).
@@ -246,8 +250,10 @@ func WithContext(ctx context.Context) *zerolog.Logger {
 	return &logger
 }
 
-func WithFields(fields map[string]interface{}) *zerolog.Logger {
-	logger := Logger.With()
+func WithFields(fields map[string]any) *zerolog.Logger {
+	loggerMu.RLock()
+	defer loggerMu.RUnlock()
+	logger := zeroLogger.With()
 	for k, v := range fields {
 		logger = logger.Interface(k, v)
 	}
@@ -255,43 +261,61 @@ func WithFields(fields map[string]interface{}) *zerolog.Logger {
 	return &l
 }
 
-func WithField(key string, value interface{}) *zerolog.Logger {
-	logger := Logger.With().Interface(key, value).Logger()
+func WithField(key string, value any) *zerolog.Logger {
+	loggerMu.RLock()
+	defer loggerMu.RUnlock()
+	logger := zeroLogger.With().Interface(key, value).Logger()
 	return &logger
 }
 
 func WithError(err error) *zerolog.Logger {
-	logger := Logger.With().Err(err).Logger()
+	loggerMu.RLock()
+	defer loggerMu.RUnlock()
+	logger := zeroLogger.With().Err(err).Logger()
 	return &logger
 }
 
 // Convenience functions for common log levels
 func Trace() *zerolog.Event {
-	return Logger.Trace()
+	loggerMu.RLock()
+	defer loggerMu.RUnlock()
+	return zeroLogger.Trace()
 }
 
 func Debug() *zerolog.Event {
-	return Logger.Debug()
+	loggerMu.RLock()
+	defer loggerMu.RUnlock()
+	return zeroLogger.Debug()
 }
 
 func Info() *zerolog.Event {
-	return Logger.Info()
+	loggerMu.RLock()
+	defer loggerMu.RUnlock()
+	return zeroLogger.Info()
 }
 
 func Warn() *zerolog.Event {
-	return Logger.Warn()
+	loggerMu.RLock()
+	defer loggerMu.RUnlock()
+	return zeroLogger.Warn()
 }
 
 func Error() *zerolog.Event {
-	return Logger.Error()
+	loggerMu.RLock()
+	defer loggerMu.RUnlock()
+	return zeroLogger.Error()
 }
 
 func Fatal() *zerolog.Event {
-	return Logger.Fatal()
+	loggerMu.RLock()
+	defer loggerMu.RUnlock()
+	return zeroLogger.Fatal()
 }
 
 func Panic() *zerolog.Event {
-	return Logger.Panic()
+	loggerMu.RLock()
+	defer loggerMu.RUnlock()
+	return zeroLogger.Panic()
 }
 
 // Structured logging with context
@@ -321,4 +345,9 @@ func FatalCtx(ctx context.Context) *zerolog.Event {
 
 func PanicCtx(ctx context.Context) *zerolog.Event {
 	return WithContext(ctx).Panic()
+}
+
+// GetLevel returns current logging level as string
+func GetLevel() string {
+	return zeroLogger.GetLevel().String()
 }

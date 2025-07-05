@@ -213,7 +213,7 @@ func (d *Driver) updateHooks() error {
 	defer d.hooksMutex.RUnlock()
 
 	// To not waste time enabling it only in debug mode
-	if log.Logger.GetLevel().String() == "debug" {
+	if log.GetLevel() == "debug" {
 		// Comparing the lists to show the differences
 		for _, newHook := range updatedHooks {
 			found := false
