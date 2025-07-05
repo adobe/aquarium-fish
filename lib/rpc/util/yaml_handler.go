@@ -56,7 +56,7 @@ func YAMLToJSONHandler(next http.Handler) http.Handler {
 		// Convert YAML to JSON
 		var yamlData any
 		if err := yaml.Unmarshal(body, &yamlData); err != nil {
-			log.Debugf("YAML: Failed to unmarshal YAML: %v", err)
+			log.Debug().Msgf("YAML: Failed to unmarshal YAML: %v", err)
 			http.Error(w, "Invalid YAML format", http.StatusBadRequest)
 			return
 		}
@@ -64,12 +64,12 @@ func YAMLToJSONHandler(next http.Handler) http.Handler {
 		// Convert to JSON
 		jsonData, err := json.Marshal(yamlData)
 		if err != nil {
-			log.Debugf("YAML: Failed to marshal to JSON: %v", err)
+			log.Debug().Msgf("YAML: Failed to marshal to JSON: %v", err)
 			http.Error(w, "Failed to convert YAML to JSON", http.StatusInternalServerError)
 			return
 		}
 
-		log.Debugf("YAML: Successfully converted YAML to JSON for %s", r.URL.Path)
+		log.Debug().Msgf("YAML: Successfully converted YAML to JSON for %s", r.URL.Path)
 
 		// Update request
 		r.Body = io.NopCloser(bytes.NewReader(jsonData))

@@ -16,6 +16,7 @@ package proxyssh
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/log"
@@ -34,7 +35,8 @@ func (c *Config) Apply(config []byte, db *database.Database) error {
 	// Parse json
 	if len(config) > 0 {
 		if err := json.Unmarshal(config, c); err != nil {
-			return log.Error("PROXYSSH: Unable to apply the gate config:", err)
+			log.Error().Msgf("PROXYSSH: Unable to apply the gate config: %v", err)
+			return fmt.Errorf("PROXYSSH: Unable to apply the gate config: %v", err)
 		}
 	}
 

@@ -98,12 +98,12 @@ func (d *Driver) AvailableCapacity(nodeUsage typesv2.Resources, req typesv2.Labe
 
 	var opts Options
 	if err := opts.Apply(req.Options); err != nil {
-		log.Error("TEST: Unable to apply options:", err)
+		log.Error().Msgf("TEST: Unable to apply options: %v", err)
 		return -1
 	}
 
 	if err := randomFail("AvailableCapacity", opts.FailAvailableCapacity); err != nil {
-		log.Error("TEST: RandomFail:", err)
+		log.Error().Msgf("TEST: RandomFail: %v", err)
 		return -1
 	}
 
@@ -162,11 +162,13 @@ func (d *Driver) AvailableCapacity(nodeUsage typesv2.Resources, req typesv2.Labe
 func (d *Driver) Allocate(def typesv2.LabelDefinition, _ /*metadata*/ map[string]any) (*typesv2.ApplicationResource, error) {
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
-		return nil, log.Error("TEST: Unable to apply options:", err)
+		log.Error().Msgf("TEST: Unable to apply options: %v", err)
+		return nil, fmt.Errorf("TEST: Unable to apply options: %v", err)
 	}
 
 	if err := randomFail("Allocate", opts.FailAllocate); err != nil {
-		return nil, log.Error("TEST: RandomFail:", err)
+		log.Error().Msgf("TEST: RandomFail: %v", err)
+		return nil, fmt.Errorf("TEST: RandomFail: %v", err)
 	}
 
 	if opts.DelayAllocate > 0 {
@@ -226,7 +228,7 @@ func (d *Driver) GetTask(name, options string) provider.DriverTask {
 	// Parse options json into task structure
 	if t != nil && len(options) > 0 {
 		if err := json.Unmarshal([]byte(options), t); err != nil {
-			log.Error("TEST: Unable to apply the task options:", err)
+			log.Error().Msgf("TEST: Unable to apply the task options: %v", err)
 			return nil
 		}
 	}
@@ -237,10 +239,12 @@ func (d *Driver) GetTask(name, options string) provider.DriverTask {
 // Deallocate the resource
 func (d *Driver) Deallocate(res typesv2.ApplicationResource) error {
 	if res.Identifier == "" {
-		return log.Error("TEST: Invalid resource:", res)
+		log.Error().Msgf("TEST: Invalid resource: %v", res)
+		return fmt.Errorf("TEST: Invalid resource: %v", res)
 	}
 	if err := randomFail(fmt.Sprintf("Deallocate %s", res.Identifier), d.cfg.FailDeallocate); err != nil {
-		return log.Error("TEST: RandomFail:", err)
+		log.Error().Msgf("TEST: RandomFail: %v", err)
+		return fmt.Errorf("TEST: RandomFail: %v", err)
 	}
 
 	resFile := filepath.Join(d.cfg.WorkspacePath, res.Identifier)

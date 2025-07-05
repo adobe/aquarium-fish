@@ -97,7 +97,7 @@ func (d *Database) ApplicationTaskCreate(at *typesv2.ApplicationTask) error {
 				// Successfully sent notification
 			default:
 				// Channel is closed or full, skip this subscriber
-				log.Debugf("Database: Failed to send ApplicationTask notification, channel closed or full")
+				log.Debug().Msgf("Database: Failed to send ApplicationTask notification, channel closed or full")
 			}
 		}
 	}(at)

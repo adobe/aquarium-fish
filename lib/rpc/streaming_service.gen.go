@@ -93,7 +93,7 @@ func (s *StreamingService) routeApplicationServiceRequest(ctx context.Context, r
 			userName := rpcutil.GetUserName(ctx)
 			appUID := stringToUUID(resp.Msg.Data.Uid)
 			s.permissionCache.GrantAccess(userName, appUID)
-			log.Debugf("Streaming: Cached permission for app creator %s -> %s", userName, appUID)
+			log.Debug().Msgf("Streaming: Cached permission for app creator %s -> %s", userName, appUID)
 		}
 
 		return anypb.New(resp.Msg)
@@ -422,7 +422,7 @@ func (s *StreamingService) routeUserServiceRequest(ctx context.Context, requestT
 
 // routeRequest routes a request to the appropriate service handler
 func (s *StreamingService) routeRequest(ctx context.Context, requestType string, requestData *anypb.Any) (*anypb.Any, error) {
-	log.Debugf("Streaming: Routing request type: %s", requestType)
+	log.Debug().Msgf("Streaming: Routing request type: %s", requestType)
 
 	// Route to the appropriate service using generated routing methods
 	switch {
@@ -449,30 +449,30 @@ func (s *StreamingService) relayApplicationStateNotifications(ctx context.Contex
 
 	defer func() {
 		if r := recover(); r != nil {
-			log.Errorf("Subscription %s: ApplicationState relay goroutine panic: %v", subscriptionID, r)
+			log.Error().Msgf("Subscription %s: ApplicationState relay goroutine panic: %v", subscriptionID, r)
 		}
 	}()
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Debugf("Subscription %s: ApplicationState relay stopping due to context cancellation", subscriptionID)
+			log.Debug().Msgf("Subscription %s: ApplicationState relay stopping due to context cancellation", subscriptionID)
 			return
 		case obj, ok := <-dbChannel:
 			if !ok {
-				log.Debugf("Subscription %s: ApplicationState relay stopping due to closed database channel", subscriptionID)
+				log.Debug().Msgf("Subscription %s: ApplicationState relay stopping due to closed database channel", subscriptionID)
 				return
 			}
 
 			// Check if client is already overflowing - skip notification to prevent further overflow
 			if sub.isClientOverflowing() {
-				log.Debugf("Subscription %s: Skipping applicationState notification due to client overflow", subscriptionID)
+				log.Debug().Msgf("Subscription %s: Skipping applicationState notification due to client overflow", subscriptionID)
 				continue
 			}
 
 			// Try to send safely - if this returns true, client should be disconnected
 			if shouldDisconnect := !sub.safeSendToApplicationStateChannel(obj); shouldDisconnect {
-				log.Errorf("Subscription %s: Disconnecting client due to excessive buffer overflow", subscriptionID)
+				log.Error().Msgf("Subscription %s: Disconnecting client due to excessive buffer overflow", subscriptionID)
 				sub.cancel() // This will cause the main subscription loop to exit
 				return
 			}
@@ -487,30 +487,30 @@ func (s *StreamingService) relayApplicationResourceNotifications(ctx context.Con
 
 	defer func() {
 		if r := recover(); r != nil {
-			log.Errorf("Subscription %s: ApplicationResource relay goroutine panic: %v", subscriptionID, r)
+			log.Error().Msgf("Subscription %s: ApplicationResource relay goroutine panic: %v", subscriptionID, r)
 		}
 	}()
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Debugf("Subscription %s: ApplicationResource relay stopping due to context cancellation", subscriptionID)
+			log.Debug().Msgf("Subscription %s: ApplicationResource relay stopping due to context cancellation", subscriptionID)
 			return
 		case obj, ok := <-dbChannel:
 			if !ok {
-				log.Debugf("Subscription %s: ApplicationResource relay stopping due to closed database channel", subscriptionID)
+				log.Debug().Msgf("Subscription %s: ApplicationResource relay stopping due to closed database channel", subscriptionID)
 				return
 			}
 
 			// Check if client is already overflowing - skip notification to prevent further overflow
 			if sub.isClientOverflowing() {
-				log.Debugf("Subscription %s: Skipping applicationResource notification due to client overflow", subscriptionID)
+				log.Debug().Msgf("Subscription %s: Skipping applicationResource notification due to client overflow", subscriptionID)
 				continue
 			}
 
 			// Try to send safely - if this returns true, client should be disconnected
 			if shouldDisconnect := !sub.safeSendToApplicationResourceChannel(obj); shouldDisconnect {
-				log.Errorf("Subscription %s: Disconnecting client due to excessive buffer overflow", subscriptionID)
+				log.Error().Msgf("Subscription %s: Disconnecting client due to excessive buffer overflow", subscriptionID)
 				sub.cancel() // This will cause the main subscription loop to exit
 				return
 			}
@@ -525,30 +525,30 @@ func (s *StreamingService) relayApplicationTaskNotifications(ctx context.Context
 
 	defer func() {
 		if r := recover(); r != nil {
-			log.Errorf("Subscription %s: ApplicationTask relay goroutine panic: %v", subscriptionID, r)
+			log.Error().Msgf("Subscription %s: ApplicationTask relay goroutine panic: %v", subscriptionID, r)
 		}
 	}()
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Debugf("Subscription %s: ApplicationTask relay stopping due to context cancellation", subscriptionID)
+			log.Debug().Msgf("Subscription %s: ApplicationTask relay stopping due to context cancellation", subscriptionID)
 			return
 		case obj, ok := <-dbChannel:
 			if !ok {
-				log.Debugf("Subscription %s: ApplicationTask relay stopping due to closed database channel", subscriptionID)
+				log.Debug().Msgf("Subscription %s: ApplicationTask relay stopping due to closed database channel", subscriptionID)
 				return
 			}
 
 			// Check if client is already overflowing - skip notification to prevent further overflow
 			if sub.isClientOverflowing() {
-				log.Debugf("Subscription %s: Skipping applicationTask notification due to client overflow", subscriptionID)
+				log.Debug().Msgf("Subscription %s: Skipping applicationTask notification due to client overflow", subscriptionID)
 				continue
 			}
 
 			// Try to send safely - if this returns true, client should be disconnected
 			if shouldDisconnect := !sub.safeSendToApplicationTaskChannel(obj); shouldDisconnect {
-				log.Errorf("Subscription %s: Disconnecting client due to excessive buffer overflow", subscriptionID)
+				log.Error().Msgf("Subscription %s: Disconnecting client due to excessive buffer overflow", subscriptionID)
 				sub.cancel() // This will cause the main subscription loop to exit
 				return
 			}
@@ -572,44 +572,44 @@ func (s *StreamingService) listenChannels(sub *subscription, ctx, subCtx context
 
 	defer func() {
 		if r := recover(); r != nil {
-			log.Errorf("Subscription %s: listenChannels goroutine panic: %v", sub.id, r)
+			log.Error().Msgf("Subscription %s: listenChannels goroutine panic: %v", sub.id, r)
 		}
 	}()
 
 	for {
 		select {
 		case <-subCtx.Done():
-			log.Debugf("Subscription %s: listenChannels stopping due to subscription context cancellation", sub.id)
+			log.Debug().Msgf("Subscription %s: listenChannels stopping due to subscription context cancellation", sub.id)
 			return
 		case <-ctx.Done():
-			log.Debugf("Subscription %s: listenChannels stopping due to request context cancellation", sub.id)
+			log.Debug().Msgf("Subscription %s: listenChannels stopping due to request context cancellation", sub.id)
 			return
 		case msg := <-sub.channels.applicationStateChannel:
 			if s.shouldSendObject(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE, msg) {
-				log.Debugf("Subscription %s: Sending ApplicationState notification for Application UID %s", sub.id, msg.ApplicationUid)
+				log.Debug().Msgf("Subscription %s: Sending ApplicationState notification for Application UID %s", sub.id, msg.ApplicationUid)
 				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE, aquariumv2.ChangeType_CHANGE_TYPE_CREATED, msg.ToApplicationState()); err != nil {
-					log.Errorf("Subscription %s: Error sending ApplicationState update: %v", sub.id, err)
+					log.Error().Msgf("Subscription %s: Error sending ApplicationState update: %v", sub.id, err)
 				}
 			} else {
-				log.Debugf("Subscription %s: Skipping ApplicationState notification for user %s", sub.id, sub.userName)
+				log.Debug().Msgf("Subscription %s: Skipping ApplicationState notification for user %s", sub.id, sub.userName)
 			}
 		case msg := <-sub.channels.applicationResourceChannel:
 			if s.shouldSendObject(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE, msg) {
-				log.Debugf("Subscription %s: Sending ApplicationResource notification for Application UID %s", sub.id, msg.ApplicationUid)
+				log.Debug().Msgf("Subscription %s: Sending ApplicationResource notification for Application UID %s", sub.id, msg.ApplicationUid)
 				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE, aquariumv2.ChangeType_CHANGE_TYPE_CREATED, msg.ToApplicationResource()); err != nil {
-					log.Errorf("Subscription %s: Error sending ApplicationResource update: %v", sub.id, err)
+					log.Error().Msgf("Subscription %s: Error sending ApplicationResource update: %v", sub.id, err)
 				}
 			} else {
-				log.Debugf("Subscription %s: Skipping ApplicationResource notification for user %s", sub.id, sub.userName)
+				log.Debug().Msgf("Subscription %s: Skipping ApplicationResource notification for user %s", sub.id, sub.userName)
 			}
 		case msg := <-sub.channels.applicationTaskChannel:
 			if s.shouldSendObject(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK, msg) {
-				log.Debugf("Subscription %s: Sending ApplicationTask notification for Application UID %s", sub.id, msg.ApplicationUid)
+				log.Debug().Msgf("Subscription %s: Sending ApplicationTask notification for Application UID %s", sub.id, msg.ApplicationUid)
 				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK, aquariumv2.ChangeType_CHANGE_TYPE_CREATED, msg.ToApplicationTask()); err != nil {
-					log.Errorf("Subscription %s: Error sending ApplicationTask update: %v", sub.id, err)
+					log.Error().Msgf("Subscription %s: Error sending ApplicationTask update: %v", sub.id, err)
 				}
 			} else {
-				log.Debugf("Subscription %s: Skipping ApplicationTask notification for user %s", sub.id, sub.userName)
+				log.Debug().Msgf("Subscription %s: Skipping ApplicationTask notification for user %s", sub.id, sub.userName)
 			}
 		}
 	}
@@ -630,7 +630,7 @@ func (s *StreamingService) setupSubscriptions(subCtx context.Context, subscripti
 			// Create a safe wrapper channel for database notifications
 			dbChannel := make(chan *typesv2.ApplicationState, 100)
 			s.fish.DB().SubscribeApplicationState(dbChannel)
-			log.Debugf("Subscription %s: Subscribed to ApplicationState changes", sub.id)
+			log.Debug().Msgf("Subscription %s: Subscribed to ApplicationState changes", sub.id)
 
 			// Add to WaitGroup before starting goroutine
 			sub.relayWg.Add(1)
@@ -640,7 +640,7 @@ func (s *StreamingService) setupSubscriptions(subCtx context.Context, subscripti
 			// Create a safe wrapper channel for database notifications
 			dbChannel := make(chan *typesv2.ApplicationResource, 100)
 			s.fish.DB().SubscribeApplicationResource(dbChannel)
-			log.Debugf("Subscription %s: Subscribed to ApplicationResource changes", sub.id)
+			log.Debug().Msgf("Subscription %s: Subscribed to ApplicationResource changes", sub.id)
 
 			// Add to WaitGroup before starting goroutine
 			sub.relayWg.Add(1)
@@ -650,7 +650,7 @@ func (s *StreamingService) setupSubscriptions(subCtx context.Context, subscripti
 			// Create a safe wrapper channel for database notifications
 			dbChannel := make(chan *typesv2.ApplicationTask, 100)
 			s.fish.DB().SubscribeApplicationTask(dbChannel)
-			log.Debugf("Subscription %s: Subscribed to ApplicationTask changes", sub.id)
+			log.Debug().Msgf("Subscription %s: Subscribed to ApplicationTask changes", sub.id)
 
 			// Add to WaitGroup before starting goroutine
 			sub.relayWg.Add(1)
@@ -730,10 +730,10 @@ func (sub *subscription) safeSendToApplicationStateChannel(msg *typesv2.Applicat
 		sub.resetOverflow()
 		return true
 	case <-time.After(overflowTimeout):
-		log.Warnf("Subscription %s: ApplicationState channel send timeout (buffer overflow)", sub.userName)
+		log.Warn().Msgf("Subscription %s: ApplicationState channel send timeout (buffer overflow)", sub.userName)
 		return sub.recordOverflow()
 	default:
-		log.Warnf("Subscription %s: ApplicationState channel full (buffer overflow)", sub.userName)
+		log.Warn().Msgf("Subscription %s: ApplicationState channel full (buffer overflow)", sub.userName)
 		return sub.recordOverflow()
 	}
 }
@@ -745,10 +745,10 @@ func (sub *subscription) safeSendToApplicationResourceChannel(msg *typesv2.Appli
 		sub.resetOverflow()
 		return true
 	case <-time.After(overflowTimeout):
-		log.Warnf("Subscription %s: ApplicationResource channel send timeout (buffer overflow)", sub.userName)
+		log.Warn().Msgf("Subscription %s: ApplicationResource channel send timeout (buffer overflow)", sub.userName)
 		return sub.recordOverflow()
 	default:
-		log.Warnf("Subscription %s: ApplicationResource channel full (buffer overflow)", sub.userName)
+		log.Warn().Msgf("Subscription %s: ApplicationResource channel full (buffer overflow)", sub.userName)
 		return sub.recordOverflow()
 	}
 }
@@ -760,10 +760,10 @@ func (sub *subscription) safeSendToApplicationTaskChannel(msg *typesv2.Applicati
 		sub.resetOverflow()
 		return true
 	case <-time.After(overflowTimeout):
-		log.Warnf("Subscription %s: ApplicationTask channel send timeout (buffer overflow)", sub.userName)
+		log.Warn().Msgf("Subscription %s: ApplicationTask channel send timeout (buffer overflow)", sub.userName)
 		return sub.recordOverflow()
 	default:
-		log.Warnf("Subscription %s: ApplicationTask channel full (buffer overflow)", sub.userName)
+		log.Warn().Msgf("Subscription %s: ApplicationTask channel full (buffer overflow)", sub.userName)
 		return sub.recordOverflow()
 	}
 }

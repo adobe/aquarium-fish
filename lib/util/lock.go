@@ -31,7 +31,8 @@ import (
 func CreateLock(lockPath string) error {
 	lockFile, err := os.Create(lockPath)
 	if err != nil {
-		return log.Error("Util: Unable to create the lock file:", lockPath)
+		log.Error().Msgf("Util: Unable to create the lock file: %s", lockPath)
+		return fmt.Errorf("Util: Unable to create the lock file: %s", lockPath)
 	}
 
 	// Writing pid into the file for additional info
@@ -58,18 +59,18 @@ func WaitLock(lockPath string, clean func()) error {
 				if err != nil || pid < 0 || pid > math.MaxInt32 {
 					// No valid pid in the lock file - it's actually a small chance it's create or
 					// write delay, but it's so small I want to ignore it
-					log.Warnf("Util: Lock file doesn't contain pid of the process '%s': %s - %v", lockPath, lockInfo, err)
+					log.Warn().Msgf("Util: Lock file doesn't contain pid of the process '%s': %s - %v", lockPath, lockInfo, err)
 					clean()
 					os.Remove(lockPath)
 					break
 				}
 				if proc, err := os.FindProcess(int(pid)); err != nil || proc.Signal(syscall.Signal(0)) != nil {
-					log.Warnf("Util: No process running for lock file '%s': %s", lockPath, lockInfo)
+					log.Warn().Msgf("Util: No process running for lock file '%s': %s", lockPath, lockInfo)
 					clean()
 					os.Remove(lockPath)
 					break
 				}
-				log.Debugf("Util: Waiting for '%s', pid %s", lockPath, lockInfo)
+				log.Debug().Msgf("Util: Waiting for '%s', pid %s", lockPath, lockInfo)
 			}
 		}
 

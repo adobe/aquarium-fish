@@ -36,7 +36,7 @@ func RunAndLog(section string, timeout time.Duration, stdin io.Reader, path stri
 
 	cmd := exec.CommandContext(ctx, path, arg...)
 
-	log.Debugf("%s: Executing: %s %s", section, cmd.Path, strings.Join(cmd.Args[1:], " "))
+	log.Debug().Msgf("%s: Executing: %s %s", section, cmd.Path, strings.Join(cmd.Args[1:], " "))
 	if stdin != nil {
 		cmd.Stdin = stdin
 	}
@@ -60,10 +60,10 @@ func RunAndLog(section string, timeout time.Duration, stdin io.Reader, path stri
 	}
 
 	if len(stdoutString) > 0 {
-		log.Debugf("%s: stdout: %s", section, stdoutString)
+		log.Debug().Msgf("%s: stdout: %s", section, stdoutString)
 	}
 	if len(stderrString) > 0 {
-		log.Debugf("%s: stderr: %s", section, stderrString)
+		log.Debug().Msgf("%s: stderr: %s", section, stderrString)
 	}
 
 	// Replace these for Windows, we only want to deal with Unix style line endings.

@@ -82,7 +82,7 @@ func (d *Database) ApplicationStateCreate(as *typesv2.ApplicationState) error {
 				// Successfully sent notification
 			default:
 				// Channel is closed or full, skip this subscriber
-				log.Debugf("Database: Failed to send ApplicationState notification, channel closed or full")
+				log.Debug().Msgf("Database: Failed to send ApplicationState notification, channel closed or full")
 			}
 		}
 	}(as)
@@ -133,7 +133,7 @@ func (d *Database) ApplicationStateListByApplication(appUID typesv2.ApplicationU
 func (d *Database) ApplicationStateNewCount(appUID typesv2.ApplicationUID) (count uint) {
 	all, err := d.ApplicationStateList()
 	if err != nil {
-		log.Errorf("Unable to get ApplicationState list: %v", err)
+		log.Error().Msgf("Unable to get ApplicationState list: %v", err)
 		return count
 	}
 	for _, as := range all {

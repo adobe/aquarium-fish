@@ -135,7 +135,7 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 	// Download the images and unpack them
 	var wg sync.WaitGroup
 	for _, image := range opts.Images {
-		log.Infof("DOCKER: %s: Loading the required image %s %s: %s", d.name, image.Name, image.Version, image.URL)
+		log.Info().Msgf("DOCKER: %s: Loading the required image %s %s: %s", d.name, image.Name, image.Version, image.URL)
 
 		// Running the background routine to download, unpack and process the image
 		// Success will be checked later by existence of the image in local docker registry
@@ -143,12 +143,12 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 		go func(image provider.Image) {
 			defer wg.Done()
 			if err := image.DownloadUnpack(d.cfg.ImagesPath, d.cfg.DownloadUser, d.cfg.DownloadPassword); err != nil {
-				log.Errorf("DOCKER: %s: Unable to download and unpack the image %s %s: %v", d.name, image.Name, image.URL, err)
+				log.Error().Msgf("DOCKER: %s: Unable to download and unpack the image %s %s: %v", d.name, image.Name, image.URL, err)
 			}
 		}(image)
 	}
 
-	log.Debugf("DOCKER: %s: Wait for all the background image processes to be done...", d.name)
+	log.Debug().Msgf("DOCKER: %s: Wait for all the background image processes to be done...", d.name)
 	wg.Wait()
 
 	// Loading the image layers tar archive into the local docker registry
@@ -164,7 +164,7 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 		subdir := ""
 		items, err := os.ReadDir(imageUnpacked)
 		if err != nil {
-			log.Errorf("DOCKER: %s: Unable to read the unpacked directory %q: %v", d.name, imageUnpacked, err)
+			log.Error().Msgf("DOCKER: %s: Unable to read the unpacked directory %q: %v", d.name, imageUnpacked, err)
 			return "", fmt.Errorf("DOCKER: %s: The image %q was unpacked incorrectly, please check log for the errors", d.name, image.Name)
 		}
 		for _, f := range items {
@@ -172,7 +172,7 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 				if f.Type()&fs.ModeSymlink != 0 {
 					// Potentially it can be a symlink (like used in local tests)
 					if _, err := os.Stat(filepath.Join(imageUnpacked, f.Name())); err != nil {
-						log.Warnf("DOCKER: %s: The image %q symlink is broken: %v", d.name, f.Name(), err)
+						log.Warn().Msgf("DOCKER: %s: The image %q symlink is broken: %v", d.name, f.Name(), err)
 						continue
 					}
 				}
@@ -181,7 +181,7 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 			}
 		}
 		if subdir == "" {
-			log.Errorf("DOCKER: %s: Unpacked image %q has no subfolder %q, only: %q", d.name, imageUnpacked, image.Name, items)
+			log.Error().Msgf("DOCKER: %s: Unpacked image %q has no subfolder %q, only: %q", d.name, imageUnpacked, image.Name, items)
 			return "", fmt.Errorf("DOCKER: %s: The image %q was unpacked incorrectly, please check log for the errors", d.name, image.Name)
 		}
 
@@ -212,7 +212,7 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 			}
 
 			if imageFound != "" {
-				log.Debugf("DOCKER: %s: The image was found in the local docker registry: %s", d.name, imageFound)
+				log.Debug().Msgf("DOCKER: %s: The image was found in the local docker registry: %s", d.name, imageFound)
 				continue
 			}
 		}
@@ -222,7 +222,7 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 		imageArchive := filepath.Join(imageUnpacked, subdir, image.Name+".tar")
 		stdout, _, err := util.RunAndLog("DOCKER", 5*time.Minute, nil, d.cfg.DockerPath, "image", "load", "-q", "-i", imageArchive)
 		if err != nil {
-			log.Errorf("DOCKER: %s: Unable to load the image %q: %v", d.name, imageArchive, err)
+			log.Error().Msgf("DOCKER: %s: Unable to load the image %q: %v", d.name, imageArchive, err)
 			return "", fmt.Errorf("DOCKER: %s: The image %q was unpacked incorrectly, please check log for the errors", d.name, image.Name)
 		}
 		for _, line := range strings.Split(stdout, "\n") {
@@ -241,11 +241,12 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 		}
 	}
 
-	log.Infof("DOCKER: %s: All the images are processed.", d.name)
+	log.Info().Msgf("DOCKER: %s: All the images are processed.", d.name)
 
 	// Check all the images are in place just by number of them
 	if len(opts.Images) != len(loadedImages) {
-		return "", log.Errorf("DOCKER: %s: Not all the images are ok (%d out of %d), please check log for the errors", d.name, len(loadedImages), len(opts.Images))
+		log.Error().Msgf("DOCKER: %s: Not all the images are ok (%d out of %d), please check log for the errors", d.name, len(loadedImages), len(opts.Images))
+		return "", fmt.Errorf("DOCKER: %s: Not all the images are ok (%d out of %d), please check log for the errors", d.name, len(loadedImages), len(opts.Images))
 	}
 
 	return targetOut, nil
@@ -284,7 +285,7 @@ func (d *Driver) ensureNetwork(name string) error {
 func (d *Driver) isNetworkExists(name string) bool {
 	stdout, stderr, err := util.RunAndLog("DOCKER", 5*time.Second, nil, d.cfg.DockerPath, "network", "ls", "-q", "--filter", "name=aquarium-"+name)
 	if err != nil {
-		log.Errorf("DOCKER: %s: Unable to list the docker network: STDOUT:%s, STDERR:%s, %v", d.name, stdout, stderr, err)
+		log.Error().Msgf("DOCKER: %s: Unable to list the docker network: STDOUT:%s, STDERR:%s, %v", d.name, stdout, stderr, err)
 		return false
 	}
 
@@ -347,7 +348,8 @@ func (d *Driver) disksCreate(cName string, runArgs *[]string, disks map[string]t
 				"-size", fmt.Sprintf("%dm", disk.Size*1024),
 			}
 			if _, _, err := util.RunAndLog("DOCKER", 10*time.Minute, nil, "/usr/bin/hdiutil", args...); err != nil {
-				return log.Errorf("DOCKER: %s: Unable to create dmg disk %q: %v", d.name, dmgPath, err)
+				log.Error().Msgf("DOCKER: %s: Unable to create dmg disk %q: %v", d.name, dmgPath, err)
+				return fmt.Errorf("DOCKER: %s: Unable to create dmg disk %q: %v", d.name, dmgPath, err)
 			}
 		}
 
@@ -355,12 +357,14 @@ func (d *Driver) disksCreate(cName string, runArgs *[]string, disks map[string]t
 
 		// Attach & mount disk
 		if _, _, err := util.RunAndLog("DOCKER", 10*time.Second, nil, "/usr/bin/hdiutil", "attach", dmgPath, "-mountpoint", mountPoint); err != nil {
-			return log.Errorf("DOCKER: %s: Unable to attach dmg disk %q to %q: %v", d.name, dmgPath, mountPoint, err)
+			log.Error().Msgf("DOCKER: %s: Unable to attach dmg disk %q to %q: %v", d.name, dmgPath, mountPoint, err)
+			return fmt.Errorf("DOCKER: %s: Unable to attach dmg disk %q to %q: %v", d.name, dmgPath, mountPoint, err)
 		}
 
 		// Allow anyone to modify the disk content
 		if err := os.Chmod(mountPoint, 0o777); err != nil {
-			return log.Errorf("DOCKER: %s: Unable to change the mount point %q access rights: %v", d.name, mountPoint, err)
+			log.Error().Msgf("DOCKER: %s: Unable to change the mount point %q access rights: %v", d.name, mountPoint, err)
+			return fmt.Errorf("DOCKER: %s: Unable to change the mount point %q access rights: %v", d.name, mountPoint, err)
 		}
 
 		diskPaths[mountPoint] = disk.Label
@@ -386,11 +390,13 @@ func (d *Driver) disksCreate(cName string, runArgs *[]string, disks map[string]t
 func (d *Driver) envCreate(cName string, metadata map[string]any) (string, error) {
 	envFilePath := filepath.Join(d.cfg.WorkspacePath, cName, ".env")
 	if err := os.MkdirAll(filepath.Dir(envFilePath), 0o755); err != nil {
-		return "", log.Errorf("DOCKER: %s: Unable to create the container directory %q: %v", d.name, filepath.Dir(envFilePath), err)
+		log.Error().Msgf("DOCKER: %s: Unable to create the container directory %q: %v", d.name, filepath.Dir(envFilePath), err)
+		return "", fmt.Errorf("DOCKER: %s: Unable to create the container directory %q: %v", d.name, filepath.Dir(envFilePath), err)
 	}
 	fd, err := os.OpenFile(envFilePath, os.O_WRONLY|os.O_CREATE, 0o640)
 	if err != nil {
-		return "", log.Errorf("DOCKER: %s: Unable to create env file %q: %v", d.name, envFilePath, err)
+		log.Error().Msgf("DOCKER: %s: Unable to create env file %q: %v", d.name, envFilePath, err)
+		return "", fmt.Errorf("DOCKER: %s: Unable to create env file %q: %v", d.name, envFilePath, err)
 	}
 	defer fd.Close()
 
@@ -398,7 +404,8 @@ func (d *Driver) envCreate(cName string, metadata map[string]any) (string, error
 	for key, value := range metadata {
 		data := []byte(fmt.Sprintf("%s=%s\n", key, value))
 		if _, err := fd.Write(data); err != nil {
-			return "", log.Errorf("DOCKER: %s: Unable to write env file data %q: %v", d.name, envFilePath, err)
+			log.Error().Msgf("DOCKER: %s: Unable to write env file data %q: %v", d.name, envFilePath, err)
+			return "", fmt.Errorf("DOCKER: %s: Unable to write env file data %q: %v", d.name, envFilePath, err)
 		}
 	}
 

@@ -360,7 +360,7 @@ func (m *Metrics) RecordElectionRound(ctx context.Context, outcome string) {
 func (m *Metrics) UpdateCertificateExpiry(ctx context.Context, certType, certPath string) {
 	expiry, err := m.getCertificateExpiry(certPath)
 	if err != nil {
-		fishlog.Debugf("Monitoring: Failed to get certificate expiry for %s: %v", certPath, err)
+		fishlog.Debug().Msgf("Monitoring: Failed to get certificate expiry for %s: %v", certPath, err)
 		return
 	}
 
@@ -498,6 +498,6 @@ func (m *Metrics) UpdateCertificateDirectory(ctx context.Context, certDir string
 	})
 
 	if err != nil {
-		fishlog.Debugf("Monitoring: Failed to scan certificate directory %s: %v", certDir, err)
+		fishlog.Debug().Msgf("Monitoring: Failed to scan certificate directory %s: %v", certDir, err)
 	}
 }

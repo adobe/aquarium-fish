@@ -39,13 +39,13 @@ func (h *RBACHandler) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		service, method := getServiceMethodFromPath(r.URL.Path)
 		if service == "" || method == "" {
-			log.Debugf("RPC: HTTP RBAC: Invalid service/method path: %s", r.URL.Path)
+			log.Debug().Msgf("RPC: HTTP RBAC: Invalid service/method path: %s", r.URL.Path)
 			http.Error(w, "Bad Request", http.StatusBadRequest)
 			return
 		}
 
 		if err := h.checkPermission(r.Context(), service, method); err != nil {
-			log.Debugf("RPC: HTTP RBAC: Permission denied: %v", err)
+			log.Debug().Msgf("RPC: HTTP RBAC: Permission denied: %v", err)
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}

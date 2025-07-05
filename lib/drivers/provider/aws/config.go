@@ -106,7 +106,8 @@ func (c *Config) Apply(config []byte) error {
 	// Parse json
 	if len(config) > 0 {
 		if err := json.Unmarshal(config, c); err != nil {
-			return log.Error("AWS: Unable to apply the driver config:", err)
+			log.Error().Msgf("AWS: Unable to apply the driver config: %v", err)
+			return fmt.Errorf("AWS: Unable to apply the driver config: %v", err)
 		}
 	}
 
@@ -158,7 +159,7 @@ func (c *Config) Validate() (err error) {
 		counter++
 		if err != nil {
 			if counter < retries {
-				log.Warn("AWS: Retry after credentials validation error:", err)
+				log.Warn().Msgf("AWS: Retry after credentials validation error: %v", err)
 				// Give command 10 seconds to rest
 				time.Sleep(10 * time.Second)
 				continue
@@ -171,10 +172,10 @@ func (c *Config) Validate() (err error) {
 		break
 	}
 	if len(c.AccountIDs) > 0 && c.AccountIDs[0] != account {
-		log.Debug("AWS: Using Account IDs:", c.AccountIDs, "(real: ", account, ")")
+		log.Debug().Msgf("AWS: Using Account IDs: %v (real: %s)", c.AccountIDs, account)
 	} else {
 		c.AccountIDs = []string{account}
-		log.Debug("AWS: Using Account IDs:", c.AccountIDs)
+		log.Debug().Msgf("AWS: Using Account IDs: %v", c.AccountIDs)
 	}
 
 	// Init empty instance tags in case its not set

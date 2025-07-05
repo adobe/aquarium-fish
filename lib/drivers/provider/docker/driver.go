@@ -130,7 +130,8 @@ func (d *Driver) Prepare(config []byte) error {
 func (d *Driver) ValidateDefinition(def typesv2.LabelDefinition) error {
 	// Check resources
 	if err := def.Resources.Validate([]string{"dir", "hfs+", "exfat", "fat32"}, true); err != nil {
-		return log.Errorf("DOCKER: %s: Resources validation failed: %v", d.name, err)
+		log.Error().Msgf("DOCKER: %s: Resources validation failed: %v", d.name, err)
+		return fmt.Errorf("DOCKER: %s: Resources validation failed: %v", d.name, err)
 	}
 
 	// Check options
@@ -153,11 +154,11 @@ func (d *Driver) AvailableCapacity(nodeUsage typesv2.Resources, req typesv2.Labe
 
 	// Check if the node has the required resources - otherwise we can't run it anyhow
 	if req.Resources.Cpu > availCPU {
-		log.Debugf("DOCKER: %s: Not enough CPU: %d > %d", d.name, req.Resources.Cpu, availCPU)
+		log.Debug().Msgf("DOCKER: %s: Not enough CPU: %d > %d", d.name, req.Resources.Cpu, availCPU)
 		return 0
 	}
 	if req.Resources.Ram > availRAM {
-		log.Debugf("DOCKER: %s: Not enough RAM: %d > %d", d.name, req.Resources.Ram, availRAM)
+		log.Debug().Msgf("DOCKER: %s: Not enough RAM: %d > %d", d.name, req.Resources.Ram, availRAM)
 		return 0
 	}
 	// TODO: Check disk requirements
@@ -245,13 +246,15 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 
 	// Create and connect volumes to container
 	if err := d.disksCreate(cName, &runArgs, def.Resources.Disks); err != nil {
-		return nil, log.Errorf("DOCKER: %s: Unable to create the required disks: %v", d.name, err)
+		log.Error().Msgf("DOCKER: %s: Unable to create the required disks: %v", d.name, err)
+		return nil, fmt.Errorf("DOCKER: %s: Unable to create the required disks: %v", d.name, err)
 	}
 
 	// Create env file
 	envPath, err := d.envCreate(cName, metadata)
 	if err != nil {
-		return nil, log.Errorf("DOCKER: %s: Unable to create the env file: %v", d.name, err)
+		log.Error().Msgf("DOCKER: %s: Unable to create the env file: %v", d.name, err)
+		return nil, fmt.Errorf("DOCKER: %s: Unable to create the env file: %v", d.name, err)
 	}
 	// Add env-file to run args
 	runArgs = append(runArgs, "--env-file", envPath)
@@ -261,7 +264,8 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 	// Run the container
 	runArgs = append(runArgs, imgNameVersion)
 	if _, _, err := util.RunAndLog("DOCKER", 30*time.Second, nil, d.cfg.DockerPath, runArgs...); err != nil {
-		return nil, log.Errorf("DOCKER: %s: Unable to run container %q: %v", d.name, cName, err)
+		log.Error().Msgf("DOCKER: %s: Unable to run container %q: %v", d.name, cName, err)
+		return nil, fmt.Errorf("DOCKER: %s: Unable to run container %q: %v", d.name, cName, err)
 	}
 
 	if d.cfg.IsRemote {
@@ -269,7 +273,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 		d.dockerUsage.Add(&def.Resources)
 	}
 
-	log.Infof("DOCKER: %s: Allocate of Container %q completed: %s", d.name, cName, cHwaddr)
+	log.Info().Msgf("DOCKER: %s: Allocate of Container %q completed: %s", d.name, cName, cHwaddr)
 
 	return &typesv2.ApplicationResource{Identifier: cName, HwAddr: cHwaddr}, nil
 }
@@ -298,7 +302,7 @@ func (d *Driver) GetTask(name, options string) provider.DriverTask {
 	// Parse options json into task structure
 	if len(options) > 0 {
 		if err := json.Unmarshal([]byte(options), t); err != nil {
-			log.Errorf("DOCKER: %s: Unable to apply the task options: %v", d.name, err)
+			log.Error().Msgf("DOCKER: %s: Unable to apply the task options: %v", d.name, err)
 			return nil
 		}
 	}
@@ -319,7 +323,8 @@ func (d *Driver) Deallocate(res typesv2.ApplicationResource) error {
 	cName := res.Identifier
 	cID := d.getAllocatedContainerID(cName)
 	if len(cID) == 0 {
-		return log.Errorf("DOCKER: %s: Unable to find container with identifier: %s", d.name, res.Identifier)
+		log.Error().Msgf("DOCKER: %s: Unable to find container with identifier: %s", d.name, res.Identifier)
+		return fmt.Errorf("DOCKER: %s: Unable to find container with identifier: %s", d.name, res.Identifier)
 	}
 
 	// Getting the mounted volumes
@@ -327,7 +332,8 @@ func (d *Driver) Deallocate(res typesv2.ApplicationResource) error {
 		"--format", "{{ range .Mounts }}{{ println .Source }}{{ end }}", cID,
 	)
 	if err != nil {
-		return log.Errorf("DOCKER: %s: Unable to inspect the container %q: %v", d.name, cName, err)
+		log.Error().Msgf("DOCKER: %s: Unable to inspect the container %q: %v", d.name, cName, err)
+		return fmt.Errorf("DOCKER: %s: Unable to inspect the container %q: %v", d.name, cName, err)
 	}
 	cVolumes := strings.Split(strings.TrimSpace(stdout), "\n")
 
@@ -335,7 +341,8 @@ func (d *Driver) Deallocate(res typesv2.ApplicationResource) error {
 		// Get the container CPU/RAM to subtract from the docker_usage
 		res, err := d.getContainersResources([]string{cID})
 		if err != nil {
-			return log.Errorf("DOCKER: %s: Unable to collect the container %q resources: %v", d.name, cName, err)
+			log.Error().Msgf("DOCKER: %s: Unable to collect the container %q resources: %v", d.name, cName, err)
+			return fmt.Errorf("DOCKER: %s: Unable to collect the container %q resources: %v", d.name, cName, err)
 		}
 		// Locked in the beginning of the function
 		d.dockerUsage.Subtract(res)
@@ -343,22 +350,26 @@ func (d *Driver) Deallocate(res typesv2.ApplicationResource) error {
 
 	// Stop the container
 	if _, _, err := util.RunAndLogRetry("DOCKER", 3, 10*time.Second, nil, d.cfg.DockerPath, "stop", cID); err != nil {
-		return log.Errorf("DOCKER: %s: Unable to stop container %q: %v", d.name, cName, err)
+		log.Error().Msgf("DOCKER: %s: Unable to stop container %q: %v", d.name, cName, err)
+		return fmt.Errorf("DOCKER: %s: Unable to stop container %q: %v", d.name, cName, err)
 	}
 	// Remove the container
 	if _, _, err := util.RunAndLog("DOCKER", 5*time.Second, nil, d.cfg.DockerPath, "rm", cID); err != nil {
-		return log.Errorf("DOCKER: %s: Unable to remove container %q: %v", d.name, cName, err)
+		log.Error().Msgf("DOCKER: %s: Unable to remove container %q: %v", d.name, cName, err)
+		return fmt.Errorf("DOCKER: %s: Unable to remove container %q: %v", d.name, cName, err)
 	}
 
 	// Umount the disk volumes if needed
 	mounts, _, err := util.RunAndLog("DOCKER", 3*time.Second, nil, "/sbin/mount")
 	if err != nil {
-		return log.Errorf("DOCKER: %s: Unable to list the mount points for container %q: %v", d.name, cName, err)
+		log.Error().Msgf("DOCKER: %s: Unable to list the mount points for container %q: %v", d.name, cName, err)
+		return fmt.Errorf("DOCKER: %s: Unable to list the mount points for container %q: %v", d.name, cName, err)
 	}
 	for _, volPath := range cVolumes {
 		if strings.Contains(mounts, volPath) {
 			if _, _, err := util.RunAndLog("DOCKER", 5*time.Second, nil, "/usr/bin/hdiutil", "detach", volPath); err != nil {
-				return log.Errorf("DOCKER: %s: Unable to detach container %q volume disk %q: %v", d.name, cName, volPath, err)
+				log.Error().Msgf("DOCKER: %s: Unable to detach container %q volume disk %q: %v", d.name, cName, volPath, err)
+				return fmt.Errorf("DOCKER: %s: Unable to detach container %q volume disk %q: %v", d.name, cName, volPath, err)
 			}
 		}
 	}
@@ -371,7 +382,7 @@ func (d *Driver) Deallocate(res typesv2.ApplicationResource) error {
 		}
 	}
 
-	log.Infof("DOCKER: %s: Deallocate of container %q completed: %s", d.name, res.Identifier, cName)
+	log.Info().Msgf("DOCKER: %s: Deallocate of container %q completed: %s", d.name, res.Identifier, cName)
 
 	return nil
 }

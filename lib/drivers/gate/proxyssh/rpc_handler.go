@@ -71,7 +71,7 @@ func (d *driverRPCHandler) GetResourceAccess(ctx context.Context, req *connect.R
 	// Get the application resource
 	resource, err := d.drv.db.ApplicationResourceGet(resourceUID)
 	if err != nil {
-		log.Errorf("PROXYSSH: %s: Unable to get application resource %s: %v", d.drv.name, appResourceUID, err)
+		log.Error().Msgf("PROXYSSH: %s: Unable to get application resource %s: %v", d.drv.name, appResourceUID, err)
 		return connect.NewResponse(&aquariumv2.GateProxySSHServiceGetResourceAccessResponse{
 			Status: false, Message: "Application resource not found",
 		}), connect.NewError(connect.CodeNotFound, err)
@@ -80,7 +80,7 @@ func (d *driverRPCHandler) GetResourceAccess(ctx context.Context, req *connect.R
 	// Get the application to verify owner permissions
 	app, err := d.drv.db.ApplicationGet(resource.ApplicationUid)
 	if err != nil {
-		log.Errorf("PROXYSSH: %s: Unable to get application %s: %v", d.drv.name, resource.ApplicationUid, err)
+		log.Error().Msgf("PROXYSSH: %s: Unable to get application %s: %v", d.drv.name, resource.ApplicationUid, err)
 		return connect.NewResponse(&aquariumv2.GateProxySSHServiceGetResourceAccessResponse{
 			Status: false, Message: "Application not found",
 		}), connect.NewError(connect.CodeNotFound, err)
@@ -92,7 +92,7 @@ func (d *driverRPCHandler) GetResourceAccess(ctx context.Context, req *connect.R
 
 	// Check if the user is owner or has permissions to get access to someone's else's resources
 	if (app == nil || userName != app.OwnerName) && !rpcutil.CheckUserPermission(ctx, auth.GateProxySSHServiceGetResourceAccessAll) {
-		log.Errorf("PROXYSSH: %s: Permission denied for %s: %s", d.drv.name, userName, resource.ApplicationUid)
+		log.Error().Msgf("PROXYSSH: %s: Permission denied for %s: %s", d.drv.name, userName, resource.ApplicationUid)
 		return connect.NewResponse(&aquariumv2.GateProxySSHServiceGetResourceAccessResponse{
 			Status: false, Message: "Permission denied",
 		}), connect.NewError(connect.CodePermissionDenied, nil)
@@ -104,14 +104,14 @@ func (d *driverRPCHandler) GetResourceAccess(ctx context.Context, req *connect.R
 	pwdHash := crypt.NewHash(pwd, []byte{}).Hash
 	key, err := crypt.GenerateSSHKey()
 	if err != nil {
-		log.Errorf("PROXYSSH: %s: Unable to create SSH key: %v", d.drv.name, err)
+		log.Error().Msgf("PROXYSSH: %s: Unable to create SSH key: %v", d.drv.name, err)
 		return connect.NewResponse(&aquariumv2.GateProxySSHServiceGetResourceAccessResponse{
 			Status: false, Message: "Unable to create SSH key",
 		}), connect.NewError(connect.CodeInternal, nil)
 	}
 	pubkey, err := crypt.GetSSHPubKeyFromPem(key)
 	if err != nil {
-		log.Errorf("PROXYSSH: %s: Unable to create SSH public key: %v", d.drv.name, err)
+		log.Error().Msgf("PROXYSSH: %s: Unable to create SSH public key: %v", d.drv.name, err)
 		return connect.NewResponse(&aquariumv2.GateProxySSHServiceGetResourceAccessResponse{
 			Status: false, Message: "Unable to create SSH public key",
 		}), connect.NewError(connect.CodeInternal, nil)
@@ -125,12 +125,12 @@ func (d *driverRPCHandler) GetResourceAccess(ctx context.Context, req *connect.R
 	// find it's ProxySSH gate config and port, so becomes quite a bit complicated...
 	addressHost, _, err := net.SplitHostPort(d.drv.db.GetNode().Address)
 	if err != nil {
-		log.Warnf("PROXYSSH: %s: Unable to parse BindAddress host:port : using default host 999.999.999.999: %v", d.drv.name, err)
+		log.Warn().Msgf("PROXYSSH: %s: Unable to parse BindAddress host:port : using default host 999.999.999.999: %v", d.drv.name, err)
 		addressHost = "999.999.999.999"
 	}
 	_, addressPort, err := net.SplitHostPort(d.drv.cfg.BindAddress)
 	if err != nil {
-		log.Warnf("PROXYSSH: %s: Unable to parse BindAddress host:port : using default port 1222: %v", d.drv.name, err)
+		log.Warn().Msgf("PROXYSSH: %s: Unable to parse BindAddress host:port : using default port 1222: %v", d.drv.name, err)
 		addressPort = "1222"
 	}
 
@@ -146,7 +146,7 @@ func (d *driverRPCHandler) GetResourceAccess(ctx context.Context, req *connect.R
 
 	// Create entry in database first
 	if err := d.drv.db.GateProxySSHAccessCreate(accessEntry); err != nil {
-		log.Errorf("PROXYSSH: %s: Unable to create access entry: %v", d.drv.name, err)
+		log.Error().Msgf("PROXYSSH: %s: Unable to create access entry: %v", d.drv.name, err)
 		return connect.NewResponse(&aquariumv2.GateProxySSHServiceGetResourceAccessResponse{
 			Status:  false,
 			Message: "Failed to create access credentials",
@@ -164,7 +164,7 @@ func (d *driverRPCHandler) GetResourceAccess(ctx context.Context, req *connect.R
 		Key:                    string(key),
 	}
 
-	log.Infof("PROXYSSH: %s: Created password access entry for user %s to resource %s", d.drv.name, userName, appResourceUID)
+	log.Info().Msgf("PROXYSSH: %s: Created password access entry for user %s to resource %s", d.drv.name, userName, appResourceUID)
 
 	return connect.NewResponse(&aquariumv2.GateProxySSHServiceGetResourceAccessResponse{
 		Status:  true,

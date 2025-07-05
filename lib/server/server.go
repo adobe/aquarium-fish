@@ -19,6 +19,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -45,12 +46,12 @@ type Wrapper struct {
 func (sw *Wrapper) Shutdown(ctx context.Context) error {
 	// First shutdown RPC server (which handles streaming connections)
 	if err := sw.rpcServer.Shutdown(ctx); err != nil {
-		log.Errorf("API: Error during RPC server shutdown: %v", err)
+		log.Error().Msgf("API: Error during RPC server shutdown: %v", err)
 	}
 
 	// Then shutdown HTTP server
 	if err := sw.httpServer.Shutdown(ctx); err != nil {
-		log.Errorf("API: Error during HTTP server shutdown: %v", err)
+		log.Error().Msgf("API: Error during HTTP server shutdown: %v", err)
 		return err
 	}
 
@@ -86,7 +87,7 @@ func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*Wrapper,
 	if monitor := f.GetMonitor(); monitor != nil && monitor.IsEnabled() {
 		if promExporter := monitor.GetPrometheusHandler(); promExporter != nil {
 			mux.Handle("/metrics", promhttp.Handler())
-			log.Info("API: Prometheus metrics endpoint enabled at /metrics")
+			log.Info().Msg("API: Prometheus metrics endpoint enabled at /metrics")
 		}
 	}
 
@@ -97,7 +98,7 @@ func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*Wrapper,
 	var handler http.Handler = mux
 	if monitor := f.GetMonitor(); monitor != nil && monitor.IsEnabled() {
 		handler = otelhttp.NewHandler(handler, "aquarium-fish-api")
-		log.Info("API: OpenTelemetry HTTP instrumentation enabled")
+		log.Info().Msg("API: OpenTelemetry HTTP instrumentation enabled")
 	}
 
 	s := &http.Server{
@@ -121,7 +122,8 @@ func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*Wrapper,
 
 	tlsListener, err := net.Listen("tcp", s.Addr)
 	if err != nil {
-		return &Wrapper{httpServer: s, rpcServer: rpcServer}, log.Error("API: Unable to start listener:", err)
+		log.Error().Msgf("API: Unable to start listener: %v", err)
+		return &Wrapper{httpServer: s, rpcServer: rpcServer}, fmt.Errorf("API: Unable to start listener: %v", err)
 	}
 
 	// There is a bit of chance that API server will not startup properly,
@@ -130,13 +132,13 @@ func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*Wrapper,
 		defer tlsListener.Close()
 
 		if err := s.ServeTLS(tlsListener, certPath, keyPath); err != http.ErrServerClosed {
-			log.Error("API: Unable to start API server:", err)
+			log.Error().Msgf("API: Unable to start API server: %v", err)
 			errChan <- err
 			f.Quit <- syscall.SIGQUIT
 		}
 	}()
 
-	log.Info("API listening on:", tlsListener.Addr())
+	log.Info().Msgf("API listening on: %s", tlsListener.Addr())
 
 	return &Wrapper{httpServer: s, rpcServer: rpcServer}, nil
 }

@@ -24,7 +24,7 @@ import (
 )
 
 func serverConnectPprofIfDebug(mux *http.ServeMux) {
-	log.Info("API: Enabling pprof debug endpoints on /debug/pprof/")
+	log.Info().Msg("API: Enabling pprof debug endpoints on /debug/pprof/")
 	mux.HandleFunc("/debug/pprof/", pprof.Index)
 	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
 	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)

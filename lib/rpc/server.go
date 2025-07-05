@@ -74,7 +74,7 @@ func NewServer(f *fish.Fish, additionalServices []gate.RPCService) *Server {
 
 	// Register additional services from gate drivers
 	for _, svc := range additionalServices {
-		log.Debugf("RPC: Registering additional service: %s", svc.Path)
+		log.Debug().Msgf("RPC: Registering additional service: %s", svc.Path)
 		s.mux.Handle(svc.Path, svc.Handler)
 	}
 
@@ -102,7 +102,7 @@ func (s *Server) Handler() http.Handler {
 
 // ListenAndServe starts the server
 func (s *Server) ListenAndServe(addr string, certFile, keyFile string) error {
-	log.Info("Starting Connect server on", addr)
+	log.Info().Msgf("Starting Connect server on %s", addr)
 
 	handler := s.Handler()
 
@@ -114,7 +114,7 @@ func (s *Server) ListenAndServe(addr string, certFile, keyFile string) error {
 
 // Shutdown gracefully shuts down the server and all streaming connections
 func (s *Server) Shutdown(ctx context.Context) error {
-	log.Info("RPC: Starting graceful server shutdown...")
+	log.Info().Msg("RPC: Starting graceful server shutdown...")
 
 	// First, gracefully shutdown all streaming connections
 	// Use half the available context timeout for streaming shutdown
@@ -134,7 +134,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		}
 	}
 
-	log.Infof("RPC: Shutting down streaming connections with %v timeout...", streamingTimeout)
+	log.Info().Msgf("RPC: Shutting down streaming connections with %v timeout...", streamingTimeout)
 	if s.streamingService != nil {
 		// Create a timeout context
 		streamingCtx, cancel := context.WithTimeout(ctx, streamingTimeout)
@@ -143,6 +143,6 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		s.streamingService.GracefulShutdown(streamingCtx)
 	}
 
-	log.Info("RPC: Server shutdown completed")
+	log.Info().Msg("RPC: Server shutdown completed")
 	return nil
 }

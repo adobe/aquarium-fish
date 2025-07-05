@@ -17,6 +17,7 @@ package database
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -70,12 +71,14 @@ type Database struct {
 // Init creates the database object by provided path
 func New(path string) (*Database, error) {
 	if err := os.MkdirAll(path, 0o750); err != nil {
-		return nil, log.Errorf("DB: Can't create working directory %s: %v", path, err)
+		log.Error().Msgf("DB: Can't create working directory %s: %v", path, err)
+		return nil, fmt.Errorf("DB: Can't create working directory %s: %v", path, err)
 	}
 
 	be, err := bitcask.Open(filepath.Join(path, "bitcask.db"))
 	if err != nil {
-		return nil, log.Errorf("DB: Unable to initialize database: %v", err)
+		log.Error().Msgf("DB: Unable to initialize database: %v", err)
+		return nil, fmt.Errorf("DB: Unable to initialize database: %v", err)
 	}
 
 	db := &Database{be: be}
@@ -135,16 +138,16 @@ func (d *Database) CompactDBWithContext(ctx context.Context) error {
 		))
 	}()
 
-	log.Debug("DB: CompactDB locking...")
-	defer log.Debug("Fish: CompactDB done")
+	log.Debug().Msg("DB: CompactDB locking...")
+	defer log.Debug().Msg("Fish: CompactDB done")
 
 	// Locking entire database
 	d.beMu.Lock()
 	defer d.beMu.Unlock()
-	log.Debug("DB: CompactDB running...")
+	log.Debug().Msg("DB: CompactDB running...")
 
 	s, _ := d.be.Stats()
-	log.Debugf("DB: CompactDB: Before compaction: Datafiles: %d, Keys: %d, Size: %d, Reclaimable: %d", s.Datafiles, s.Keys, s.Size, s.Reclaimable)
+	log.Debug().Msgf("DB: CompactDB: Before compaction: Datafiles: %d, Keys: %d, Size: %d, Reclaimable: %d", s.Datafiles, s.Keys, s.Size, s.Reclaimable)
 
 	// Record metrics before compaction
 	d.dbSizeGauge.Record(ctx, int64(s.Size))
@@ -163,11 +166,12 @@ func (d *Database) CompactDBWithContext(ctx context.Context) error {
 			attribute.String("operation", "compact"),
 			attribute.String("result", "error"),
 		))
-		return log.Errorf("DB: CompactDB: Merge operation failed: %v", err)
+		log.Error().Msgf("DB: CompactDB: Merge operation failed: %v", err)
+		return fmt.Errorf("DB: CompactDB: Merge operation failed: %v", err)
 	}
 
 	s, _ = d.be.Stats()
-	log.Debugf("DB: CompactDB: After compaction: Datafiles: %d, Keys: %d, Size: %d, Reclaimable: %d", s.Datafiles, s.Keys, s.Size, s.Reclaimable)
+	log.Debug().Msgf("DB: CompactDB: After compaction: Datafiles: %d, Keys: %d, Size: %d, Reclaimable: %d", s.Datafiles, s.Keys, s.Size, s.Reclaimable)
 
 	// Record metrics after compaction
 	d.dbSizeGauge.Record(ctx, int64(s.Size))
@@ -197,7 +201,8 @@ func (d *Database) Shutdown() error {
 	defer d.beMu.Unlock()
 
 	if err := d.be.Close(); err != nil {
-		return log.Errorf("DB: Unable to close backend: %v", err)
+		log.Error().Msgf("DB: Unable to close backend: %v", err)
+		return fmt.Errorf("DB: Unable to close backend: %v", err)
 	}
 
 	return nil

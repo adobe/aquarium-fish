@@ -100,11 +100,11 @@ type Monitor struct {
 // Initialize sets up OpenTelemetry monitoring
 func Initialize(ctx context.Context, config *Config) (*Monitor, error) {
 	if !config.Enabled {
-		log.Info("Monitoring: Disabled")
+		log.Info().Msg("Monitoring: Disabled")
 		return &Monitor{config: config}, nil
 	}
 
-	log.Info("Monitoring: Initializing OpenTelemetry...")
+	log.Info().Msg("Monitoring: Initializing OpenTelemetry...")
 
 	m := &Monitor{
 		config:        config,
@@ -122,7 +122,7 @@ func Initialize(ctx context.Context, config *Config) (*Monitor, error) {
 		if err := m.initTracing(ctx, res); err != nil {
 			return nil, fmt.Errorf("failed to initialize tracing: %w", err)
 		}
-		log.Info("Monitoring: Tracing initialized")
+		log.Info().Msg("Monitoring: Tracing initialized")
 	}
 
 	// Initialize metrics
@@ -130,7 +130,7 @@ func Initialize(ctx context.Context, config *Config) (*Monitor, error) {
 		if err := m.initMetrics(ctx, res); err != nil {
 			return nil, fmt.Errorf("failed to initialize metrics: %w", err)
 		}
-		log.Info("Monitoring: Metrics initialized")
+		log.Info().Msg("Monitoring: Metrics initialized")
 	}
 
 	// Initialize logging
@@ -138,7 +138,9 @@ func Initialize(ctx context.Context, config *Config) (*Monitor, error) {
 		if err := m.initLogging(ctx, res); err != nil {
 			return nil, fmt.Errorf("failed to initialize logging: %w", err)
 		}
-		log.Info("Monitoring: Logging initialized")
+		// Setup OpenTelemetry integration with zerolog
+		log.SetupOtelIntegration("info")
+		log.Info().Msg("Monitoring: Logging initialized")
 	}
 
 	// Initialize profiling
@@ -146,7 +148,7 @@ func Initialize(ctx context.Context, config *Config) (*Monitor, error) {
 		if err := m.initProfiling(); err != nil {
 			return nil, fmt.Errorf("failed to initialize profiling: %w", err)
 		}
-		log.Info("Monitoring: Profiling initialized")
+		log.Info().Msg("Monitoring: Profiling initialized")
 	}
 
 	// Initialize metrics collection
@@ -154,10 +156,10 @@ func Initialize(ctx context.Context, config *Config) (*Monitor, error) {
 		if err := m.initMetricsCollection(); err != nil {
 			return nil, fmt.Errorf("failed to initialize metrics collection: %w", err)
 		}
-		log.Info("Monitoring: Metrics collection initialized")
+		log.Info().Msg("Monitoring: Metrics collection initialized")
 	}
 
-	log.Info("Monitoring: OpenTelemetry initialization complete")
+	log.Info().Msg("Monitoring: OpenTelemetry initialization complete")
 	return m, nil
 }
 
@@ -172,7 +174,7 @@ func (m *Monitor) createResource() (*resource.Resource, error) {
 		attribute.String("node.uid", m.config.NodeUID),
 		attribute.String("node.location", m.config.NodeLocation),
 	)
-	log.Debugf("Monitoring: Merging 2 resources: %s and %s", res1, res2)
+	log.Debug().Msgf("Monitoring: Merging 2 resources: %s and %s", res1, res2)
 	return resource.Merge(res1, res2)
 }
 
@@ -359,7 +361,7 @@ func (m *Monitor) RecordMetric(ctx context.Context, name string, value float64, 
 
 // Shutdown gracefully shuts down the monitoring system
 func (m *Monitor) Shutdown(ctx context.Context) error {
-	log.Info("Monitoring: Shutting down...")
+	log.Info().Msg("Monitoring: Shutting down...")
 
 	var errs []error
 	for _, shutdown := range m.shutdownFuncs {
@@ -372,7 +374,7 @@ func (m *Monitor) Shutdown(ctx context.Context) error {
 		return fmt.Errorf("shutdown errors: %v", errs)
 	}
 
-	log.Info("Monitoring: Shutdown complete")
+	log.Info().Msg("Monitoring: Shutdown complete")
 	return nil
 }
 

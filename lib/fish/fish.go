@@ -139,7 +139,8 @@ func (f *Fish) Init() error {
 	if err == database.ErrObjectNotFound {
 		pass, adminUser, err := f.db.UserNew("admin", "")
 		if err != nil {
-			return log.Error("Fish: Unable to create new admin User:", err)
+			log.Error().Msgf("Fish: Unable to create new admin User: %v", err)
+			return fmt.Errorf("Fish: Unable to create new admin User: %v", err)
 		}
 		if pass != "" {
 			// Print pass of newly created admin user to stderr
@@ -149,17 +150,19 @@ func (f *Fish) Init() error {
 		// Assigning admin role
 		adminUser.Roles = []string{auth.AdminRoleName}
 		if err := f.db.UserSave(adminUser); err != nil {
-			return log.Error("Fish: Failed to assign Administrator Role to admin user:", err)
+			log.Error().Msgf("Fish: Failed to assign Administrator Role to admin user: %v", err)
+			return fmt.Errorf("Fish: Failed to assign Administrator Role to admin user: %v", err)
 		}
 	} else if err != nil {
-		return log.Error("Fish: Unable to create admin:", err)
+		log.Error().Msgf("Fish: Unable to create admin: %v", err)
+		return fmt.Errorf("Fish: Unable to create admin: %v", err)
 	}
 
 	// Init node
 	createNode := false
 	node, err := f.db.NodeGet(f.cfg.NodeName)
 	if err != nil {
-		log.Info("Fish: Create new node:", f.cfg.NodeName, f.cfg.NodeLocation)
+		log.Info().Msgf("Fish: Create new node %s: %s", f.cfg.NodeName, f.cfg.NodeLocation)
 		createNode = true
 
 		node = &typesv2.Node{
@@ -167,7 +170,7 @@ func (f *Fish) Init() error {
 			Location: f.cfg.NodeLocation,
 		}
 	} else {
-		log.Info("Fish: Use existing node:", node.Name, node.Location)
+		log.Info().Msgf("Fish: Use existing node %s: %s", node.Name, node.Location)
 	}
 
 	certPath := f.cfg.TLSCrt
@@ -202,38 +205,40 @@ func (f *Fish) Init() error {
 			"Arch:"+node.Definition.Host.KernelArch,
 		)
 	}
-	log.Info("Fish: Using the next node identifiers:", f.cfg.NodeIdentifiers)
+	log.Info().Msgf("Fish: Using the next node identifiers: %v", f.cfg.NodeIdentifiers)
 
 	// Fish is running now
 	f.running, f.runningCancel = context.WithCancel(context.Background())
 
 	if err := drivers.Init(f.db, f.cfg.Directory, f.cfg.Drivers); err != nil {
-		return log.Error("Fish: Unable to init drivers:", err)
+		log.Error().Msgf("Fish: Unable to init drivers: %v", err)
+		return fmt.Errorf("Fish: Unable to init drivers: %v", err)
 	}
 
 	// Run application state processing before resuming the assigned Applications
 	go f.applicationProcess()
 
-	log.Debug("Fish: Resuming to execute the assigned Applications...")
+	log.Debug().Msg("Fish: Resuming to execute the assigned Applications...")
 	resources, err := f.db.ApplicationResourceListNode(f.db.GetNodeUID())
 	if err != nil {
-		return log.Error("Fish: Unable to get the node resources:", err)
+		log.Error().Msgf("Fish: Unable to get the node resources: %v", err)
+		return fmt.Errorf("Fish: Unable to get the node resources: %v", err)
 	}
 	for _, res := range resources {
-		log.Debugf("Fish: Resuming Resource execution for Application: %q", res.ApplicationUid)
+		log.Debug().Msgf("Fish: Resuming Resource execution for Application: %q", res.ApplicationUid)
 		if f.db.ApplicationIsAllocated(res.ApplicationUid) == nil {
-			log.Info("Fish: Found allocated resource to serve:", res.Uid)
+			log.Info().Msgf("Fish: Found allocated resource to serve: %s", res.Uid)
 			// We will not retry here, because the mentioned Applications should be already running
 			if _, err := f.executeApplicationStart(res.ApplicationUid, res.DefinitionIndex); err != nil {
 				f.applicationsMutex.Lock()
 				delete(f.applications, res.ApplicationUid)
 				f.applicationsMutex.Unlock()
-				log.Errorf("Fish: Can't execute Application %s: %v", res.ApplicationUid, err)
+				log.Error().Msgf("Fish: Can't execute Application %s: %v", res.ApplicationUid, err)
 			}
 		} else {
-			log.Warn("Fish: Found not allocated Resource of Application, cleaning up:", res.ApplicationUid)
+			log.Warn().Msgf("Fish: Found not allocated Resource of Application, cleaning up: %s", res.ApplicationUid)
 			if err := f.db.ApplicationResourceDelete(res.Uid); err != nil {
-				log.Error("Fish: Unable to delete Resource of Application:", res.ApplicationUid, err)
+				log.Error().Msgf("Fish: Unable to delete Resource of Application %s: %v", res.ApplicationUid, err)
 			}
 			appState := typesv2.ApplicationState{
 				ApplicationUid: res.ApplicationUid, Status: typesv2.ApplicationState_ERROR,
@@ -243,17 +248,18 @@ func (f *Fish) Init() error {
 		}
 	}
 
-	log.Debug("Fish: Resuming electionProcess for the NEW and ELECTED Applications...")
+	log.Debug().Msg("Fish: Resuming electionProcess for the NEW and ELECTED Applications...")
 	electionAppStates, err := f.db.ApplicationStateListNewElected()
 	if err != nil {
-		return log.Error("Fish: Unable to get NEW and ELECTED ApplicationState list:", err)
+		log.Error().Msgf("Fish: Unable to get NEW and ELECTED ApplicationState list: %v", err)
+		return fmt.Errorf("Fish: Unable to get NEW and ELECTED ApplicationState list: %v", err)
 	}
 	for _, as := range electionAppStates {
 		appState := as
 		f.maybeRunElectionProcess(&appState)
 	}
 
-	log.Debug("Fish: Running background processes...")
+	log.Debug().Msg("Fish: Running background processes...")
 
 	// Run node ping timer
 	go f.pingProcess()
@@ -276,7 +282,8 @@ func (f *Fish) initDefaultRoles() error {
 	// Create enforcer first since we'll need it for setting up permissions
 	enforcer, err := auth.NewEnforcer()
 	if err != nil {
-		return log.Error("Fish: Failed to create enforcer:", err)
+		log.Error().Msgf("Fish: Failed to create enforcer: %v", err)
+		return fmt.Errorf("Fish: Failed to create enforcer: %v", err)
 	}
 
 	// Create all roles described in the proto specs
@@ -288,19 +295,22 @@ func (f *Fish) initDefaultRoles() error {
 
 		r, err := f.db.RoleGet(role)
 		if err == database.ErrObjectNotFound {
-			log.Debugf("Fish: Create %q role and assigning permissions", role)
+			log.Debug().Msgf("Fish: Create %q role and assigning permissions", role)
 			r = &newRole
 			if err := f.db.RoleCreate(r); err != nil {
-				return log.Errorf("Fish: Failed to create %q role: %v", role, err)
+				log.Error().Msgf("Fish: Failed to create %q role: %v", role, err)
+				return fmt.Errorf("Fish: Failed to create %q role: %v", role, err)
 			}
 		} else if err != nil {
-			return log.Errorf("Fish: Unable to get %q role: %v", role, err)
+			log.Error().Msgf("Fish: Unable to get %q role: %v", role, err)
+			return fmt.Errorf("Fish: Unable to get %q role: %v", role, err)
 		}
 
 		// Add role permissions to the enforcer
 		for _, p := range r.Permissions {
 			if err := enforcer.AddPolicy(r.Name, p.Resource, p.Action); err != nil {
-				return log.Errorf("Fish: Failed to add %q role permission %v: %v", role, p, err)
+				log.Error().Msgf("Fish: Failed to add %q role permission %v: %v", role, p, err)
+				return fmt.Errorf("Fish: Failed to add %q role permission %v: %v", role, p, err)
 			}
 		}
 	}
@@ -310,19 +320,19 @@ func (f *Fish) initDefaultRoles() error {
 
 // Close tells the node that the Fish execution need to be stopped
 func (f *Fish) Close() {
-	log.Debug("Fish: Stopping the running drivers")
+	log.Debug().Msg("Fish: Stopping the running drivers")
 	if errs := drivers.Shutdown(); len(errs) > 0 {
-		log.Debugf("Fish: Some drivers failed to stop: %v", errs)
+		log.Debug().Msgf("Fish: Some drivers failed to stop: %v", errs)
 	} else {
-		log.Debug("Fish: All drivers are stopped")
+		log.Debug().Msg("Fish: All drivers are stopped")
 	}
 
 	f.runningCancel()
-	log.Debug("Fish: Waiting for background routines to shutdown")
+	log.Debug().Msg("Fish: Waiting for background routines to shutdown")
 	f.routines.Wait()
-	log.Debug("Fish: All the background routines are stopped")
+	log.Debug().Msg("Fish: All the background routines are stopped")
 
-	log.Debug("Fish: Closing the DB")
+	log.Debug().Msg("Fish: Closing the DB")
 	f.db.Shutdown()
 }
 
@@ -341,7 +351,7 @@ func (f *Fish) pingProcess() {
 	f.routines.Add(1)
 	f.routinesMutex.Unlock()
 	defer f.routines.Done()
-	defer log.Info("Fish Node: pingProcess stopped")
+	defer log.Info().Msg("Fish Node: pingProcess stopped")
 
 	// In order to optimize network & database - update just UpdatedAt field
 	pingTicker := time.NewTicker(typesv2.NodePingDelay * time.Second)
@@ -351,7 +361,7 @@ func (f *Fish) pingProcess() {
 		case <-f.running.Done():
 			return
 		case <-pingTicker.C:
-			log.Debug("Fish Node: ping")
+			log.Debug().Msg("Fish Node: ping")
 			f.db.NodePing(f.db.GetNode())
 		}
 	}
@@ -363,7 +373,7 @@ func (f *Fish) applicationProcess() {
 	f.routines.Add(1)
 	f.routinesMutex.Unlock()
 	defer f.routines.Done()
-	defer log.Info("Fish: checkApplicationProcess stopped")
+	defer log.Info().Msg("Fish: checkApplicationProcess stopped")
 
 	// Here we looking for all the new and executing Applications
 	for {
@@ -373,7 +383,7 @@ func (f *Fish) applicationProcess() {
 		case appState := <-f.applicationStateChannel:
 			switch appState.Status {
 			case typesv2.ApplicationState_UNSPECIFIED:
-				log.Errorf("Fish: Application %s has unspecified state %s", appState.ApplicationUid, appState.Status)
+				log.Error().Msgf("Fish: Application %s has unspecified state %s", appState.ApplicationUid, appState.Status)
 			case typesv2.ApplicationState_NEW:
 				// Running election process for the new Application, if it's not already procesing
 				f.maybeRunElectionProcess(appState)
@@ -390,7 +400,7 @@ func (f *Fish) applicationProcess() {
 				// Not much to do here, but maybe later in the future?
 				// In this state the Application has no Resource to deal with, so no tasks for now
 				//f.maybeRunApplicationTask(appState.ApplicationUid, nil)
-				log.Debugf("Fish: Application %s reached end state %s", appState.ApplicationUid, appState.Status)
+				log.Debug().Msgf("Fish: Application %s reached end state %s", appState.ApplicationUid, appState.Status)
 			}
 		case appTask := <-f.applicationTaskChannel:
 			// Runs check for Application state and decides if need to execute or drop
@@ -407,17 +417,17 @@ func (f *Fish) dbCleanupCompactProcess() {
 	f.routines.Add(1)
 	f.routinesMutex.Unlock()
 	defer f.routines.Done()
-	defer log.Info("Fish: dbCleanupCompactProcess stopped")
+	defer log.Info().Msg("Fish: dbCleanupCompactProcess stopped")
 
 	// Checking the completed/error applications and clean up if they've sit there for > 5 minutes
 	dbCleanupDelay := time.Duration(f.cfg.DBCleanupInterval)
 	cleanupTicker := time.NewTicker(dbCleanupDelay / 2)
 	defer cleanupTicker.Stop()
-	log.Infof("Fish: dbCleanupCompactProcess: Triggering CleanupDB once per %s", dbCleanupDelay/2)
+	log.Info().Msgf("Fish: dbCleanupCompactProcess: Triggering CleanupDB once per %s", dbCleanupDelay/2)
 
 	dbCompactDelay := time.Duration(f.cfg.DBCompactInterval)
 	compactionTicker := time.NewTicker(dbCompactDelay)
-	log.Infof("Fish: dbCleanupCompactProcess: Triggering CompactDB once per %s", dbCompactDelay)
+	log.Info().Msgf("Fish: dbCleanupCompactProcess: Triggering CompactDB once per %s", dbCompactDelay)
 	defer compactionTicker.Stop()
 
 	for {
@@ -434,8 +444,8 @@ func (f *Fish) dbCleanupCompactProcess() {
 
 // CleanupDB removing stale Applications and data from database to keep it slim
 func (f *Fish) CleanupDB() {
-	log.Debug("Fish: CleanupDB running...")
-	defer log.Debug("Fish: CleanupDB completed")
+	log.Debug().Msg("Fish: CleanupDB running...")
+	defer log.Debug().Msg("Fish: CleanupDB completed")
 
 	// Detecting the time we need to use as a cutting point
 	dbCleanupDelay := time.Duration(f.cfg.DBCleanupInterval)
@@ -444,45 +454,45 @@ func (f *Fish) CleanupDB() {
 	// Look for the stale Applications
 	states, err := f.db.ApplicationStateListLatest()
 	if err != nil {
-		log.Warnf("Fish: CleanupDB: Unable to get ApplicationStates: %v", err)
+		log.Warn().Msgf("Fish: CleanupDB: Unable to get ApplicationStates: %v", err)
 		return
 	}
 	for _, state := range states {
 		if !f.db.ApplicationStateIsDead(state.Status) {
 			continue
 		}
-		log.Debugf("Fish: CleanupDB: Checking Application %s (%s): %v", state.ApplicationUid, state.Status, state.CreatedAt)
+		log.Debug().Msgf("Fish: CleanupDB: Checking Application %s (%s): %v", state.ApplicationUid, state.Status, state.CreatedAt)
 
 		if state.CreatedAt.After(cutTime) {
-			log.Debugf("Fish: CleanupDB: Skipping %s due to not reached the cut time, left: %s", state.ApplicationUid, state.CreatedAt.Sub(cutTime))
+			log.Debug().Msgf("Fish: CleanupDB: Skipping %s due to not reached the cut time, left: %s", state.ApplicationUid, state.CreatedAt.Sub(cutTime))
 			continue
 		}
 
 		// If the Application died before the Fish is started - then we need to give it aditional dbCleanupDelay time
 		if f.startup.After(cutTime) {
-			log.Debugf("Fish: CleanupDB: Skipping %s due to recent startup, left: %s", state.ApplicationUid, f.startup.Sub(cutTime))
+			log.Debug().Msgf("Fish: CleanupDB: Skipping %s due to recent startup, left: %s", state.ApplicationUid, f.startup.Sub(cutTime))
 			continue
 		}
 
-		log.Debugf("Fish: CleanupDB: Removing everything related to Application %s (%s)", state.ApplicationUid, state.Status)
+		log.Debug().Msgf("Fish: CleanupDB: Removing everything related to Application %s (%s)", state.ApplicationUid, state.Status)
 
 		// First of all removing the Application itself to make sure it will not be restarted
 		if err = f.db.ApplicationDelete(state.ApplicationUid); err != nil {
-			log.Errorf("Fish: CleanupDB: Unable to remove Application %s: %v", state.ApplicationUid, err)
+			log.Error().Msgf("Fish: CleanupDB: Unable to remove Application %s: %v", state.ApplicationUid, err)
 			continue
 		}
 
 		ats, _ := f.db.ApplicationTaskListByApplication(state.ApplicationUid)
 		for _, at := range ats {
 			if err = f.db.ApplicationTaskDelete(at.Uid); err != nil {
-				log.Errorf("Fish: CleanupDB: Unable to remove ApplicationTask %s: %v", at.Uid, err)
+				log.Error().Msgf("Fish: CleanupDB: Unable to remove ApplicationTask %s: %v", at.Uid, err)
 			}
 		}
 
 		ss, _ := f.db.ApplicationStateListByApplication(state.ApplicationUid)
 		for _, s := range ss {
 			if err = f.db.ApplicationStateDelete(s.Uid); err != nil {
-				log.Errorf("Fish: CleanupDB: Unable to remove ApplicationState %s: %v", s.Uid, err)
+				log.Error().Msgf("Fish: CleanupDB: Unable to remove ApplicationState %s: %v", s.Uid, err)
 			}
 		}
 	}
@@ -503,14 +513,14 @@ func (f *Fish) isNodeAvailableForDefinitions(defs []typesv2.LabelDefinition) int
 func (f *Fish) isNodeAvailableForDefinition(def typesv2.LabelDefinition) bool {
 	// When node is in maintenance mode - it should not accept any Applications
 	if f.maintenance {
-		log.Debug("Fish: Maintenance mode blocks node availability")
+		log.Debug().Msg("Fish: Maintenance mode blocks node availability")
 		return false
 	}
 
 	// Is node supports the required label driver
 	driver := drivers.GetProvider(def.Driver)
 	if driver == nil {
-		log.Debugf("Fish: No driver found with name %q", def.Driver)
+		log.Debug().Msgf("Fish: No driver found with name %q", def.Driver)
 		return false
 	}
 
@@ -529,7 +539,7 @@ func (f *Fish) isNodeAvailableForDefinition(def typesv2.LabelDefinition) bool {
 			}
 			neededSlots := (*f.nodeUsage.Slots) + (*def.Resources.Slots)
 			if uint(neededSlots) > f.cfg.NodeSlotsLimit {
-				log.Debugf("Fish: Not enough slots to execute definition: %d > %d", neededSlots, f.cfg.NodeSlotsLimit)
+				log.Debug().Msgf("Fish: Not enough slots to execute definition: %d > %d", neededSlots, f.cfg.NodeSlotsLimit)
 				return false
 			}
 		}
@@ -550,7 +560,7 @@ func (f *Fish) isNodeAvailableForDefinition(def typesv2.LabelDefinition) bool {
 			}
 			if !found {
 				// One of the required node identifiers did not matched the node ones
-				log.Debugf("Fish: NodeFilter prevents to run on this node: %q", needed)
+				log.Debug().Msgf("Fish: NodeFilter prevents to run on this node: %q", needed)
 				return false
 			}
 		}
@@ -563,10 +573,10 @@ func (f *Fish) isNodeAvailableForDefinition(def typesv2.LabelDefinition) bool {
 	capacity := driver.AvailableCapacity(nodeUsage, def)
 	elapsed := time.Since(before)
 	if elapsed > 300*time.Millisecond {
-		log.Warnf("Fish: AvailableCapacity of %s driver took %s", def.Driver, elapsed)
+		log.Warn().Msgf("Fish: AvailableCapacity of %s driver took %s", def.Driver, elapsed)
 	}
 	if capacity < 1 {
-		log.Debugf("Fish: Driver %q has not enough capacity: %d", driver.Name(), capacity)
+		log.Debug().Msgf("Fish: Driver %q has not enough capacity: %d", driver.Name(), capacity)
 		return false
 	}
 
@@ -577,9 +587,9 @@ func (f *Fish) isNodeAvailableForDefinition(def typesv2.LabelDefinition) bool {
 func (f *Fish) MaintenanceSet(value bool) {
 	if f.maintenance != value {
 		if value {
-			log.Info("Fish: Enabled maintenance mode, no new workload accepted")
+			log.Info().Msg("Fish: Enabled maintenance mode, no new workload accepted")
 		} else {
-			log.Info("Fish: Disabled maintenance mode, accepting new workloads")
+			log.Info().Msg("Fish: Disabled maintenance mode, accepting new workloads")
 		}
 	}
 
@@ -592,7 +602,7 @@ func (f *Fish) ShutdownSet(value bool) {
 		if value {
 			f.activateShutdown()
 		} else {
-			log.Info("Fish: Disabled shutdown mode")
+			log.Info().Msg("Fish: Disabled shutdown mode")
 			f.shutdownCancel <- true
 		}
 	}
@@ -603,14 +613,14 @@ func (f *Fish) ShutdownSet(value bool) {
 // ShutdownDelaySet set of how much time to wait before executing the node shutdown operation
 func (f *Fish) ShutdownDelaySet(delay time.Duration) {
 	if f.shutdownDelay != delay {
-		log.Info("Fish: Shutdown delay is set to:", delay)
+		log.Info().Msgf("Fish: Shutdown delay is set to: %s", delay)
 	}
 
 	f.shutdownDelay = delay
 }
 
 func (f *Fish) activateShutdown() {
-	log.Infof("Fish: Enabled shutdown mode with maintenance: %v, delay: %v", f.maintenance, f.shutdownDelay)
+	log.Info().Msgf("Fish: Enabled shutdown mode with maintenance: %v, delay: %v", f.maintenance, f.shutdownDelay)
 
 	waitApps := make(chan bool, 1)
 
@@ -627,7 +637,7 @@ func (f *Fish) activateShutdown() {
 				return
 			case <-waitApps:
 				// Maintenance mode: All the apps are completed so it's safe to shutdown
-				log.Debug("Fish: Shutdown: apps execution completed")
+				log.Debug().Msg("Fish: Shutdown: apps execution completed")
 				// If the delay is set, then running timer to execute shutdown with delay
 				if f.shutdownDelay > 0 {
 					delayEndTime = time.Now().Add(f.shutdownDelay)
@@ -642,12 +652,12 @@ func (f *Fish) activateShutdown() {
 					fireShutdown <- true
 				}
 			case <-delayTickerReport.C:
-				log.Infof("Fish: Shutdown: countdown: T-%v", time.Until(delayEndTime))
+				log.Info().Msgf("Fish: Shutdown: countdown: T-%v", time.Until(delayEndTime))
 			case <-delayTimer.C:
 				// Delay time has passed, triggering shutdown
 				fireShutdown <- true
 			case <-fireShutdown:
-				log.Info("Fish: Shutdown sends quit signal to Fish")
+				log.Info().Msg("Fish: Shutdown sends quit signal to Fish")
 				f.Quit <- syscall.SIGQUIT
 			}
 		}
@@ -670,7 +680,7 @@ func (f *Fish) activateShutdown() {
 					f.applicationsMutex.Lock()
 					appsCount := len(f.applications)
 					f.applicationsMutex.Unlock()
-					log.Debug("Fish: Shutdown: checking apps execution:", appsCount)
+					log.Debug().Msgf("Fish: Shutdown: checking apps execution: %d", appsCount)
 					if appsCount == 0 {
 						waitApps <- true
 						return
@@ -679,7 +689,7 @@ func (f *Fish) activateShutdown() {
 					f.applicationsMutex.Lock()
 					appsCount := len(f.applications)
 					f.applicationsMutex.Unlock()
-					log.Info("Fish: Shutdown: waiting for running Applications:", appsCount)
+					log.Info().Msgf("Fish: Shutdown: waiting for running Applications: %d", appsCount)
 				}
 			}
 		}()

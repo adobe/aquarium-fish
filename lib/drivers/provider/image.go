@@ -108,7 +108,7 @@ func (i *Image) Validate() error {
 			return fmt.Errorf("Image: Checksum with not supported algorithm (md5, sha1, sha256, sha512): %q", algo)
 		}
 		if algo == "md5" || algo == "sha1" {
-			log.Debug("Image: Insecure algorithm is used, please consider moving to sha256 or sha512:", algo)
+			log.Debug().Msgf("Image: Insecure algorithm is used, please consider moving to sha256 or sha512: %v", algo)
 		}
 	}
 
@@ -121,13 +121,13 @@ func (i *Image) Validate() error {
 // -> user, password - credentials for HTTP Basic auth
 func (i *Image) DownloadUnpack(outDir, user, password string) error {
 	imgPath := filepath.Join(outDir, i.Name+"-"+i.Version)
-	log.Debug("Image: Downloading & Unpacking image:", i.URL, imgPath)
+	log.Debug().Msgf("Image: Downloading & Unpacking image: %s %s", i.URL, imgPath)
 	lockPath := imgPath + ".lock"
 
 	// Wait for another process to download and unpack the archive
 	// In case it failed to download - will be redownloaded further
 	util.WaitLock(lockPath, func() {
-		log.Debug("Util: Cleaning the abandoned files and begin redownloading:", imgPath)
+		log.Debug().Msgf("Util: Cleaning the abandoned files and begin redownloading: %s", imgPath)
 		os.RemoveAll(imgPath)
 	})
 
@@ -245,7 +245,7 @@ func (i *Image) DownloadUnpack(outDir, user, password string) error {
 			}
 		case tar.TypeReg:
 			// Write a file
-			log.Debugf("Util: Extracting '%s': %s", imgPath, hdr.Name)
+			log.Debug().Msgf("Util: Extracting '%s': %s", imgPath, hdr.Name)
 			err = os.MkdirAll(filepath.Dir(target), 0750)
 			if err != nil {
 				os.RemoveAll(imgPath)

@@ -102,7 +102,7 @@ func (d *Driver) getSubnetID(conn *ec2.Client, idTag, zone string) (string, int6
 
 	// Check if the tag is provided ("<Key>:<Value>")
 	if strings.Contains(idTag, ":") {
-		log.Debugf("AWS: %s: Fetching tag vpc or subnet: %s", d.name, idTag)
+		log.Debug().Msgf("AWS: %s: Fetching tag vpc or subnet: %s", d.name, idTag)
 		tagKeyVal := strings.SplitN(idTag, ":", 2)
 		filter.Name = aws.String("tag:" + tagKeyVal[0])
 		filter.Values = []string{tagKeyVal[1]}
@@ -143,10 +143,10 @@ func (d *Driver) getSubnetID(conn *ec2.Client, idTag, zone string) (string, int6
 			return idTag, int64(aws.ToInt32(resp.Subnets[0].AvailableIpAddressCount)), nil
 		}
 		if len(resp.Vpcs) > 1 {
-			log.Warnf("AWS: %s: There is more than one vpc with the same tag: %s", d.name, idTag)
+			log.Warn().Msgf("AWS: %s: There is more than one vpc with the same tag: %s", d.name, idTag)
 		}
 		idTag = aws.ToString(resp.Vpcs[0].VpcId)
-		log.Debugf("AWS: %s: Found VPC with id: %s", d.name, idTag)
+		log.Debug().Msgf("AWS: %s: Found VPC with id: %s", d.name, idTag)
 	} else {
 		// If network id is not a subnet - process as vpc
 		if !strings.HasPrefix(idTag, "subnet-") {
@@ -175,7 +175,7 @@ func (d *Driver) getSubnetID(conn *ec2.Client, idTag, zone string) (string, int6
 
 			if idTag == "" {
 				idTag = aws.ToString(resp.Vpcs[0].VpcId)
-				log.Debugf("AWS: %s: Using default VPC: %s", d.name, idTag)
+				log.Debug().Msgf("AWS: %s: Using default VPC: %s", d.name, idTag)
 			} else if idTag != aws.ToString(resp.Vpcs[0].VpcId) {
 				return "", 0, fmt.Errorf("AWS: %s: Unable to verify the vpc id: %q != %q", d.name, idTag, aws.ToString(resp.Vpcs[0].VpcId))
 			}
@@ -238,7 +238,7 @@ func (d *Driver) getImageID(conn *ec2.Client, idName string) (string, error) {
 		return idName, nil
 	}
 
-	log.Debugf("AWS: %s: Looking for image name: %s", d.name, idName)
+	log.Debug().Msgf("AWS: %s: Looking for image name: %s", d.name, idName)
 
 	// Look for image with the defined name
 	req := ec2.DescribeImagesInput{
@@ -270,13 +270,13 @@ func (d *Driver) getImageID(conn *ec2.Client, idName string) (string, error) {
 			return "", fmt.Errorf("AWS: %s: Error during requesting snapshot: %v", d.name, err)
 		}
 		if len(resp.Images) > 100 {
-			log.Warnf("AWS: %s: Over 100 images was found for the name %q, could be slow...", d.name, idName)
+			log.Warn().Msgf("AWS: %s: Over 100 images was found for the name %q, could be slow...", d.name, idName)
 		}
 		for _, r := range resp.Images {
 			// Converting from RFC-3339/ISO-8601 format "2024-03-07T15:53:03.000Z"
 			t, err := time.Parse("2006-01-02T15:04:05.000Z", aws.ToString(r.CreationDate))
 			if err != nil {
-				log.Warnf("AWS: %s: Error during parsing image create time: %v", d.name, err)
+				log.Warn().Msgf("AWS: %s: Error during parsing image create time: %v", d.name, err)
 				continue
 			}
 			if foundTime.Before(t) {
@@ -325,7 +325,7 @@ func (d *Driver) getTypes(conn *ec2.Client, instanceTypes []string) (map[string]
 
 // Will return latest available image for the instance type
 func (d *Driver) getImageIDByType(conn *ec2.Client, instanceType string) (string, error) {
-	log.Debugf("AWS: %s: Looking an image for type: %s", d.name, instanceType)
+	log.Debug().Msgf("AWS: %s: Looking an image for type: %s", d.name, instanceType)
 
 	instTypes, err := d.getTypes(conn, []string{instanceType})
 	if err != nil {
@@ -337,13 +337,13 @@ func (d *Driver) getImageIDByType(conn *ec2.Client, instanceType string) (string
 	}
 
 	typeArch := instTypes[instanceType].ProcessorInfo.SupportedArchitectures[0]
-	log.Debugf("AWS: %s: Looking an image for type: %s, found arch: %s", d.name, instanceType, typeArch)
+	log.Debug().Msgf("AWS: %s: Looking an image for type: %s, found arch: %s", d.name, instanceType, typeArch)
 
 	// Look for base image from aws with the defined architecture
 	// We checking last year and if it's empty - trying past years until will find the image
 	imagesTill := time.Now()
 	for imagesTill.Year() > time.Now().Year()-10 { // Probably past 10 years will work for everyone, right?
-		log.Debugf("AWS: %s: Looking an image: Checking past year from %d", d.name, imagesTill.Year())
+		log.Debug().Msgf("AWS: %s: Looking an image: Checking past year from %d", d.name, imagesTill.Year())
 		req := ec2.DescribeImagesInput{
 			Filters: []types.Filter{
 				{
@@ -370,20 +370,20 @@ func (d *Driver) getImageIDByType(conn *ec2.Client, instanceType string) (string
 		}
 		resp, err := conn.DescribeImages(context.TODO(), &req)
 		if err != nil {
-			log.Errorf("AWS: %s: Error during request to find image with arch %q for year %d: %v", d.name, typeArch, imagesTill.Year(), err)
+			log.Error().Msgf("AWS: %s: Error during request to find image with arch %q for year %d: %v", d.name, typeArch, imagesTill.Year(), err)
 			imagesTill = imagesTill.AddDate(-1, 0, 0)
 			continue
 		}
 		if len(resp.Images) == 0 {
 			// No images this year, let's reiterate with previous year
-			log.Infof("AWS: %s: Unable to find any images of arch %q till year %d: %v %v", d.name, typeArch, imagesTill.Year(), req, resp)
+			log.Info().Msgf("AWS: %s: Unable to find any images of arch %q till year %d: %v %v", d.name, typeArch, imagesTill.Year(), req, resp)
 			imagesTill = imagesTill.AddDate(-1, 0, 0)
 			continue
 		}
 
 		imageID := aws.ToString(resp.Images[0].ImageId)
 
-		log.Debugf("AWS: %s: Found image for specified type %q (arch %s): %s", d.name, instanceType, typeArch, imageID)
+		log.Debug().Msgf("AWS: %s: Found image for specified type %q (arch %s): %s", d.name, instanceType, typeArch, imageID)
 
 		return imageID, nil
 	}
@@ -397,7 +397,7 @@ func (d *Driver) getSecGroupID(conn *ec2.Client, idName string) (string, error) 
 		return idName, nil
 	}
 
-	log.Debugf("AWS: %s: Looking for security group name: %s", d.name, idName)
+	log.Debug().Msgf("AWS: %s: Looking for security group name: %s", d.name, idName)
 
 	// Look for security group with the defined name
 	req := ec2.DescribeSecurityGroupsInput{
@@ -417,7 +417,7 @@ func (d *Driver) getSecGroupID(conn *ec2.Client, idName string) (string, error) 
 		return "", fmt.Errorf("AWS: %s: Unable to locate security group with specified name: %v", d.name, err)
 	}
 	if len(resp.SecurityGroups) > 1 {
-		log.Warnf("AWS: %s: There is more than one group with the same name: %s", d.name, idName)
+		log.Warn().Msgf("AWS: %s: There is more than one group with the same name: %s", d.name, idName)
 	}
 	idName = aws.ToString(resp.SecurityGroups[0].GroupId)
 
@@ -433,7 +433,7 @@ func (d *Driver) getSnapshotID(conn *ec2.Client, idTag string) (string, error) {
 		return "", fmt.Errorf("AWS: %s: Incorrect snapshot tag format: %s", d.name, idTag)
 	}
 
-	log.Debugf("AWS: %s: Fetching snapshot tag: %s", d.name, idTag)
+	log.Debug().Msgf("AWS: %s: Fetching snapshot tag: %s", d.name, idTag)
 	tagKeyVal := strings.SplitN(idTag, ":", 2)
 
 	// Look for VPC with the defined tag over pages
@@ -461,7 +461,7 @@ func (d *Driver) getSnapshotID(conn *ec2.Client, idTag string) (string, error) {
 			return "", fmt.Errorf("AWS: %s: Error during requesting snapshot: %v", d.name, err)
 		}
 		if len(resp.Snapshots) > 900 {
-			log.Warnf("AWS: %s: Over 900 snapshots was found for tag %q, could be slow", d.name, idTag)
+			log.Warn().Msgf("AWS: %s: Over 900 snapshots was found for tag %q, could be slow", d.name, idTag)
 		}
 		for _, r := range resp.Snapshots {
 			if foundTime.Before(aws.ToTime(r.StartTime)) {
@@ -498,7 +498,8 @@ func (d *Driver) getProjectCPUUsage(conn *ec2.Client, instTypes []string) (int64
 	for p.HasMorePages() {
 		resp, err := p.NextPage(context.TODO())
 		if err != nil {
-			return -1, log.Errorf("AWS: %s: Error during requesting instances: %v", d.name, err)
+			log.Error().Msgf("AWS: %s: Error during requesting instances: %v", d.name, err)
+			return -1, fmt.Errorf("AWS: %s: Error during requesting instances: %v", d.name, err)
 		}
 		for _, res := range resp.Reservations {
 			for _, inst := range res.Instances {
@@ -539,7 +540,7 @@ func (d *Driver) getKeyID(idAlias string) (string, error) {
 		return idAlias, nil
 	}
 
-	log.Debugf("AWS: %s: Fetching key alias: %s", d.name, idAlias)
+	log.Debug().Msgf("AWS: %s: Fetching key alias: %s", d.name, idAlias)
 
 	conn := d.newKMSConn()
 
@@ -556,7 +557,7 @@ func (d *Driver) getKeyID(idAlias string) (string, error) {
 			return "", fmt.Errorf("AWS: %s: Error during requesting alias list: %v", d.name, err)
 		}
 		if len(resp.Aliases) > 90 {
-			log.Warnf("AWS: %s: Over 90 aliases was found %s, could be slow", d.name, idAlias)
+			log.Warn().Msgf("AWS: %s: Over 90 aliases was found %s, could be slow", d.name, idAlias)
 		}
 		for _, r := range resp.Aliases {
 			if idAlias == aws.ToString(r.AliasName) {
@@ -576,7 +577,7 @@ func (d *Driver) updateQuotas(force bool) error {
 		return nil
 	}
 
-	log.Debugf("AWS: %s: Updating quotas...", d.name)
+	log.Debug().Msgf("AWS: %s: Updating quotas...", d.name)
 
 	// Update the cache
 	connSq := d.newServiceQuotasConn()
@@ -591,7 +592,8 @@ func (d *Driver) updateQuotas(force bool) error {
 	for p.HasMorePages() {
 		resp, err := p.NextPage(context.TODO())
 		if err != nil {
-			return log.Errorf("AWS: %s: Error during requesting quotas: %v", d.name, err)
+			log.Error().Msgf("AWS: %s: Error during requesting quotas: %v", d.name, err)
+			return fmt.Errorf("AWS: %s: Error during requesting quotas: %v", d.name, err)
 		}
 		for _, r := range resp.Quotas {
 			if _, ok := d.quotas[aws.ToString(r.QuotaName)]; ok {
@@ -600,7 +602,7 @@ func (d *Driver) updateQuotas(force bool) error {
 		}
 	}
 
-	log.Debugf("AWS: %s: Quotas: %s", d.name, d.quotas)
+	log.Debug().Msgf("AWS: %s: Quotas: %#v", d.name, d.quotas)
 
 	d.quotasNextUpdate = time.Now().Add(time.Minute * 30)
 
@@ -638,7 +640,7 @@ func (d *Driver) triggerHostScrubbing(hostID, instanceType string) (err error) {
 	if vmImage, err = d.getImageIDByType(conn, instanceType); err != nil {
 		return fmt.Errorf("AWS: %s: scrubbing %s: Unable to find image: %v", d.name, hostID, err)
 	}
-	log.Infof("AWS: %s: scrubbing %s: Selected image: %q", d.name, hostID, vmImage)
+	log.Info().Msgf("AWS: %s: scrubbing %s: Selected image: %q", d.name, hostID, vmImage)
 
 	// Prepare Instance request information
 	placement := types.Placement{
@@ -659,7 +661,8 @@ func (d *Driver) triggerHostScrubbing(hostID, instanceType string) (err error) {
 	// Run the instance
 	result, err := conn.RunInstances(context.TODO(), &input)
 	if err != nil {
-		return log.Errorf("AWS: %s: scrubbing %s: Unable to run instance: %v", d.name, hostID, err)
+		log.Error().Msgf("AWS: %s: scrubbing %s: Unable to run instance: %v", d.name, hostID, err)
+		return fmt.Errorf("AWS: %s: scrubbing %s: Unable to run instance: %v", d.name, hostID, err)
 	}
 
 	instID := aws.ToString(result.Instances[0].InstanceId)
@@ -675,13 +678,13 @@ func (d *Driver) triggerHostScrubbing(hostID, instanceType string) (err error) {
 
 		result, err := conn.TerminateInstances(context.TODO(), &input)
 		if err != nil || len(result.TerminatingInstances) < 1 {
-			log.Errorf("AWS: %s: scrubbing %s: Error during termianting the instance %s: %s", d.name, hostID, instID, err)
+			log.Error().Msgf("AWS: %s: scrubbing %s: Error during termianting the instance %s: %s", d.name, hostID, instID, err)
 			time.Sleep(10 * time.Second)
 			continue
 		}
 
 		if aws.ToString(result.TerminatingInstances[0].InstanceId) != instID {
-			log.Errorf("AWS: %s: scrubbing %s: Wrong instance id result %s during terminating of %s", d.name, hostID, aws.ToString(result.TerminatingInstances[0].InstanceId), instID)
+			log.Error().Msgf("AWS: %s: scrubbing %s: Wrong instance id result %s during terminating of %s", d.name, hostID, aws.ToString(result.TerminatingInstances[0].InstanceId), instID)
 			time.Sleep(10 * time.Second)
 			continue
 		}
@@ -689,7 +692,7 @@ func (d *Driver) triggerHostScrubbing(hostID, instanceType string) (err error) {
 		break
 	}
 
-	log.Infof("AWS: %s: scrubbing %s: Scrubbing process was triggered", d.name, hostID)
+	log.Info().Msgf("AWS: %s: scrubbing %s: Scrubbing process was triggered", d.name, hostID)
 
 	return nil
 }
@@ -699,7 +702,7 @@ func (d *Driver) deleteImage(conn *ec2.Client, id string) (err error) {
 	if !strings.HasPrefix(id, "ami-") {
 		return fmt.Errorf("AWS: %s: Incorrect AMI id: %s", d.name, id)
 	}
-	log.Debugf("AWS: %s: Deleting the image %s...", d.name, id)
+	log.Debug().Msgf("AWS: %s: Deleting the image %s...", d.name, id)
 
 	// Look for the image snapshots
 	req := ec2.DescribeImagesInput{
@@ -723,12 +726,12 @@ func (d *Driver) deleteImage(conn *ec2.Client, id string) (err error) {
 		if disk.Ebs == nil || disk.Ebs.SnapshotId == nil {
 			continue
 		}
-		log.Debugf("AWS: %s: Deleting the image %s associated snapshot %s", d.name, id, aws.ToString(disk.Ebs.SnapshotId))
+		log.Debug().Msgf("AWS: %s: Deleting the image %s associated snapshot %s", d.name, id, aws.ToString(disk.Ebs.SnapshotId))
 		input := ec2.DeleteSnapshotInput{SnapshotId: disk.Ebs.SnapshotId}
 		_, errTmp := conn.DeleteSnapshot(context.TODO(), &input)
 		if errTmp != nil {
 			// Do not fail hard to try to delete all the snapshots
-			log.Errorf("AWS: %s: Unable to delete image %s %q snapshot %s: %v", d.name, id, aws.ToString(respImg.Images[0].Name), aws.ToString(disk.Ebs.SnapshotId), err)
+			log.Error().Msgf("AWS: %s: Unable to delete image %s %q snapshot %s: %v", d.name, id, aws.ToString(respImg.Images[0].Name), aws.ToString(disk.Ebs.SnapshotId), err)
 			err = errTmp
 		}
 	}

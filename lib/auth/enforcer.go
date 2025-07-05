@@ -103,15 +103,15 @@ func (e *Enforcer) CheckPermission(roles []string, obj, act string) bool {
 	for _, role := range roles {
 		allowed, err := e.enforcer.Enforce(role, obj, act)
 		if err != nil {
-			log.Errorf("Auth: Enforcer: BLOCKED: %s %s %s: Failed to check permission: %v", roles, obj, act, err)
+			log.Error().Msgf("Auth: Enforcer: BLOCKED: %s %s %s: Failed to check permission: %v", roles, obj, act, err)
 			return false
 		}
 		if allowed {
-			log.Debug("Auth: Enforcer: PASSED:", roles, obj, act)
+			log.Debug().Msgf("Auth: Enforcer: PASSED: %s %s %s", roles, obj, act)
 			return true
 		}
 	}
-	log.Debug("Auth: Enforcer: BLOCKED:", roles, obj, act)
+	log.Debug().Msgf("Auth: Enforcer: BLOCKED: %s %s %s", roles, obj, act)
 	return false
 }
 

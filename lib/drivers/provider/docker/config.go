@@ -17,6 +17,7 @@ package docker
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -59,7 +60,8 @@ type Config struct {
 func (c *Config) Apply(config []byte) error {
 	if len(config) > 0 {
 		if err := json.Unmarshal(config, c); err != nil {
-			return log.Error("DOCKER: Unable to apply the driver config", err)
+			log.Error().Msgf("DOCKER: Unable to apply the driver config: %v", err)
+			return fmt.Errorf("DOCKER: Unable to apply the driver config: %v", err)
 		}
 	}
 	return nil
@@ -71,7 +73,8 @@ func (c *Config) Validate() (err error) {
 	if c.DockerPath == "" {
 		// Look in the PATH
 		if c.DockerPath, err = exec.LookPath("docker"); err != nil {
-			return log.Error("DOCKER: Unable to locate `docker` path", err)
+			log.Error().Msgf("DOCKER: Unable to locate `docker` path: %v", err)
+			return fmt.Errorf("DOCKER: Unable to locate `docker` path: %v", err)
 		}
 	}
 
@@ -90,7 +93,7 @@ func (c *Config) Validate() (err error) {
 		return err
 	}
 
-	log.Debug("DOCKER: Creating working directories:", c.ImagesPath, c.WorkspacePath)
+	log.Debug().Msgf("DOCKER: Creating working directories: %s %s", c.ImagesPath, c.WorkspacePath)
 	if err := os.MkdirAll(c.ImagesPath, 0o750); err != nil {
 		return err
 	}

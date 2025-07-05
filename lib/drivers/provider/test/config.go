@@ -17,6 +17,7 @@ package test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -47,7 +48,8 @@ func (c *Config) Apply(config []byte) error {
 	// Parse json
 	if len(config) > 0 {
 		if err := json.Unmarshal(config, c); err != nil {
-			return log.Error("TEST: Unable to apply the driver config:", err)
+			log.Error().Msgf("TEST: Unable to apply the driver config: %v", err)
+			return fmt.Errorf("TEST: Unable to apply the driver config: %v", err)
 		}
 	}
 
@@ -62,7 +64,7 @@ func (c *Config) Validate() (err error) {
 	if c.WorkspacePath, err = filepath.Abs(c.WorkspacePath); err != nil {
 		return err
 	}
-	log.Debug("TEST: Creating working directory:", c.WorkspacePath)
+	log.Debug().Msgf("TEST: Creating working directory: %s", c.WorkspacePath)
 	if err := os.MkdirAll(c.WorkspacePath, 0o750); err != nil {
 		return err
 	}

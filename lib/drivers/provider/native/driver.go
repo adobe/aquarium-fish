@@ -185,23 +185,26 @@ func (d *Driver) AvailableCapacity(nodeUsage typesv2.Resources, req typesv2.Labe
 func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) (*typesv2.ApplicationResource, error) {
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
-		return nil, log.Errorf("NATIVE: %s: Unable to apply options: %v", d.name, err)
+		log.Error().Msgf("NATIVE: %s: Unable to apply options: %v", d.name, err)
+		return nil, fmt.Errorf("NATIVE: %s: Unable to apply options: %v", d.name, err)
 	}
 
 	// Create user to execute the workload
 	user, homedir, err := d.userCreate(opts.Groups)
 	if err != nil {
 		d.userDelete(user)
-		return nil, log.Errorf("NATIVE: %s: Unable to create user %q: %v", d.name, user, err)
+		log.Error().Msgf("NATIVE: %s: Unable to create user %q: %v", d.name, user, err)
+		return nil, fmt.Errorf("NATIVE: %s: Unable to create user %q: %v", d.name, user, err)
 	}
-	log.Infof("NATIVE: %s: Created user for Application execution: %s", d.name, user)
+	log.Info().Msgf("NATIVE: %s: Created user for Application execution: %s", d.name, user)
 
 	// Create and connect volumes to container
 	diskPaths, err := d.disksCreate(user, def.Resources.Disks)
 	if err != nil {
 		d.disksDelete(user)
 		d.userDelete(user)
-		return nil, log.Errorf("NATIVE: %s: Unable to create the required disks: %v", d.name, err)
+		log.Error().Msgf("NATIVE: %s: Unable to create the required disks: %v", d.name, err)
+		return nil, fmt.Errorf("NATIVE: %s: Unable to create the required disks: %v", d.name, err)
 	}
 
 	// Set default path as homedir
@@ -211,17 +214,19 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 	if err := d.loadImages(user, opts.Images, diskPaths); err != nil {
 		d.disksDelete(user)
 		d.userDelete(user)
-		return nil, log.Errorf("NATIVE: %s: Unable to load and unpack images: %v", d.name, err)
+		log.Error().Msgf("NATIVE: %s: Unable to load and unpack images: %v", d.name, err)
+		return nil, fmt.Errorf("NATIVE: %s: Unable to load and unpack images: %v", d.name, err)
 	}
 
 	// Running workload
 	if err := d.userRun(&EnvData{Disks: diskPaths}, user, opts.Entry, metadata); err != nil {
 		d.disksDelete(user)
 		d.userDelete(user)
-		return nil, log.Errorf("NATIVE: %s: Unable to run the entry workload: %v", d.name, err)
+		log.Error().Msgf("NATIVE: %s: Unable to run the entry workload: %v", d.name, err)
+		return nil, fmt.Errorf("NATIVE: %s: Unable to run the entry workload: %v", d.name, err)
 	}
 
-	log.Infof("NATIVE: %s: Started environment for user %q", d.name, user)
+	log.Info().Msgf("NATIVE: %s: Started environment for user %q", d.name, user)
 
 	return &typesv2.ApplicationResource{Identifier: user}, nil
 }
@@ -250,7 +255,7 @@ func (d *Driver) GetTask(name, options string) provider.DriverTask {
 	// Parse options json into task structure
 	if len(options) > 0 {
 		if err := json.Unmarshal([]byte(options), t); err != nil {
-			log.Error("VMX: Unable to apply the task options:", err)
+			log.Error().Msgf("VMX: Unable to apply the task options: %v", err)
 			return nil
 		}
 	}
@@ -264,7 +269,8 @@ func (d *Driver) Deallocate(res typesv2.ApplicationResource) error {
 		return fmt.Errorf("NATIVE: %s: Invalid resource: %v", d.name, res)
 	}
 	if !isEnvAllocated(res.Identifier) {
-		return log.Errorf("NATIVE: %s: Unable to find the environment user: %s", d.name, res.Identifier)
+		log.Error().Msgf("NATIVE: %s: Unable to find the environment user: %s", d.name, res.Identifier)
+		return fmt.Errorf("NATIVE: %s: Unable to find the environment user: %s", d.name, res.Identifier)
 	}
 
 	user := res.Identifier
@@ -275,7 +281,7 @@ func (d *Driver) Deallocate(res typesv2.ApplicationResource) error {
 	// Umounting & delete the user env disks
 	err2 := d.userDelete(user)
 
-	log.Info("Docker: Deallocate of user env completed:", user)
+	log.Info().Msgf("Docker: Deallocate of user env completed: %s", user)
 
 	// Processing the errors after the cleanup
 	if err != nil {

@@ -50,18 +50,19 @@ func (d *Driver) checkDeliveries() (outerr error) {
 	d.hooksMutex.RLock()
 	defer d.hooksMutex.RUnlock()
 
-	log.Debugf("GITHUB: %s: Checking deliveries...", d.name)
-	defer log.Debugf("GITHUB: %s: Checking deliveries done", d.name)
+	log.Debug().Msgf("GITHUB: %s: Checking deliveries...", d.name)
+	defer log.Debug().Msgf("GITHUB: %s: Checking deliveries done", d.name)
 
 	var checkpointUpdate time.Time
 	checkpointUpdated := false
 
 	for _, hook := range d.hooks {
-		log.Debugf("GITHUB: %s: Processing hook %s", d.name, hook.GetURL())
+		log.Debug().Msgf("GITHUB: %s: Processing hook %s", d.name, hook.GetURL())
 		// Getting repo name from the webhook URL
 		spl := strings.Split(hook.GetURL(), "/")
 		if len(spl) < 8 {
-			outerr = log.Errorf("GITHUB: %s: Not enough parameters in webhook URL: %s", d.name, hook.GetURL())
+			log.Error().Msgf("GITHUB: %s: Not enough parameters in webhook URL: %s", d.name, hook.GetURL())
+			outerr = fmt.Errorf("GITHUB: %s: Not enough parameters in webhook URL: %s", d.name, hook.GetURL())
 			continue
 		}
 		owner := spl[len(spl)-4]
@@ -70,10 +71,11 @@ func (d *Driver) checkDeliveries() (outerr error) {
 
 		deliveries, err := d.apiGetDeliveriesList(owner, repo, hook.GetID())
 		if err != nil {
-			outerr = log.Errorf("GITHUB: %s: Repo %q hook %d deliveries list request: %v", d.name, repoName, hook.GetID(), err)
+			log.Error().Msgf("GITHUB: %s: Repo %q hook %d deliveries list request: %v", d.name, repoName, hook.GetID(), err)
+			outerr = fmt.Errorf("GITHUB: %s: Repo %q hook %d deliveries list request: %v", d.name, repoName, hook.GetID(), err)
 		}
 		if len(deliveries) == 0 {
-			log.Debugf("GITHUB: %s: Repo %q hook %d no new deliveries found", d.name, repoName, hook.GetID())
+			log.Debug().Msgf("GITHUB: %s: Repo %q hook %d no new deliveries found", d.name, repoName, hook.GetID())
 			continue
 		}
 
@@ -93,7 +95,7 @@ func (d *Driver) checkDeliveries() (outerr error) {
 	if !checkpointUpdate.IsZero() {
 		// We need to add 1 microsecond here because we comparing it to delivery as After
 		d.apiCheckpoint = checkpointUpdate.Add(1)
-		log.Debugf("GITHUB: %s: Updated deliveries checkpoint to %s", d.name, d.apiCheckpoint)
+		log.Debug().Msgf("GITHUB: %s: Updated deliveries checkpoint to %s", d.name, d.apiCheckpoint)
 	}
 
 	return outerr
@@ -105,19 +107,20 @@ func (d *Driver) checkDeliveries() (outerr error) {
 func (d *Driver) processHookDeliveries(deliveries []*github.HookDelivery, owner, repo string, hookID int64) error {
 	var jobs []*github.WorkflowJob
 	for _, delivery := range deliveries {
-		log.Debugf("GITHUB: %s: Getting full delivery for %s/%s webhook %d: %s", d.name, owner, repo, hookID, delivery.String())
+		log.Debug().Msgf("GITHUB: %s: Getting full delivery for %s/%s webhook %d: %s", d.name, owner, repo, hookID, delivery.String())
 
 		// Receiving full delivery body
 		fullDelivery, err := d.apiGetFullDelivery(owner, repo, hookID, delivery.GetID())
 		if err != nil {
-			return log.Errorf("GITHUB: %s: Repo %s/%s full delivery %s request: %v", d.name, owner, repo, delivery.GetGUID(), err)
+			log.Error().Msgf("GITHUB: %s: Repo %s/%s full delivery %s request: %v", d.name, owner, repo, delivery.GetGUID(), err)
+			return fmt.Errorf("GITHUB: %s: Repo %s/%s full delivery %s request: %v", d.name, owner, repo, delivery.GetGUID(), err)
 		}
 
 		// Extracting job fom webhook request with optional verification of the secret if
 		// it's not set - because we already reading from github.com, so should be enough for
 		// proper security measures - if we don't trust github.com, then we have a problem
 		if job, err := d.extractJob(fullDelivery.Request, false); err != nil {
-			log.Errorf("GITHUB: %s: Error processing repo %s/%s webhook request %s: %v", d.name, owner, repo, delivery.GetGUID(), err)
+			log.Error().Msgf("GITHUB: %s: Error processing repo %s/%s webhook request %s: %v", d.name, owner, repo, delivery.GetGUID(), err)
 		} else if job != nil {
 			jobs = append(jobs, job)
 		}
@@ -141,7 +144,7 @@ func (d *Driver) processHookDeliveries(deliveries []*github.HookDelivery, owner,
 		if job.GetStatus() == jobQueued {
 			for _, compJob := range completed {
 				if compJob.GetID() == job.GetID() && compJob.GetRunID() == job.GetRunID() {
-					log.Debugf("GITHUB: %s: Cancelling out queued-completed job: %d-%d", d.name, job.GetRunID(), job.GetID())
+					log.Debug().Msgf("GITHUB: %s: Cancelling out queued-completed job: %d-%d", d.name, job.GetRunID(), job.GetID())
 					nomatch = false
 				}
 			}
@@ -158,7 +161,7 @@ func (d *Driver) processHookDeliveries(deliveries []*github.HookDelivery, owner,
 		// it's not set - because we already reading from github.com, so should be enough for
 		// proper security measures - if we don't trust github.com, then we have a problem
 		if err := d.executeJob(owner, repo, job); err != nil {
-			log.Errorf("GITHUB: %s: Error executing job for repo %s/%s run-job %d-%d: %v", d.name, owner, repo, job.GetRunID(), job.GetID(), err)
+			log.Error().Msgf("GITHUB: %s: Error executing job for repo %s/%s run-job %d-%d: %v", d.name, owner, repo, job.GetRunID(), job.GetID(), err)
 		}
 	}
 
@@ -170,15 +173,15 @@ func (d *Driver) processHookDeliveries(deliveries []*github.HookDelivery, owner,
 // It will run on schedule if gate is configured only for Pull by API
 // It will run only during initialization if gate configured for both Push and Pull
 func (d *Driver) updateHooks() error {
-	log.Debugf("GITHUB: %s: Updating hooks...", d.name)
-	defer log.Debugf("GITHUB: %s: Updating hooks done", d.name)
+	log.Debug().Msgf("GITHUB: %s: Updating hooks...", d.name)
+	defer log.Debug().Msgf("GITHUB: %s: Updating hooks done", d.name)
 
 	repos, err := d.apiGetRepos()
 	if err != nil {
-		log.Warnf("GITHUB: %s: Unable to get all available repositories: %v", d.name, err)
+		log.Warn().Msgf("GITHUB: %s: Unable to get all available repositories: %v", d.name, err)
 	}
 	if len(repos) == 0 {
-		log.Errorf("GITHUB: %s: No available repositories found: %d", d.name, len(repos))
+		log.Error().Msgf("GITHUB: %s: No available repositories found: %d", d.name, len(repos))
 		return nil
 	}
 
@@ -187,18 +190,19 @@ func (d *Driver) updateHooks() error {
 	for _, repoName := range repos {
 		spl := strings.SplitN(repoName, "/", 2)
 		if len(spl) < 2 {
-			log.Errorf("GITHUB: %s: Incorrect repo full name: %q", d.name, repoName)
+			log.Error().Msgf("GITHUB: %s: Incorrect repo full name: %q", d.name, repoName)
 			continue
 		}
 
 		hooks, err := d.apiGetHooks(spl[0], spl[1])
 		if err != nil {
-			return log.Errorf("GITHUB: %s: Repo %q hooks request: %v", d.name, repoName, err)
+			log.Error().Msgf("GITHUB: %s: Repo %q hooks request: %v", d.name, repoName, err)
+			return fmt.Errorf("GITHUB: %s: Repo %q hooks request: %v", d.name, repoName, err)
 		}
 
 		// We need to have just one webhook per repo - all the other hooks will be skipped
 		for _, hook := range hooks {
-			log.Debugf("GITHUB: %s: Using only one first hook for repo %q: %d", d.name, repoName, hook.GetID())
+			log.Debug().Msgf("GITHUB: %s: Using only one first hook for repo %q: %d", d.name, repoName, hook.GetID())
 			updatedHooks = append(updatedHooks, hook)
 			break
 		}
@@ -209,7 +213,7 @@ func (d *Driver) updateHooks() error {
 	defer d.hooksMutex.RUnlock()
 
 	// To not waste time enabling it only in debug mode
-	if log.GetVerbosity() == log.VerbosityDebug {
+	if log.Logger.GetLevel().String() == "debug" {
 		// Comparing the lists to show the differences
 		for _, newHook := range updatedHooks {
 			found := false
@@ -221,7 +225,7 @@ func (d *Driver) updateHooks() error {
 				}
 			}
 			if !found {
-				log.Debugf("GITHUB: %s: Found new webhook: %s", d.name, newHook.GetURL())
+				log.Debug().Msgf("GITHUB: %s: Found new webhook: %s", d.name, newHook.GetURL())
 			}
 		}
 		for _, oldHook := range d.hooks {
@@ -234,7 +238,7 @@ func (d *Driver) updateHooks() error {
 				}
 			}
 			if !found {
-				log.Debugf("GITHUB: %s: Removed known webhook: %s", oldHook.GetURL())
+				log.Debug().Msgf("GITHUB: %s: Removed known webhook: %s", d.name, oldHook.GetURL())
 			}
 		}
 	}
@@ -253,16 +257,17 @@ func (d *Driver) cleanupRunners() (outerr error) {
 	d.hooksMutex.RLock()
 	defer d.hooksMutex.RUnlock()
 
-	log.Debugf("GITHUB: %s: Cleanup runners...", d.name)
-	defer log.Debugf("GITHUB: %s: Cleanup runners done", d.name)
+	log.Debug().Msgf("GITHUB: %s: Cleanup runners...", d.name)
+	defer log.Debug().Msgf("GITHUB: %s: Cleanup runners done", d.name)
 
 	var foundRunners []string
 	for _, hook := range d.hooks {
-		log.Debugf("GITHUB: %s: cleanupRunners: Processing hook %s", d.name, hook.GetURL())
+		log.Debug().Msgf("GITHUB: %s: cleanupRunners: Processing hook %s", d.name, hook.GetURL())
 		// Getting repo name from the webhook URL
 		spl := strings.Split(hook.GetURL(), "/")
 		if len(spl) < 8 {
-			outerr = log.Errorf("GITHUB: %s: cleanupRunners: Not enough parameters in webhook URL: %s", d.name, hook.GetURL())
+			log.Error().Msgf("GITHUB: %s: cleanupRunners: Not enough parameters in webhook URL: %s", d.name, hook.GetURL())
+			outerr = fmt.Errorf("GITHUB: %s: cleanupRunners: Not enough parameters in webhook URL: %s", d.name, hook.GetURL())
 			continue
 		}
 		owner := spl[len(spl)-4]
@@ -271,10 +276,11 @@ func (d *Driver) cleanupRunners() (outerr error) {
 
 		runners, err := d.apiGetFishEphemeralRunnersList(owner, repo)
 		if err != nil {
-			outerr = log.Errorf("GITHUB: %s: Repo %q runners list request: %v", d.name, repoName, err)
+			log.Error().Msgf("GITHUB: %s: Repo %q runners list request: %v", d.name, repoName, err)
+			outerr = fmt.Errorf("GITHUB: %s: Repo %q runners list request: %v", d.name, repoName, err)
 		}
 		if len(runners) == 0 {
-			log.Debugf("GITHUB: %s: cleanupRunners: No fish runners in repo %q", d.name, repoName)
+			log.Debug().Msgf("GITHUB: %s: cleanupRunners: No fish runners in repo %q", d.name, repoName)
 			continue
 		}
 
@@ -298,7 +304,7 @@ func (d *Driver) cleanupRunners() (outerr error) {
 			}
 			if found < 0 {
 				// Since not found in the naughty list - adding there, so will be checked next time
-				log.Debugf("GITHUB: %s: cleanupRunners: Found offline fish node, adding to list: %q", d.name, runnerID)
+				log.Debug().Msgf("GITHUB: %s: cleanupRunners: Found offline fish node, adding to list: %q", d.name, runnerID)
 				foundRunners = append(foundRunners, runnerID)
 				continue
 			}
@@ -307,13 +313,14 @@ func (d *Driver) cleanupRunners() (outerr error) {
 			for _, lbl := range runner.Labels {
 				labels = append(labels, lbl.GetName())
 			}
-			log.Warnf("GITHUB: %s: cleanupRunners: Removing runner: %q, please check what's wrong with the used image: %s", d.name, runnerID, strings.Join(labels, ", "))
+			log.Warn().Msgf("GITHUB: %s: cleanupRunners: Removing runner: %q, please check what's wrong with the used image: %s", d.name, runnerID, strings.Join(labels, ", "))
 
 			// Attempting removing of the runner
 			if err := d.apiRemoveRunner(owner, repo, runner.GetID()); err != nil {
 				// Ok will try the next time
 				foundRunners = append(foundRunners, runnerID)
-				outerr = log.Errorf("GITHUB: %s: cleanupRunners: Unable to remove runner %q", d.name, runnerID)
+				log.Error().Msgf("GITHUB: %s: cleanupRunners: Unable to remove runner %q", d.name, runnerID)
+				outerr = fmt.Errorf("GITHUB: %s: cleanupRunners: Unable to remove runner %q", d.name, runnerID)
 				continue
 			}
 
@@ -333,14 +340,14 @@ func (d *Driver) pullBackgroundProcess() {
 	d.routines.Add(1)
 	d.routinesMutex.Unlock()
 	defer d.routines.Done()
-	defer log.Infof("GITHUB: %s: backgroundProcess stopped", d.name)
+	defer log.Info().Msgf("GITHUB: %s: backgroundProcess stopped", d.name)
 
 	interval := time.Duration(d.cfg.APIUpdateHooksInterval)
 	var updateHooksTicker *time.Ticker
 	if interval > 0 {
 		updateHooksTicker = time.NewTicker(interval)
 		defer updateHooksTicker.Stop()
-		log.Infof("GITHUB: %s: backgroundProcess: Triggering updateHooks once per %s", d.name, interval)
+		log.Info().Msgf("GITHUB: %s: backgroundProcess: Triggering updateHooks once per %s", d.name, interval)
 	}
 
 	interval = time.Duration(d.cfg.APICleanupRunnersInterval)
@@ -348,13 +355,13 @@ func (d *Driver) pullBackgroundProcess() {
 	if interval > 0 {
 		cleanupRunnersTicker = time.NewTicker(interval)
 		defer cleanupRunnersTicker.Stop()
-		log.Infof("GITHUB: %s: backgroundProcess: Triggering cleanupRunners once per %s", d.name, interval)
+		log.Info().Msgf("GITHUB: %s: backgroundProcess: Triggering cleanupRunners once per %s", d.name, interval)
 	}
 
 	interval = time.Duration(d.cfg.APIMinCheckInterval)
 	checkDeliveriesTicker := time.NewTicker(interval)
 	defer checkDeliveriesTicker.Stop()
-	log.Infof("GITHUB: %s: backgroundProcess: Triggering checkDeliveries once per %s", d.name, interval)
+	log.Info().Msgf("GITHUB: %s: backgroundProcess: Triggering checkDeliveries once per %s", d.name, interval)
 
 	for {
 		select {

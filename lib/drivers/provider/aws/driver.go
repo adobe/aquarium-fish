@@ -156,7 +156,7 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ typesv2.Resources, def typesv
 
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
-		log.Errorf("AWS: %s: Unable to apply options: %v", d.name, err)
+		log.Error().Msgf("AWS: %s: Unable to apply options: %v", d.name, err)
 		return -1
 	}
 
@@ -167,10 +167,10 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ typesv2.Resources, def typesv
 		// The pool is specified - let's check if it has the capacity
 		if p, ok := d.dedicatedPools[opts.Pool]; ok {
 			count := p.AvailableCapacity(opts.InstanceType)
-			log.Debugf("AWS: %s: AvailableCapacity: Pool: %s, Type: %s, Count: %d", d.name, opts.Pool, opts.InstanceType, count)
+			log.Debug().Msgf("AWS: %s: AvailableCapacity: Pool: %s, Type: %s, Count: %d", d.name, opts.Pool, opts.InstanceType, count)
 			return count
 		}
-		log.Warnf("AWS: %s: Unable to locate dedicated pool: %s", d.name, opts.Pool)
+		log.Warn().Msgf("AWS: %s: Unable to locate dedicated pool: %s", d.name, opts.Pool)
 		return -1
 	} else if awsInstTypeAny(opts.InstanceType, "mac") {
 		// Ensure we have the available auto-placing dedicated hosts to use as base for resource.
@@ -192,7 +192,7 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ typesv2.Resources, def typesv
 		for p.HasMorePages() {
 			resp, err := p.NextPage(context.TODO())
 			if err != nil {
-				log.Errorf("AWS: %s: Error during requesting hosts: %v", d.name, err)
+				log.Error().Msgf("AWS: %s: Error during requesting hosts: %v", d.name, err)
 				return -1
 			}
 			if len(resp.Hosts) > 0 {
@@ -206,7 +206,7 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ typesv2.Resources, def typesv
 			}
 		}
 
-		log.Debugf("AWS: %s: AvailableCapacity for dedicated Mac: %s %d", d.name, opts.InstanceType, instCount)
+		log.Debug().Msgf("AWS: %s: AvailableCapacity for dedicated Mac: %s %d", d.name, opts.InstanceType, instCount)
 
 		return instCount
 	}
@@ -219,7 +219,7 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ typesv2.Resources, def typesv
 	if upd, ok := d.typeCacheUpdated[opts.InstanceType]; ok {
 		if upd.After(time.Now().Add(-30 * time.Second)) {
 			if val, ok := d.typeCache[opts.InstanceType]; ok {
-				log.Debugf("AWS: %s: AvailableCapacity: Type: %s, Cache: %d", d.name, opts.InstanceType, val)
+				log.Debug().Msgf("AWS: %s: AvailableCapacity: Type: %s, Cache: %d", d.name, opts.InstanceType, val)
 				return val
 			}
 		}
@@ -267,7 +267,7 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ typesv2.Resources, def typesv
 			cpuQuota = d.quotas["Running On-Demand Standard (A, C, D, H, I, M, R, T, Z) instances"]
 			instTypes = append(instTypes, "a", "c", "d", "h", "i", "m", "r", "t", "z")
 		} else {
-			log.Errorf("AWS: %s: Driver does not support instance type: %s", d.name, opts.InstanceType)
+			log.Error().Msgf("AWS: %s: Driver does not support instance type: %s", d.name, opts.InstanceType)
 			return -1
 		}
 
@@ -286,11 +286,11 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ typesv2.Resources, def typesv
 	var ipCount int64
 	var err error
 	if _, ipCount, err = d.getSubnetID(connEc2, def.Resources.Network, ""); err != nil {
-		log.Errorf("AWS: %s: Error during requesting subnet: %v", d.name, err)
+		log.Error().Msgf("AWS: %s: Error during requesting subnet: %v", d.name, err)
 		return -1
 	}
 
-	log.Debugf("AWS: %s: AvailableCapacity: Type: %s, Quotas: %d, IP's: %d", d.name, opts.InstanceType, instCount, ipCount)
+	log.Debug().Msgf("AWS: %s: AvailableCapacity: Type: %s, Quotas: %d, IP's: %d", d.name, opts.InstanceType, instCount, ipCount)
 
 	// Return the most limiting value
 	result := instCount
@@ -327,7 +327,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 	if vmImage, err = d.getImageID(conn, vmImage); err != nil {
 		return nil, fmt.Errorf("AWS: %s: Unable to get image: %v", iName, err)
 	}
-	log.Infof("AWS: %s: Selected image: %q", iName, vmImage)
+	log.Info().Msgf("AWS: %s: Selected image: %q", iName, vmImage)
 
 	// Preparing common tags used for instance resources
 	commonTags := []ec2types.Tag{}
@@ -398,18 +398,19 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 
 			result, err := conn.CreateKeyPair(context.TODO(), &keypairInput)
 			if err != nil {
-				return nil, log.Errorf("AWS: %s: Unable to create keypair: %v", iName, err)
+				log.Error().Msgf("AWS: %s: Unable to create keypair: %v", iName, err)
+				return nil, fmt.Errorf("AWS: %s: Unable to create keypair: %v", iName, err)
 			}
 
 			input.KeyName = aws.String(keyName)
 			keyPem = aws.ToString(result.KeyMaterial)
-			log.Debugf("AWS: %s: Generated keypair: %q", iName, keyName)
+			log.Debug().Msgf("AWS: %s: Generated keypair: %q", iName, keyName)
 		} else {
-			log.Debugf("AWS: %s: Skipping key generation since no Authentication provided", iName)
+			log.Debug().Msgf("AWS: %s: Skipping key generation since no Authentication provided", iName)
 		}
 	} else if d.cfg.InstanceKey != "" {
 		input.KeyName = aws.String(d.cfg.InstanceKey)
-		log.Debugf("AWS: %s: Using keypair: %q", iName, d.cfg.InstanceKey)
+		log.Debug().Msgf("AWS: %s: Using keypair: %q", iName, d.cfg.InstanceKey)
 	}
 
 	var netZone string
@@ -428,7 +429,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 			Tenancy: ec2types.TenancyHost,
 			HostId:  aws.String(hostID),
 		}
-		log.Infof("AWS: %s: Utilizing pool %q host: %s", iName, opts.Pool, hostID)
+		log.Info().Msgf("AWS: %s: Utilizing pool %q host: %s", iName, opts.Pool, hostID)
 	} else if awsInstTypeAny(opts.InstanceType, "mac") {
 		// For mac machines only dedicated hosts are working, so set the tenancy
 		input.Placement = &ec2types.Placement{
@@ -441,7 +442,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 	if subnetID, _, err = d.getSubnetID(conn, subnetID, netZone); err != nil {
 		return nil, fmt.Errorf("AWS: %s: Unable to get subnet: %v", iName, err)
 	}
-	log.Infof("AWS: %s: Selected subnet: %q", iName, subnetID)
+	log.Info().Msgf("AWS: %s: Selected subnet: %q", iName, subnetID)
 
 	input.NetworkInterfaces = []ec2types.InstanceNetworkInterfaceSpecification{
 		{
@@ -462,7 +463,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 	}
 
 	if opts.SecurityGroup != "" {
-		log.Warnf("AWS: %s: security_group option is DEPRECATED, please use security_groups instead", iName)
+		log.Warn().Msgf("AWS: %s: security_group option is DEPRECATED, please use security_groups instead", iName)
 		opts.SecurityGroups = append(opts.SecurityGroups, opts.SecurityGroup)
 	}
 	for _, grp := range opts.SecurityGroups {
@@ -470,7 +471,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 		if vmSecgroup, err = d.getSecGroupID(conn, vmSecgroup); err != nil {
 			return nil, fmt.Errorf("AWS: %s: Unable to get security group: %v", iName, err)
 		}
-		log.Infof("AWS: %s: Selected security group: %q", iName, vmSecgroup)
+		log.Info().Msgf("AWS: %s: Selected security group: %q", iName, vmSecgroup)
 		input.NetworkInterfaces[0].Groups = append(input.NetworkInterfaces[0].Groups, vmSecgroup)
 	}
 
@@ -509,7 +510,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 			if vmSnapshot, err = d.getSnapshotID(conn, vmSnapshot); err != nil {
 				return nil, fmt.Errorf("AWS: %s: Unable to get snapshot: %v", iName, err)
 			}
-			log.Infof("AWS: %s: Selected snapshot: %q", iName, vmSnapshot)
+			log.Info().Msgf("AWS: %s: Selected snapshot: %q", iName, vmSnapshot)
 			mapping.Ebs.SnapshotId = aws.String(vmSnapshot)
 		} else {
 			// Just create a new disk
@@ -520,7 +521,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 				if err != nil {
 					return nil, fmt.Errorf("AWS: %s: Unable to get encrypt key from KMS: %v", iName, err)
 				}
-				log.Infof("AWS: %s: Selected encryption key: %q for disk: %q", iName, keyID, name)
+				log.Info().Msgf("AWS: %s: Selected encryption key: %q for disk: %q", iName, keyID, name)
 				mapping.Ebs.KmsKeyId = aws.String(keyID)
 			}
 		}
@@ -530,7 +531,8 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 	// Run the instance
 	result, err := conn.RunInstances(context.TODO(), &input)
 	if err != nil {
-		return nil, log.Errorf("AWS: %s: Unable to run instance: %v", iName, err)
+		log.Error().Msgf("AWS: %s: Unable to run instance: %v", iName, err)
+		return nil, fmt.Errorf("AWS: %s: Unable to run instance: %v", iName, err)
 	}
 
 	inst := &result.Instances[0]
@@ -555,7 +557,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 				inst = instTmp
 			}
 			if err != nil {
-				log.Errorf("AWS: %s: Error during getting instance while waiting for BlockDeviceMappings: %v", iName, err)
+				log.Error().Msgf("AWS: %s: Error during getting instance while waiting for BlockDeviceMappings: %v", iName, err)
 			}
 		}
 		for _, bd := range inst.BlockDeviceMappings {
@@ -582,7 +584,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 			}
 			if _, err := conn.CreateTags(context.TODO(), &tagsInput); err != nil {
 				// Do not fail hard here - the instance is already running
-				log.Warnf("AWS: %s: Unable to set tags for volume: %q, %q, %q", iName, aws.ToString(bd.Ebs.VolumeId), aws.ToString(bd.DeviceName), err)
+				log.Warn().Msgf("AWS: %s: Unable to set tags for volume: %q, %q, %q", iName, aws.ToString(bd.Ebs.VolumeId), aws.ToString(bd.DeviceName), err)
 			}
 		}
 	}
@@ -605,7 +607,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 	timeout := 60
 	for {
 		if inst.PrivateIpAddress != nil {
-			log.Infof("AWS: %s: Allocate of instance completed: %q, %q", iName, aws.ToString(inst.InstanceId), aws.ToString(inst.PrivateIpAddress))
+			log.Info().Msgf("AWS: %s: Allocate of instance completed: %q, %q", iName, aws.ToString(inst.InstanceId), aws.ToString(inst.PrivateIpAddress))
 			res.Identifier = aws.ToString(inst.InstanceId)
 			res.IpAddr = aws.ToString(inst.PrivateIpAddress)
 			return res, nil
@@ -622,12 +624,13 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 			inst = instTmp
 		}
 		if err != nil {
-			log.Errorf("AWS: %s: Error during getting instance while waiting for IP: %v, %q", iName, err, aws.ToString(inst.InstanceId))
+			log.Error().Msgf("AWS: %s: Error during getting instance while waiting for IP: %v, %q", iName, err, aws.ToString(inst.InstanceId))
 		}
 	}
 
 	res.Identifier = aws.ToString(inst.InstanceId)
-	return res, log.Errorf("AWS: %s: Unable to locate the instance IP: %q", iName, aws.ToString(inst.InstanceId))
+	log.Error().Msgf("AWS: %s: Unable to locate the instance IP: %q", iName, aws.ToString(inst.InstanceId))
+	return res, fmt.Errorf("AWS: %s: Unable to locate the instance IP: %q", iName, aws.ToString(inst.InstanceId))
 }
 
 // Status shows status of the resource
@@ -659,7 +662,7 @@ func (d *Driver) GetTask(name, options string) provider.DriverTask {
 	// Parse options json into task structure
 	if len(options) > 0 {
 		if err := json.Unmarshal([]byte(options), t); err != nil {
-			log.Errorf("AWS: %s: Unable to apply the task options: %v", d.name, err)
+			log.Error().Msgf("AWS: %s: Unable to apply the task options: %v", d.name, err)
 			return nil
 		}
 	}
@@ -697,13 +700,13 @@ func (d *Driver) Deallocate(res typesv2.ApplicationResource) error {
 		result, err := conn.DeleteKeyPair(context.TODO(), &keypairInput)
 		if err != nil || result == nil || !aws.ToBool(result.Return) {
 			// It's not critical, but could leave some additional work for cleanup
-			log.Errorf("AWS: %s: Unable to delete keypair %q: %v", res.Identifier, keyName, err)
+			log.Error().Msgf("AWS: %s: Unable to delete keypair %q: %v", res.Identifier, keyName, err)
 		} else {
-			log.Debugf("AWS: %s: Removed generated keypair: %q", res.Identifier, keyName)
+			log.Debug().Msgf("AWS: %s: Removed generated keypair: %q", res.Identifier, keyName)
 		}
 	}
 
-	log.Infof("AWS: %s: Deallocate of instance completed: %s", res.Identifier, inst.CurrentState.Name)
+	log.Info().Msgf("AWS: %s: Deallocate of instance completed: %s", res.Identifier, inst.CurrentState.Name)
 
 	return nil
 }

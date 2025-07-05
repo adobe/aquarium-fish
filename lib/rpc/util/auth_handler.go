@@ -39,31 +39,31 @@ func (h *AuthHandler) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		auth := r.Header.Get("Authorization")
 		if !strings.HasPrefix(auth, "Basic ") {
-			log.Debugf("RPC: HTTP Auth: No Basic auth header found")
+			log.Debug().Msgf("RPC: HTTP Auth: No Basic auth header found")
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
 		payload, err := base64.StdEncoding.DecodeString(auth[6:])
 		if err != nil {
-			log.Debugf("RPC: HTTP Auth: Failed to decode auth header: %v", err)
+			log.Debug().Msgf("RPC: HTTP Auth: Failed to decode auth header: %v", err)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
 		parts := strings.SplitN(string(payload), ":", 2)
 		if len(parts) != 2 {
-			log.Debugf("RPC: HTTP Auth: Invalid auth format")
+			log.Debug().Msgf("RPC: HTTP Auth: Invalid auth format")
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
 		username, password := parts[0], parts[1]
-		log.Debugf("RPC: %s: New HTTP request received: %s", username, r.URL.Path)
+		log.Debug().Msgf("RPC: %s: New HTTP request received: %s", username, r.URL.Path)
 
 		user := h.db.UserAuth(username, password)
 		if user == nil {
-			log.Debugf("RPC: HTTP Auth: Authentication failed for user: %s", username)
+			log.Debug().Msgf("RPC: HTTP Auth: Authentication failed for user: %s", username)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}

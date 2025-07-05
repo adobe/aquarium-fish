@@ -80,12 +80,12 @@ func (d *Database) UserAuth(name string, password string) *typesv2.User {
 	// TODO: Make auth process to take constant time in case of failure
 	user, err := d.UserGet(name)
 	if err != nil {
-		log.Warn("Fish: User not exists:", name)
+		log.Warn().Msgf("Fish: User not exists: %s", name)
 		return nil
 	}
 
 	if hash, err := user.GetHash(); err != nil || !hash.IsEqual(password) {
-		log.Warnf("Fish: Incorrect user password: %s, %v", name, err)
+		log.Warn().Msgf("Fish: Incorrect user password: %s, %v", name, err)
 		return nil
 	}
 
@@ -102,11 +102,13 @@ func (d *Database) UserNew(name string, password string) (string, *typesv2.User,
 		Name: name,
 	}
 	if err := user.SetHash(crypt.NewHash(password, nil)); err != nil {
-		return "", nil, log.Error("Fish: Unable to set hash for new user:", name, err)
+		log.Error().Msgf("Fish: Unable to set hash for new user %q: %v", name, err)
+		return "", nil, fmt.Errorf("Fish: Unable to set hash for new user %q: %v", name, err)
 	}
 
 	if err := d.UserCreate(user); err != nil {
-		return "", nil, log.Error("Fish: Unable to create new user:", name, err)
+		log.Error().Msgf("Fish: Unable to create new user %q: %v", name, err)
+		return "", nil, fmt.Errorf("Fish: Unable to create new user %q: %v", name, err)
 	}
 
 	return password, user, nil

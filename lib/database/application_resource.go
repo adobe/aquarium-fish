@@ -87,7 +87,7 @@ func (d *Database) ApplicationResourceCreate(r *typesv2.ApplicationResource) err
 				// Successfully sent notification
 			default:
 				// Channel is closed or full, skip this subscriber
-				log.Debugf("Database: Failed to send ApplicationResource notification, channel closed or full")
+				log.Debug().Msgf("Database: Failed to send ApplicationResource notification, channel closed or full")
 			}
 		}
 	}(r)
@@ -160,14 +160,14 @@ func isControlledNetwork(ip string) bool {
 
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		log.Errorf("Unable to get the available network interfaces: %+v\n", err.Error())
+		log.Error().Msgf("Unable to get the available network interfaces: %+v\n", err.Error())
 		return false
 	}
 
 	for _, i := range ifaces {
 		addrs, err := i.Addrs()
 		if err != nil {
-			log.Errorf("Unable to get available addresses of the interface %s: %+v\n", i.Name, err.Error())
+			log.Error().Msgf("Unable to get available addresses of the interface %s: %+v\n", i.Name, err.Error())
 			continue
 		}
 
@@ -229,7 +229,7 @@ func (d *Database) ApplicationResourceGetByIP(ip string) (res *typesv2.Applicati
 		return nil, fmt.Errorf("Fish: Prohibited to access the ApplicationResource of not allocated Application")
 	}
 
-	log.Debug("Fish: Update IP address for the ApplicationResource", res.ApplicationUid, ip)
+	log.Debug().Msgf("Fish: Update IP address for the ApplicationResource %s: %s", res.ApplicationUid, ip)
 	res.IpAddr = ip
 	err = d.ApplicationResourceSave(res)
 

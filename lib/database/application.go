@@ -98,7 +98,7 @@ func (d *Database) ApplicationDeallocate(appUID typesv2.ApplicationUID, requesto
 	}
 	if !d.ApplicationStateIsActive(out.Status) {
 		// Since app can't be deallocated - it's not really an error, treating as precaution
-		log.Warnf("DB: Unable to deallocate the Application %q with status: %s", appUID, out.Status)
+		log.Warn().Msgf("DB: Unable to deallocate the Application %q with status: %s", appUID, out.Status)
 		return out, nil
 	}
 
