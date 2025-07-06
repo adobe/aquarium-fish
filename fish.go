@@ -147,6 +147,14 @@ func main() {
 			monitoringConfig.NodeName = cfg.NodeName
 			monitoringConfig.NodeLocation = cfg.NodeLocation
 
+			// Set up file export path if not configured and no remote endpoints are set
+			if monitoringConfig.FileExportPath == "" && monitoringConfig.Enabled {
+				if monitoringConfig.OTLPEndpoint == "" || monitoringConfig.OTLPEndpoint == "localhost:4317" {
+					monitoringConfig.FileExportPath = filepath.Join(cfg.Directory, "otel")
+					log.Info().Msgf("Fish: Setting file export path to %s", monitoringConfig.FileExportPath)
+				}
+			}
+
 			// Initialize monitoring
 			monitor, err := monitoring.Initialize(context.Background(), monitoringConfig)
 			if err != nil {

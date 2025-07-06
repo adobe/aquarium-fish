@@ -26,7 +26,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
@@ -82,14 +81,6 @@ func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*Wrapper,
 
 	// Handle metadata requests on /meta/v1/data
 	mux.Handle("/meta/", http.StripPrefix("/meta", metaServer))
-
-	// Handle Prometheus metrics endpoint if monitoring is enabled
-	if monitor := f.GetMonitor(); monitor != nil && monitor.IsEnabled() {
-		if promExporter := monitor.GetPrometheusHandler(); promExporter != nil {
-			mux.Handle("/metrics", promhttp.Handler())
-			log.Info().Msg("API: Prometheus metrics endpoint enabled at /metrics")
-		}
-	}
 
 	// Handle pprof debug endpoints if compiled as debug
 	serverConnectPprofIfDebug(mux)

@@ -155,7 +155,7 @@ func DefaultConfig() *Config {
 		Level:        "info",
 		Format:       "console",
 		UseTimestamp: true,
-		UseColor:     true,
+		UseColor:     false, // Disabled by default due to tests don't like it
 		UseCaller:    false,
 		OtelEnabled:  false,
 		OtelMinLevel: "info",
@@ -177,9 +177,14 @@ func Initialize(config *Config) error {
 	var output io.Writer = os.Stdout
 
 	if config.Format == "console" {
+		format := "060102/150405-07"
+		if level == zerolog.DebugLevel || level == zerolog.TraceLevel {
+			zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
+			format = "060102/150405.000-07"
+		}
 		consoleWriter := zerolog.ConsoleWriter{
-			Out:        output,
-			TimeFormat: time.RFC3339,
+			Out:        os.Stdout,
+			TimeFormat: format,
 			NoColor:    !config.UseColor,
 		}
 		if !config.UseTimestamp {

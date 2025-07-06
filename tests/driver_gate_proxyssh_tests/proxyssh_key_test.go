@@ -21,6 +21,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"os/exec"
 	"strconv"
@@ -44,7 +45,7 @@ import (
 // WARN: This test requires `ssh` and `sh` binary to be available in PATH
 func Test_proxyssh_ssh_key2password_tty_access(t *testing.T) {
 	t.Parallel()
-	afi := h.NewAquariumFish(t, "node-1", `---
+	afi := h.NewStoppedAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0
@@ -55,6 +56,22 @@ drivers:
       bind_address: 127.0.0.1:0
   providers:
     test:`)
+
+	var proxysshEndpoint string
+	afi.WaitForLog("PROXYSSH listening on: ", func(substring, line string) bool {
+		data := strings.SplitN(strings.TrimSpace(line), substring, 2)
+		addrport, err := netip.ParseAddrPort(data[1])
+		if err != nil {
+			t.Fatalf("ERROR: Unable to parse address:port from data %q: %v", data[1], err)
+			return false
+		}
+		proxysshEndpoint = addrport.String()
+		t.Logf("Located proxyssh endpoint: %q", proxysshEndpoint)
+
+		return true
+	})
+
+	afi.Start(t)
 
 	t.Cleanup(func() {
 		afi.Cleanup(t)
@@ -216,7 +233,7 @@ drivers:
 			t.Fatalf("Unable to change temp proxykey file mod: %v", err)
 		}
 
-		proxyHost, proxyPort, err := net.SplitHostPort(afi.ProxySSHEndpoint())
+		proxyHost, proxyPort, err := net.SplitHostPort(proxysshEndpoint)
 		if err != nil {
 			t.Fatalf("Unable to parse ProxySSH endpoint: %v", err)
 		}
@@ -272,7 +289,7 @@ drivers:
 // WARN: This test requires `ssh` and `sh` binary to be available in PATH
 func Test_proxyssh_ssh_key2key_tty_access(t *testing.T) {
 	t.Parallel()
-	afi := h.NewAquariumFish(t, "node-1", `---
+	afi := h.NewStoppedAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0
@@ -283,6 +300,22 @@ drivers:
       bind_address: 127.0.0.1:0
   providers:
     test:`)
+
+	var proxysshEndpoint string
+	afi.WaitForLog("PROXYSSH listening on: ", func(substring, line string) bool {
+		data := strings.SplitN(strings.TrimSpace(line), substring, 2)
+		addrport, err := netip.ParseAddrPort(data[1])
+		if err != nil {
+			t.Fatalf("ERROR: Unable to parse address:port from data %q: %v", data[1], err)
+			return false
+		}
+		proxysshEndpoint = addrport.String()
+		t.Logf("Located proxyssh endpoint: %q", proxysshEndpoint)
+
+		return true
+	})
+
+	afi.Start(t)
 
 	t.Cleanup(func() {
 		afi.Cleanup(t)
@@ -518,7 +551,7 @@ drivers:
 			t.Fatalf("Unable to change temp proxykey file mod: %v", err)
 		}
 
-		proxyHost, proxyPort, err := net.SplitHostPort(afi.ProxySSHEndpoint())
+		proxyHost, proxyPort, err := net.SplitHostPort(proxysshEndpoint)
 		if err != nil {
 			t.Fatalf("Unable to parse ProxySSH endpoint: %v", err)
 		}
@@ -603,7 +636,7 @@ drivers:
 // Test ProxySSH SCP functionality with key authentication for client and password for target
 func Test_proxyssh_scp_key2password_copy(t *testing.T) {
 	t.Parallel()
-	afi := h.NewAquariumFish(t, "node-1", `---
+	afi := h.NewStoppedAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0
@@ -614,6 +647,22 @@ drivers:
       bind_address: 127.0.0.1:0
   providers:
     test:`)
+
+	var proxysshEndpoint string
+	afi.WaitForLog("PROXYSSH listening on: ", func(substring, line string) bool {
+		data := strings.SplitN(strings.TrimSpace(line), substring, 2)
+		addrport, err := netip.ParseAddrPort(data[1])
+		if err != nil {
+			t.Fatalf("ERROR: Unable to parse address:port from data %q: %v", data[1], err)
+			return false
+		}
+		proxysshEndpoint = addrport.String()
+		t.Logf("Located proxyssh endpoint: %q", proxysshEndpoint)
+
+		return true
+	})
+
+	afi.Start(t)
 
 	t.Cleanup(func() {
 		afi.Cleanup(t)
@@ -790,7 +839,7 @@ drivers:
 			t.Fatalf("Unable to change temp proxykey file mod: %v", err)
 		}
 
-		proxyHost, proxyPort, err := net.SplitHostPort(afi.ProxySSHEndpoint())
+		proxyHost, proxyPort, err := net.SplitHostPort(proxysshEndpoint)
 
 		stdout, stderr, err := util.RunAndLog("TEST", 5*time.Second, nil, "scp", "-v",
 			"-s", // Forcing SFTP for the scp < v9.0
@@ -866,7 +915,7 @@ drivers:
 			t.Fatalf("Unable to change temp proxykey file mod: %v", err)
 		}
 
-		proxyHost, proxyPort, err := net.SplitHostPort(afi.ProxySSHEndpoint())
+		proxyHost, proxyPort, err := net.SplitHostPort(proxysshEndpoint)
 
 		args := []string{
 			"-v",
@@ -925,7 +974,7 @@ drivers:
 // Test ProxySSH port forwarding functionality with key-to-key authentication
 func Test_proxyssh_port_key2key(t *testing.T) {
 	t.Parallel()
-	afi := h.NewAquariumFish(t, "node-1", `---
+	afi := h.NewStoppedAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0
@@ -936,6 +985,22 @@ drivers:
       bind_address: 127.0.0.1:0
   providers:
     test:`)
+
+	var proxysshEndpoint string
+	afi.WaitForLog("PROXYSSH listening on: ", func(substring, line string) bool {
+		data := strings.SplitN(strings.TrimSpace(line), substring, 2)
+		addrport, err := netip.ParseAddrPort(data[1])
+		if err != nil {
+			t.Fatalf("ERROR: Unable to parse address:port from data %q: %v", data[1], err)
+			return false
+		}
+		proxysshEndpoint = addrport.String()
+		t.Logf("Located proxyssh endpoint: %q", proxysshEndpoint)
+
+		return true
+	})
+
+	afi.Start(t)
 
 	t.Cleanup(func() {
 		afi.Cleanup(t)
@@ -1113,7 +1178,7 @@ drivers:
 			t.Fatalf("Unable to change temp proxykey file mod: %v", err)
 		}
 
-		proxyHost, proxyPort, err := net.SplitHostPort(afi.ProxySSHEndpoint())
+		proxyHost, proxyPort, err := net.SplitHostPort(proxysshEndpoint)
 		if err != nil {
 			t.Fatalf("Unable to parse ProxySSH endpoint: %v", err)
 		}
@@ -1187,7 +1252,7 @@ drivers:
 	//	if err != nil {
 	//		t.Fatalf("Unable to change temp proxykey file mod: %v", err)
 	//	}
-	//	proxyHost, proxyPort, err := net.SplitHostPort(afi.ProxySSHEndpoint())
+	//	proxyHost, proxyPort, err := net.SplitHostPort(proxysshEndpoint)
 	//	_, apiPort, err := net.SplitHostPort(afi.APIEndpoint())
 	//	// Picking semi-random port to listen on
 	//	proxyApiPort, _ := strconv.Atoi(apiPort)

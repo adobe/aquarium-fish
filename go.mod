@@ -19,6 +19,7 @@ require (
 	github.com/gliderlabs/ssh v0.3.7
 	github.com/google/go-github/v71 v71.0.0
 	github.com/google/uuid v1.6.0
+	github.com/grafana/otel-profiling-go v0.5.1
 	github.com/grafana/pyroscope-go v1.2.2
 	github.com/hpcloud/tail v1.0.0
 	github.com/mostlygeek/arp v0.0.0-20170424181311-541a2129847a

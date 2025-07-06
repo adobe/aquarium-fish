@@ -107,4 +107,5 @@ func (c *Config) initDefaults() {
 	c.ElectedRoundsToWait = 10
 	c.DBCleanupInterval = util.Duration(DefaultDBCleanupInterval)
 	c.DBCompactInterval = util.Duration(DefaultDBCompactInterval)
+	c.Monitoring.InitDefaults()
 }
