@@ -14,6 +14,7 @@
 
 package fish
 
+import "context"
 import (
 	"fmt"
 	"time"
@@ -51,6 +52,7 @@ func (f *Fish) maybeRunElectionProcess(appState *typesv2.ApplicationState) {
 // electionProcess performs & monitors the election process for the NEW Application until it's in
 // ALLOCATED state.
 func (f *Fish) electionProcess(appUID typesv2.ApplicationUID) error {
+	ctx := context.Background()
 	// It's not a waited Fish routine - because doesn't actually hold anything valuable, so
 	// could be terminated at any time with no particular harm to the rest of the system.
 
@@ -62,14 +64,14 @@ func (f *Fish) electionProcess(appUID typesv2.ApplicationUID) error {
 	// Make sure the active vote will be removed in case error happens to restart the process next time
 	defer f.activeVotesRemove(appUID)
 
-	app, err := f.db.ApplicationGet(appUID)
+	app, err := f.db.ApplicationGet(ctx, appUID)
 	if err != nil {
 		log.Error().Msgf("Fish: Election %s: Fatal: Unable to get the Application: %v", appUID, err)
 		return fmt.Errorf("Fish: Election %s: Fatal: Unable to get the Application: %v", appUID, err)
 	}
 
 	// Get label with the definitions
-	label, err := f.db.LabelGet(app.LabelUid)
+	label, err := f.db.LabelGet(ctx, app.LabelUid)
 	if err != nil {
 		log.Error().Msgf("Fish: Election %s: Fatal: Unable to get the Label %s: %v", appUID, app.LabelUid, err)
 		return fmt.Errorf("Fish: Election %s: Fatal: Unable to get the Label %s: %v", appUID, app.LabelUid, err)
@@ -100,7 +102,7 @@ func (f *Fish) electionProcess(appUID typesv2.ApplicationUID) error {
 		roundEndsAt := app.CreatedAt.Add(time.Duration(ElectionRoundTime*(myvote.Round+1)) * time.Second)
 
 		// Check if the Application is good to go or maybe we need to wait until the change
-		if appState, err := f.db.ApplicationStateGetByApplication(appUID); err != nil {
+		if appState, err := f.db.ApplicationStateGetByApplication(ctx, appUID); err != nil {
 			// If the cleanup is set to very tight limit (< ElectionRoundTime) - the Application
 			// can actually complete it's journey before election process confirms it's state, so
 			// not existing Application can't be elected anymore and we can safely drop here
@@ -172,7 +174,7 @@ func (f *Fish) electionProcess(appUID typesv2.ApplicationUID) error {
 		// Loop to recheck status within the round
 		for time.Until(roundEndsAt) > 0 {
 			// Check all the cluster nodes voted
-			nodes, err := f.db.NodeActiveList()
+			nodes, err := f.db.NodeActiveList(ctx)
 			if err != nil {
 				log.Error().Msgf("Fish: Election %s: Fatal: Unable to get the Node list: %v", appUID, err)
 				return fmt.Errorf("Fish: Election %s: Fatal: Unable to get the Node list: %v", appUID, err)
@@ -222,7 +224,7 @@ func (f *Fish) electionProcess(appUID typesv2.ApplicationUID) error {
 					Status:         typesv2.ApplicationState_ELECTED,
 					Description:    "Elected node: " + f.db.GetNodeName(),
 				}
-				if err := f.db.ApplicationStateCreate(&appState); err != nil {
+				if err := f.db.ApplicationStateCreate(ctx, &appState); err != nil {
 					log.Error().Msgf("Fish: Election %s: Unable to set Application state: %v", app.Uid, err)
 					return fmt.Errorf("Fish: Election %s: Unable to set Application state: %v", app.Uid, err)
 				}

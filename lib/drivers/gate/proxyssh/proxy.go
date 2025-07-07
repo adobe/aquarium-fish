@@ -15,6 +15,7 @@
 package proxyssh
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -68,7 +69,7 @@ func (d *Driver) serveConnection(clientConn net.Conn) error {
 	}
 
 	// Getting the info about the destination resource
-	resource, err := d.db.ApplicationResourceGet(session.ResourceAccessor.ApplicationResourceUid)
+	resource, err := d.db.ApplicationResourceGet(context.Background(), session.ResourceAccessor.ApplicationResourceUid)
 	if err != nil {
 		log.Error().Msgf("PROXYSSH: %s: %s: Unable to retrieve Resource %s: %v", d.name, session.SrcAddr, session.ResourceAccessor.ApplicationResourceUid, err)
 		return fmt.Errorf("PROXYSSH: %s: %s: Unable to retrieve Resource %s: %v", d.name, session.SrcAddr, session.ResourceAccessor.ApplicationResourceUid, err)
@@ -310,7 +311,7 @@ func (d *Driver) passwordCallback(incomingConn ssh.ConnMetadata, pass []byte) (*
 	user := incomingConn.User()
 	log.Debug().Msgf("PROXYSSH: %s: %s: Login attempt for user %q.", d.name, incomingConn.RemoteAddr(), user)
 
-	fishUser, err := d.db.UserGet(user)
+	fishUser, err := d.db.UserGet(context.Background(), user)
 	if err != nil {
 		log.Error().Msgf("PROXYSSH: %s: %s: Unrecognized user %q", d.name, incomingConn.RemoteAddr(), user)
 		return nil, fmt.Errorf("Invalid access")
@@ -344,7 +345,7 @@ func (d *Driver) publicKeyCallback(incomingConn ssh.ConnMetadata, key ssh.Public
 	user := incomingConn.User()
 	log.Debug().Msgf("PROXYSSH: %s: %s: Login attempt for user %q.", d.name, incomingConn.RemoteAddr(), user)
 
-	fishUser, err := d.db.UserGet(user)
+	fishUser, err := d.db.UserGet(context.Background(), user)
 	if err != nil {
 		log.Error().Msgf("PROXYSSH: %s: %s: Unrecognized user %q", d.name, incomingConn.RemoteAddr(), user)
 		return nil, fmt.Errorf("Invalid access")

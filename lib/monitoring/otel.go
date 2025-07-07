@@ -94,7 +94,7 @@ func (c *Config) InitDefaults() {
 
 	c.OTLPEndpoint = ""
 	c.PyroscopeURL = ""
-	c.FileExportPath = "" // Will be set to fish data directory + "otel" if not configured
+	c.FileExportPath = "" // Will be set to fish ws directory + "telemetry" if not configured
 
 	c.ServiceName = serviceName
 	c.ServiceVersion = serviceVersion
@@ -233,7 +233,7 @@ func (m *Monitor) setupFileExport() error {
 
 // shouldUseFileExport returns true if file export should be used instead of remote endpoints
 func (m *Monitor) shouldUseFileExport() bool {
-	return m.config.FileExportPath != "" && (m.config.OTLPEndpoint == "" || m.config.OTLPEndpoint == "localhost:4317")
+	return m.config.FileExportPath != "" && m.config.OTLPEndpoint == ""
 }
 
 // initTracing initializes OpenTelemetry tracing

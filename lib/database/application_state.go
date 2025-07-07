@@ -15,6 +15,7 @@
 package database
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -24,14 +25,14 @@ import (
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
-func (d *Database) SubscribeApplicationState(ch chan *typesv2.ApplicationState) {
+func (d *Database) subscribeApplicationStateImpl(ctx context.Context, ch chan *typesv2.ApplicationState) {
 	d.subsMu.Lock()
 	defer d.subsMu.Unlock()
 	d.subsApplicationState = append(d.subsApplicationState, ch)
 }
 
-// UnsubscribeApplicationState removes a channel from the subscription list
-func (d *Database) UnsubscribeApplicationState(ch chan *typesv2.ApplicationState) {
+// unsubscribeApplicationStateImpl removes a channel from the subscription list
+func (d *Database) unsubscribeApplicationStateImpl(ctx context.Context, ch chan *typesv2.ApplicationState) {
 	d.subsMu.Lock()
 	defer d.subsMu.Unlock()
 	for i, existing := range d.subsApplicationState {
@@ -43,8 +44,8 @@ func (d *Database) UnsubscribeApplicationState(ch chan *typesv2.ApplicationState
 	}
 }
 
-// ApplicationStateList returns list of ApplicationStates
-func (d *Database) ApplicationStateList() (ass []typesv2.ApplicationState, err error) {
+// applicationStateListImpl returns list of ApplicationStates
+func (d *Database) applicationStateListImpl(ctx context.Context) (ass []typesv2.ApplicationState, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -52,8 +53,8 @@ func (d *Database) ApplicationStateList() (ass []typesv2.ApplicationState, err e
 	return ass, err
 }
 
-// ApplicationStateCreate makes new ApplicationState
-func (d *Database) ApplicationStateCreate(as *typesv2.ApplicationState) error {
+// applicationStateCreateImpl makes new ApplicationState
+func (d *Database) applicationStateCreateImpl(ctx context.Context, as *typesv2.ApplicationState) error {
 	if as.ApplicationUid == uuid.Nil {
 		return fmt.Errorf("Fish: ApplicationUID can't be unset")
 	}
@@ -91,15 +92,15 @@ func (d *Database) ApplicationStateCreate(as *typesv2.ApplicationState) error {
 }
 
 // Intentionally disabled, application state can't be updated
-/*func (d *Database) ApplicationStateSave(as *typesv2.ApplicationState) error {
+/*func (d *Database) applicationStateSaveImpl(ctx context.Context, as *typesv2.ApplicationState) error {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
 	return d.be.Save(as).Error
 }*/
 
-// ApplicationStateGet returns specific ApplicationState
-func (d *Database) ApplicationStateGet(uid typesv2.ApplicationStateUID) (as *typesv2.ApplicationState, err error) {
+// applicationStateGetImpl returns specific ApplicationState
+func (d *Database) applicationStateGetImpl(ctx context.Context, uid typesv2.ApplicationStateUID) (as *typesv2.ApplicationState, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -107,17 +108,17 @@ func (d *Database) ApplicationStateGet(uid typesv2.ApplicationStateUID) (as *typ
 	return as, err
 }
 
-// ApplicationStateDelete removes the ApplicationState
-func (d *Database) ApplicationStateDelete(uid typesv2.ApplicationStateUID) (err error) {
+// applicationStateDeleteImpl removes the ApplicationState
+func (d *Database) applicationStateDeleteImpl(ctx context.Context, uid typesv2.ApplicationStateUID) (err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
 	return d.be.Collection(ObjectApplicationState).Delete(uid.String())
 }
 
-// ApplicationStateListByApplication returns all ApplicationStates with ApplicationUID
-func (d *Database) ApplicationStateListByApplication(appUID typesv2.ApplicationUID) (states []typesv2.ApplicationState, err error) {
-	all, err := d.ApplicationStateList()
+// applicationStateListByApplicationImpl returns all ApplicationStates with ApplicationUID
+func (d *Database) applicationStateListByApplicationImpl(ctx context.Context, appUID typesv2.ApplicationUID) (states []typesv2.ApplicationState, err error) {
+	all, err := d.ApplicationStateList(ctx)
 	if err != nil {
 		return states, err
 	}
@@ -129,9 +130,9 @@ func (d *Database) ApplicationStateListByApplication(appUID typesv2.ApplicationU
 	return states, err
 }
 
-// ApplicationStateNewCount returns amount of NEW states of the Application, to get amount of tries
-func (d *Database) ApplicationStateNewCount(appUID typesv2.ApplicationUID) (count uint) {
-	all, err := d.ApplicationStateList()
+// applicationStateNewCountImpl returns amount of NEW states of the Application, to get amount of tries
+func (d *Database) applicationStateNewCountImpl(ctx context.Context, appUID typesv2.ApplicationUID) (count uint) {
+	all, err := d.ApplicationStateList(ctx)
 	if err != nil {
 		log.Error().Msgf("Unable to get ApplicationState list: %v", err)
 		return count
@@ -144,10 +145,10 @@ func (d *Database) ApplicationStateNewCount(appUID typesv2.ApplicationUID) (coun
 	return count
 }
 
-// ApplicationStateListLatest returns list of latest ApplicationState per Application
-func (d *Database) ApplicationStateListLatest() (out []typesv2.ApplicationState, err error) {
+// applicationStateListLatestImpl returns list of latest ApplicationState per Application
+func (d *Database) applicationStateListLatestImpl(ctx context.Context) (out []typesv2.ApplicationState, err error) {
 	states := make(map[string]typesv2.ApplicationState)
-	all, err := d.ApplicationStateList()
+	all, err := d.ApplicationStateList(ctx)
 	if err != nil {
 		return out, err
 	}
@@ -162,9 +163,9 @@ func (d *Database) ApplicationStateListLatest() (out []typesv2.ApplicationState,
 	return out, nil
 }
 
-// ApplicationStateListNewElected returns new and elected Applications
-func (d *Database) ApplicationStateListNewElected() (ass []typesv2.ApplicationState, err error) {
-	states, err := d.ApplicationStateListLatest()
+// applicationStateListNewElectedImpl returns new and elected Applications
+func (d *Database) applicationStateListNewElectedImpl(ctx context.Context) (ass []typesv2.ApplicationState, err error) {
+	states, err := d.ApplicationStateListLatest(ctx)
 	if err != nil {
 		return ass, err
 	}
@@ -176,9 +177,9 @@ func (d *Database) ApplicationStateListNewElected() (ass []typesv2.ApplicationSt
 	return ass, err
 }
 
-// ApplicationStateGetByApplication returns latest ApplicationState of requested ApplicationUID
-func (d *Database) ApplicationStateGetByApplication(appUID typesv2.ApplicationUID) (state *typesv2.ApplicationState, err error) {
-	all, err := d.ApplicationStateListByApplication(appUID)
+// applicationStateGetByApplicationImpl returns latest ApplicationState of requested ApplicationUID
+func (d *Database) applicationStateGetByApplicationImpl(ctx context.Context, appUID typesv2.ApplicationUID) (state *typesv2.ApplicationState, err error) {
+	all, err := d.ApplicationStateListByApplication(ctx, appUID)
 	if err != nil {
 		return nil, err
 	}
@@ -190,6 +191,7 @@ func (d *Database) ApplicationStateGetByApplication(appUID typesv2.ApplicationUI
 	if state == nil {
 		err = fmt.Errorf("Fish: Unable to find any state with ApplicationUID %s", appUID)
 	}
+
 	return state, err
 }
 

@@ -629,7 +629,7 @@ func (s *StreamingService) setupSubscriptions(subCtx context.Context, subscripti
 		case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE:
 			// Create a safe wrapper channel for database notifications
 			dbChannel := make(chan *typesv2.ApplicationState, 100)
-			s.fish.DB().SubscribeApplicationState(dbChannel)
+			s.fish.DB().SubscribeApplicationState(subCtx, dbChannel)
 			log.Debug().Msgf("Subscription %s: Subscribed to ApplicationState changes", sub.id)
 
 			// Add to WaitGroup before starting goroutine
@@ -639,7 +639,7 @@ func (s *StreamingService) setupSubscriptions(subCtx context.Context, subscripti
 		case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE:
 			// Create a safe wrapper channel for database notifications
 			dbChannel := make(chan *typesv2.ApplicationResource, 100)
-			s.fish.DB().SubscribeApplicationResource(dbChannel)
+			s.fish.DB().SubscribeApplicationResource(subCtx, dbChannel)
 			log.Debug().Msgf("Subscription %s: Subscribed to ApplicationResource changes", sub.id)
 
 			// Add to WaitGroup before starting goroutine
@@ -649,7 +649,7 @@ func (s *StreamingService) setupSubscriptions(subCtx context.Context, subscripti
 		case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK:
 			// Create a safe wrapper channel for database notifications
 			dbChannel := make(chan *typesv2.ApplicationTask, 100)
-			s.fish.DB().SubscribeApplicationTask(dbChannel)
+			s.fish.DB().SubscribeApplicationTask(subCtx, dbChannel)
 			log.Debug().Msgf("Subscription %s: Subscribed to ApplicationTask changes", sub.id)
 
 			// Add to WaitGroup before starting goroutine

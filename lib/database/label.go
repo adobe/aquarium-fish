@@ -15,6 +15,7 @@
 package database
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -28,8 +29,8 @@ type LabelListParams struct {
 	Version *string
 }
 
-// LabelFind returns list of Labels that fits filters
-func (d *Database) LabelList(filters LabelListParams) (labels []typesv2.Label, err error) {
+// labelListImpl returns list of Labels that fits filters
+func (d *Database) labelListImpl(ctx context.Context, filters LabelListParams) (labels []typesv2.Label, err error) {
 	d.beMu.RLock()
 	err = d.be.Collection(ObjectLabel).List(&labels)
 	d.beMu.RUnlock()
@@ -76,25 +77,8 @@ func (d *Database) LabelList(filters LabelListParams) (labels []typesv2.Label, e
 	return labels, err
 }
 
-func (d *Database) LabelListName(name string) (labels []typesv2.Label, err error) {
-	allLabels := []typesv2.Label{}
-
-	d.beMu.RLock()
-	err = d.be.Collection(ObjectLabel).List(&allLabels)
-	d.beMu.RUnlock()
-
-	if err == nil {
-		for _, l := range allLabels {
-			if l.Name == name {
-				labels = append(labels, l)
-			}
-		}
-	}
-	return labels, err
-}
-
-// LabelCreate makes new Label
-func (d *Database) LabelCreate(l *typesv2.Label) error {
+// labelCreateImpl makes new Label
+func (d *Database) labelCreateImpl(ctx context.Context, l *typesv2.Label) error {
 	if l.Name == "" {
 		return fmt.Errorf("Fish: Name can't be empty")
 	}
@@ -113,7 +97,7 @@ func (d *Database) LabelCreate(l *typesv2.Label) error {
 
 	// Name and version need to be unique
 	strversion := fmt.Sprintf("%d", l.Version)
-	founds, err := d.LabelList(LabelListParams{Name: &l.Name, Version: &strversion})
+	founds, err := d.LabelList(ctx, LabelListParams{Name: &l.Name, Version: &strversion})
 	if err != nil || len(founds) != 0 {
 		return fmt.Errorf("Fish: Label name + version is not unique: %v", err)
 	}
@@ -128,15 +112,15 @@ func (d *Database) LabelCreate(l *typesv2.Label) error {
 
 // Intentionally disabled - labels can be created once and can't be updated
 // Create label with incremented version instead
-/*func (d *Database) LabelSave(label *typesv2.Label) error {
+/*func (d *Database) labelSaveImpl(ctx context.Context, label *typesv2.Label) error {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
 	return d.be.Save(label).Error
 }*/
 
-// LabelGet returns Label by UID
-func (d *Database) LabelGet(uid typesv2.LabelUID) (label *typesv2.Label, err error) {
+// labelGetImpl returns Label by UID
+func (d *Database) labelGetImpl(ctx context.Context, uid typesv2.LabelUID) (label *typesv2.Label, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -144,8 +128,8 @@ func (d *Database) LabelGet(uid typesv2.LabelUID) (label *typesv2.Label, err err
 	return label, err
 }
 
-// LabelDelete deletes the Label by UID
-func (d *Database) LabelDelete(uid typesv2.LabelUID) error {
+// labelDeleteImpl deletes the Label by UID
+func (d *Database) labelDeleteImpl(ctx context.Context, uid typesv2.LabelUID) error {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 

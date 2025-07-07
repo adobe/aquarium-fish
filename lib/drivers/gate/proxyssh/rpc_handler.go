@@ -69,7 +69,7 @@ func (d *driverRPCHandler) GetResourceAccess(ctx context.Context, req *connect.R
 	}
 
 	// Get the application resource
-	resource, err := d.drv.db.ApplicationResourceGet(resourceUID)
+	resource, err := d.drv.db.ApplicationResourceGet(ctx, resourceUID)
 	if err != nil {
 		log.Error().Msgf("PROXYSSH: %s: Unable to get application resource %s: %v", d.drv.name, appResourceUID, err)
 		return connect.NewResponse(&aquariumv2.GateProxySSHServiceGetResourceAccessResponse{
@@ -78,7 +78,7 @@ func (d *driverRPCHandler) GetResourceAccess(ctx context.Context, req *connect.R
 	}
 
 	// Get the application to verify owner permissions
-	app, err := d.drv.db.ApplicationGet(resource.ApplicationUid)
+	app, err := d.drv.db.ApplicationGet(ctx, resource.ApplicationUid)
 	if err != nil {
 		log.Error().Msgf("PROXYSSH: %s: Unable to get application %s: %v", d.drv.name, resource.ApplicationUid, err)
 		return connect.NewResponse(&aquariumv2.GateProxySSHServiceGetResourceAccessResponse{

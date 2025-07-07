@@ -34,6 +34,7 @@ import (
 	"go.opentelemetry.io/otel/metric"
 
 	fishlog "github.com/adobe/aquarium-fish/lib/log"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
 // Metrics holds all monitoring metrics for Aquarium Fish
@@ -90,6 +91,30 @@ type Metrics struct {
 	stopCh   chan struct{}
 	stopOnce sync.Once
 	wg       sync.WaitGroup
+
+	// New metrics
+	RPCRequestDuration        metric.Float64Histogram
+	RPCRequestCount           metric.Int64Counter
+	RPCRequestErrors          metric.Int64Counter
+	RPCActiveRequests         metric.Int64UpDownCounter
+	ApplicationStateChanges   metric.Int64Counter
+	ApplicationCreations      metric.Int64Counter
+	ApplicationDeallocations  metric.Int64Counter
+	ApplicationsByState       metric.Int64Gauge
+	ApplicationProcessingTime metric.Float64Histogram
+	DatabaseOperationDuration metric.Float64Histogram
+	DatabaseOperationCount    metric.Int64Counter
+	DatabaseErrors            metric.Int64Counter
+	DatabaseActiveConnections metric.Int64UpDownCounter
+	SystemCPUUsage            metric.Float64Gauge
+	SystemMemoryUsage         metric.Float64Gauge
+	SystemDiskUsage           metric.Float64Gauge
+	SystemNetworkRxBytes      metric.Int64Counter
+	SystemNetworkTxBytes      metric.Int64Counter
+	GoGoroutines              metric.Int64Gauge
+	GoMemoryHeap              metric.Int64Gauge
+	GoMemoryStack             metric.Int64Gauge
+	GoGCCycles                metric.Int64Counter
 }
 
 // NewMetrics creates a new metrics collection
@@ -229,6 +254,193 @@ func NewMetrics(meter metric.Meter) (*Metrics, error) {
 
 	if m.dbCompactions, err = meter.Int64Counter("fish_db_compactions_total"); err != nil {
 		return nil, fmt.Errorf("failed to create db_compactions metric: %w", err)
+	}
+
+	// New metrics
+	m.RPCRequestDuration, err = meter.Float64Histogram(
+		"aquarium_rpc_request_duration_seconds",
+		metric.WithDescription("Duration of RPC requests in seconds"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create RPCRequestDuration metric: %w", err)
+	}
+
+	m.RPCRequestCount, err = meter.Int64Counter(
+		"aquarium_rpc_requests_total",
+		metric.WithDescription("Total number of RPC requests"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create RPCRequestCount metric: %w", err)
+	}
+
+	m.RPCRequestErrors, err = meter.Int64Counter(
+		"aquarium_rpc_request_errors_total",
+		metric.WithDescription("Total number of RPC request errors"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create RPCRequestErrors metric: %w", err)
+	}
+
+	m.RPCActiveRequests, err = meter.Int64UpDownCounter(
+		"aquarium_rpc_active_requests",
+		metric.WithDescription("Number of active RPC requests"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create RPCActiveRequests metric: %w", err)
+	}
+
+	m.ApplicationStateChanges, err = meter.Int64Counter(
+		"aquarium_application_state_changes_total",
+		metric.WithDescription("Total number of application state changes"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ApplicationStateChanges metric: %w", err)
+	}
+
+	m.ApplicationCreations, err = meter.Int64Counter(
+		"aquarium_application_creations_total",
+		metric.WithDescription("Total number of applications created"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ApplicationCreations metric: %w", err)
+	}
+
+	m.ApplicationDeallocations, err = meter.Int64Counter(
+		"aquarium_application_deallocations_total",
+		metric.WithDescription("Total number of applications deallocated"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ApplicationDeallocations metric: %w", err)
+	}
+
+	m.ApplicationsByState, err = meter.Int64Gauge(
+		"aquarium_applications_by_state",
+		metric.WithDescription("Number of applications by state"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ApplicationsByState metric: %w", err)
+	}
+
+	m.ApplicationProcessingTime, err = meter.Float64Histogram(
+		"aquarium_application_processing_time_seconds",
+		metric.WithDescription("Time taken to process applications through states"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ApplicationProcessingTime metric: %w", err)
+	}
+
+	m.DatabaseOperationDuration, err = meter.Float64Histogram(
+		"aquarium_database_operation_duration_seconds",
+		metric.WithDescription("Duration of database operations in seconds"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create DatabaseOperationDuration metric: %w", err)
+	}
+
+	m.DatabaseOperationCount, err = meter.Int64Counter(
+		"aquarium_database_operations_total",
+		metric.WithDescription("Total number of database operations"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create DatabaseOperationCount metric: %w", err)
+	}
+
+	m.DatabaseErrors, err = meter.Int64Counter(
+		"aquarium_database_errors_total",
+		metric.WithDescription("Total number of database errors"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create DatabaseErrors metric: %w", err)
+	}
+
+	m.DatabaseActiveConnections, err = meter.Int64UpDownCounter(
+		"aquarium_database_active_connections",
+		metric.WithDescription("Number of active database connections"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create DatabaseActiveConnections metric: %w", err)
+	}
+
+	m.SystemCPUUsage, err = meter.Float64Gauge(
+		"aquarium_system_cpu_usage_percent",
+		metric.WithDescription("System CPU usage percentage"),
+		metric.WithUnit("%"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create SystemCPUUsage metric: %w", err)
+	}
+
+	m.SystemMemoryUsage, err = meter.Float64Gauge(
+		"aquarium_system_memory_usage_percent",
+		metric.WithDescription("System memory usage percentage"),
+		metric.WithUnit("%"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create SystemMemoryUsage metric: %w", err)
+	}
+
+	m.SystemDiskUsage, err = meter.Float64Gauge(
+		"aquarium_system_disk_usage_percent",
+		metric.WithDescription("System disk usage percentage"),
+		metric.WithUnit("%"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create SystemDiskUsage metric: %w", err)
+	}
+
+	m.SystemNetworkRxBytes, err = meter.Int64Counter(
+		"aquarium_system_network_rx_bytes_total",
+		metric.WithDescription("Total network bytes received"),
+		metric.WithUnit("bytes"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create SystemNetworkRxBytes metric: %w", err)
+	}
+
+	m.SystemNetworkTxBytes, err = meter.Int64Counter(
+		"aquarium_system_network_tx_bytes_total",
+		metric.WithDescription("Total network bytes transmitted"),
+		metric.WithUnit("bytes"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create SystemNetworkTxBytes metric: %w", err)
+	}
+
+	m.GoGoroutines, err = meter.Int64Gauge(
+		"aquarium_go_goroutines",
+		metric.WithDescription("Number of goroutines"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GoGoroutines metric: %w", err)
+	}
+
+	m.GoMemoryHeap, err = meter.Int64Gauge(
+		"aquarium_go_memory_heap_bytes",
+		metric.WithDescription("Go heap memory in bytes"),
+		metric.WithUnit("bytes"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GoMemoryHeap metric: %w", err)
+	}
+
+	m.GoMemoryStack, err = meter.Int64Gauge(
+		"aquarium_go_memory_stack_bytes",
+		metric.WithDescription("Go stack memory in bytes"),
+		metric.WithUnit("bytes"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GoMemoryStack metric: %w", err)
+	}
+
+	m.GoGCCycles, err = meter.Int64Counter(
+		"aquarium_go_gc_cycles_total",
+		metric.WithDescription("Total number of Go GC cycles"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GoGCCycles metric: %w", err)
 	}
 
 	return m, nil
@@ -449,13 +661,30 @@ func (m *Metrics) UpdateStreamingClients(ctx context.Context, clients int64) {
 }
 
 // RecordDatabaseOperation records a database operation
-func (m *Metrics) RecordDatabaseOperation(ctx context.Context, operation, status string) {
+func (m *Metrics) RecordDatabaseOperation(ctx context.Context, operation, status string, duration time.Duration) {
 	attrs := []attribute.KeyValue{
 		attribute.String("operation", operation),
 		attribute.String("status", status),
 	}
 
 	m.dbOperations.Add(ctx, 1, metric.WithAttributes(attrs...))
+
+	// Record duration if available
+	if m.DatabaseOperationDuration != nil && duration > 0 {
+		m.DatabaseOperationDuration.Record(ctx, duration.Seconds(), metric.WithAttributes(attrs...))
+	}
+
+	// Record operation count if available
+	if m.DatabaseOperationCount != nil {
+		success := status == "success"
+		successAttr := attribute.Bool("success", success)
+		m.DatabaseOperationCount.Add(ctx, 1, metric.WithAttributes(append(attrs, successAttr)...))
+
+		// Record errors if unsuccessful
+		if m.DatabaseErrors != nil && !success {
+			m.DatabaseErrors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+	}
 }
 
 // UpdateDatabaseStats updates database statistics
@@ -499,5 +728,160 @@ func (m *Metrics) UpdateCertificateDirectory(ctx context.Context, certDir string
 
 	if err != nil {
 		fishlog.Debug().Msgf("Monitoring: Failed to scan certificate directory %s: %v", certDir, err)
+	}
+}
+
+// RecordRPCRequest records metrics for an RPC request
+func (m *Metrics) RecordRPCRequest(ctx context.Context, method string, duration time.Duration, success bool, userID string) {
+	attrs := []attribute.KeyValue{
+		attribute.String("method", method),
+		attribute.String("user_id", userID),
+	}
+
+	// Record duration
+	if m.RPCRequestDuration != nil {
+		m.RPCRequestDuration.Record(ctx, duration.Seconds(), metric.WithAttributes(attrs...))
+	}
+
+	// Record request count
+	if m.RPCRequestCount != nil {
+		successAttr := attribute.Bool("success", success)
+		m.RPCRequestCount.Add(ctx, 1, metric.WithAttributes(append(attrs, successAttr)...))
+	}
+
+	// Record errors if unsuccessful
+	if m.RPCRequestErrors != nil && !success {
+		m.RPCRequestErrors.Add(ctx, 1, metric.WithAttributes(attrs...))
+	}
+}
+
+// RecordRPCActiveRequest tracks active requests
+func (m *Metrics) RecordRPCActiveRequest(ctx context.Context, method string, delta int64) {
+	if m.RPCActiveRequests != nil {
+		attrs := []attribute.KeyValue{
+			attribute.String("method", method),
+		}
+		m.RPCActiveRequests.Add(ctx, delta, metric.WithAttributes(attrs...))
+	}
+}
+
+// RecordApplicationStateChange records application state changes
+func (m *Metrics) RecordApplicationStateChange(ctx context.Context, appUID string, fromState, toState typesv2.ApplicationState_Status, userID string) {
+	if m.ApplicationStateChanges != nil {
+		attrs := []attribute.KeyValue{
+			attribute.String("application_uid", appUID),
+			attribute.String("from_state", fromState.String()),
+			attribute.String("to_state", toState.String()),
+			attribute.String("user_id", userID),
+		}
+		m.ApplicationStateChanges.Add(ctx, 1, metric.WithAttributes(attrs...))
+	}
+}
+
+// RecordApplicationCreation records application creation
+func (m *Metrics) RecordApplicationCreation(ctx context.Context, appUID, labelUID, userID string) {
+	if m.ApplicationCreations != nil {
+		attrs := []attribute.KeyValue{
+			attribute.String("application_uid", appUID),
+			attribute.String("label_uid", labelUID),
+			attribute.String("user_id", userID),
+		}
+		m.ApplicationCreations.Add(ctx, 1, metric.WithAttributes(attrs...))
+	}
+}
+
+// RecordApplicationDeallocation records application deallocation
+func (m *Metrics) RecordApplicationDeallocation(ctx context.Context, appUID, userID string) {
+	if m.ApplicationDeallocations != nil {
+		attrs := []attribute.KeyValue{
+			attribute.String("application_uid", appUID),
+			attribute.String("user_id", userID),
+		}
+		m.ApplicationDeallocations.Add(ctx, 1, metric.WithAttributes(attrs...))
+	}
+}
+
+// RecordApplicationsByState records the current count of applications by state
+func (m *Metrics) RecordApplicationsByState(ctx context.Context, state typesv2.ApplicationState_Status, count int64) {
+	if m.ApplicationsByState != nil {
+		attrs := []attribute.KeyValue{
+			attribute.String("state", state.String()),
+		}
+		m.ApplicationsByState.Record(ctx, count, metric.WithAttributes(attrs...))
+	}
+}
+
+// RecordApplicationProcessingTime records how long it takes to process applications through states
+func (m *Metrics) RecordApplicationProcessingTime(ctx context.Context, appUID string, fromState, toState typesv2.ApplicationState_Status, duration time.Duration) {
+	if m.ApplicationProcessingTime != nil {
+		attrs := []attribute.KeyValue{
+			attribute.String("application_uid", appUID),
+			attribute.String("from_state", fromState.String()),
+			attribute.String("to_state", toState.String()),
+		}
+		m.ApplicationProcessingTime.Record(ctx, duration.Seconds(), metric.WithAttributes(attrs...))
+	}
+}
+
+// RecordDatabaseActiveConnections tracks active database connections
+func (m *Metrics) RecordDatabaseActiveConnections(ctx context.Context, delta int64) {
+	if m.DatabaseActiveConnections != nil {
+		m.DatabaseActiveConnections.Add(ctx, delta)
+	}
+}
+
+// CollectSystemMetrics collects and records system metrics
+func (m *Metrics) CollectSystemMetrics(ctx context.Context) {
+	// CPU metrics
+	if m.SystemCPUUsage != nil {
+		if cpuPercent, err := cpu.Percent(0, false); err == nil && len(cpuPercent) > 0 {
+			m.SystemCPUUsage.Record(ctx, cpuPercent[0])
+		}
+	}
+
+	// Memory metrics
+	if m.SystemMemoryUsage != nil {
+		if memInfo, err := mem.VirtualMemory(); err == nil {
+			m.SystemMemoryUsage.Record(ctx, memInfo.UsedPercent)
+		}
+	}
+
+	// Disk metrics
+	if m.SystemDiskUsage != nil {
+		if diskInfo, err := disk.Usage("/"); err == nil {
+			m.SystemDiskUsage.Record(ctx, diskInfo.UsedPercent)
+		}
+	}
+
+	// Network metrics
+	if m.SystemNetworkRxBytes != nil && m.SystemNetworkTxBytes != nil {
+		if netStats, err := net.IOCounters(false); err == nil && len(netStats) > 0 {
+			m.SystemNetworkRxBytes.Add(ctx, int64(netStats[0].BytesRecv))
+			m.SystemNetworkTxBytes.Add(ctx, int64(netStats[0].BytesSent))
+		}
+	}
+}
+
+// CollectRuntimeMetrics collects and records Go runtime metrics
+func (m *Metrics) CollectRuntimeMetrics(ctx context.Context) {
+	var stats runtime.MemStats
+	runtime.ReadMemStats(&stats)
+
+	// Goroutines
+	if m.GoGoroutines != nil {
+		m.GoGoroutines.Record(ctx, int64(runtime.NumGoroutine()))
+	}
+
+	// Memory metrics
+	if m.GoMemoryHeap != nil {
+		m.GoMemoryHeap.Record(ctx, int64(stats.HeapAlloc))
+	}
+	if m.GoMemoryStack != nil {
+		m.GoMemoryStack.Record(ctx, int64(stats.StackInuse))
+	}
+
+	// GC metrics
+	if m.GoGCCycles != nil {
+		m.GoGCCycles.Add(ctx, int64(stats.NumGC))
 	}
 }

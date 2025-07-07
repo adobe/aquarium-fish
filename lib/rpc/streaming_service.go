@@ -105,7 +105,7 @@ func (spc *SubscriptionPermissionCache) CleanupStaleEntries(f *fish.Fish) {
 	for userName, userApps := range spc.userAppAccess {
 		for appUID := range userApps {
 			// Check if application still exists
-			_, err := f.DB().ApplicationGet(appUID)
+			_, err := f.DB().ApplicationGet(context.Background(), appUID)
 			if err != nil {
 				// Application doesn't exist anymore, remove from cache
 				delete(userApps, appUID)
@@ -608,7 +608,7 @@ func (s *StreamingService) checkApplicationAccess(sub *subscription, appUID type
 	}
 
 	// Not in cache, need to validate through database + RBAC
-	app, err := s.fish.DB().ApplicationGet(appUID)
+	app, err := s.fish.DB().ApplicationGet(context.Background(), appUID)
 	if err != nil {
 		log.Debug().Msgf("Streaming: Failed to get application %s for permission check: %v", appUID, err)
 		return false

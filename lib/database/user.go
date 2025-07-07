@@ -15,6 +15,7 @@
 package database
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -23,8 +24,8 @@ import (
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
-// UserList returns list of users
-func (d *Database) UserList() (us []typesv2.User, err error) {
+// userListImpl returns list of users
+func (d *Database) userListImpl(ctx context.Context) (us []typesv2.User, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -32,8 +33,8 @@ func (d *Database) UserList() (us []typesv2.User, err error) {
 	return us, err
 }
 
-// UserCreate makes new User
-func (d *Database) UserCreate(u *typesv2.User) error {
+// userCreateImpl makes new User
+func (d *Database) userCreateImpl(ctx context.Context, u *typesv2.User) error {
 	if u.Name == "" {
 		return fmt.Errorf("Fish: Name can't be empty")
 	}
@@ -49,8 +50,8 @@ func (d *Database) UserCreate(u *typesv2.User) error {
 	return d.be.Collection(ObjectUser).Add(u.Name, u)
 }
 
-// UserSave stores User
-func (d *Database) UserSave(u *typesv2.User) error {
+// userSaveImpl stores User
+func (d *Database) userSaveImpl(ctx context.Context, u *typesv2.User) error {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -58,8 +59,8 @@ func (d *Database) UserSave(u *typesv2.User) error {
 	return d.be.Collection(ObjectUser).Add(u.Name, &u)
 }
 
-// UserGet returns User by unique name
-func (d *Database) UserGet(name string) (u *typesv2.User, err error) {
+// userGetImpl returns User by unique name
+func (d *Database) userGetImpl(ctx context.Context, name string) (u *typesv2.User, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -67,18 +68,18 @@ func (d *Database) UserGet(name string) (u *typesv2.User, err error) {
 	return u, err
 }
 
-// UserDelete removes User
-func (d *Database) UserDelete(name string) error {
+// userDeleteImpl removes User
+func (d *Database) userDeleteImpl(ctx context.Context, name string) error {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
 	return d.be.Collection(ObjectUser).Delete(name)
 }
 
-// UserAuth returns User if name and password are correct
-func (d *Database) UserAuth(name string, password string) *typesv2.User {
+// userAuthImpl returns User if name and password are correct
+func (d *Database) userAuthImpl(ctx context.Context, name string, password string) *typesv2.User {
 	// TODO: Make auth process to take constant time in case of failure
-	user, err := d.UserGet(name)
+	user, err := d.UserGet(ctx, name)
 	if err != nil {
 		log.Warn().Msgf("Fish: User not exists: %s", name)
 		return nil
@@ -92,8 +93,8 @@ func (d *Database) UserAuth(name string, password string) *typesv2.User {
 	return user
 }
 
-// UserNew makes new User
-func (d *Database) UserNew(name string, password string) (string, *typesv2.User, error) {
+// userNewImpl makes new User
+func (d *Database) userNewImpl(ctx context.Context, name string, password string) (string, *typesv2.User, error) {
 	if password == "" {
 		password = crypt.RandString(64)
 	}
@@ -106,7 +107,7 @@ func (d *Database) UserNew(name string, password string) (string, *typesv2.User,
 		return "", nil, fmt.Errorf("Fish: Unable to set hash for new user %q: %v", name, err)
 	}
 
-	if err := d.UserCreate(user); err != nil {
+	if err := d.UserCreate(ctx, user); err != nil {
 		log.Error().Msgf("Fish: Unable to create new user %q: %v", name, err)
 		return "", nil, fmt.Errorf("Fish: Unable to create new user %q: %v", name, err)
 	}

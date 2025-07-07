@@ -19,6 +19,8 @@ import (
 	"net/http"
 	"time"
 
+	"connectrpc.com/connect"
+	"connectrpc.com/otelconnect"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
@@ -44,25 +46,48 @@ func NewServer(f *fish.Fish, additionalServices []gate.RPCService) *Server {
 		mux:  http.NewServeMux(),
 	}
 
-	// Register services WITHOUT interceptors (auth/rbac is handled at HTTP level)
+	// Create OpenTelemetry interceptor for tracing and metrics
+	otelInterceptor, err := otelconnect.NewInterceptor(
+		otelconnect.WithTrustRemote(), // Trust remote tracing information for internal microservices
+	)
+	if err != nil {
+		log.Error().Err(err).Msg("RPC: Failed to create OpenTelemetry interceptor")
+		// Continue without instrumentation if OTEL fails
+		otelInterceptor = nil
+	}
+
+	// Create interceptor options
+	var interceptorOpts []connect.HandlerOption
+	if otelInterceptor != nil {
+		interceptorOpts = append(interceptorOpts, connect.WithInterceptors(otelInterceptor))
+		log.Debug().Msg("RPC: OpenTelemetry interceptor enabled")
+	}
+
+	// Register services WITH OpenTelemetry interceptors
+	// Note: auth/rbac is still handled at HTTP level for better security
 	s.mux.Handle(aquariumv2connect.NewUserServiceHandler(
 		&UserService{fish: f},
+		interceptorOpts...,
 	))
 
 	s.mux.Handle(aquariumv2connect.NewRoleServiceHandler(
 		&RoleService{fish: f},
+		interceptorOpts...,
 	))
 
 	s.mux.Handle(aquariumv2connect.NewApplicationServiceHandler(
 		&ApplicationService{fish: f},
+		interceptorOpts...,
 	))
 
 	s.mux.Handle(aquariumv2connect.NewLabelServiceHandler(
 		&LabelService{fish: f},
+		interceptorOpts...,
 	))
 
 	s.mux.Handle(aquariumv2connect.NewNodeServiceHandler(
 		&NodeService{fish: f},
+		interceptorOpts...,
 	))
 
 	// Create and store streaming service
@@ -70,6 +95,7 @@ func NewServer(f *fish.Fish, additionalServices []gate.RPCService) *Server {
 	s.streamingService = streamingService
 	s.mux.Handle(aquariumv2connect.NewStreamingServiceHandler(
 		streamingService,
+		interceptorOpts...,
 	))
 
 	// Register additional services from gate drivers

@@ -15,6 +15,7 @@
 package github
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"path"
@@ -196,7 +197,7 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 			params.Name = &spl[0]
 			params.Version = &spl[1]
 		}
-		labels, err := d.db.LabelList(params)
+		labels, err := d.db.LabelList(context.Background(), params)
 		if err != nil || len(labels) < 1 {
 			log.Info().Msgf("GITHUB: %s: Skipping the job %s on repo %s/%s: Unable to find the requested label %q", d.name, runJobID, owner, repo, job.Labels[1])
 			// We returning nil here because it's not Fish fault someone made a mistake in workflow
@@ -229,7 +230,7 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 			OwnerName: d.name,
 			Metadata:  util.UnparsedJSON(metadata),
 		}
-		if err := d.db.ApplicationCreate(&app); err != nil {
+		if err := d.db.ApplicationCreate(context.Background(), &app); err != nil {
 			return fmt.Errorf("Unable to create Application: %v", err)
 		}
 
@@ -283,7 +284,7 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 		log.Info().Msgf("GITHUB: %s: The job %s is completed as %q, runner should be gone: %d", d.name, runJobID, job.GetConclusion(), record.RunnerID)
 
 		// Requesting deallocate of the Application
-		if _, err := d.db.ApplicationDeallocate(record.ApplicationUID, fmt.Sprintf("gate/%s", d.name)); err != nil {
+		if _, err := d.db.ApplicationDeallocate(context.Background(), record.ApplicationUID, fmt.Sprintf("gate/%s", d.name)); err != nil {
 			return err
 		}
 
@@ -389,7 +390,7 @@ func (d *Driver) cleanupDB() {
 					log.Warn().Msgf("GITHUB: %s: cleanupDB: Forcefully removing stale %s job: %s, Application: %s", d.name, job.Status, key, job.ApplicationUID)
 
 					// Requesting deallocate of the Application
-					if _, err := d.db.ApplicationDeallocate(job.ApplicationUID, fmt.Sprintf("gate/%s", d.name)); err != nil {
+					if _, err := d.db.ApplicationDeallocate(context.Background(), job.ApplicationUID, fmt.Sprintf("gate/%s", d.name)); err != nil {
 						log.Error().Msgf("GITHUB: %s: cleanupDB: Unable to deallocate Application %s for job %s: %v", d.name, job.ApplicationUID, key, err)
 						// Will try next time
 						return nil
@@ -408,7 +409,7 @@ func (d *Driver) cleanupDB() {
 				// DefaultJobMaxLifetime), and then removing and deallocating the Application as well
 
 				// First check if the app resource is here at all
-				appRes, err := d.db.ApplicationResourceGetByApplication(job.ApplicationUID)
+				appRes, err := d.db.ApplicationResourceGetByApplication(context.Background(), job.ApplicationUID)
 				if err != nil {
 					log.Warn().Msgf("GITHUB: %s: cleanupDB: Forcefully removing stale %s job: %s, Application: %s : %v", d.name, job.Status, key, job.ApplicationUID, err)
 					if err := d.db.Del(dbPrefixJob, key); err != nil {
@@ -422,7 +423,7 @@ func (d *Driver) cleanupDB() {
 				}
 
 				// Next if the app is not allocated
-				appState, err := d.db.ApplicationStateGetByApplication(job.ApplicationUID)
+				appState, err := d.db.ApplicationStateGetByApplication(context.Background(), job.ApplicationUID)
 				if err != nil || !d.db.ApplicationStateIsActive(appState.Status) {
 					log.Warn().Msgf("GITHUB: %s: cleanupDB: Forcefully removing stale %s job: %s, Application: %s : %v", d.name, job.Status, key, job.ApplicationUID, err)
 					if err := d.db.Del(dbPrefixJob, key); err != nil {
@@ -449,7 +450,7 @@ func (d *Driver) cleanupDB() {
 					log.Warn().Msgf("GITHUB: %s: cleanupDB: Forcefully removing stale %s job: %s, Application: %s", d.name, job.Status, key, job.ApplicationUID)
 
 					// Requesting deallocate of the Application
-					if _, err := d.db.ApplicationDeallocate(job.ApplicationUID, fmt.Sprintf("gate/%s", d.name)); err != nil {
+					if _, err := d.db.ApplicationDeallocate(context.Background(), job.ApplicationUID, fmt.Sprintf("gate/%s", d.name)); err != nil {
 						log.Error().Msgf("GITHUB: %s: cleanupDB: Unable to deallocate Application %s for job %s: %v", d.name, job.ApplicationUID, key, err)
 						// Will try next time
 						return nil

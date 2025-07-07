@@ -15,14 +15,15 @@
 package database
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
-// RoleList returns a list of all roles
-func (d *Database) RoleList() (rs []typesv2.Role, err error) {
+// roleListImpl returns a list of all roles
+func (d *Database) roleListImpl(ctx context.Context) (rs []typesv2.Role, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -30,8 +31,8 @@ func (d *Database) RoleList() (rs []typesv2.Role, err error) {
 	return rs, err
 }
 
-// RoleGet returns a role by name
-func (d *Database) RoleGet(name string) (r *typesv2.Role, err error) {
+// roleGetImpl returns a role by name
+func (d *Database) roleGetImpl(ctx context.Context, name string) (r *typesv2.Role, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -39,8 +40,8 @@ func (d *Database) RoleGet(name string) (r *typesv2.Role, err error) {
 	return r, err
 }
 
-// RoleCreate makes a new role
-func (d *Database) RoleCreate(r *typesv2.Role) error {
+// roleCreateImpl makes a new role
+func (d *Database) roleCreateImpl(ctx context.Context, r *typesv2.Role) error {
 	if r.Name == "" {
 		return fmt.Errorf("Fish: Role.Name can't be empty")
 	}
@@ -53,8 +54,8 @@ func (d *Database) RoleCreate(r *typesv2.Role) error {
 	return d.be.Collection(ObjectRole).Add(r.Name, r)
 }
 
-// RoleSave saves a role
-func (d *Database) RoleSave(r *typesv2.Role) error {
+// roleSaveImpl saves a role
+func (d *Database) roleSaveImpl(ctx context.Context, r *typesv2.Role) error {
 	if r.Name == "" {
 		return fmt.Errorf("Fish: Role.Name can't be empty")
 	}
@@ -69,8 +70,8 @@ func (d *Database) RoleSave(r *typesv2.Role) error {
 	return d.be.Collection(ObjectRole).Add(r.Name, r)
 }
 
-// RoleDelete deletes a role
-func (d *Database) RoleDelete(name string) error {
+// roleDeleteImpl deletes a role
+func (d *Database) roleDeleteImpl(ctx context.Context, name string) error {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 

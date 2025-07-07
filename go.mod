@@ -6,6 +6,7 @@ toolchain go1.23.1
 
 require (
 	connectrpc.com/connect v1.18.1
+	connectrpc.com/otelconnect v0.7.2
 	github.com/alessio/shellescape v1.4.1
 	github.com/aws/aws-sdk-go-v2 v1.27.2
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.163.1
@@ -24,7 +25,6 @@ require (
 	github.com/hpcloud/tail v1.0.0
 	github.com/mostlygeek/arp v0.0.0-20170424181311-541a2129847a
 	github.com/pkg/sftp v1.13.7
-	github.com/prometheus/client_golang v1.22.0
 	github.com/rs/zerolog v1.33.0
 	github.com/shirou/gopsutil/v4 v4.25.1
 	github.com/spf13/cobra v1.8.0
@@ -87,6 +87,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
+	github.com/prometheus/client_golang v1.22.0 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.65.0 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect

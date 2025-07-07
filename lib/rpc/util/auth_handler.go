@@ -61,7 +61,7 @@ func (h *AuthHandler) Handler(next http.Handler) http.Handler {
 		username, password := parts[0], parts[1]
 		log.Debug().Msgf("RPC: %s: New HTTP request received: %s", username, r.URL.Path)
 
-		user := h.db.UserAuth(username, password)
+		user := h.db.UserAuth(context.Background(), username, password)
 		if user == nil {
 			log.Debug().Msgf("RPC: HTTP Auth: Authentication failed for user: %s", username)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)

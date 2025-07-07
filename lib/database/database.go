@@ -118,12 +118,7 @@ func New(path string) (*Database, error) {
 }
 
 // CompactDB runs stale Applications and data removing
-func (d *Database) CompactDB() error {
-	return d.CompactDBWithContext(context.Background())
-}
-
-// CompactDBWithContext runs stale Applications and data removing with context
-func (d *Database) CompactDBWithContext(ctx context.Context) error {
+func (d *Database) CompactDB(ctx context.Context) error {
 	ctx, span := d.tracer.Start(ctx, "database.compact")
 	defer span.End()
 
@@ -192,9 +187,9 @@ func (d *Database) CompactDBWithContext(ctx context.Context) error {
 	return nil
 }
 
-// Shutdown compacts database backend and closes it
-func (d *Database) Shutdown() error {
-	d.CompactDB()
+// shutdownImpl compacts database backend and closes it
+func (d *Database) shutdownImpl(ctx context.Context) error {
+	d.CompactDB(ctx)
 
 	// Waiting for all the current requests to be done by acquiring write lock and closing the DB
 	d.beMu.Lock()

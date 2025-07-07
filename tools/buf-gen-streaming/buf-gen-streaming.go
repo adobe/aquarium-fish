@@ -280,7 +280,7 @@ func (s *StreamingService) setupSubscriptions(subCtx context.Context, subscripti
 		case aquariumv2.{{ .SubscriptionType }}:
 			// Create a safe wrapper channel for database notifications
 			dbChannel := make(chan {{ .TypesPackageType }}, 100)
-			s.fish.DB().{{ .DatabaseMethod }}(dbChannel)
+			s.fish.DB().{{ .DatabaseMethod }}(subCtx, dbChannel)
 			log.Debug().Msgf("Subscription %s: Subscribed to {{ .MessageType }} changes", sub.id)
 
 			// Add to WaitGroup before starting goroutine

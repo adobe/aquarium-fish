@@ -107,6 +107,8 @@ func New(db *database.Database, cfg *Config) (*Fish, error) {
 
 // Init initializes the Fish node
 func (f *Fish) Init() error {
+	ctx := context.Background()
+
 	f.startup = time.Now()
 	f.shutdownCancel = make(chan bool)
 	f.Quit = make(chan os.Signal, 1)
@@ -114,11 +116,11 @@ func (f *Fish) Init() error {
 
 	// Init channel for ApplicationState changes
 	f.applicationStateChannel = make(chan *typesv2.ApplicationState, 100)
-	f.db.SubscribeApplicationState(f.applicationStateChannel)
+	f.db.SubscribeApplicationState(ctx, f.applicationStateChannel)
 
 	// Init channel for ApplicationTask changes
 	f.applicationTaskChannel = make(chan *typesv2.ApplicationTask, 100)
-	f.db.SubscribeApplicationTask(f.applicationTaskChannel)
+	f.db.SubscribeApplicationTask(ctx, f.applicationTaskChannel)
 
 	// Init variables
 	f.activeVotes = make(map[typesv2.ApplicationUID]*typesv2.Vote)
@@ -132,12 +134,12 @@ func (f *Fish) Init() error {
 	var zeroSlotsValue uint32
 	f.nodeUsage.Slots = &zeroSlotsValue
 
-	f.initDefaultRoles()
+	f.initDefaultRoles(ctx)
 
 	// Create admin user and ignore errors if it's existing
-	_, err := f.db.UserGet("admin")
+	_, err := f.db.UserGet(ctx, "admin")
 	if err == database.ErrObjectNotFound {
-		pass, adminUser, err := f.db.UserNew("admin", "")
+		pass, adminUser, err := f.db.UserNew(ctx, "admin", "")
 		if err != nil {
 			log.Error().Msgf("Fish: Unable to create new admin User: %v", err)
 			return fmt.Errorf("Fish: Unable to create new admin User: %v", err)
@@ -149,7 +151,7 @@ func (f *Fish) Init() error {
 
 		// Assigning admin role
 		adminUser.Roles = []string{auth.AdminRoleName}
-		if err := f.db.UserSave(adminUser); err != nil {
+		if err := f.db.UserSave(ctx, adminUser); err != nil {
 			log.Error().Msgf("Fish: Failed to assign Administrator Role to admin user: %v", err)
 			return fmt.Errorf("Fish: Failed to assign Administrator Role to admin user: %v", err)
 		}
@@ -160,7 +162,7 @@ func (f *Fish) Init() error {
 
 	// Init node
 	createNode := false
-	node, err := f.db.NodeGet(f.cfg.NodeName)
+	node, err := f.db.NodeGet(ctx, f.cfg.NodeName)
 	if err != nil {
 		log.Info().Msgf("Fish: Create new node %s: %s", f.cfg.NodeName, f.cfg.NodeLocation)
 		createNode = true
@@ -184,11 +186,11 @@ func (f *Fish) Init() error {
 	f.db.SetNode(*node)
 
 	if createNode {
-		if err = f.db.NodeCreate(f.db.GetNode()); err != nil {
+		if err = f.db.NodeCreate(ctx, f.db.GetNode()); err != nil {
 			return fmt.Errorf("Fish: Unable to create node: %v", err)
 		}
 	} else {
-		if err = f.db.NodeSave(f.db.GetNode()); err != nil {
+		if err = f.db.NodeSave(ctx, f.db.GetNode()); err != nil {
 			return fmt.Errorf("Fish: Unable to save node: %v", err)
 		}
 	}
@@ -219,14 +221,14 @@ func (f *Fish) Init() error {
 	go f.applicationProcess()
 
 	log.Debug().Msg("Fish: Resuming to execute the assigned Applications...")
-	resources, err := f.db.ApplicationResourceListNode(f.db.GetNodeUID())
+	resources, err := f.db.ApplicationResourceListNode(ctx, f.db.GetNodeUID())
 	if err != nil {
 		log.Error().Msgf("Fish: Unable to get the node resources: %v", err)
 		return fmt.Errorf("Fish: Unable to get the node resources: %v", err)
 	}
 	for _, res := range resources {
 		log.Debug().Msgf("Fish: Resuming Resource execution for Application: %q", res.ApplicationUid)
-		if f.db.ApplicationIsAllocated(res.ApplicationUid) == nil {
+		if f.db.ApplicationIsAllocated(ctx, res.ApplicationUid) == nil {
 			log.Info().Msgf("Fish: Found allocated resource to serve: %s", res.Uid)
 			// We will not retry here, because the mentioned Applications should be already running
 			if _, err := f.executeApplicationStart(res.ApplicationUid, res.DefinitionIndex); err != nil {
@@ -237,19 +239,19 @@ func (f *Fish) Init() error {
 			}
 		} else {
 			log.Warn().Msgf("Fish: Found not allocated Resource of Application, cleaning up: %s", res.ApplicationUid)
-			if err := f.db.ApplicationResourceDelete(res.Uid); err != nil {
+			if err := f.db.ApplicationResourceDelete(ctx, res.Uid); err != nil {
 				log.Error().Msgf("Fish: Unable to delete Resource of Application %s: %v", res.ApplicationUid, err)
 			}
 			appState := typesv2.ApplicationState{
 				ApplicationUid: res.ApplicationUid, Status: typesv2.ApplicationState_ERROR,
 				Description: "Found not cleaned up resource",
 			}
-			f.db.ApplicationStateCreate(&appState)
+			f.db.ApplicationStateCreate(ctx, &appState)
 		}
 	}
 
 	log.Debug().Msg("Fish: Resuming electionProcess for the NEW and ELECTED Applications...")
-	electionAppStates, err := f.db.ApplicationStateListNewElected()
+	electionAppStates, err := f.db.ApplicationStateListNewElected(ctx)
 	if err != nil {
 		log.Error().Msgf("Fish: Unable to get NEW and ELECTED ApplicationState list: %v", err)
 		return fmt.Errorf("Fish: Unable to get NEW and ELECTED ApplicationState list: %v", err)
@@ -262,22 +264,22 @@ func (f *Fish) Init() error {
 	log.Debug().Msg("Fish: Running background processes...")
 
 	// Run node ping timer
-	go f.pingProcess()
+	go f.pingProcess(ctx)
 
 	// Run ARP autoupdate process to ensure the addresses will be ok
 	arp.AutoRefresh(30 * time.Second)
 
 	// Run database cleanup & compaction process
-	go f.dbCleanupCompactProcess()
+	go f.dbCleanupCompactProcess(ctx)
 
 	// Running the watcher for running Applications lifetime
-	go f.applicationTimeoutProcess()
+	go f.applicationTimeoutProcess(ctx)
 
 	return nil
 }
 
 // initDefaultRoles is needed to initialize DB with Administrator & User roles and fill-up policies
-func (f *Fish) initDefaultRoles() error {
+func (f *Fish) initDefaultRoles(ctx context.Context) error {
 	// TODO: Implement enforcer update on role change
 	// Create enforcer first since we'll need it for setting up permissions
 	enforcer, err := auth.NewEnforcer()
@@ -293,11 +295,11 @@ func (f *Fish) initDefaultRoles() error {
 			Permissions: perms,
 		}
 
-		r, err := f.db.RoleGet(role)
+		r, err := f.db.RoleGet(ctx, role)
 		if err == database.ErrObjectNotFound {
 			log.Debug().Msgf("Fish: Create %q role and assigning permissions", role)
 			r = &newRole
-			if err := f.db.RoleCreate(r); err != nil {
+			if err := f.db.RoleCreate(ctx, r); err != nil {
 				log.Error().Msgf("Fish: Failed to create %q role: %v", role, err)
 				return fmt.Errorf("Fish: Failed to create %q role: %v", role, err)
 			}
@@ -319,7 +321,7 @@ func (f *Fish) initDefaultRoles() error {
 }
 
 // Close tells the node that the Fish execution need to be stopped
-func (f *Fish) Close() {
+func (f *Fish) Close(ctx context.Context) {
 	log.Debug().Msg("Fish: Stopping the running drivers")
 	if errs := drivers.Shutdown(); len(errs) > 0 {
 		log.Debug().Msgf("Fish: Some drivers failed to stop: %v", errs)
@@ -333,7 +335,7 @@ func (f *Fish) Close() {
 	log.Debug().Msg("Fish: All the background routines are stopped")
 
 	log.Debug().Msg("Fish: Closing the DB")
-	f.db.Shutdown()
+	f.db.Shutdown(ctx)
 }
 
 // GetNode returns current Fish node spec
@@ -346,7 +348,7 @@ func (f *Fish) GetCfg() Config {
 	return *f.cfg
 }
 
-func (f *Fish) pingProcess() {
+func (f *Fish) pingProcess(ctx context.Context) {
 	f.routinesMutex.Lock()
 	f.routines.Add(1)
 	f.routinesMutex.Unlock()
@@ -362,7 +364,7 @@ func (f *Fish) pingProcess() {
 			return
 		case <-pingTicker.C:
 			log.Debug().Msg("Fish Node: ping")
-			f.db.NodePing(f.db.GetNode())
+			f.db.NodePing(ctx, f.db.GetNode())
 		}
 	}
 }
@@ -412,7 +414,7 @@ func (f *Fish) applicationProcess() {
 }
 
 // dbCleanupCompactProcess background process helping with managing the database cleannes
-func (f *Fish) dbCleanupCompactProcess() {
+func (f *Fish) dbCleanupCompactProcess(ctx context.Context) {
 	f.routinesMutex.Lock()
 	f.routines.Add(1)
 	f.routinesMutex.Unlock()
@@ -435,15 +437,15 @@ func (f *Fish) dbCleanupCompactProcess() {
 		case <-f.running.Done():
 			return
 		case <-cleanupTicker.C:
-			f.CleanupDB()
+			f.CleanupDB(ctx)
 		case <-compactionTicker.C:
-			f.db.CompactDB()
+			f.db.CompactDB(ctx)
 		}
 	}
 }
 
 // CleanupDB removing stale Applications and data from database to keep it slim
-func (f *Fish) CleanupDB() {
+func (f *Fish) CleanupDB(ctx context.Context) {
 	log.Debug().Msg("Fish: CleanupDB running...")
 	defer log.Debug().Msg("Fish: CleanupDB completed")
 
@@ -452,7 +454,7 @@ func (f *Fish) CleanupDB() {
 	cutTime := time.Now().Add(-dbCleanupDelay)
 
 	// Look for the stale Applications
-	states, err := f.db.ApplicationStateListLatest()
+	states, err := f.db.ApplicationStateListLatest(ctx)
 	if err != nil {
 		log.Warn().Msgf("Fish: CleanupDB: Unable to get ApplicationStates: %v", err)
 		return
@@ -477,21 +479,21 @@ func (f *Fish) CleanupDB() {
 		log.Debug().Msgf("Fish: CleanupDB: Removing everything related to Application %s (%s)", state.ApplicationUid, state.Status)
 
 		// First of all removing the Application itself to make sure it will not be restarted
-		if err = f.db.ApplicationDelete(state.ApplicationUid); err != nil {
+		if err = f.db.ApplicationDelete(ctx, state.ApplicationUid); err != nil {
 			log.Error().Msgf("Fish: CleanupDB: Unable to remove Application %s: %v", state.ApplicationUid, err)
 			continue
 		}
 
-		ats, _ := f.db.ApplicationTaskListByApplication(state.ApplicationUid)
+		ats, _ := f.db.ApplicationTaskListByApplication(ctx, state.ApplicationUid)
 		for _, at := range ats {
-			if err = f.db.ApplicationTaskDelete(at.Uid); err != nil {
+			if err = f.db.ApplicationTaskDelete(ctx, at.Uid); err != nil {
 				log.Error().Msgf("Fish: CleanupDB: Unable to remove ApplicationTask %s: %v", at.Uid, err)
 			}
 		}
 
-		ss, _ := f.db.ApplicationStateListByApplication(state.ApplicationUid)
+		ss, _ := f.db.ApplicationStateListByApplication(ctx, state.ApplicationUid)
 		for _, s := range ss {
-			if err = f.db.ApplicationStateDelete(s.Uid); err != nil {
+			if err = f.db.ApplicationStateDelete(ctx, s.Uid); err != nil {
 				log.Error().Msgf("Fish: CleanupDB: Unable to remove ApplicationState %s: %v", s.Uid, err)
 			}
 		}

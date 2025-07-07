@@ -15,6 +15,7 @@
 package database
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"time"
@@ -24,8 +25,8 @@ import (
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
-// NodeFind returns list of Nodes that fits filter
-func (d *Database) NodeList() (ns []typesv2.Node, err error) {
+// nodeListImpl returns list of Nodes that fits filter
+func (d *Database) nodeListImpl(ctx context.Context) (ns []typesv2.Node, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -33,8 +34,8 @@ func (d *Database) NodeList() (ns []typesv2.Node, err error) {
 	return ns, err
 }
 
-// NodeGet returns Node by it's unique name
-func (d *Database) NodeGet(name string) (node *typesv2.Node, err error) {
+// nodeGetImpl returns Node by it's unique name
+func (d *Database) nodeGetImpl(ctx context.Context, name string) (node *typesv2.Node, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -42,11 +43,11 @@ func (d *Database) NodeGet(name string) (node *typesv2.Node, err error) {
 	return node, err
 }
 
-// NodeActiveList lists all the nodes in the cluster
-func (d *Database) NodeActiveList() (ns []typesv2.Node, err error) {
+// nodeActiveListImpl lists all the nodes in the cluster
+func (d *Database) nodeActiveListImpl(ctx context.Context) (ns []typesv2.Node, err error) {
 	// Only the nodes that pinged at least twice the delay time
 	t := time.Now().Add(-typesv2.NodePingDelay * 2 * time.Second)
-	all, err := d.NodeList()
+	all, err := d.NodeList(ctx)
 	if err != nil {
 		return ns, err
 	}
@@ -58,8 +59,8 @@ func (d *Database) NodeActiveList() (ns []typesv2.Node, err error) {
 	return ns, err
 }
 
-// NodeCreate makes new Node
-func (d *Database) NodeCreate(n *typesv2.Node) error {
+// nodeCreateImpl makes new Node
+func (d *Database) nodeCreateImpl(ctx context.Context, n *typesv2.Node) error {
 	if n.Name == "" {
 		return fmt.Errorf("Fish: Name can't be empty")
 	}
@@ -79,8 +80,8 @@ func (d *Database) NodeCreate(n *typesv2.Node) error {
 	return d.be.Collection(ObjectNode).Add(n.Name, n)
 }
 
-// NodeSave stores Node
-func (d *Database) NodeSave(node *typesv2.Node) error {
+// nodeSaveImpl stores Node
+func (d *Database) nodeSaveImpl(ctx context.Context, node *typesv2.Node) error {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -88,7 +89,7 @@ func (d *Database) NodeSave(node *typesv2.Node) error {
 	return d.be.Collection(ObjectNode).Add(node.Name, node)
 }
 
-// NodePing updates Node and shows that it's active
-func (d *Database) NodePing(node *typesv2.Node) error {
-	return d.NodeSave(node)
+// nodePingImpl updates Node and shows that it's active
+func (d *Database) nodePingImpl(ctx context.Context, node *typesv2.Node) error {
+	return d.NodeSave(ctx, node)
 }

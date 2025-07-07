@@ -32,8 +32,8 @@ type RoleService struct {
 }
 
 // List implements the List RPC
-func (s *RoleService) List(_ /*ctx*/ context.Context, _ /*req*/ *connect.Request[aquariumv2.RoleServiceListRequest]) (*connect.Response[aquariumv2.RoleServiceListResponse], error) {
-	roles, err := s.fish.DB().RoleList()
+func (s *RoleService) List(ctx context.Context, _ /*req*/ *connect.Request[aquariumv2.RoleServiceListRequest]) (*connect.Response[aquariumv2.RoleServiceListResponse], error) {
+	roles, err := s.fish.DB().RoleList(ctx)
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.RoleServiceListResponse{
 			Status: false, Message: "Failed to list roles: " + err.Error(),
@@ -53,8 +53,8 @@ func (s *RoleService) List(_ /*ctx*/ context.Context, _ /*req*/ *connect.Request
 }
 
 // Get implements the Get RPC
-func (s *RoleService) Get(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.RoleServiceGetRequest]) (*connect.Response[aquariumv2.RoleServiceGetResponse], error) {
-	role, err := s.fish.DB().RoleGet(req.Msg.GetRoleName())
+func (s *RoleService) Get(ctx context.Context, req *connect.Request[aquariumv2.RoleServiceGetRequest]) (*connect.Response[aquariumv2.RoleServiceGetResponse], error) {
+	role, err := s.fish.DB().RoleGet(ctx, req.Msg.GetRoleName())
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.RoleServiceGetResponse{
 			Status: false, Message: "Role not found: " + err.Error(),
@@ -68,7 +68,7 @@ func (s *RoleService) Get(_ /*ctx*/ context.Context, req *connect.Request[aquari
 }
 
 // Create implements the Create RPC
-func (s *RoleService) Create(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.RoleServiceCreateRequest]) (*connect.Response[aquariumv2.RoleServiceCreateResponse], error) {
+func (s *RoleService) Create(ctx context.Context, req *connect.Request[aquariumv2.RoleServiceCreateRequest]) (*connect.Response[aquariumv2.RoleServiceCreateResponse], error) {
 	msgRole := req.Msg.GetRole()
 	if msgRole == nil {
 		return connect.NewResponse(&aquariumv2.RoleServiceCreateResponse{
@@ -76,7 +76,7 @@ func (s *RoleService) Create(_ /*ctx*/ context.Context, req *connect.Request[aqu
 		}), connect.NewError(connect.CodeInvalidArgument, nil)
 	}
 	// Check if role already exists
-	if _, err := s.fish.DB().RoleGet(msgRole.GetName()); err == nil {
+	if _, err := s.fish.DB().RoleGet(ctx, msgRole.GetName()); err == nil {
 		return connect.NewResponse(&aquariumv2.RoleServiceCreateResponse{
 			Status: false, Message: "Role already exists",
 		}), connect.NewError(connect.CodeAlreadyExists, nil)
@@ -94,7 +94,7 @@ func (s *RoleService) Create(_ /*ctx*/ context.Context, req *connect.Request[aqu
 		}
 	}
 
-	if err := s.fish.DB().RoleCreate(role); err != nil {
+	if err := s.fish.DB().RoleCreate(ctx, role); err != nil {
 		return connect.NewResponse(&aquariumv2.RoleServiceCreateResponse{
 			Status: false, Message: "Failed to create role: " + err.Error(),
 		}), connect.NewError(connect.CodeInternal, err)
@@ -107,14 +107,14 @@ func (s *RoleService) Create(_ /*ctx*/ context.Context, req *connect.Request[aqu
 }
 
 // Update implements the Update RPC
-func (s *RoleService) Update(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.RoleServiceUpdateRequest]) (*connect.Response[aquariumv2.RoleServiceUpdateResponse], error) {
+func (s *RoleService) Update(ctx context.Context, req *connect.Request[aquariumv2.RoleServiceUpdateRequest]) (*connect.Response[aquariumv2.RoleServiceUpdateResponse], error) {
 	msgRole := req.Msg.GetRole()
 	if msgRole == nil {
 		return connect.NewResponse(&aquariumv2.RoleServiceUpdateResponse{
 			Status: false, Message: "Role not provided",
 		}), connect.NewError(connect.CodeInvalidArgument, nil)
 	}
-	role, err := s.fish.DB().RoleGet(msgRole.GetName())
+	role, err := s.fish.DB().RoleGet(ctx, msgRole.GetName())
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.RoleServiceUpdateResponse{
 			Status: false, Message: "Role not found: " + err.Error(),
@@ -129,7 +129,7 @@ func (s *RoleService) Update(_ /*ctx*/ context.Context, req *connect.Request[aqu
 		}
 	}
 
-	if err := s.fish.DB().RoleSave(role); err != nil {
+	if err := s.fish.DB().RoleSave(ctx, role); err != nil {
 		return connect.NewResponse(&aquariumv2.RoleServiceUpdateResponse{
 			Status: false, Message: "Failed to update role: " + err.Error(),
 		}), connect.NewError(connect.CodeInternal, err)
@@ -142,8 +142,8 @@ func (s *RoleService) Update(_ /*ctx*/ context.Context, req *connect.Request[aqu
 }
 
 // Delete implements the Delete RPC
-func (s *RoleService) Delete(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.RoleServiceDeleteRequest]) (*connect.Response[aquariumv2.RoleServiceDeleteResponse], error) {
-	if err := s.fish.DB().RoleDelete(req.Msg.GetRoleName()); err != nil {
+func (s *RoleService) Delete(ctx context.Context, req *connect.Request[aquariumv2.RoleServiceDeleteRequest]) (*connect.Response[aquariumv2.RoleServiceDeleteResponse], error) {
+	if err := s.fish.DB().RoleDelete(ctx, req.Msg.GetRoleName()); err != nil {
 		return connect.NewResponse(&aquariumv2.RoleServiceDeleteResponse{
 			Status: false, Message: "Failed to delete role: " + err.Error(),
 		}), connect.NewError(connect.CodeNotFound, err)

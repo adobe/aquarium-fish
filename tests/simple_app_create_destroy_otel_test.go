@@ -183,7 +183,7 @@ drivers:
 	t.Run("Check OpenTelemetry data files are created", func(t *testing.T) {
 		// Get the fish workspace directory (which contains the data)
 		fishWorkspace := afi.Workspace()
-		otelDir := filepath.Join(fishWorkspace, "fish_data", "otel")
+		otelDir := filepath.Join(fishWorkspace, "telemetry")
 
 		// Check if otel directory exists
 		if _, err := os.Stat(otelDir); os.IsNotExist(err) {
@@ -258,6 +258,4 @@ drivers:
 
 		t.Log("Import tool test completed - directory structure verified")
 	})
-
-	t.Fatal("test")
 }

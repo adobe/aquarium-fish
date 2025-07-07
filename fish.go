@@ -18,6 +18,7 @@ package main
 // Generating everything from protobuf specs for RPC interface
 //go:generate buf generate
 //go:generate buf generate --template buf.gen2.yaml
+//go:generate go run ./tools/trace-gen-functions/trace-gen-functions.go ./lib
 
 import (
 	"context"
@@ -149,8 +150,8 @@ func main() {
 
 			// Set up file export path if not configured and no remote endpoints are set
 			if monitoringConfig.FileExportPath == "" && monitoringConfig.Enabled {
-				if monitoringConfig.OTLPEndpoint == "" || monitoringConfig.OTLPEndpoint == "localhost:4317" {
-					monitoringConfig.FileExportPath = filepath.Join(cfg.Directory, "otel")
+				if monitoringConfig.OTLPEndpoint == "" {
+					monitoringConfig.FileExportPath = "telemetry"
 					log.Info().Msgf("Fish: Setting file export path to %s", monitoringConfig.FileExportPath)
 				}
 			}
@@ -194,7 +195,7 @@ func main() {
 				log.Error().Msgf("Fish forced to shutdown: %v", err)
 			}
 
-			fish.Close()
+			fish.Close(context.Background())
 
 			log.Info().Msg("Fish stopped")
 
