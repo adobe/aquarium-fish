@@ -94,8 +94,9 @@ jobs:
 
       - name: Integration Tests
         run: |
-          go install github.com/jstemmer/go-junit-report/v2@85bf471  # Oct 18, 2023
-          go test -v -parallel 4 -count=1 -skip '_stress$' -race ./tests/... 2>&1 | go-junit-report -iocopy -set-exit-code -out report.xml
+          go install github.com/jstemmer/go-junit-report/v2@85bf4716ac1f025f2925510a9f5e9f5bb347c009  # Oct 18, 2023
+          go install github.com/gotesttools/gotestfmt/v2/cmd/gotestfmt@4c97682ab858d6bbd26fc020e255cb339c9c8119  # Jun 5, 2023
+          go test -json -v -parallel 4 -count=1 -skip '_stress$' -race ./tests/... 2>&1 | go-junit-report -parser gojson -iocopy -set-exit-code -out report.xml | gotestfmt
 
       - name: Benchmarks main
         run: go run go.bobheadxi.dev/gobenchdata@v1 action
