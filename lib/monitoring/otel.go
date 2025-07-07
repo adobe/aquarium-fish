@@ -71,14 +71,14 @@ type Config struct {
 	PyroscopeURL   string `json:"pyroscope_url"`    // Pyroscope URL for profiling
 	FileExportPath string `json:"file_export_path"` // Path to export telemetry data to files (when no remote endpoints configured)
 
-	ServiceName    string `json:"service_name"`    // Service name for telemetry
-	ServiceVersion string `json:"service_version"` // Service version
-
 	SampleRate        float64       `json:"sample_rate"`        // Trace sampling rate (0.0 to 1.0)
 	MetricsInterval   util.Duration `json:"metrics_interval"`   // Metrics collection interval
 	ProfilingInterval util.Duration `json:"profiling_interval"` // Profiling file export interval
 
 	// Will be set automatically from fish
+	ServiceName    string `json:"service_name"`    // Service name for telemetry
+	ServiceVersion string `json:"service_version"` // Service version
+
 	NodeUID      string `json:"node_uid"`      // Node UID for resource attributes
 	NodeName     string `json:"node_name"`     // Node name for resource attributes
 	NodeLocation string `json:"node_location"` // Node location for resource attributes
@@ -98,7 +98,6 @@ func (c *Config) InitDefaults() {
 
 	c.ServiceName = serviceName
 	c.ServiceVersion = serviceVersion
-
 	c.SampleRate = 1.0 // 100% sampling for development
 	c.MetricsInterval = util.Duration(15 * time.Second)
 	c.ProfilingInterval = util.Duration(30 * time.Second)
