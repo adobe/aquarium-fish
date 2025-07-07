@@ -76,7 +76,7 @@ func NewRPCClient(username, password string, clientType RPCClientType) (*http.Cl
 		}
 
 		cli = &http.Client{
-			Timeout:   time.Second * 5,
+			Timeout:   time.Second * 15,
 			Transport: tr,
 		}
 	}
