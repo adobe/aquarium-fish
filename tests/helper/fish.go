@@ -348,6 +348,13 @@ func (afi *AFInstance) WaitForLog(substring string, call func(string, string) bo
 	afi.waitForLog[substring] = call
 }
 
+// WaitForLog stores substring to be looked in the Fish log to execute call function with substring & found line
+func (afi *AFInstance) WaitForLogDelete(substring string) {
+	afi.waitForLogMu.Lock()
+	defer afi.waitForLogMu.Unlock()
+	delete(afi.waitForLog, substring)
+}
+
 // callWaitForLog is called by log scanner when substring from waitForLog was found
 func (afi *AFInstance) callWaitForLog(substring, line string) {
 	afi.waitForLogMu.RLock()

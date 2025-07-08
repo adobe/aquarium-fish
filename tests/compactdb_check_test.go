@@ -202,14 +202,12 @@ drivers:
 	t.Run("Applications should be cleaned from DB and compacted", func(t *testing.T) {
 		// Wait for the next 20 cleanupdb completed to have enough time to fill the DB
 		cleaned := make(chan struct{})
-		counter := 10
 		afi.WaitForLog("Fish: CleanupDB completed", func(substring, line string) bool {
-			t.Logf("Found warm up %d: %q", counter, substring)
-			counter--
+			t.Logf("Found cleanup: %q", substring)
 			cleaned <- struct{}{}
-			return !(counter > 0)
+			return false
 		})
-		for counter > 0 {
+		for range 10 {
 			<-cleaned
 		}
 
@@ -219,16 +217,10 @@ drivers:
 		t.Logf("Wait for all workers to finish...")
 		wg.Wait()
 
-		counter = 4
-		afi.WaitForLog("Fish: CleanupDB completed", func(substring, line string) bool {
-			t.Logf("Found calm down %d: %q", counter, substring)
-			counter--
-			cleaned <- struct{}{}
-			return !(counter > 0)
-		})
-		for counter > 0 {
+		for range 4 {
 			<-cleaned
 		}
+		afi.WaitForLogDelete("Fish: CleanupDB completed")
 
 		t.Logf("Looking for Applications leftovers in the database...")
 		appClient := aquariumv2connect.NewApplicationServiceClient(

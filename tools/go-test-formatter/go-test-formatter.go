@@ -432,7 +432,7 @@ func (f *Formatter) generateJUnitReports() error {
 			} else if test.Timeout {
 				suite.Failures++
 				testCase.Failure = &jUnitFailure{
-					Message: "Timeout occured",
+					Message: "Timeout occurred",
 					Type:    "timeout",
 					Content: "Test execution failed",
 				}
@@ -476,7 +476,7 @@ func (f *Formatter) generateJUnitReports() error {
 				} else if test.Timeout {
 					suite.Failures++
 					subtestCase.Failure = &jUnitFailure{
-						Message: "Timeout occured",
+						Message: "Timeout occurred",
 						Type:    "timeout",
 						Content: "Test execution failed",
 					}
