@@ -665,7 +665,8 @@ func (*StreamingService) sendSubscriptionResponse(sub *subscription, objectType 
 	// Check if context is cancelled
 	select {
 	case <-sub.ctx.Done():
-		return fmt.Errorf("subscription context cancelled")
+		log.Warnf("Streaming %s: Subscription context cancelled, skipping sending response", sub.id)
+		return nil
 	default:
 	}
 
