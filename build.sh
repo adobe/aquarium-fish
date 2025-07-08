@@ -26,7 +26,7 @@ echo "--- GENERATE CODE FOR AQUARIUM-FISH ---"
 
 # Install required tools if not available
 gopath=$(go env GOPATH)
-export PATH="$PATH:$gopath/bin" 
+export PATH="$PATH:$gopath/bin"
 
 # Install buf for protobuf management if not available
 if ! command -v buf >/dev/null 2>&1; then
@@ -111,7 +111,7 @@ for GOOS in $os_list; do
         fi
 
         echo "Building: $name ..."
-        if [ "x${RELEASE}" != "x" ]; then
+        if [ "x${RELEASE}" = "x" ]; then
             echo "WARNING: It's DEBUG binary with instrumentation"
         fi
         rm -f "$name" "$name.log" "$name.zip" "$name.tar.xz"

@@ -75,7 +75,7 @@ jobs:
         with:
           name: binaries
           path: aquarium-fish*.tar.xz
-  
+
   Tests:
     runs-on: ubuntu-latest
     steps:
@@ -88,14 +88,24 @@ jobs:
         with:
           go-version-file: go.mod
 
-      # Build here is needed to prepare a debug race instrumented version of the binary
+      # Debug build here is needed to prepare a debug race instrumented version of the binary
       - name: Build
-        run: RELEASE=1 ./build.sh
+        run: ./build.sh
 
       - name: Integration Tests
         run: |
-          go install github.com/jstemmer/go-junit-report/v2@85bf471  # Oct 18, 2023
-          FISH_PATH="$PWD/$(ls -t aquarium-fish*.linux_amd64 | head -1)" go test -v -parallel 4 -count=1 -skip '_stress$' ./tests/... 2>&1 | go-junit-report -iocopy -set-exit-code -out report.xml
+          go test -json -v -parallel 4 -count=1 -skip '_stress$' -race ./tests/... 2>&1 | \
+            tee integration_tests_report.full.log | \
+            go run ./tools/go-test-formatter/go-test-formatter.go -stdout_timestamp test -stdout_color \
+              -stdout_filter failed -junit integration_tests_report.xml -junit_truncate 4000 \
+              -junit_filter failed -junit_timestamp test
+
+      - name: Pack failed tests workspaces
+        if: failure()
+        run: |
+          target_dir="$PWD"
+          cd /tmp
+          tar -czf "$target_dir/integration_tests_ws.tar.gz" fish*
 
       - name: Benchmarks main
         run: go run go.bobheadxi.dev/gobenchdata@v1 action
@@ -125,10 +135,12 @@ jobs:
           name: tests
           path: |
             /tmp/gobenchdata/*
-            report.xml
+            integration_tests_ws.tar.gz
+            integration_tests_report.full.log
+            integration_tests_report.xml
 
       - name: Test Summary
         uses: test-summary/action@v2
         if: always()
         with:
-          paths: report.xml
+          paths: integration_tests_report.xml

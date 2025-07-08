@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -32,7 +33,6 @@ import (
 
 // Check the database compaction works correctly in constant flow of applications
 func Test_compactdb_check(t *testing.T) {
-	t.Parallel()
 	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 default_resource_lifetime: 20s
@@ -99,7 +99,7 @@ drivers:
 
 	workerCli, workerOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
 
-	completed := false
+	var completed int32 // Use atomic int32: 0=false, 1=true
 	workerFunc := func(t *testing.T, wg *sync.WaitGroup, id int) {
 		t.Logf("Worker %d: Started", id)
 		defer t.Logf("Worker %d: Ended", id)
@@ -112,7 +112,7 @@ drivers:
 			workerOpts...,
 		)
 
-		for !completed {
+		for atomic.LoadInt32(&completed) == 0 {
 			// Create new application
 			t.Logf("Worker %d: Starting new application", id)
 			resp, err := appClient.Create(
@@ -135,8 +135,9 @@ drivers:
 			}
 			t.Logf("Worker %d: Created application %s", id, appUID)
 
-			// Checking state until it's allocated
-			for {
+			// Checking state for 20 times until it's allocated - duratin ~5 seconds total
+			var appStatus aquariumv2.ApplicationState_Status
+			for range 20 {
 				stateResp, err := appClient.GetState(
 					context.Background(),
 					connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
@@ -152,17 +153,24 @@ drivers:
 					t.Errorf("Worker %d: ApplicationStatus UID is empty", id)
 					return
 				}
-				if stateResp.Msg.Data.Status == aquariumv2.ApplicationState_ERROR {
-					t.Errorf("Worker %d: ApplicationStatus is ERROR: %v", id, stateResp.Msg.Data.Status)
+
+				appStatus = stateResp.Msg.Data.Status
+				if appStatus == aquariumv2.ApplicationState_ERROR {
+					t.Errorf("Worker %d: ApplicationStatus is ERROR: %v", id, appStatus)
 					return
 				}
 
-				if stateResp.Msg.Data.Status == aquariumv2.ApplicationState_ALLOCATED {
+				if appStatus == aquariumv2.ApplicationState_ALLOCATED {
 					t.Logf("Worker %d: Application allocated %s", id, appUID)
 					break
 				}
 
 				time.Sleep(250 * time.Millisecond)
+			}
+
+			if appStatus != aquariumv2.ApplicationState_ALLOCATED {
+				t.Errorf("Worker %d: Did not receive ALLOCATED ApplicationStatus in 5 seconds: %s", id, appStatus)
+				return
 			}
 
 			// Time to deallocate
@@ -194,29 +202,25 @@ drivers:
 	t.Run("Applications should be cleaned from DB and compacted", func(t *testing.T) {
 		// Wait for the next 20 cleanupdb completed to have enough time to fill the DB
 		cleaned := make(chan struct{})
+		afi.WaitForLog("Fish: CleanupDB completed", func(substring, line string) bool {
+			t.Logf("Found cleanup: %q", substring)
+			cleaned <- struct{}{}
+			return false
+		})
 		for range 10 {
-			afi.WaitForLog("Fish: CleanupDB completed", func(substring, line string) bool {
-				t.Logf("Found warm up: %q", substring)
-				cleaned <- struct{}{}
-				return true
-			})
 			<-cleaned
 		}
 
 		t.Logf("Now stopping the workers to calm down a bit and wait for a few more cleanups")
-		completed = true
+		atomic.StoreInt32(&completed, 1)
 
 		t.Logf("Wait for all workers to finish...")
 		wg.Wait()
 
 		for range 4 {
-			afi.WaitForLog("Fish: CleanupDB completed", func(substring, line string) bool {
-				t.Logf("Found calm down: %q", substring)
-				cleaned <- struct{}{}
-				return true
-			})
 			<-cleaned
 		}
+		afi.WaitForLogDelete("Fish: CleanupDB completed")
 
 		t.Logf("Looking for Applications leftovers in the database...")
 		appClient := aquariumv2connect.NewApplicationServiceClient(

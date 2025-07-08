@@ -142,13 +142,14 @@ func main() {
 			// Wait for signal to quit
 			<-fish.Quit
 
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			log.Info("Fish stopping...")
+
+			// Shutdown the server (RPC server will handle streaming connections gracefully)
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 			if err := srv.Shutdown(ctx); err != nil {
 				log.Error("Fish forced to shutdown:", err)
 			}
-
-			log.Info("Fish stopping...")
 
 			fish.Close()
 

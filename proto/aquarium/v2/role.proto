@@ -22,16 +22,16 @@ option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aq
 service RoleService {
   // Get list of roles
   rpc List(RoleServiceListRequest) returns (RoleServiceListResponse) {}
-  
+
   // Get role by name
   rpc Get(RoleServiceGetRequest) returns (RoleServiceGetResponse) {}
-  
+
   // Create new role
   rpc Create(RoleServiceCreateRequest) returns (RoleServiceCreateResponse) {}
-  
+
   // Update existing role
   rpc Update(RoleServiceUpdateRequest) returns (RoleServiceUpdateResponse) {}
-  
+
   // Delete role
   rpc Delete(RoleServiceDeleteRequest) returns (RoleServiceDeleteResponse) {}
 }
@@ -103,5 +103,4 @@ message RoleServiceDeleteRequest {
 message RoleServiceDeleteResponse {
   bool status = 1;
   string message = 2;
-} 
-
+}

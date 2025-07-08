@@ -86,3 +86,10 @@ func GetUserName(ctx context.Context) string {
 
 	return user.Name
 }
+
+// SetRBACContext sets the RBAC service and method in context for permission checking
+func SetRBACContext(ctx context.Context, service, method string) context.Context {
+	ctx = context.WithValue(ctx, rbacServiceContextKey, service)
+	ctx = context.WithValue(ctx, rbacMethodContextKey, method)
+	return ctx
+}

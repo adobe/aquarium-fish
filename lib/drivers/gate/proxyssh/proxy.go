@@ -159,6 +159,9 @@ func (s *session) handleChannel(ch ssh.NewChannel, dstConn ssh.Conn) {
 	defer s.wg.Done()
 	log.Debugf("PROXYSSH: %s: %s: Handling new channel: %s", s.drv.name, s.SrcAddr, ch.ChannelType())
 
+	// To prevent concurrent access to the channels
+	var chnMutex sync.Mutex
+
 	dstChn, dstChnRequests, dstChnErr := dstConn.OpenChannel(ch.ChannelType(), ch.ExtraData())
 	if dstChnErr != nil {
 		log.Errorf("PROXYSSH: %s: %s: Could not open channel to destination: %v", s.drv.name, s.SrcAddr, dstChnErr)
@@ -183,8 +186,12 @@ func (s *session) handleChannel(ch ssh.NewChannel, dstConn ssh.Conn) {
 		defer chWg.Done()
 
 		// End the communication between the source and destination when this function is complete.
-		defer srcChn.Close()
-		defer dstChn.Close()
+		defer func() {
+			chnMutex.Lock()
+			srcChn.Close()
+			dstChn.Close()
+			chnMutex.Unlock()
+		}()
 
 		log.Debugf("PROXYSSH: %s: %s: Starting to listen for channel requests", s.drv.name, s.SrcAddr)
 		for {
@@ -241,6 +248,8 @@ func (s *session) handleChannel(ch ssh.NewChannel, dstConn ssh.Conn) {
 		} else {
 			log.Debugf("PROXYSSH: %s: %s: The dst->src channel was closed: %v", s.drv.name, s.SrcAddr, err)
 		}
+		chnMutex.Lock()
+		defer chnMutex.Unlock()
 		// Properly closing the channel
 		if err := dstChn.CloseWrite(); err != nil {
 			log.Warnf("PROXYSSH: %s: %s: The dst->src closing write for dst channel did not go well: %v", s.drv.name, s.SrcAddr, err)
@@ -256,12 +265,14 @@ func (s *session) handleChannel(ch ssh.NewChannel, dstConn ssh.Conn) {
 		log.Debugf("PROXYSSH: %s: %s: The src->dst channel was closed", s.drv.name, s.SrcAddr)
 	}
 	// Properly closing the channel
+	chnMutex.Lock()
 	if err := dstChn.CloseWrite(); err != nil {
 		log.Warnf("PROXYSSH: %s: %s: The src->dst closing write for dst channel did not go well: %v", s.drv.name, s.SrcAddr, err)
 	}
 	if err := srcChn.CloseWrite(); err != nil {
 		log.Warnf("PROXYSSH: %s: %s: The src->dst closing write for src channel did not go well: %v", s.drv.name, s.SrcAddr, err)
 	}
+	chnMutex.Unlock()
 
 	chWg.Wait()
 	log.Debugf("PROXYSSH: %s: %s: Completed processing channel: %s", s.drv.name, s.SrcAddr, ch.ChannelType())

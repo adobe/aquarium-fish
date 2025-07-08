@@ -29,7 +29,7 @@ service GateProxySSHService {
    };
   }
 }
-  
+
 
 // ProxySSHAccess represents user accessor to connect to the ApplicationResource.
 //

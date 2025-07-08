@@ -53,7 +53,7 @@ type Fish struct {
 	Quit chan os.Signal
 
 	// Allows us to gracefully close all the subroutines
-	running       context.Context //nolint:containedctx
+	running       context.Context //nolint:containedctx // Is used for sending stop for goroutines
 	runningCancel context.CancelFunc
 	routines      sync.WaitGroup
 	routinesMutex sync.Mutex
@@ -111,11 +111,11 @@ func (f *Fish) Init() error {
 	signal.Notify(f.Quit, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 
 	// Init channel for ApplicationState changes
-	f.applicationStateChannel = make(chan *typesv2.ApplicationState)
+	f.applicationStateChannel = make(chan *typesv2.ApplicationState, 100)
 	f.db.SubscribeApplicationState(f.applicationStateChannel)
 
 	// Init channel for ApplicationTask changes
-	f.applicationTaskChannel = make(chan *typesv2.ApplicationTask)
+	f.applicationTaskChannel = make(chan *typesv2.ApplicationTask, 100)
 	f.db.SubscribeApplicationTask(f.applicationTaskChannel)
 
 	// Init variables

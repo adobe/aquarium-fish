@@ -274,16 +274,16 @@ It uses the configuration from .golangci.yml file.
 
 ### Integration tests
 
+The integration tests needs aquarium-fish* binary, so prior to execution please run `./build.sh`.
+
 * To verify that everything works as expected you can run integration tests like that:
    ```sh
-   $ FISH_PATH=$PWD/aquarium-fish.darwin_amd64 go test -v -failfast -count 1 ./tests
+   $ go test -v -failfast -parallel 4 -count 1 ./tests/...
    ```
-* To run just one test of the suite:
+* To run just one test of the suite on specific aquarium-fish binary:
    ```sh
    $ FISH_PATH=$PWD/aquarium-fish.darwin_amd64 go test -v -failfast -count 1 -run '^TEST_NAME$' ./tests
    ```
-* You can also validate what's happening in the apitest request by adding `Debug().` before Get/Post
-  specification.
 
 ### Benchmarks
 

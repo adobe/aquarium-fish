@@ -109,9 +109,9 @@ func (d *Driver) Prepare(config []byte) error {
 	}
 	d.totalCPU = uint32(parsedCPU)
 
-	parsedRAM, err := strconv.ParseUint(cpuMem[1], 10, 32)
+	parsedRAM, err := strconv.ParseUint(cpuMem[1], 10, 64)
 	if err != nil {
-		return fmt.Errorf("DOCKER: %s: Unable to parse RAM uint32: %v (%q)", d.name, err, cpuMem[1])
+		return fmt.Errorf("DOCKER: %s: Unable to parse RAM uint64: %v (%q)", d.name, err, cpuMem[1])
 	}
 	d.totalRAM = uint32(parsedRAM / 1073741824) // Get in GB
 

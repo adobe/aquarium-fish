@@ -17,6 +17,7 @@ package rpc
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
@@ -31,8 +32,9 @@ import (
 
 // Server represents the Connect server
 type Server struct {
-	fish *fish.Fish
-	mux  *http.ServeMux
+	fish             *fish.Fish
+	mux              *http.ServeMux
+	streamingService *StreamingService
 }
 
 // NewServer creates a new Connect server
@@ -61,6 +63,13 @@ func NewServer(f *fish.Fish, additionalServices []gate.RPCService) *Server {
 
 	s.mux.Handle(aquariumv2connect.NewNodeServiceHandler(
 		&NodeService{fish: f},
+	))
+
+	// Create and store streaming service
+	streamingService := NewStreamingService(f)
+	s.streamingService = streamingService
+	s.mux.Handle(aquariumv2connect.NewStreamingServiceHandler(
+		streamingService,
 	))
 
 	// Register additional services from gate drivers
@@ -103,8 +112,37 @@ func (s *Server) ListenAndServe(addr string, certFile, keyFile string) error {
 	return http.ListenAndServe(addr, handler) //nolint:gosec // G114 - We don't need timeouts here
 }
 
-// Shutdown gracefully shuts down the server
-func (*Server) Shutdown(_ /*ctx*/ context.Context) error {
-	// TODO: Implement graceful shutdown
+// Shutdown gracefully shuts down the server and all streaming connections
+func (s *Server) Shutdown(ctx context.Context) error {
+	log.Info("RPC: Starting graceful server shutdown...")
+
+	// First, gracefully shutdown all streaming connections
+	// Use half the available context timeout for streaming shutdown
+	deadline, hasDeadline := ctx.Deadline()
+	streamingTimeout := 15 * time.Second // Default to 15 seconds
+	if hasDeadline {
+		remaining := time.Until(deadline)
+		if remaining > 30*time.Second {
+			streamingTimeout = 15 * time.Second // Use 15 seconds if we have plenty of time
+		} else if remaining > 10*time.Second {
+			streamingTimeout = remaining / 2 // Use half the remaining time
+		} else {
+			streamingTimeout = remaining - 5*time.Second // Leave 5 seconds for other cleanup
+			if streamingTimeout < 1*time.Second {
+				streamingTimeout = 1 * time.Second // Minimum 1 second
+			}
+		}
+	}
+
+	log.Infof("RPC: Shutting down streaming connections with %v timeout...", streamingTimeout)
+	if s.streamingService != nil {
+		// Create a timeout context
+		streamingCtx, cancel := context.WithTimeout(ctx, streamingTimeout)
+		defer cancel()
+
+		s.streamingService.GracefulShutdown(streamingCtx)
+	}
+
+	log.Info("RPC: Server shutdown completed")
 	return nil
 }

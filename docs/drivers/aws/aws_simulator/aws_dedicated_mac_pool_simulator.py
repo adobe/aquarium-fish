@@ -242,7 +242,7 @@ class Event:
             events = Event.events.pop(k)
             for evt in events:
                 Event.current_time = evt.start
-                # Print object.name In case it's object method otherwise just class.method 
+                # Print object.name In case it's object method otherwise just class.method
                 #if getattr(evt.fun, '__self__', None) != None:
                 #    print(datetime.fromtimestamp(Event.current_time) , "-->", f"Event starting: {evt.fun.__self__}.{evt.fun.__name__}{evt.params}")
                 #else:

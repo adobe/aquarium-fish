@@ -28,23 +28,23 @@ service UserService {
     no_permission_needed: true,
    };
   }
-  
+
   // Get list of users
   rpc List(UserServiceListRequest) returns (UserServiceListResponse) {}
-  
+
   // Get user by name
   rpc Get(UserServiceGetRequest) returns (UserServiceGetResponse) {}
-  
+
   // Create new user
   rpc Create(UserServiceCreateRequest) returns (UserServiceCreateResponse) {}
-  
+
   // Update existing user
   rpc Update(UserServiceUpdateRequest) returns (UserServiceUpdateResponse) {
    option (access_control) = {
     additional_actions: ['UpdateAll', 'UpdatePassword', 'UpdateRoles'],
    };
   }
-  
+
   // Delete user
   rpc Delete(UserServiceDeleteRequest) returns (UserServiceDeleteResponse) {}
 }
@@ -53,7 +53,7 @@ service UserService {
 //
 // Contains user information including roles and permissions. The `admin` user is created during
 // the first cluster start and prints credentials to stderr.
-// 
+//
 // Can be created by any node and updated by any node with appropriate permissions.
 message User {
   string name = 1;

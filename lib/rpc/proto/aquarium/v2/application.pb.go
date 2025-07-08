@@ -1475,7 +1475,7 @@ var File_aquarium_v2_application_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_application_proto_rawDesc = "" +
 	"\n" +
-	"\x1daquarium/v2/application.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x18aquarium/v2/common.proto\x1a\x16aquarium/v2/rbac.proto\"\xcb\x01\n" +
+	"\x1daquarium/v2/application.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x18aquarium/v2/common.proto\x1a\x16aquarium/v2/rbac.proto\x1a#aquarium/v2/streaming_options.proto\"\xcb\x01\n" +
 	"\vApplication\x12\x10\n" +
 	"\x03uid\x18\x01 \x01(\tR\x03uid\x129\n" +
 	"\n" +
@@ -1483,7 +1483,7 @@ const file_aquarium_v2_application_proto_rawDesc = "" +
 	"\n" +
 	"owner_name\x18\x03 \x01(\tR\townerName\x12\x1b\n" +
 	"\tlabel_uid\x18\x04 \x01(\tR\blabelUid\x123\n" +
-	"\bmetadata\x18\x05 \x01(\v2\x17.google.protobuf.StructR\bmetadata\"\xd4\x02\n" +
+	"\bmetadata\x18\x05 \x01(\v2\x17.google.protobuf.StructR\bmetadata\"\xf9\x02\n" +
 	"\x10ApplicationState\x12\x10\n" +
 	"\x03uid\x18\x01 \x01(\tR\x03uid\x129\n" +
 	"\n" +
@@ -1499,7 +1499,8 @@ const file_aquarium_v2_application_proto_rawDesc = "" +
 	"\n" +
 	"DEALLOCATE\x10\x04\x12\x0f\n" +
 	"\vDEALLOCATED\x10\x05\x12\t\n" +
-	"\x05ERROR\x10\x06\"\xd4\x04\n" +
+	"\x05ERROR\x10\x06:#\x8a\xb5\x18\x1f\n" +
+	"\x1dApplicationServiceGetStateAll\"\xfc\x04\n" +
 	"\x13ApplicationResource\x12\x10\n" +
 	"\x03uid\x18\x01 \x01(\tR\x03uid\x129\n" +
 	"\n" +
@@ -1518,10 +1519,11 @@ const file_aquarium_v2_application_proto_rawDesc = "" +
 	" \x01(\tR\x06hwAddr\x123\n" +
 	"\bmetadata\x18\v \x01(\v2\x17.google.protobuf.StructR\bmetadata\x129\n" +
 	"\atimeout\x18\f \x01(\v2\x1a.google.protobuf.TimestampH\x00R\atimeout\x88\x01\x01\x12H\n" +
-	"\x0eauthentication\x18\r \x01(\v2\x1b.aquarium.v2.AuthenticationH\x01R\x0eauthentication\x88\x01\x01B\n" +
+	"\x0eauthentication\x18\r \x01(\v2\x1b.aquarium.v2.AuthenticationH\x01R\x0eauthentication\x88\x01\x01:&\x8a\xb5\x18\"\n" +
+	" ApplicationServiceGetResourceAllB\n" +
 	"\n" +
 	"\b_timeoutB\x11\n" +
-	"\x0f_authentication\"\xf4\x02\n" +
+	"\x0f_authentication\"\x99\x03\n" +
 	"\x0fApplicationTask\x12\x10\n" +
 	"\x03uid\x18\x01 \x01(\tR\x03uid\x129\n" +
 	"\n" +
@@ -1532,7 +1534,8 @@ const file_aquarium_v2_application_proto_rawDesc = "" +
 	"\x04task\x18\x05 \x01(\tR\x04task\x128\n" +
 	"\x04when\x18\x06 \x01(\x0e2$.aquarium.v2.ApplicationState.StatusR\x04when\x121\n" +
 	"\aoptions\x18\a \x01(\v2\x17.google.protobuf.StructR\aoptions\x12/\n" +
-	"\x06result\x18\b \x01(\v2\x17.google.protobuf.StructR\x06result\"\x1f\n" +
+	"\x06result\x18\b \x01(\v2\x17.google.protobuf.StructR\x06result:#\x8a\xb5\x18\x1f\n" +
+	"\x1dApplicationServiceListTaskAll\"\x1f\n" +
 	"\x1dApplicationServiceListRequest\"\x80\x01\n" +
 	"\x1eApplicationServiceListResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
@@ -1700,6 +1703,7 @@ func file_aquarium_v2_application_proto_init() {
 	}
 	file_aquarium_v2_common_proto_init()
 	file_aquarium_v2_rbac_proto_init()
+	file_aquarium_v2_streaming_options_proto_init()
 	file_aquarium_v2_application_proto_msgTypes[2].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

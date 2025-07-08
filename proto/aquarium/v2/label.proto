@@ -29,13 +29,13 @@ service LabelService {
      allowed_roles: ["User"]
    };
   }
-  
+
   // Get label by UID
   rpc Get(LabelServiceGetRequest) returns (LabelServiceGetResponse) {}
-  
+
   // Create new label
   rpc Create(LabelServiceCreateRequest) returns (LabelServiceCreateResponse) {}
-  
+
   // Delete label by UID
   rpc Delete(LabelServiceDeleteRequest) returns (LabelServiceDeleteResponse) {}
 }
@@ -127,11 +127,11 @@ message LabelDefinition {
 //
 // It's used for 2 purposes, in Label definitions to describe the required amount of resources
 // and in Fish to store the currently used resources, so could add and subtract resources.
-// 
+//
 // Modificators are used for parallel node usage by different Applications, they are stored
 // for the first Application and used for the others to determine node tenancy/overbook
 // tolerance.
-// 
+//
 // Different drivers uses it in different ways to provide quite similar functionality, so it's
 // a good idea to check the driver's wiki page to get some clue on how to create Label def.
 message Resources {
@@ -219,4 +219,4 @@ message LabelServiceDeleteRequest {
 message LabelServiceDeleteResponse {
   bool status = 1;
   string message = 2;
-} 
+}

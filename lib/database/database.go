@@ -43,8 +43,11 @@ type Database struct {
 	node typesv2.Node
 
 	// Subscriptions to notify subscribers about changes in DB, contains key prefix and channel
-	subsApplicationState []chan *typesv2.ApplicationState
-	subsApplicationTask  []chan *typesv2.ApplicationTask
+	// Protected by subsMu to prevent data races during subscribe/unsubscribe operations
+	subsMu                  sync.RWMutex
+	subsApplicationState    []chan *typesv2.ApplicationState
+	subsApplicationTask     []chan *typesv2.ApplicationTask
+	subsApplicationResource []chan *typesv2.ApplicationResource
 }
 
 // Init creates the database object by provided path
