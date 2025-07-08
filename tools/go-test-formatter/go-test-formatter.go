@@ -17,9 +17,9 @@
 // Usage:
 // go test -json -v -parallel 4 -count=1 -skip '_stress$' ./tests/... | \
 //     tee integration_tests_report.full.log | \
-//     go run ./tools/go-test-formatter/go-test-formatter.go -stdout_timestamp -stdout_color \
+//     go run ./tools/go-test-formatter/go-test-formatter.go -stdout_timestamp test -stdout_color \
 //         -stdout_filter failed -junit integration_tests_report.xml -junit_truncate 2000 \
-//         -junit_filter failed -junit_timestamp
+//         -junit_filter failed -junit_timestamp true
 
 package main
 
@@ -31,13 +31,12 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 )
 
-// TestEvent represents a single test event from go test -json
-type TestEvent struct {
+// testEvent represents a single test event from go test -json
+type testEvent struct {
 	Time    string  `json:"Time"`
 	Action  string  `json:"Action"`
 	Package string  `json:"Package"`
@@ -46,41 +45,41 @@ type TestEvent struct {
 	Elapsed float64 `json:"Elapsed"`
 }
 
-// TestLine contains time and text output
-type TestLine struct {
+// testLine contains time and text output
+type testLine struct {
 	Time time.Time
 	Line string
 }
 
-// TestResult represents a completed test with all its output
-type TestResult struct {
+// testResult represents a completed test with all its output
+type testResult struct {
 	Package   string
 	Test      string
 	Action    string
 	StartTime time.Time
 	EndTime   time.Time
 	Elapsed   float64
-	Output    []TestLine
+	Output    []testLine
 	Failed    bool
 	Passed    bool
-	Subtests  map[string]*TestResult
-	Parent    *TestResult
+	Subtests  map[string]*testResult
+	Parent    *testResult
 
 	activeSubtest string
 }
 
-// PackageResult represents all tests in a package
-type PackageResult struct {
+// packageResult represents all tests in a package
+type packageResult struct {
 	Name      string
-	Tests     map[string]*TestResult
+	Tests     map[string]*testResult
 	Failed    bool
 	Passed    bool
 	StartTime time.Time
 	EndTime   time.Time
 }
 
-// JUnitTestSuite represents a JUnit XML test suite
-type JUnitTestSuite struct {
+// jUnitTestSuite represents a JUnit XML test suite
+type jUnitTestSuite struct {
 	XMLName   xml.Name        `xml:"testsuite"`
 	Name      string          `xml:"name,attr"`
 	Tests     int             `xml:"tests,attr"`
@@ -89,22 +88,22 @@ type JUnitTestSuite struct {
 	Skipped   int             `xml:"skipped,attr"`
 	Time      float64         `xml:"time,attr"`
 	Timestamp string          `xml:"timestamp,attr"`
-	TestCases []JUnitTestCase `xml:"testcase"`
+	TestCases []jUnitTestCase `xml:"testcase"`
 }
 
-// JUnitTestCase represents a JUnit XML test case
-type JUnitTestCase struct {
+// jUnitTestCase represents a JUnit XML test case
+type jUnitTestCase struct {
 	XMLName   xml.Name      `xml:"testcase"`
 	Classname string        `xml:"classname,attr"`
 	Name      string        `xml:"name,attr"`
 	Time      float64       `xml:"time,attr"`
-	Failure   *JUnitFailure `xml:"failure,omitempty"`
+	Failure   *jUnitFailure `xml:"failure,omitempty"`
 	SystemOut string        `xml:"system-out,omitempty"`
 	SystemErr string        `xml:"system-err,omitempty"`
 }
 
-// JUnitFailure represents a JUnit XML failure
-type JUnitFailure struct {
+// jUnitFailure represents a JUnit XML failure
+type jUnitFailure struct {
 	XMLName xml.Name `xml:"failure"`
 	Message string   `xml:"message,attr"`
 	Type    string   `xml:"type,attr"`
@@ -121,14 +120,18 @@ type Config struct {
 	JUnitTruncate   int
 	JUnitFilter     string
 	JUnitTimestamp  bool
+
+	StdoutTimestampFlavor string
+	JUnitTimestampFlavor  string
 }
 
 // Formatter holds the main formatter state
 type Formatter struct {
 	config        *Config
-	packages      map[string]*PackageResult
+	packages      map[string]*packageResult
 	currentOutput []string
 	hasFailures   bool
+	startTime     time.Time
 }
 
 // Colors for terminal output
@@ -146,7 +149,7 @@ func main() {
 
 	formatter := &Formatter{
 		config:   config,
-		packages: make(map[string]*PackageResult),
+		packages: make(map[string]*packageResult),
 	}
 
 	if err := formatter.process(); err != nil {
@@ -164,14 +167,23 @@ func parseFlags() *Config {
 
 	flag.StringVar(&config.StdoutFilter, "stdout_filter", "", "Filter stdout output (non-failed, non-error, all)")
 	flag.IntVar(&config.StdoutTruncate, "stdout_truncate", 0, "Truncate stdout output to N lines")
-	flag.BoolVar(&config.StdoutTimestamp, "stdout_timestamp", false, "Add timestamps to stdout output")
+	flag.StringVar(&config.StdoutTimestampFlavor, "stdout_timestamp", "", "Add timestamps to stdout output (true, start, test)")
 	flag.BoolVar(&config.StdoutColor, "stdout_color", false, "Enable colored stdout output")
 	flag.StringVar(&config.JUnitOutput, "junit", "", "JUnit XML output file")
 	flag.IntVar(&config.JUnitTruncate, "junit_truncate", 0, "Truncate JUnit test output to N lines")
 	flag.StringVar(&config.JUnitFilter, "junit_filter", "", "Filter JUnit output (non-failed, non-error, all)")
-	flag.BoolVar(&config.JUnitTimestamp, "junit_timestamp", false, "Add timestamps to JUnit output")
+	flag.StringVar(&config.JUnitTimestampFlavor, "junit_timestamp", "", "Add timestamps to JUnit output (true, start, test)")
 
 	flag.Parse()
+
+	if config.StdoutTimestampFlavor != "" {
+		config.StdoutTimestamp = true
+	}
+
+	if config.JUnitTimestampFlavor != "" {
+		config.JUnitTimestamp = true
+	}
+
 	return config
 }
 
@@ -179,14 +191,16 @@ func (f *Formatter) process() error {
 	scanner := bufio.NewScanner(os.Stdin)
 
 	for scanner.Scan() {
-		var event TestEvent
+		var event testEvent
 		if err := json.Unmarshal([]byte(scanner.Text()), &event); err != nil {
 			return fmt.Errorf("failed to parse JSON: %v", err)
 		}
 
-		if err := f.processEvent(&event); err != nil {
-			return fmt.Errorf("failed to process event: %v", err)
+		// Set start time of the tests run
+		if event.Time != "" && f.startTime.IsZero() {
+			f.startTime = f.parseTime(event.Time)
 		}
+		f.processEvent(&event)
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -196,19 +210,20 @@ func (f *Formatter) process() error {
 	return f.generateOutputs()
 }
 
-func (f *Formatter) processEvent(event *TestEvent) error {
+func (f *Formatter) processEvent(event *testEvent) {
 	switch event.Action {
 	case "run":
 		f.runTest(event)
+	case "cont":
+		f.setTestStartTime(event)
 	case "output":
 		f.addOutput(event)
 	case "pass", "fail", "skip":
 		f.completeTest(event)
 	}
-	return nil
 }
 
-func (f *Formatter) runTest(event *TestEvent) {
+func (f *Formatter) runTest(event *testEvent) {
 	if event.Test == "" {
 		return
 	}
@@ -220,12 +235,12 @@ func (f *Formatter) runTest(event *TestEvent) {
 	parentTest, isSubtest := f.findParentTest(pkg, testKey)
 
 	if _, exists := pkg.Tests[testKey]; !exists {
-		test := &TestResult{
+		test := &testResult{
 			Package:   event.Package,
 			Test:      event.Test,
 			StartTime: f.parseTime(event.Time),
-			Output:    make([]TestLine, 0),
-			Subtests:  make(map[string]*TestResult),
+			Output:    make([]testLine, 0),
+			Subtests:  make(map[string]*testResult),
 		}
 
 		if isSubtest {
@@ -240,7 +255,20 @@ func (f *Formatter) runTest(event *TestEvent) {
 	f.currentOutput = make([]string, 0)
 }
 
-func (f *Formatter) addOutput(event *TestEvent) {
+func (f *Formatter) setTestStartTime(event *testEvent) {
+	// We need to set the actual test start time because it's starting with pause
+	if event.Test == "" {
+		return
+	}
+
+	pkg := f.getOrCreatePackage(event.Package)
+
+	if test, exists := pkg.Tests[event.Test]; exists && len(test.Output) == 0 {
+		test.StartTime = f.parseTime(event.Time)
+	}
+}
+
+func (f *Formatter) addOutput(event *testEvent) {
 	if event.Test == "" {
 		return
 	}
@@ -252,6 +280,7 @@ func (f *Formatter) addOutput(event *TestEvent) {
 
 	// Remove not that needed RUN and PASS/FAIL/SKIP due to not needed in block output
 	if strings.HasPrefix(event.Output, "=== RUN ") ||
+		strings.HasPrefix(strings.TrimLeft(event.Output, " "), "--- PASS: ") ||
 		strings.HasPrefix(strings.TrimLeft(event.Output, " "), "--- FAIL: ") ||
 		strings.HasPrefix(strings.TrimLeft(event.Output, " "), "--- SKIP: ") {
 		return
@@ -260,7 +289,7 @@ func (f *Formatter) addOutput(event *TestEvent) {
 	pkg := f.getOrCreatePackage(event.Package)
 
 	// Determine which test should receive this output
-	var targetTest *TestResult = f.findTest(pkg, event.Test)
+	targetTest := f.findTest(pkg, event.Test)
 	if targetTest == nil {
 		return
 	}
@@ -274,14 +303,14 @@ func (f *Formatter) addOutput(event *TestEvent) {
 		return
 	}
 
-	targetTest.Output = append(targetTest.Output, TestLine{
+	targetTest.Output = append(targetTest.Output, testLine{
 		Time: f.parseTime(event.Time),
 		Line: event.Output,
 	})
 	f.currentOutput = append(f.currentOutput, event.Output)
 }
 
-func (f *Formatter) completeTest(event *TestEvent) {
+func (f *Formatter) completeTest(event *testEvent) {
 	if event.Test == "" {
 		return
 	}
@@ -329,20 +358,20 @@ func (f *Formatter) completeTest(event *TestEvent) {
 	f.currentOutput = nil
 }
 
-func (f *Formatter) getOrCreatePackage(pkgName string) *PackageResult {
+func (f *Formatter) getOrCreatePackage(pkgName string) *packageResult {
 	if pkg, exists := f.packages[pkgName]; exists {
 		return pkg
 	}
 
-	pkg := &PackageResult{
+	pkg := &packageResult{
 		Name:  pkgName,
-		Tests: make(map[string]*TestResult),
+		Tests: make(map[string]*testResult),
 	}
 	f.packages[pkgName] = pkg
 	return pkg
 }
 
-func (f *Formatter) parseTime(timeStr string) time.Time {
+func (*Formatter) parseTime(timeStr string) time.Time {
 	if t, err := time.Parse(time.RFC3339Nano, timeStr); err == nil {
 		return t
 	}
@@ -357,21 +386,19 @@ func (f *Formatter) generateOutputs() error {
 	}
 
 	// Print summary at the end
-	if err := f.printSummary(); err != nil {
-		return fmt.Errorf("failed to print summary: %v", err)
-	}
+	f.printSummary()
 
 	return nil
 }
 
 func (f *Formatter) generateJUnitReports() error {
 	// Group tests by package for JUnit
-	suites := make([]*JUnitTestSuite, 0)
+	suites := make([]*jUnitTestSuite, 0)
 
 	for pkgName, pkg := range f.packages {
-		suite := &JUnitTestSuite{
+		suite := &jUnitTestSuite{
 			Name:      pkgName,
-			TestCases: make([]JUnitTestCase, 0),
+			TestCases: make([]jUnitTestCase, 0),
 			Timestamp: time.Now().Format(time.RFC3339),
 		}
 
@@ -383,7 +410,7 @@ func (f *Formatter) generateJUnitReports() error {
 			}
 
 			// Add main test
-			testCase := JUnitTestCase{
+			testCase := jUnitTestCase{
 				Classname: pkgName,
 				Name:      testName,
 				Time:      test.Elapsed,
@@ -391,7 +418,7 @@ func (f *Formatter) generateJUnitReports() error {
 
 			if test.Failed {
 				suite.Failures++
-				testCase.Failure = &JUnitFailure{
+				testCase.Failure = &jUnitFailure{
 					Message: "Test failed",
 					Type:    "failure",
 					Content: "Test execution failed",
@@ -418,7 +445,7 @@ func (f *Formatter) generateJUnitReports() error {
 					continue
 				}
 
-				subtestCase := JUnitTestCase{
+				subtestCase := jUnitTestCase{
 					Classname: pkgName,
 					Name:      subtest.Test,
 					Time:      subtest.Elapsed,
@@ -426,7 +453,7 @@ func (f *Formatter) generateJUnitReports() error {
 
 				if subtest.Failed {
 					suite.Failures++
-					subtestCase.Failure = &JUnitFailure{
+					subtestCase.Failure = &jUnitFailure{
 						Message: "Test failed",
 						Type:    "failure",
 						Content: "Test execution failed",
@@ -457,7 +484,7 @@ func (f *Formatter) generateJUnitReports() error {
 	return f.writeSingleJUnitReport(suites)
 }
 
-func (f *Formatter) writeSingleJUnitReport(suites []*JUnitTestSuite) error {
+func (f *Formatter) writeSingleJUnitReport(suites []*jUnitTestSuite) error {
 	file, err := os.Create(f.config.JUnitOutput)
 	if err != nil {
 		return err
@@ -485,7 +512,7 @@ func (f *Formatter) writeSingleJUnitReport(suites []*JUnitTestSuite) error {
 	return nil
 }
 
-func (f *Formatter) shouldIncludeTest(test *TestResult, filter string) bool {
+func (*Formatter) shouldIncludeTest(test *testResult, filter string) bool {
 	switch filter {
 	case "non-failed":
 		return !test.Failed
@@ -502,7 +529,7 @@ func (f *Formatter) shouldIncludeTest(test *TestResult, filter string) bool {
 	}
 }
 
-func (f *Formatter) formatTestOutput(test *TestResult, truncate int, addTimestamp bool) string {
+func (f *Formatter) formatTestOutput(test *testResult, truncate int, addTimestamp bool) string {
 	if len(test.Output) == 0 {
 		return ""
 	}
@@ -510,7 +537,17 @@ func (f *Formatter) formatTestOutput(test *TestResult, truncate int, addTimestam
 	var lines []string
 	for _, output := range test.Output {
 		if addTimestamp {
-			lines = append(lines, fmt.Sprintf("[%s] %s", output.Time.Format("15:04:05.000"), output.Line))
+			t := output.Time
+			if f.config.JUnitTimestampFlavor == "start" {
+				t = time.Time{}.Add(t.Sub(f.startTime))
+			} else if f.config.JUnitTimestampFlavor == "test" {
+				if test.Parent != nil {
+					t = time.Time{}.Add(t.Sub(test.Parent.StartTime))
+				} else {
+					t = time.Time{}.Add(t.Sub(test.StartTime))
+				}
+			}
+			lines = append(lines, fmt.Sprintf("[%s] %s", t.Format("15:04:05.000"), output.Line))
 		} else {
 			lines = append(lines, output.Line)
 		}
@@ -530,8 +567,8 @@ func (f *Formatter) formatTestOutput(test *TestResult, truncate int, addTimestam
 	return output
 }
 
-func (f *Formatter) getAllSubtests(test *TestResult) []*TestResult {
-	var allSubtests []*TestResult
+func (f *Formatter) getAllSubtests(test *testResult) []*testResult {
+	var allSubtests []*testResult
 	for _, subtest := range test.Subtests {
 		allSubtests = append(allSubtests, subtest)
 		allSubtests = append(allSubtests, f.getAllSubtests(subtest)...)
@@ -539,41 +576,14 @@ func (f *Formatter) getAllSubtests(test *TestResult) []*TestResult {
 	return allSubtests
 }
 
-func (f *Formatter) parseSize(sizeStr string) (int64, error) {
-	if sizeStr == "" {
-		return 0, nil
-	}
-
-	sizeStr = strings.ToUpper(sizeStr)
-	var multiplier int64 = 1
-
-	if strings.HasSuffix(sizeStr, "KB") {
-		multiplier = 1024
-		sizeStr = strings.TrimSuffix(sizeStr, "KB")
-	} else if strings.HasSuffix(sizeStr, "MB") {
-		multiplier = 1024 * 1024
-		sizeStr = strings.TrimSuffix(sizeStr, "MB")
-	} else if strings.HasSuffix(sizeStr, "GB") {
-		multiplier = 1024 * 1024 * 1024
-		sizeStr = strings.TrimSuffix(sizeStr, "GB")
-	}
-
-	size, err := strconv.ParseInt(sizeStr, 10, 64)
-	if err != nil {
-		return 0, err
-	}
-
-	return size * multiplier, nil
-}
-
-func (f *Formatter) findParentTest(pkg *PackageResult, testName string) (*TestResult, bool) {
+func (f *Formatter) findParentTest(pkg *packageResult, testName string) (*testResult, bool) {
 	// Check if this is a subtest (contains "/")
 	if !strings.Contains(testName, "/") {
 		return nil, false
 	}
 
 	// Extract parent test name (everything before the last "/")
-	parts := strings.Split(testName, "/")
+	parts := strings.SplitN(testName, "/", 2)
 	parentName := strings.Join(parts[:len(parts)-1], "/")
 
 	// Look for parent test in package tests
@@ -591,7 +601,7 @@ func (f *Formatter) findParentTest(pkg *PackageResult, testName string) (*TestRe
 	return nil, false
 }
 
-func (f *Formatter) findParentTestRecursive(test *TestResult, parentName string) *TestResult {
+func (f *Formatter) findParentTestRecursive(test *testResult, parentName string) *testResult {
 	if test.Test == parentName {
 		return test
 	}
@@ -605,7 +615,7 @@ func (f *Formatter) findParentTestRecursive(test *TestResult, parentName string)
 	return nil
 }
 
-func (f *Formatter) findTest(pkg *PackageResult, testName string) *TestResult {
+func (f *Formatter) findTest(pkg *packageResult, testName string) *testResult {
 	// First check direct tests
 	if test, exists := pkg.Tests[testName]; exists {
 		return test
@@ -621,7 +631,7 @@ func (f *Formatter) findTest(pkg *PackageResult, testName string) *TestResult {
 	return nil
 }
 
-func (f *Formatter) findTestRecursive(test *TestResult, testName string) *TestResult {
+func (f *Formatter) findTestRecursive(test *testResult, testName string) *testResult {
 	if test.Test == testName {
 		return test
 	}
@@ -635,7 +645,7 @@ func (f *Formatter) findTestRecursive(test *TestResult, testName string) *TestRe
 	return nil
 }
 
-func (f *Formatter) printTestResult(pkg *PackageResult, test *TestResult) {
+func (f *Formatter) printTestResult(pkg *packageResult, test *testResult) {
 	// Apply stdout filter
 	if !f.shouldIncludeTest(test, f.config.StdoutFilter) {
 		return
@@ -666,7 +676,7 @@ func (f *Formatter) printTestResult(pkg *PackageResult, test *TestResult) {
 	// Extract test name (remove parent prefix for display)
 	displayName := test.Test
 	if test.Parent != nil {
-		parts := strings.Split(test.Test, "/")
+		parts := strings.SplitN(test.Test, "/", 2)
 		displayName = parts[len(parts)-1]
 	}
 
@@ -674,7 +684,7 @@ func (f *Formatter) printTestResult(pkg *PackageResult, test *TestResult) {
 	if f.config.StdoutTimestamp {
 		fmt.Printf("[%s] %s", test.StartTime.Format("15:04:05.000"), out)
 	} else {
-		fmt.Printf(out)
+		fmt.Print(out)
 	}
 
 	// Print package as well
@@ -692,12 +702,12 @@ func (f *Formatter) printTestResult(pkg *PackageResult, test *TestResult) {
 	if f.config.StdoutTimestamp {
 		fmt.Printf("[%s] %s", test.EndTime.Format("15:04:05.000"), out)
 	} else {
-		fmt.Printf(out)
+		fmt.Print(out)
 	}
 	fmt.Println()
 }
 
-func (f *Formatter) printOrganizedOutput(test *TestResult, indent int) {
+func (f *Formatter) printOrganizedOutput(test *testResult, indent int) {
 	indentStr := strings.Repeat(" │", indent)
 
 	// Sort subtests by start time
@@ -719,22 +729,27 @@ func (f *Formatter) printOrganizedOutput(test *TestResult, indent int) {
 		// Check if we need to insert subtest runs before this output
 		for subtestIndex < len(subtestNames) {
 			subtest := test.Subtests[subtestNames[subtestIndex]]
-			if subtest.StartTime.Before(currentOutput.Time) {
-				// Print subtest run
-				f.printSubtestRun(subtest, indent)
-				// Print subtest output block
-				f.printSubtestOutput(subtest, indent+1)
-				// Print subtest result
-				f.printSubtestResult(subtest, indent)
-				subtestIndex++
-			} else {
+			if !subtest.StartTime.Before(currentOutput.Time) {
 				break
 			}
+			// Print subtest run
+			f.printSubtestRun(subtest, indent)
+			// Print subtest output block
+			f.printSubtestOutput(subtest, indent+1)
+			// Print subtest result
+			f.printSubtestResult(subtest, indent)
+			subtestIndex++
 		}
 
 		// Print current output line
 		if f.config.StdoutTimestamp {
-			fmt.Printf("[%s]%s %s", currentOutput.Time.Format("15:04:05.000"), indentStr, currentOutput.Line)
+			t := currentOutput.Time
+			if f.config.StdoutTimestampFlavor == "start" {
+				t = time.Time{}.Add(t.Sub(f.startTime))
+			} else if f.config.StdoutTimestampFlavor == "test" {
+				t = time.Time{}.Add(t.Sub(test.StartTime))
+			}
+			fmt.Printf("[%s]%s %s", t.Format("15:04:05.000"), indentStr, currentOutput.Line)
 		} else {
 			fmt.Printf("%s%s", indentStr, currentOutput.Line)
 		}
@@ -751,19 +766,25 @@ func (f *Formatter) printOrganizedOutput(test *TestResult, indent int) {
 	}
 }
 
-func (f *Formatter) printSubtestRun(subtest *TestResult, indent int) {
+func (f *Formatter) printSubtestRun(subtest *testResult, indent int) {
 	indentStr := strings.Repeat(" │", indent)
 
 	if f.config.StdoutTimestamp {
-		fmt.Printf("[%s]%s ┍━ RUN %s\n", subtest.StartTime.Format("15:04:05.000"), indentStr, subtest.Test)
+		t := subtest.StartTime
+		if f.config.StdoutTimestampFlavor == "start" {
+			t = time.Time{}.Add(t.Sub(f.startTime))
+		} else if f.config.StdoutTimestampFlavor == "test" {
+			t = time.Time{}.Add(t.Sub(subtest.Parent.StartTime))
+		}
+		fmt.Printf("[%s]%s ┍━ RUN %s\n", t.Format("15:04:05.000"), indentStr, subtest.Test)
 	} else {
 		fmt.Printf("%s┍━ RUN   %s\n", indentStr, subtest.Test)
 	}
 }
 
-func (f *Formatter) printSubtestResult(subtest *TestResult, indent int) {
+func (f *Formatter) printSubtestResult(subtest *testResult, indent int) {
 	indentStr := strings.Repeat(" │", indent)
-	displayName := strings.Split(subtest.Test, "/")[len(strings.Split(subtest.Test, "/"))-1]
+	displayName := strings.SplitN(subtest.Test, "/", 2)[len(strings.SplitN(subtest.Test, "/", 2))-1]
 
 	var status string
 	if subtest.Passed {
@@ -775,27 +796,39 @@ func (f *Formatter) printSubtestResult(subtest *TestResult, indent int) {
 	}
 
 	if f.config.StdoutTimestamp {
-		fmt.Printf("[%s]%s ┕━ %s: %s (%.3fs)\n", subtest.EndTime.Format("15:04:05.000"), indentStr, status, displayName, subtest.Elapsed)
+		t := subtest.EndTime
+		if f.config.StdoutTimestampFlavor == "start" {
+			t = time.Time{}.Add(t.Sub(f.startTime))
+		} else if f.config.StdoutTimestampFlavor == "test" {
+			t = time.Time{}.Add(t.Sub(subtest.Parent.StartTime))
+		}
+		fmt.Printf("[%s]%s ┕━ %s: %s (%.3fs)\n", t.Format("15:04:05.000"), indentStr, status, displayName, subtest.Elapsed)
 	} else {
 		fmt.Printf("%s┕━ %s: %s (%.3fs)\n", indentStr, status, displayName, subtest.Elapsed)
 	}
 }
 
-func (f *Formatter) printSubtestOutput(subtest *TestResult, indent int) {
+func (f *Formatter) printSubtestOutput(subtest *testResult, indent int) {
 	indentStr := strings.Repeat(" │", indent)
 
 	for _, output := range subtest.Output {
 		if f.config.StdoutTimestamp {
-			fmt.Printf("[%s]%s %s", output.Time.Format("15:04:05.000"), indentStr, output.Line)
+			t := output.Time
+			if f.config.StdoutTimestampFlavor == "start" {
+				t = time.Time{}.Add(t.Sub(f.startTime))
+			} else if f.config.StdoutTimestampFlavor == "test" {
+				t = time.Time{}.Add(t.Sub(subtest.Parent.StartTime))
+			}
+			fmt.Printf("[%s]%s %s", t.Format("15:04:05.000"), indentStr, output.Line)
 		} else {
 			fmt.Printf("%s%s", indentStr, output.Line)
 		}
 	}
 }
 
-func (f *Formatter) printSummary() error {
+func (f *Formatter) printSummary() {
 	// Collect all tests and subtests
-	var allTests []*TestResult
+	var allTests []*testResult
 	var failedTests []string
 
 	totalTests := 0
@@ -812,7 +845,7 @@ func (f *Formatter) printSummary() error {
 				totalPassed++
 			} else if test.Failed {
 				totalFailed++
-				failedTests = append(failedTests, pkg.Name + ":" +test.Test)
+				failedTests = append(failedTests, pkg.Name+":"+test.Test)
 			} else {
 				totalSkipped++
 			}
@@ -821,7 +854,7 @@ func (f *Formatter) printSummary() error {
 			allSubtests := f.getAllSubtests(test)
 			for _, subtest := range allSubtests {
 				if subtest.Failed {
-					failedTests = append(failedTests, pkg.Name + ":" +subtest.Test)
+					failedTests = append(failedTests, pkg.Name+":"+subtest.Test)
 				}
 			}
 		}
@@ -914,6 +947,4 @@ func (f *Formatter) printSummary() error {
 			}
 		}
 	}
-
-	return nil
 }
