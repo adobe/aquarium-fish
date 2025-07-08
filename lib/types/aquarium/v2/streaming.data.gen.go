@@ -15,8 +15,36 @@
 package aquariumv2
 
 import (
+	"github.com/google/uuid"
+
 	pbTypes "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 )
+
+// StreamCreated is a data for StreamCreated without internal locks
+type StreamCreated struct {
+	StreamUid uuid.UUID `json:"stream_uid,omitempty"`
+}
+
+// FromStreamCreated creates a StreamCreated from StreamCreated
+func FromStreamCreated(src *pbTypes.StreamCreated) StreamCreated {
+	if src == nil {
+		return StreamCreated{}
+	}
+
+	result := StreamCreated{}
+	if uid, err := uuid.Parse(src.GetStreamUid()); err == nil {
+		result.StreamUid = uid
+	}
+	return result
+}
+
+// ToStreamCreated converts StreamCreated to StreamCreated
+func (s StreamCreated) ToStreamCreated() *pbTypes.StreamCreated {
+	result := &pbTypes.StreamCreated{}
+
+	result.StreamUid = s.StreamUid.String()
+	return result
+}
 
 // StreamError is a data for StreamError without internal locks
 type StreamError struct {

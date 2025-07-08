@@ -97,6 +97,12 @@ message StreamingServiceSubscribeResponse {
   google.protobuf.Any object_data = 4;
 }
 
+// StreamCreated is sent as the first message when stream channel is created
+message StreamCreated {
+  // Streaming channel UID to be known by the client
+  string stream_uid = 1;
+}
+
 // Subscription types for database objects
 enum SubscriptionType {
   SUBSCRIPTION_TYPE_UNSPECIFIED = 0;

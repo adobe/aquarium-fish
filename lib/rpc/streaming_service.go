@@ -261,14 +261,14 @@ func NewStreamingService(f *fish.Fish) *StreamingService {
 // Connect handles bidirectional streaming for RPC requests
 func (s *StreamingService) Connect(ctx context.Context, stream *connect.BidiStream[aquariumv2.StreamingServiceConnectRequest, aquariumv2.StreamingServiceConnectResponse]) error {
 	userName := rpcutil.GetUserName(ctx)
-	connectionID := fmt.Sprintf("%s-%s", userName, uuid.NewString())
-	log.Debugf("Streaming: New bidirectional connection for user: %s (ID: %s)", userName, connectionID)
+	connectionUID := fmt.Sprintf("%s-%s", userName, uuid.NewString())
+	log.Debugf("Streaming: New bidirectional connection for user: %s (UID: %s)", userName, connectionUID)
 
 	// Check if server is shutting down
 	s.shutdownMutex.RLock()
 	if s.isShuttingDown {
 		s.shutdownMutex.RUnlock()
-		log.Debugf("Streaming: Rejecting new connection during shutdown: %s", connectionID)
+		log.Debugf("Streaming: Rejecting new connection during shutdown: %s", connectionUID)
 		return connect.NewError(connect.CodeUnavailable, fmt.Errorf("server is shutting down"))
 	}
 	s.shutdownMutex.RUnlock()
@@ -285,16 +285,16 @@ func (s *StreamingService) Connect(ctx context.Context, stream *connect.BidiStre
 	}
 
 	s.connectionsMutex.Lock()
-	s.connections[connectionID] = conn
+	s.connections[connectionUID] = conn
 	s.connectionsMutex.Unlock()
 
 	defer func() {
 		// Clean up connection
 		s.connectionsMutex.Lock()
-		delete(s.connections, connectionID)
+		delete(s.connections, connectionUID)
 		s.connectionsMutex.Unlock()
 		cancel()
-		log.Debugf("Streaming: Cleaned up bidirectional connection: %s", connectionID)
+		log.Debugf("Streaming: Cleaned up bidirectional connection: %s", connectionUID)
 	}()
 
 	// Create a channel to handle incoming requests
@@ -334,7 +334,7 @@ func (s *StreamingService) Connect(ctx context.Context, stream *connect.BidiStre
 	for {
 		select {
 		case <-connCtx.Done():
-			log.Debugf("Streaming: Bidirectional connection context cancelled for user: %s (ID: %s)", userName, connectionID)
+			log.Debugf("Streaming: Bidirectional connection context cancelled for user: %s (ID: %s)", userName, connectionUID)
 			return nil
 
 		case <-keepAliveTicker.C:
@@ -479,15 +479,15 @@ func (*StreamingService) getResponseType(requestType string) string {
 func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[aquariumv2.StreamingServiceSubscribeRequest], stream *connect.ServerStream[aquariumv2.StreamingServiceSubscribeResponse]) error {
 	userName := rpcutil.GetUserName(ctx)
 	// Generating SubscriptionID with NodeUID prefix to later figure out where the user come from
-	subscriptionID := fmt.Sprintf("%s-%s", userName, s.fish.DB().NewUID())
+	subscriptionUID := fmt.Sprintf("%s-%s", userName, s.fish.DB().NewUID())
 
-	log.Debugf("Subscription %s: New subscription from user %s", subscriptionID, userName)
+	log.Debugf("Subscription %s: New subscription from user %s", subscriptionUID, userName)
 
 	// Check if server is shutting down
 	s.shutdownMutex.RLock()
 	if s.isShuttingDown {
 		s.shutdownMutex.RUnlock()
-		log.Debugf("Subscription %s: Rejecting new subscription during shutdown", subscriptionID)
+		log.Debugf("Subscription %s: Rejecting new subscription during shutdown", subscriptionUID)
 		return connect.NewError(connect.CodeUnavailable, fmt.Errorf("server is shutting down"))
 	}
 	s.shutdownMutex.RUnlock()
@@ -497,7 +497,7 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 
 	// Create subscription
 	sub := &subscription{
-		id:            subscriptionID,
+		id:            subscriptionUID,
 		stream:        stream,
 		subscriptions: req.Msg.GetSubscriptionTypes(),
 		filters:       req.Msg.GetFilters(),
@@ -509,44 +509,50 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 
 	// Register subscription
 	s.subscriptionsMutex.Lock()
-	s.subscriptions[subscriptionID] = sub
+	s.subscriptions[subscriptionUID] = sub
 	s.subscriptionsMutex.Unlock()
 
 	// Subscribe to database changes using generated setup function
-	s.setupSubscriptions(subCtx, subscriptionID, sub, req.Msg.GetSubscriptionTypes())
+	s.setupSubscriptions(subCtx, subscriptionUID, sub, req.Msg.GetSubscriptionTypes())
 
 	defer func() {
 		// Clean up subscription
 		s.subscriptionsMutex.Lock()
-		delete(s.subscriptions, subscriptionID)
+		delete(s.subscriptions, subscriptionUID)
 		s.subscriptionsMutex.Unlock()
 
 		cancel()
 
 		// Wait for all relay goroutines to finish before closing channels
-		log.Debugf("Subscription %s: Waiting for relay goroutines to finish", subscriptionID)
+		log.Debugf("Subscription %s: Waiting for relay goroutines to finish", subscriptionUID)
 		sub.relayWg.Wait()
-		log.Debugf("Subscription %s: All relay goroutines finished, waiting for listenChannels", subscriptionID)
+		log.Debugf("Subscription %s: All relay goroutines finished, waiting for listenChannels", subscriptionUID)
 
 		// Wait for listenChannels goroutine to finish
 		sub.listenChannelsWg.Wait()
-		log.Debugf("Subscription %s: All goroutines finished, closing channels", subscriptionID)
+		log.Debugf("Subscription %s: All goroutines finished, closing channels", subscriptionUID)
 
 		// Close subscription channels (relay goroutines have finished)
 		sub.channels.Close()
-		log.Debugf("Subscription %s: Cleaned up", subscriptionID)
+		log.Debugf("Subscription %s: Cleaned up", subscriptionUID)
 	}()
 
 	// Send initial heartbeat to confirm subscription is active
-	log.Debugf("Subscription %s: Established and ready for events", subscriptionID)
+	log.Debugf("Subscription %s: Established and ready for events", subscriptionUID)
 
 	// Send initial confirmation message to client to confirm subscription is active
-	log.Debugf("Subscription %s: About to send subscription confirmation to client", subscriptionID)
-	if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED, aquariumv2.ChangeType_CHANGE_TYPE_CREATED, nil); err != nil {
-		log.Errorf("Subscription %s: Error sending subscription confirmation: %v", subscriptionID, err)
+	err := s.sendSubscriptionResponse(sub,
+		aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED,
+		aquariumv2.ChangeType_CHANGE_TYPE_CREATED,
+		&aquariumv2.StreamCreated{
+			StreamUid: subscriptionUID,
+		},
+	)
+	if err != nil {
+		log.Errorf("Subscription %s: Error sending subscription confirmation: %v", subscriptionUID, err)
 		return err
 	}
-	log.Debugf("Subscription %s: Sent subscription confirmation to client", subscriptionID)
+	log.Debugf("Subscription %s: Sent subscription confirmation to client", subscriptionUID)
 
 	// Create a ticker for periodic keepalives
 	keepAliveTicker := time.NewTicker(60 * time.Second)
@@ -561,33 +567,33 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 	for {
 		select {
 		case <-subCtx.Done():
-			log.Debugf("Subscription %s: Cancelled", subscriptionID)
+			log.Debugf("Subscription %s: Cancelled", subscriptionUID)
 
 			// Check if cancellation was due to buffer overflow
 			if sub.isClientOverflowing() {
-				log.Warnf("Subscription %s: Client disconnected due to buffer overflow", subscriptionID)
+				log.Warnf("Subscription %s: Client disconnected due to buffer overflow", subscriptionUID)
 				// Send buffer overflow error notification
-				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED, aquariumv2.ChangeType_CHANGE_TYPE_DELETED, nil); err != nil {
-					log.Debugf("Subscription %s: Failed to send buffer overflow notification: %v", subscriptionID, err)
+				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED, aquariumv2.ChangeType_CHANGE_TYPE_UNSPECIFIED, nil); err != nil {
+					log.Debugf("Subscription %s: Failed to send buffer overflow notification: %v", subscriptionUID, err)
 				}
 				// Return error to signal client disconnect due to overflow
 				return connect.NewError(connect.CodeResourceExhausted,
 					fmt.Errorf("client disconnected due to buffer overflow - unable to keep up with notification rate"))
 			} else {
 				// Normal shutdown notification
-				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED, aquariumv2.ChangeType_CHANGE_TYPE_UNSPECIFIED, nil); err != nil {
-					log.Debugf("Subscription %s: Failed to send subscription shutdown notification: %v", subscriptionID, err)
+				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED, aquariumv2.ChangeType_CHANGE_TYPE_DELETED, nil); err != nil {
+					log.Debugf("Subscription %s: Failed to send subscription shutdown notification: %v", subscriptionUID, err)
 				}
 			}
 			return nil
 
 		case <-ctx.Done():
-			log.Debugf("Subscription %s: Context cancelled", subscriptionID)
+			log.Debugf("Subscription %s: Context cancelled", subscriptionUID)
 			return nil
 
 		case <-keepAliveTicker.C:
 			// Periodic keepalive logging
-			log.Debugf("Subscription %s: Still active, waiting for events...", subscriptionID)
+			log.Debugf("Subscription %s: Still active, waiting for events...", subscriptionUID)
 		}
 	}
 }

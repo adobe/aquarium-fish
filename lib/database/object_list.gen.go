@@ -36,6 +36,7 @@ const (
 	ObjectResourcesDisk          = "ResourcesDisk"
 	ObjectRole                   = "Role"
 	ObjectRoleBasedAccessControl = "RoleBasedAccessControl"
+	ObjectStreamCreated          = "StreamCreated"
 	ObjectStreamError            = "StreamError"
 	ObjectSubscribeConfig        = "SubscribeConfig"
 	ObjectUser                   = "User"

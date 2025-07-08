@@ -476,6 +476,52 @@ func (x *StreamingServiceSubscribeResponse) GetObjectData() *anypb.Any {
 	return nil
 }
 
+// StreamCreated is sent as the first message when stream channel is created
+type StreamCreated struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Streaming channel UID to be known by the client
+	StreamUid     string `protobuf:"bytes,1,opt,name=stream_uid,json=streamUid,proto3" json:"stream_uid,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreamCreated) Reset() {
+	*x = StreamCreated{}
+	mi := &file_aquarium_v2_streaming_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamCreated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamCreated) ProtoMessage() {}
+
+func (x *StreamCreated) ProtoReflect() protoreflect.Message {
+	mi := &file_aquarium_v2_streaming_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamCreated.ProtoReflect.Descriptor instead.
+func (*StreamCreated) Descriptor() ([]byte, []int) {
+	return file_aquarium_v2_streaming_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *StreamCreated) GetStreamUid() string {
+	if x != nil {
+		return x.StreamUid
+	}
+	return ""
+}
+
 var File_aquarium_v2_streaming_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_streaming_proto_rawDesc = "" +
@@ -509,7 +555,10 @@ const file_aquarium_v2_streaming_proto_rawDesc = "" +
 	"changeType\x128\n" +
 	"\ttimestamp\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x125\n" +
 	"\vobject_data\x18\x04 \x01(\v2\x14.google.protobuf.AnyR\n" +
-	"objectData*\xc6\x02\n" +
+	"objectData\".\n" +
+	"\rStreamCreated\x12\x1d\n" +
+	"\n" +
+	"stream_uid\x18\x01 \x01(\tR\tstreamUid*\xc6\x02\n" +
 	"\x10SubscriptionType\x12!\n" +
 	"\x1dSUBSCRIPTION_TYPE_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dSUBSCRIPTION_TYPE_APPLICATION\x10\x01\x12'\n" +
@@ -545,7 +594,7 @@ func file_aquarium_v2_streaming_proto_rawDescGZIP() []byte {
 }
 
 var file_aquarium_v2_streaming_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_aquarium_v2_streaming_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_aquarium_v2_streaming_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_aquarium_v2_streaming_proto_goTypes = []any{
 	(SubscriptionType)(0),                     // 0: aquarium.v2.SubscriptionType
 	(ChangeType)(0),                           // 1: aquarium.v2.ChangeType
@@ -554,20 +603,21 @@ var file_aquarium_v2_streaming_proto_goTypes = []any{
 	(*StreamError)(nil),                       // 4: aquarium.v2.StreamError
 	(*StreamingServiceSubscribeRequest)(nil),  // 5: aquarium.v2.StreamingServiceSubscribeRequest
 	(*StreamingServiceSubscribeResponse)(nil), // 6: aquarium.v2.StreamingServiceSubscribeResponse
-	nil,                           // 7: aquarium.v2.StreamingServiceSubscribeRequest.FiltersEntry
-	(*anypb.Any)(nil),             // 8: google.protobuf.Any
-	(*timestamppb.Timestamp)(nil), // 9: google.protobuf.Timestamp
+	(*StreamCreated)(nil),                     // 7: aquarium.v2.StreamCreated
+	nil,                                       // 8: aquarium.v2.StreamingServiceSubscribeRequest.FiltersEntry
+	(*anypb.Any)(nil),                         // 9: google.protobuf.Any
+	(*timestamppb.Timestamp)(nil),             // 10: google.protobuf.Timestamp
 }
 var file_aquarium_v2_streaming_proto_depIdxs = []int32{
-	8,  // 0: aquarium.v2.StreamingServiceConnectRequest.request_data:type_name -> google.protobuf.Any
-	8,  // 1: aquarium.v2.StreamingServiceConnectResponse.response_data:type_name -> google.protobuf.Any
+	9,  // 0: aquarium.v2.StreamingServiceConnectRequest.request_data:type_name -> google.protobuf.Any
+	9,  // 1: aquarium.v2.StreamingServiceConnectResponse.response_data:type_name -> google.protobuf.Any
 	4,  // 2: aquarium.v2.StreamingServiceConnectResponse.error:type_name -> aquarium.v2.StreamError
 	0,  // 3: aquarium.v2.StreamingServiceSubscribeRequest.subscription_types:type_name -> aquarium.v2.SubscriptionType
-	7,  // 4: aquarium.v2.StreamingServiceSubscribeRequest.filters:type_name -> aquarium.v2.StreamingServiceSubscribeRequest.FiltersEntry
+	8,  // 4: aquarium.v2.StreamingServiceSubscribeRequest.filters:type_name -> aquarium.v2.StreamingServiceSubscribeRequest.FiltersEntry
 	0,  // 5: aquarium.v2.StreamingServiceSubscribeResponse.object_type:type_name -> aquarium.v2.SubscriptionType
 	1,  // 6: aquarium.v2.StreamingServiceSubscribeResponse.change_type:type_name -> aquarium.v2.ChangeType
-	9,  // 7: aquarium.v2.StreamingServiceSubscribeResponse.timestamp:type_name -> google.protobuf.Timestamp
-	8,  // 8: aquarium.v2.StreamingServiceSubscribeResponse.object_data:type_name -> google.protobuf.Any
+	10, // 7: aquarium.v2.StreamingServiceSubscribeResponse.timestamp:type_name -> google.protobuf.Timestamp
+	9,  // 8: aquarium.v2.StreamingServiceSubscribeResponse.object_data:type_name -> google.protobuf.Any
 	2,  // 9: aquarium.v2.StreamingService.Connect:input_type -> aquarium.v2.StreamingServiceConnectRequest
 	5,  // 10: aquarium.v2.StreamingService.Subscribe:input_type -> aquarium.v2.StreamingServiceSubscribeRequest
 	3,  // 11: aquarium.v2.StreamingService.Connect:output_type -> aquarium.v2.StreamingServiceConnectResponse
@@ -592,7 +642,7 @@ func file_aquarium_v2_streaming_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aquarium_v2_streaming_proto_rawDesc), len(file_aquarium_v2_streaming_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
