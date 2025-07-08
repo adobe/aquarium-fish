@@ -112,14 +112,15 @@ type jUnitFailure struct {
 
 // Config holds the tool configuration
 type Config struct {
-	JUnitOutput     string
 	StdoutFilter    string
 	StdoutTruncate  int
 	StdoutTimestamp bool
 	StdoutColor     bool
-	JUnitTruncate   int
-	JUnitFilter     string
-	JUnitTimestamp  bool
+
+	JUnitOutput    string
+	JUnitTruncate  int
+	JUnitFilter    string
+	JUnitTimestamp bool
 
 	StdoutTimestampFlavor string
 	JUnitTimestampFlavor  string
@@ -165,13 +166,13 @@ func main() {
 func parseFlags() *Config {
 	config := &Config{}
 
-	flag.StringVar(&config.StdoutFilter, "stdout_filter", "", "Filter stdout output (non-failed, non-error, all)")
+	flag.StringVar(&config.StdoutFilter, "stdout_filter", "", "Filter stdout output (non-failed, non-passed, failed, passed, all)")
 	flag.IntVar(&config.StdoutTruncate, "stdout_truncate", 0, "Truncate stdout output to N lines")
 	flag.StringVar(&config.StdoutTimestampFlavor, "stdout_timestamp", "", "Add timestamps to stdout output (true, start, test)")
 	flag.BoolVar(&config.StdoutColor, "stdout_color", false, "Enable colored stdout output")
 	flag.StringVar(&config.JUnitOutput, "junit", "", "JUnit XML output file")
 	flag.IntVar(&config.JUnitTruncate, "junit_truncate", 0, "Truncate JUnit test output to N lines")
-	flag.StringVar(&config.JUnitFilter, "junit_filter", "", "Filter JUnit output (non-failed, non-error, all)")
+	flag.StringVar(&config.JUnitFilter, "junit_filter", "", "Filter JUnit output (non-failed, non-passed, failed, passed, all)")
 	flag.StringVar(&config.JUnitTimestampFlavor, "junit_timestamp", "", "Add timestamps to JUnit output (true, start, test)")
 
 	flag.Parse()

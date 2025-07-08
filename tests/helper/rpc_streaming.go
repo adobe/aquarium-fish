@@ -173,7 +173,7 @@ func (sc *StreamingClient) EstablishSubscriptionStreaming(subscriptionTypes []aq
 						sc.t.Logf("Client %s: ERROR: Unable to parse the StreamCreated data: %v", sc.name, err)
 					} else {
 						sc.subMu.Lock()
-						sc.subUID = streamCreated.StreamUid
+						sc.subUID = streamCreated.GetStreamUid()
 						sc.subMu.Unlock()
 						sc.logf("Received subscription confirmation from server")
 					}

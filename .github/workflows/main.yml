@@ -93,11 +93,11 @@ jobs:
         run: ./build.sh
 
       - name: Integration Tests
-        run: >
-          go test -json -v -parallel 4 -count=1 -skip '_stress$' -race ./tests/... 2>&1 |
-            tee integration_tests_report.full.log |
-            go run ./tools/go-test-formatter/go-test-formatter.go -stdout_timestamp test -stdout_color
-              -stdout_filter failed -junit integration_tests_report.xml -junit_truncate 4000
+        run: |
+          go test -json -v -parallel 4 -count=1 -skip '_stress$' -race ./tests/... 2>&1 | \
+            tee integration_tests_report.full.log | \
+            go run ./tools/go-test-formatter/go-test-formatter.go -stdout_timestamp test -stdout_color \
+              -stdout_filter failed -junit integration_tests_report.xml -junit_truncate 4000 \
               -junit_filter failed -junit_timestamp test
 
       - name: Pack failed tests workspaces
