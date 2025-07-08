@@ -100,6 +100,13 @@ jobs:
               -stdout_filter failed -junit integration_tests_report.xml -junit_truncate 4000
               -junit_filter failed -junit_timestamp test
 
+      - name: Pack failed tests workspaces
+        if: failure()
+        run: |
+          target_dir="$PWD"
+          cd /tmp
+          tar -czf "$target_dir/integration_tests_ws.tar.gz" fish*
+
       - name: Benchmarks main
         run: go run go.bobheadxi.dev/gobenchdata@v1 action
         if: github.ref == 'refs/heads/main'
@@ -128,7 +135,7 @@ jobs:
           name: tests
           path: |
             /tmp/gobenchdata/*
-            /tmp/fish*
+            integration_tests_ws.tar.gz
             integration_tests_report.full.log
             integration_tests_report.xml
 
