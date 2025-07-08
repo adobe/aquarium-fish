@@ -93,10 +93,12 @@ jobs:
         run: ./build.sh
 
       - name: Integration Tests
-        run: |
-          go install github.com/jstemmer/go-junit-report/v2@85bf4716ac1f025f2925510a9f5e9f5bb347c009  # Oct 18, 2023
-          go install github.com/gotesttools/gotestfmt/v2/cmd/gotestfmt@4c97682ab858d6bbd26fc020e255cb339c9c8119  # Jun 5, 2023
-          go test -json -v -parallel 4 -count=1 -skip '_stress$' -race ./tests/... 2>&1 | go-junit-report -parser gojson -iocopy -set-exit-code -out report.xml | gotestfmt
+        run: >
+          go test -json -v -parallel 4 -count=1 -skip '_stress$' -race ./tests/... 2>&1 |
+            tee integration_tests_report.full.log |
+            go run ./tools/go-test-formatter/go-test-formatter.go -stdout_timestamp -stdout_color
+              -stdout_filter failed -junit integration_tests_report.xml -junit_truncate 4000
+              -junit_filter failed -junit_timestamp
 
       - name: Benchmarks main
         run: go run go.bobheadxi.dev/gobenchdata@v1 action
@@ -126,10 +128,12 @@ jobs:
           name: tests
           path: |
             /tmp/gobenchdata/*
-            report.xml
+            /tmp/fish*
+            integration_tests_report.full.log
+            integration_tests_report.xml
 
       - name: Test Summary
         uses: test-summary/action@v2
         if: always()
         with:
-          paths: report.xml
+          paths: integration_tests_report.xml

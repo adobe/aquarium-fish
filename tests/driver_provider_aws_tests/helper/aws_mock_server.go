@@ -801,9 +801,6 @@ func (m *MockAWSServer) handleDescribeImages(w http.ResponseWriter, _ *http.Requ
 		imagesXML,
 	)
 
-	// Debug output
-	fmt.Printf("Mock AWS server: DescribeImages response:\n%s\n", response)
-
 	w.Header().Set("Content-Type", "text/xml")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(response))
