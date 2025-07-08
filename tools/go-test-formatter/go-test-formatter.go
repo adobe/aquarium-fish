@@ -60,8 +60,10 @@ type testResult struct {
 	EndTime   time.Time
 	Elapsed   float64
 	Output    []testLine
-	Failed    bool
 	Passed    bool
+	Skipped   bool
+	Failed    bool
+	Timeout   bool
 	Subtests  map[string]*testResult
 	Parent    *testResult
 
@@ -312,12 +314,21 @@ func (f *Formatter) addOutput(event *testEvent) {
 }
 
 func (f *Formatter) completeTest(event *testEvent) {
-	if event.Test == "" {
+	pkg := f.packages[event.Package]
+	if pkg == nil {
 		return
 	}
 
-	pkg := f.packages[event.Package]
-	if pkg == nil {
+	if event.Test == "" {
+		// Package completed - so we need to mark it
+		pkg.EndTime = f.parseTime(event.Time)
+		switch event.Action {
+		case "pass":
+			pkg.Passed = true
+		case "fail":
+			f.hasFailures = true
+			pkg.Failed = true
+		}
 		return
 	}
 
@@ -333,6 +344,8 @@ func (f *Formatter) completeTest(event *testEvent) {
 	switch event.Action {
 	case "pass":
 		test.Passed = true
+	case "skip":
+		test.Skipped = true
 	case "fail":
 		test.Failed = true
 		f.hasFailures = true
@@ -341,11 +354,6 @@ func (f *Formatter) completeTest(event *testEvent) {
 			test.Parent.Failed = true
 		}
 		pkg.Failed = true
-	}
-
-	// Update package status
-	if test.Passed {
-		pkg.Passed = true
 	}
 
 	// Clear active subtest if this was a subtest
@@ -380,14 +388,14 @@ func (*Formatter) parseTime(timeStr string) time.Time {
 }
 
 func (f *Formatter) generateOutputs() error {
+	// Print summary at the end
+	f.printSummary()
+
 	if f.config.JUnitOutput != "" {
 		if err := f.generateJUnitReports(); err != nil {
 			return fmt.Errorf("failed to generate JUnit reports: %v", err)
 		}
 	}
-
-	// Print summary at the end
-	f.printSummary()
 
 	return nil
 }
@@ -405,11 +413,6 @@ func (f *Formatter) generateJUnitReports() error {
 
 		var totalTime float64
 		for testName, test := range pkg.Tests {
-			// Apply JUnit filter
-			if !f.shouldIncludeTest(test, f.config.JUnitFilter) {
-				continue
-			}
-
 			// Add main test
 			testCase := jUnitTestCase{
 				Classname: pkgName,
@@ -424,14 +427,23 @@ func (f *Formatter) generateJUnitReports() error {
 					Type:    "failure",
 					Content: "Test execution failed",
 				}
-			} else if test.Action == "skip" {
+			} else if test.Skipped {
 				suite.Skipped++
+			} else if test.Timeout {
+				suite.Failures++
+				testCase.Failure = &jUnitFailure{
+					Message: "Timeout occured",
+					Type:    "timeout",
+					Content: "Test execution failed",
+				}
 			}
 
-			// Add output
-			output := f.formatTestOutput(test, f.config.JUnitTruncate, f.config.JUnitTimestamp)
-			if output != "" {
-				testCase.SystemOut = output
+			// Add output if allowed by JUnit filter
+			if !f.shouldSkipBody(test, f.config.JUnitFilter) {
+				output := f.formatTestOutput(test, f.config.JUnitTruncate, f.config.JUnitTimestamp)
+				if output != "" {
+					testCase.SystemOut = output
+				}
 			}
 
 			suite.TestCases = append(suite.TestCases, testCase)
@@ -442,7 +454,7 @@ func (f *Formatter) generateJUnitReports() error {
 			allSubtests := f.getAllSubtests(test)
 			for _, subtest := range allSubtests {
 				// Apply JUnit filter
-				if !f.shouldIncludeTest(subtest, f.config.JUnitFilter) {
+				if f.shouldSkipBody(subtest, f.config.JUnitFilter) {
 					continue
 				}
 
@@ -461,6 +473,13 @@ func (f *Formatter) generateJUnitReports() error {
 					}
 				} else if subtest.Action == "skip" {
 					suite.Skipped++
+				} else if test.Timeout {
+					suite.Failures++
+					subtestCase.Failure = &jUnitFailure{
+						Message: "Timeout occured",
+						Type:    "timeout",
+						Content: "Test execution failed",
+					}
 				}
 
 				// Add output
@@ -513,20 +532,20 @@ func (f *Formatter) writeSingleJUnitReport(suites []*jUnitTestSuite) error {
 	return nil
 }
 
-func (*Formatter) shouldIncludeTest(test *testResult, filter string) bool {
+func (*Formatter) shouldSkipBody(test *testResult, filter string) bool {
 	switch filter {
 	case "non-failed":
-		return !test.Failed
-	case "non-passed":
-		return !test.Passed
-	case "failed":
 		return test.Failed
-	case "passed":
+	case "non-passed":
 		return test.Passed
-	case "all", "":
+	case "failed":
+		return !(test.Failed || test.Timeout)
+	case "passed":
+		return !test.Passed
+	case "all":
 		return true
 	default:
-		return true
+		return false
 	}
 }
 
@@ -647,11 +666,6 @@ func (f *Formatter) findTestRecursive(test *testResult, testName string) *testRe
 }
 
 func (f *Formatter) printTestResult(pkg *packageResult, test *testResult) {
-	// Apply stdout filter
-	if !f.shouldIncludeTest(test, f.config.StdoutFilter) {
-		return
-	}
-
 	// Test status
 	var icon, status string
 	if test.Passed {
@@ -666,11 +680,18 @@ func (f *Formatter) printTestResult(pkg *packageResult, test *testResult) {
 		if f.config.StdoutColor {
 			status = colorRed + status + colorReset
 		}
-	} else {
+	} else if test.Skipped {
 		icon = "⏭️"
 		status = "SKIP"
 		if f.config.StdoutColor {
 			status = colorYellow + status + colorReset
+		}
+	} else {
+		icon = "⌛"
+		status = "TIMEOUT"
+		test.Timeout = true
+		if f.config.StdoutColor {
+			status = colorRed + status + colorReset
 		}
 	}
 
@@ -681,7 +702,13 @@ func (f *Formatter) printTestResult(pkg *packageResult, test *testResult) {
 		displayName = parts[len(parts)-1]
 	}
 
-	out := fmt.Sprintf("╒━ %s %s (%s) - %.3fs", icon, displayName, status, test.Elapsed)
+	skipBody := f.shouldSkipBody(test, f.config.StdoutFilter)
+	prefix := "╒━"
+	if skipBody {
+		prefix = "━━"
+	}
+
+	out := fmt.Sprintf("%s %s %s (%s) - %.3fs", prefix, icon, displayName, status, test.Elapsed)
 	if f.config.StdoutTimestamp {
 		fmt.Printf("[%s] %s", test.StartTime.Format("15:04:05.000"), out)
 	} else {
@@ -696,16 +723,18 @@ func (f *Formatter) printTestResult(pkg *packageResult, test *testResult) {
 		fmt.Printf(" (%s %s)\n", pkgIcon, pkg.Name)
 	}
 
-	// Organize and print output with subtests
-	f.printOrganizedOutput(test, 1)
+	if !skipBody {
+		// Organize and print output with subtests if not filtered
+		f.printOrganizedOutput(test, 1)
 
-	out = fmt.Sprintf("╘━ %s %s (%s) - %.3fs\n", icon, displayName, status, test.Elapsed)
-	if f.config.StdoutTimestamp {
-		fmt.Printf("[%s] %s", test.EndTime.Format("15:04:05.000"), out)
-	} else {
-		fmt.Print(out)
+		out = fmt.Sprintf("╘━ %s %s (%s) - %.3fs\n", icon, displayName, status, test.Elapsed)
+		if f.config.StdoutTimestamp {
+			fmt.Printf("[%s] %s", test.EndTime.Format("15:04:05.000"), out)
+		} else {
+			fmt.Print(out)
+		}
+		fmt.Println()
 	}
-	fmt.Println()
 }
 
 func (f *Formatter) printOrganizedOutput(test *testResult, indent int) {
@@ -785,15 +814,17 @@ func (f *Formatter) printSubtestRun(subtest *testResult, indent int) {
 
 func (f *Formatter) printSubtestResult(subtest *testResult, indent int) {
 	indentStr := strings.Repeat(" │", indent)
-	displayName := strings.SplitN(subtest.Test, "/", 2)[len(strings.SplitN(subtest.Test, "/", 2))-1]
 
 	var status string
 	if subtest.Passed {
 		status = "✅ PASS"
 	} else if subtest.Failed {
 		status = "❌ FAIL"
-	} else {
+	} else if subtest.Skipped {
 		status = "⏭️ SKIP"
+	} else {
+		status = "⌛ TIMEOUT"
+		subtest.Timeout = true
 	}
 
 	if f.config.StdoutTimestamp {
@@ -803,9 +834,9 @@ func (f *Formatter) printSubtestResult(subtest *testResult, indent int) {
 		} else if f.config.StdoutTimestampFlavor == "test" {
 			t = time.Time{}.Add(t.Sub(subtest.Parent.StartTime))
 		}
-		fmt.Printf("[%s]%s ┕━ %s: %s (%.3fs)\n", t.Format("15:04:05.000"), indentStr, status, displayName, subtest.Elapsed)
+		fmt.Printf("[%s]%s ┕━ %s: %s (%.3fs)\n", t.Format("15:04:05.000"), indentStr, status, subtest.Test, subtest.Elapsed)
 	} else {
-		fmt.Printf("%s┕━ %s: %s (%.3fs)\n", indentStr, status, displayName, subtest.Elapsed)
+		fmt.Printf("%s┕━ %s: %s (%.3fs)\n", indentStr, status, subtest.Test, subtest.Elapsed)
 	}
 }
 
@@ -847,8 +878,16 @@ func (f *Formatter) printSummary() {
 			} else if test.Failed {
 				totalFailed++
 				failedTests = append(failedTests, pkg.Name+":"+test.Test)
-			} else {
+			} else if test.Skipped {
 				totalSkipped++
+			} else {
+				// Sometimes test could timeout with no result - so print it out and mark timeout
+				totalFailed++
+				failedTests = append(failedTests, pkg.Name+":"+test.Test+" (TIMEOUT)")
+				if test.Parent == nil {
+					// Print test result immediately (only for top-level tests)
+					f.printTestResult(pkg, test)
+				}
 			}
 
 			// Add subtests to failed list
