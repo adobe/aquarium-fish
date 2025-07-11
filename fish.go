@@ -43,7 +43,7 @@ import (
 )
 
 func main() {
-	log.Info().Msgf("Aquarium Fish %s (%s)", build.Version, build.Time)
+	fmt.Printf("Aquarium Fish %s (%s)\n", build.Version, build.Time)
 
 	var apiAddress string
 	var nodeAddress string
@@ -65,11 +65,12 @@ func main() {
 			return log.Initialize(logCfg)
 		},
 		RunE: func(_ /*cmd*/ *cobra.Command, _ /*args*/ []string) (err error) {
-			log.Info().Msg("Fish init...")
+			logger := log.WithFunc("main", "RunE")
+			logger.Info("Fish init...")
 
 			cfg := &fish.Config{}
 			if err = cfg.ReadConfigFile(cfgPath); err != nil {
-				log.Error().Msgf("Fish: Unable to apply config file %s: %v", cfgPath, err)
+				logger.Error("Fish: Unable to apply config file", "chg_path", cfgPath, "err", err)
 				return fmt.Errorf("Fish: Unable to apply config file %s: %v", cfgPath, err)
 			}
 			if apiAddress != "" {
@@ -84,35 +85,35 @@ func main() {
 			if cpuLimit != "" {
 				val, err := strconv.ParseUint(cpuLimit, 10, 16)
 				if err != nil {
-					log.Error().Msgf("Fish: Unable to parse cpu limit value: %v", err)
+					logger.Error("Fish: Unable to parse cpu limit value", "err", err)
 					return fmt.Errorf("Fish: Unable to parse cpu limit value: %v", err)
 				}
 				cfg.CPULimit = uint16(val)
 			}
 			if memTarget != "" {
 				if cfg.MemTarget, err = util.NewHumanSize(memTarget); err != nil {
-					log.Error().Msgf("Fish: Unable to parse mem target value: %v", err)
+					logger.Error("Fish: Unable to parse mem target value", "err", err)
 					return fmt.Errorf("Fish: Unable to parse mem target value: %v", err)
 				}
 			}
 
 			// Set Fish Node resources limits
 			if cfg.CPULimit > 0 {
-				log.Info().Msgf("Fish CPU limited: %d", cfg.CPULimit)
+				logger.Info("Fish CPU limited", "cpu_limit", cfg.CPULimit)
 				runtime.GOMAXPROCS(int(cfg.CPULimit))
 			}
 			if cfg.MemTarget > 0 {
-				log.Info().Msgf("Fish MEM targeted: %s", cfg.MemTarget.String())
+				logger.Info("Fish MEM targeted", "mem_target", cfg.MemTarget.String())
 				debug.SetMemoryLimit(int64(cfg.MemTarget.Bytes()))
 			}
 
-			log.Info().Msg("Fish init DB...")
+			logger.Info("Fish init DB...")
 			db, err := database.New(filepath.Join(cfg.Directory, cfg.NodeAddress))
 			if err != nil {
 				return err
 			}
 
-			log.Info().Msg("Fish init TLS...")
+			logger.Info("Fish init TLS...")
 			caPath := cfg.TLSCaCrt
 			if !filepath.IsAbs(caPath) {
 				caPath = filepath.Join(cfg.Directory, caPath)
@@ -129,13 +130,13 @@ func main() {
 				return err
 			}
 
-			log.Info().Msg("Fish starting node...")
+			logger.Info("Fish starting node...")
 			fish, err := fish.New(db, cfg)
 			if err != nil {
 				return err
 			}
 
-			log.Info().Msg("Fish initializing monitoring...")
+			logger.Info("Fish initializing monitoring...")
 			// Initialize monitoring configuration and overriding values from fish info
 			monitoringConfig := &cfg.Monitoring
 			if monitoringConfig.ServiceName == "" {
@@ -152,14 +153,14 @@ func main() {
 			if monitoringConfig.FileExportPath == "" && monitoringConfig.Enabled {
 				if monitoringConfig.OTLPEndpoint == "" {
 					monitoringConfig.FileExportPath = "telemetry"
-					log.Info().Msgf("Fish: Setting file export path to %s", monitoringConfig.FileExportPath)
+					logger.Info("Fish: Setting file export path to", "path", monitoringConfig.FileExportPath)
 				}
 			}
 
 			// Initialize monitoring
 			monitor, err := monitoring.Initialize(context.Background(), monitoringConfig)
 			if err != nil {
-				log.Error().Msgf("Fish: Unable to initialize monitoring: %v", err)
+				logger.Error("Fish: Unable to initialize monitoring", "err", err)
 				return fmt.Errorf("Fish: Unable to initialize monitoring: %v", err)
 			}
 			defer func() {
@@ -167,7 +168,7 @@ func main() {
 					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 					defer cancel()
 					if err := monitor.Shutdown(ctx); err != nil {
-						log.Error().Msgf("Fish: Error shutting down monitoring: %v", err)
+						logger.Error("Fish: Error shutting down monitoring", "err", err)
 					}
 				}
 			}()
@@ -175,29 +176,30 @@ func main() {
 			// Set the monitor on the Fish instance
 			fish.SetMonitor(monitor)
 
-			log.Info().Msg("Fish starting API...")
+			logger.Info("Fish starting API...")
 			srv, err := server.Init(fish, cfg.APIAddress, caPath, certPath, keyPath)
 			if err != nil {
 				return err
 			}
 
-			log.Info().Msg("Fish initialized")
+			// WARN: Used by integration tests
+			logger.Info("Fish initialized", "fish_init", "completed")
 
 			// Wait for signal to quit
 			<-fish.Quit
 
-			log.Info().Msg("Fish stopping...")
+			logger.Info("Fish stopping...")
 
 			// Shutdown the server (RPC server will handle streaming connections gracefully)
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 			if err := srv.Shutdown(ctx); err != nil {
-				log.Error().Msgf("Fish forced to shutdown: %v", err)
+				logger.Error("Fish forced to shutdown", "err", err)
 			}
 
 			fish.Close(context.Background())
 
-			log.Info().Msg("Fish stopped")
+			logger.Info("Fish stopped")
 
 			return nil
 		},

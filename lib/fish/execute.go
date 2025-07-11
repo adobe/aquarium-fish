@@ -38,13 +38,16 @@ func (f *Fish) maybeRunExecuteApplicationStart(appState *typesv2.ApplicationStat
 		return
 	}
 
+	ctx := context.Background()
+	logger := log.WithFunc("fish", "maybeRunExecuteApplicationStart").With("app_uid", appState.ApplicationUid)
+
 	// Check if this node won the election process
 	vote := f.wonVotesGetRemove(appState.ApplicationUid)
 	if vote == nil {
 		return
 	}
 
-	log.Info().Msgf("Fish: Running execution of Application: %s %s", appState.ApplicationUid, appState.CreatedAt)
+	logger.InfoContext(ctx, "Running execution of Application", "created_at", appState.CreatedAt)
 
 	retry, err := f.executeApplicationStart(vote.ApplicationUid, vote.Available)
 	if err == nil {
@@ -62,8 +65,8 @@ func (f *Fish) maybeRunExecuteApplicationStart(appState *typesv2.ApplicationStat
 	lock.Unlock()
 
 	// If we have retries left for Application - trying to elect the node again
-	if retry && f.db.ApplicationStateNewCount(context.Background(), appState.ApplicationUid) <= f.cfg.AllocationRetry {
-		log.Warn().Msgf("Fish: Can't allocate Application %s, will retry: %v", appState.ApplicationUid, err)
+	if retry && f.db.ApplicationStateNewCount(ctx, appState.ApplicationUid) <= f.cfg.AllocationRetry {
+		logger.WarnContext(ctx, "Can't allocate Application, will retry...", "err", err)
 
 		// Returning Application to the original NEW state
 		// to allow the other nodes to try out their luck
@@ -73,13 +76,13 @@ func (f *Fish) maybeRunExecuteApplicationStart(appState *typesv2.ApplicationStat
 			Description:    fmt.Sprintf("Failed to run execution on node %s, retry: %v", f.db.GetNodeName(), err),
 		}
 	} else {
-		log.Error().Msgf("Fish: Can't allocate Application %s: %v", appState.ApplicationUid, err)
+		logger.ErrorContext(ctx, "Can't allocate Application", "err", err)
 		appState = &typesv2.ApplicationState{ApplicationUid: appState.ApplicationUid, Status: typesv2.ApplicationState_ERROR,
 			Description: fmt.Sprint("Driver allocate resource error:", err),
 		}
 	}
-	if err := f.db.ApplicationStateCreate(context.Background(), appState); err != nil {
-		log.Error().Msgf("Fish: Unable to create ApplicationState for Application %s: %v", appState.ApplicationUid, err)
+	if err := f.db.ApplicationStateCreate(ctx, appState); err != nil {
+		logger.ErrorContext(ctx, "Unable to create ApplicationState for Application", "err", err)
 	}
 }
 
@@ -95,37 +98,39 @@ func (f *Fish) maybeRunExecuteApplicationStop(appState *typesv2.ApplicationState
 // maybeRunApplicationTask is executed on ApplicationTask change and leaves the task to State
 // change if the current Application state does not fit the described one in the task.
 func (f *Fish) maybeRunApplicationTask(appUID typesv2.ApplicationUID, appTask *typesv2.ApplicationTask) error {
+	ctx := context.Background()
+	logger := log.WithFunc("fish", "maybeRunApplicationTask").With("app_uid", appUID)
 	// Check current Application state
-	appState, err := f.db.ApplicationStateGetByApplication(context.Background(), appUID)
+	appState, err := f.db.ApplicationStateGetByApplication(ctx, appUID)
 	if err != nil {
-		log.Error().Msgf("Fish: Application %s: Task: Unable to get ApplicationState: %v", appUID, err)
+		logger.Error("Task: Unable to get ApplicationState", "err", err)
 		return fmt.Errorf("Fish: Application %s: Task: Unable to get ApplicationState: %v", appUID, err)
 	}
 
 	// We can quickly figure out if the Application is in proper state to execute this task or not
 	if appTask != nil && appState.Status != appTask.When {
-		log.Debug().Msgf("Fish: Application %s: Task: Skipping task %q due to wrong state: %q != %q", appUID, appTask.Uid, appState.Status, appTask.When)
+		logger.Debug("Task: Skipping task due to wrong state", "app_status", appState.Status, "apptask_when", appTask.When)
 		return nil
 	}
 
 	// Getting ApplicationResource to execute a task on it - if it's not here, it's not a big deal,
 	// because the Application could be not allocated yet, so have no resource and we need to skip.
-	res, err := f.db.ApplicationResourceGetByApplication(context.Background(), appUID)
+	res, err := f.db.ApplicationResourceGetByApplication(ctx, appUID)
 	if err != nil {
-		log.Info().Msgf("Fish: Application %s: Task: Skipping since no ApplicationResource found: %v", appUID, err)
+		logger.Info("Task: Skipping since no ApplicationResource found", "err", err)
 		return nil
 	}
 
 	// Get label with the definitions
-	label, err := f.db.LabelGet(context.Background(), res.LabelUid)
+	label, err := f.db.LabelGet(ctx, res.LabelUid)
 	if err != nil {
-		log.Error().Msgf("Fish: Application %s: Task: Unable to find Label %s: %v", appUID, res.LabelUid, err)
+		logger.Error("Task: Unable to find Label", "err", err)
 		return fmt.Errorf("Fish: Application %s: Task: Unable to find Label %s: %v", appUID, res.LabelUid, err)
 	}
 
 	// Extract the Label Definition by the provided index
 	if len(label.Definitions) <= int(res.DefinitionIndex) {
-		log.Error().Msgf("Fish: Application %s: Task: The Definition does not exist in the Label %s: %v", appUID, res.LabelUid, res.DefinitionIndex)
+		logger.Error("Task: The Definition does not exist in the Label", "label_uid", res.LabelUid, "definition_index", res.DefinitionIndex)
 		return fmt.Errorf("Fish: Application %s: Task: The Definition does not exist in the Label %s: %v", appUID, res.LabelUid, res.DefinitionIndex)
 	}
 	labelDef := label.Definitions[res.DefinitionIndex]
@@ -133,7 +138,7 @@ func (f *Fish) maybeRunApplicationTask(appUID typesv2.ApplicationUID, appTask *t
 	// Locate the required driver
 	driver := drivers.GetProvider(labelDef.Driver)
 	if driver == nil {
-		log.Error().Msgf("Fish: Application %s: Task: Unable to locate driver: %s", appUID, labelDef.Driver)
+		logger.Error("Task: Unable to locate driver", "driver", labelDef.Driver)
 		return fmt.Errorf("Fish: Application %s: Task: Unable to locate driver: %s", appUID, labelDef.Driver)
 	}
 
@@ -142,7 +147,7 @@ func (f *Fish) maybeRunApplicationTask(appUID typesv2.ApplicationUID, appTask *t
 		f.routines.Add(1)
 		f.routinesMutex.Unlock()
 		defer f.routines.Done()
-		defer log.Info().Msgf("Fish: executeApplicationTasks for Application %s stopped", appUID)
+		defer logger.Info("executeApplicationTasks stopped")
 
 		// Execute the existing ApplicationTasks on the change
 		f.executeApplicationTasks(driver, &labelDef, res, appState.Status)
@@ -156,8 +161,9 @@ func (f *Fish) maybeRunApplicationTask(appUID typesv2.ApplicationUID, appTask *t
 // that will cause the cluster to start another round of election. Second stage is executed
 // on background and watches the Application till it's deallocated.
 func (f *Fish) executeApplicationStart(appUID typesv2.ApplicationUID, defIndex int32) (bool, error) {
-	log.Debug().Msgf("Fish: Application %s: Start: Start executing Application", appUID.String())
 	ctx := context.Background()
+	logger := log.WithFunc("fish", "executeApplicationStart").With("app_uid", appUID)
+	logger.Debug("Start executing Application")
 
 	// Check the application is executed already
 	f.applicationsMutex.Lock()
@@ -238,10 +244,10 @@ func (f *Fish) executeApplicationStart(appUID typesv2.ApplicationUID, defIndex i
 		f.routines.Add(1)
 		f.routinesMutex.Unlock()
 		defer f.routines.Done()
-		defer log.Info().Msgf("Fish: executeApplicationStart for Application %s stopped", app.Uid)
+		defer logger.Info("executeApplicationStart stopped")
 		defer lock.Unlock()
 
-		log.Info().Msgf("Fish: Application %s: Start: Continuing executing: %s", app.Uid, appState.Status)
+		logger.Info("Continuing execute", "appstate_status", appState.Status)
 
 		// Get or create the new resource object
 		var res *typesv2.ApplicationResource
@@ -250,19 +256,19 @@ func (f *Fish) executeApplicationStart(appUID typesv2.ApplicationUID, defIndex i
 			var mergedMetadata []byte
 			var metadata map[string]any
 			if err := json.Unmarshal([]byte(app.Metadata), &metadata); err != nil {
-				log.Error().Msgf("Fish: Application %s: Start: Unable to parse the Application metadata: %v", app.Uid, err)
+				logger.Error("Unable to parse the Application metadata", "err", err)
 				appState = &typesv2.ApplicationState{ApplicationUid: app.Uid, Status: typesv2.ApplicationState_ERROR,
 					Description: fmt.Sprint("Unable to parse the app metadata:", err),
 				}
 				f.db.ApplicationStateCreate(ctx, appState)
 			} else if err := json.Unmarshal([]byte(label.Metadata), &metadata); err != nil {
-				log.Error().Msgf("Fish: Application %s: Start: Unable to parse the Label metadata: %v", label.Uid, err)
+				logger.Error("Unable to parse the Label metadata", "err", err, "label_uid", label.Uid)
 				appState = &typesv2.ApplicationState{ApplicationUid: app.Uid, Status: typesv2.ApplicationState_ERROR,
 					Description: fmt.Sprint("Unable to parse the label metadata:", err),
 				}
 				f.db.ApplicationStateCreate(ctx, appState)
 			} else if mergedMetadata, err = json.Marshal(metadata); err != nil {
-				log.Error().Msgf("Fish: Application %s: Start: Unable to merge metadata: %v", label.Uid, err)
+				logger.Error("Unable to merge metadata", "err", err, "label_uid", label.Uid)
 				appState = &typesv2.ApplicationState{ApplicationUid: app.Uid, Status: typesv2.ApplicationState_ERROR,
 					Description: fmt.Sprint("Unable to merge metadata:", err),
 				}
@@ -276,7 +282,7 @@ func (f *Fish) executeApplicationStart(appUID typesv2.ApplicationUID, defIndex i
 		} else if appState.Status == typesv2.ApplicationState_ALLOCATED {
 			res, err = f.db.ApplicationResourceGetByApplication(ctx, app.Uid)
 			if err != nil {
-				log.Error().Msgf("Fish: Application %s: Start: Unable to get the allocated Resource: %v", app.Uid, err)
+				logger.Error("Unable to get the allocated Resource", "err", err)
 				appState = &typesv2.ApplicationState{ApplicationUid: app.Uid, Status: typesv2.ApplicationState_ERROR,
 					Description: fmt.Sprint("Unable to find the allocated resource:", err),
 				}
@@ -287,7 +293,7 @@ func (f *Fish) executeApplicationStart(appUID typesv2.ApplicationUID, defIndex i
 		var metadata map[string]any
 		if appState.Status == typesv2.ApplicationState_ELECTED {
 			if err := json.Unmarshal([]byte(res.Metadata), &metadata); err != nil {
-				log.Error().Msgf("Fish: Application %s: Start: Unable to parse the ApplicationResource metadata: %v", app.Uid, err)
+				logger.Error("Unable to parse the ApplicationResource metadata", "err", err)
 				appState = &typesv2.ApplicationState{ApplicationUid: app.Uid, Status: typesv2.ApplicationState_ERROR,
 					Description: fmt.Sprint("Unable to parse the res metadata:", err),
 				}
@@ -298,13 +304,13 @@ func (f *Fish) executeApplicationStart(appUID typesv2.ApplicationUID, defIndex i
 		// Allocate the resource
 		if appState.Status == typesv2.ApplicationState_ELECTED {
 			// Run the allocation
-			log.Info().Msgf("Fish: Application %s: Start: Allocate Resource with Label %q (def %d) using driver: %s", app.Uid, label.Name, defIndex, driver.Name())
+			logger.Info("Allocate Resource", "label_name", label.Name, "definition_index", defIndex, "driver_name", driver.Name())
 			drvRes, err := driver.Allocate(labelDef, metadata)
 			if err != nil {
 				// If we have retries left for Application - trying to elect the node again
 				retries := f.db.ApplicationStateNewCount(ctx, app.Uid)
 				if retries <= f.cfg.AllocationRetry {
-					log.Warn().Msgf("Fish: Application %s: Start: Can't allocate, will retry (%d): %v", app.Uid, retries, err)
+					logger.Warn("Can't allocate, will retry...", "retries", retries, "err", err)
 
 					// Returning Application to the original NEW state
 					// to allow the other nodes to try out their luck
@@ -314,7 +320,7 @@ func (f *Fish) executeApplicationStart(appUID typesv2.ApplicationUID, defIndex i
 						Description:    fmt.Sprintf("Failed to allocate Resource on node %s, retry: %v", f.db.GetNodeName(), err),
 					}
 				} else {
-					log.Error().Msgf("Fish: Application %s: Start: Unable to allocate Resource, (tried: %d): %v", app.Uid, retries, err)
+					logger.Error("Unable to allocate Resource", "retries", retries, "err", err)
 					appState = &typesv2.ApplicationState{ApplicationUid: app.Uid, Status: typesv2.ApplicationState_ERROR,
 						Description: fmt.Sprint("Driver allocate resource error:", err),
 					}
@@ -330,7 +336,7 @@ func (f *Fish) executeApplicationStart(appUID typesv2.ApplicationUID, defIndex i
 				// Getting the resource lifetime to know how much time it will live
 				resourceLifetime, err := time.ParseDuration(labelDef.Resources.Lifetime)
 				if labelDef.Resources.Lifetime != "" && err != nil {
-					log.Error().Msgf("Fish: Application %s: Start: Can't parse the Lifetime from Label: %s (def %d)", app.Uid, label.Uid, res.DefinitionIndex)
+					logger.Error("Can't parse the Lifetime from Label", "label_uid", label.Uid, "res_def_index", res.DefinitionIndex, "err", err)
 				}
 				if err != nil {
 					// Try to get default value from fish config
@@ -338,7 +344,7 @@ func (f *Fish) executeApplicationStart(appUID typesv2.ApplicationUID, defIndex i
 					if resourceLifetime <= 0 {
 						// Not an error - in worst case the resource will just sit there but at least will
 						// not ruin the workload execution
-						log.Warn().Msgf("Fish: Application %s: Start: Default Resource Lifetime is not set in fish config", app.Uid)
+						logger.Warn("Default Resource Lifetime is not set in fish config")
 					}
 				}
 
@@ -348,15 +354,15 @@ func (f *Fish) executeApplicationStart(appUID typesv2.ApplicationUID, defIndex i
 				}
 
 				if err = f.db.ApplicationResourceCreate(ctx, res); err != nil {
-					log.Error().Msgf("Fish: Application %s: Start: Unable to store Resource: %v", app.Uid, err)
+					logger.Error("Unable to store Resource", "err", err)
 				}
 				appState = &typesv2.ApplicationState{ApplicationUid: app.Uid, Status: typesv2.ApplicationState_ALLOCATED,
 					Description: "Driver allocated the resource",
 				}
-				log.Info().Msgf("Fish: Application %s: Start: Allocated Resource: %s", app.Uid, res.Identifier)
+				logger.Info("Allocated Resource", "res_identifier", res.Identifier)
 			}
 			if err := f.db.ApplicationStateCreate(ctx, appState); err != nil {
-				log.Error().Msgf("Fish: Application %s: Start: Unable to create ApplicationState: %v", app.Uid, err)
+				logger.Error("Unable to create ApplicationState", "err", err)
 			}
 		}
 
@@ -364,15 +370,15 @@ func (f *Fish) executeApplicationStart(appUID typesv2.ApplicationUID, defIndex i
 			if res.Timeout != nil && !res.Timeout.IsZero() {
 				f.applicationTimeoutSet(app.Uid, *res.Timeout)
 			} else {
-				log.Warn().Msgf("Fish: Application %s: Start: Resource have no lifetime set and will live until deallocated by user", app.Uid)
+				logger.Warn("Resource have no lifetime set and will live until deallocated by user")
 			}
 			// Everything went just fine, so returning here
-			log.Info().Msgf("Fish: Application %s: Start: Completed: %s", app.Uid, appState.Status)
+			logger.Info("Completed", "appstate_status", appState.Status)
 			return
 		}
 
 		// In case the status was incorrect - cleaning the Application execution
-		log.Warn().Msgf("Fish: Application %s: Start: Failed to start to execute: %s", app.Uid, appState.Status)
+		logger.Warn("Failed to start to execute", "appstate_status", appState.Status)
 
 		// Decrease the amout of running local apps
 		if !driver.IsRemote() {
@@ -392,6 +398,7 @@ func (f *Fish) executeApplicationStart(appUID typesv2.ApplicationUID, defIndex i
 
 func (f *Fish) executeApplicationStop(appUID typesv2.ApplicationUID) error {
 	ctx := context.Background()
+	logger := log.WithFunc("fish", "executeApplicationStop").With("app_uid", appUID)
 	f.applicationsMutex.Lock()
 	lock, ok := f.applications[appUID]
 	if !ok {
@@ -406,31 +413,31 @@ func (f *Fish) executeApplicationStop(appUID typesv2.ApplicationUID) error {
 	defer lock.Unlock()
 
 	// Check current Application state
-	log.Debug().Msgf("Fish: Application %s: Stop: Stopping the Application", appUID)
+	logger.Debug("Stopping the Application")
 
 	appState, err := f.db.ApplicationStateGetByApplication(ctx, appUID)
 	if err != nil {
-		log.Error().Msgf("Fish: Application %s: Stop: Unable to get ApplicationState: %v", appUID, err)
+		logger.Error("Unable to get ApplicationState", "err", err)
 		return fmt.Errorf("Fish: Application %s: Stop: Unable to get ApplicationState: %v", appUID, err)
 	}
 
 	// Getting ApplicationResource for deallocation
 	res, err := f.db.ApplicationResourceGetByApplication(ctx, appUID)
 	if err != nil {
-		log.Error().Msgf("Fish: Application %s: Stop: Unable to find ApplicationResource: %v", appUID, err)
+		logger.Error("Unable to find ApplicationResource", "err", err)
 		return fmt.Errorf("Fish: Application %s: Stop: Unable to find ApplicationResource: %v", appUID, err)
 	}
 
 	// Get label with the definitions
 	label, err := f.db.LabelGet(ctx, res.LabelUid)
 	if err != nil {
-		log.Error().Msgf("Fish: Application %s: Stop Unable to find Label %s: %v", appUID, res.LabelUid, err)
+		logger.Error("Unable to find Label", "label_uid", res.LabelUid, "err", err)
 		return fmt.Errorf("Fish: Application %s: Stop Unable to find Label %s: %v", appUID, res.LabelUid, err)
 	}
 
 	// Extract the Label Definition by the provided index
 	if len(label.Definitions) <= int(res.DefinitionIndex) {
-		log.Error().Msgf("Fish: Application %s: Stop The Definition does not exist in the Label %s: %v", appUID, res.LabelUid, res.DefinitionIndex)
+		logger.Error("The Definition does not exist in the Label", "label_uid", res.LabelUid, "res_def_index", res.DefinitionIndex)
 		return fmt.Errorf("Fish: Application %s: Stop The Definition does not exist in the Label %s: %v", appUID, res.LabelUid, res.DefinitionIndex)
 	}
 	labelDef := label.Definitions[res.DefinitionIndex]
@@ -438,7 +445,7 @@ func (f *Fish) executeApplicationStop(appUID typesv2.ApplicationUID) error {
 	// Locate the required driver
 	driver := drivers.GetProvider(labelDef.Driver)
 	if driver == nil {
-		log.Error().Msgf("Fish: Application %s: Stop Unable to locate driver: %s", appUID, labelDef.Driver)
+		logger.Error("Unable to locate driver", "driver", labelDef.Driver)
 		return fmt.Errorf("Fish: Application %s: Stop Unable to locate driver: %s", appUID, labelDef.Driver)
 	}
 
@@ -447,7 +454,7 @@ func (f *Fish) executeApplicationStop(appUID typesv2.ApplicationUID) error {
 		f.routines.Add(1)
 		f.routinesMutex.Unlock()
 		defer f.routines.Done()
-		defer log.Info().Msgf("Fish: executeApplicationStop of Application %s stopped", appUID)
+		defer logger.Info("executeApplicationStop completed")
 
 		// Execute the existing ApplicationTasks. It will be executed prior to executing
 		// deallocation by DEALLOCATE which is useful for `snapshot` and `image` tasks.
@@ -456,12 +463,12 @@ func (f *Fish) executeApplicationStop(appUID typesv2.ApplicationUID) error {
 		// Locking the application transition state
 		lock.Lock()
 		defer lock.Unlock()
-		log.Info().Msgf("Fish: Application %s: Stop: Running Deallocate of the ApplicationResource: %s", appUID, res.Identifier)
+		logger.Info("Running Deallocate of the ApplicationResource", "res_identifier", res.Identifier)
 
 		// Deallocating and destroy the resource
 		for retry := range 20 {
 			if err := driver.Deallocate(*res); err != nil {
-				log.Error().Msgf("Fish: Application %s: Stop: Unable to deallocate the ApplicationResource (try: %d): %v", appUID, retry, err)
+				logger.Error("Unable to deallocate the ApplicationResource", "retry", retry, "err", err)
 				appState = &typesv2.ApplicationState{ApplicationUid: appUID, Status: typesv2.ApplicationState_ERROR,
 					Description: fmt.Sprint("Driver deallocate resource error:", err),
 				}
@@ -469,7 +476,7 @@ func (f *Fish) executeApplicationStop(appUID typesv2.ApplicationUID) error {
 				continue
 			}
 
-			log.Info().Msgf("Fish: Application %s: Stop: Application deallocated successfully", appUID)
+			logger.Info("Application deallocated successfully")
 			appState = &typesv2.ApplicationState{ApplicationUid: appUID, Status: typesv2.ApplicationState_DEALLOCATED,
 				Description: "Driver deallocated the resource",
 			}
@@ -480,10 +487,10 @@ func (f *Fish) executeApplicationStop(appUID typesv2.ApplicationUID) error {
 		// Destroying the resource anyway to not bloat the table - otherwise it will stuck there and
 		// will block the access to IP of the other VM's that will reuse this IP
 		if err := f.db.ApplicationResourceDelete(ctx, res.Uid); err != nil {
-			log.Error().Msgf("Fish: Application %s: Stop: Unable to delete ApplicationResource: %v", appUID, err)
+			logger.Error("Unable to delete ApplicationResource", "err", err)
 		}
 		if err := f.db.ApplicationStateCreate(ctx, appState); err != nil {
-			log.Error().Msgf("Fish: Application %s: Stop: Unable to create ApplicationState: %v", appUID, err)
+			logger.Error("Unable to create ApplicationState", "err", err)
 		}
 
 		// Decrease the amout of running local apps
@@ -498,7 +505,7 @@ func (f *Fish) executeApplicationStop(appUID typesv2.ApplicationUID) error {
 		delete(f.applications, appUID)
 		f.applicationsMutex.Unlock()
 
-		log.Info().Msgf("Fish: Application %s: Stop: Completed executing of Application: %s", appUID, appState.Status)
+		logger.Info("Completed executing of Application", "app_status", appState.Status)
 	}()
 
 	return nil
@@ -519,6 +526,8 @@ func (f *Fish) executeApplicationTasks(drv provider.Driver, def *typesv2.LabelDe
 	}
 	f.applicationsMutex.Unlock()
 
+	logger := log.WithFunc("fish", "executeApplicationTasks").With("app_uid", res.ApplicationUid, "app_status", appStatus)
+
 	// Locking Application in task execution
 	lock.Lock()
 	defer lock.Unlock()
@@ -526,32 +535,33 @@ func (f *Fish) executeApplicationTasks(drv provider.Driver, def *typesv2.LabelDe
 	// Execute the associated ApplicationTasks if there is some
 	tasks, err := f.db.ApplicationTaskListByApplicationAndWhen(context.Background(), res.ApplicationUid, appStatus)
 	if err != nil {
-		log.Error().Msgf("Fish: Application %s: Task: Unable to get ApplicationTasks: %v", res.ApplicationUid, err)
+		logger.Error("Unable to get ApplicationTasks", "err", err)
 		return fmt.Errorf("Fish: Application %s: Task: Unable to get ApplicationTasks: %v", res.ApplicationUid, err)
 	}
 	for _, task := range tasks {
+		tasklogger := logger.With("task", task.Task, "task_uid", task.Uid)
 		// Skipping already executed task
 		if task.Result != "{}" {
 			continue
 		}
 		t := drv.GetTask(task.Task, string(task.Options))
 		if t == nil {
-			log.Error().Msgf("Fish: Application %s: Task: Unable to get associated driver task type for Task %q: %v", res.ApplicationUid, task.Uid, task.Task)
+			tasklogger.Error("Unable to get associated driver task type")
 			task.Result = util.UnparsedJSON(`{"error":"task not available in driver"}`)
 		} else {
-			log.Debug().Msgf("Fish: Application %s: Executing task %s: %s", res.ApplicationUid, task.Task, task.Uid)
+			tasklogger.Debug("Executing task")
 			// Executing the task
 			t.SetInfo(&task, def, res)
 			result, err := t.Execute()
 			if err != nil {
 				// We're not crashing here because even with error task could have a result
-				log.Error().Msgf("Fish: Application %s: Error happened during executing the task %s: %v", res.ApplicationUid, task.Uid, err)
+				tasklogger.Error("Error happened during executing the task", "err", err)
 			}
 			task.Result = util.UnparsedJSON(result)
-			log.Debug().Msgf("Fish: Application %s: Executing task completed %s: %s", res.ApplicationUid, task.Task, task.Uid)
+			tasklogger.Debug("Executing task completed")
 		}
 		if err := f.db.ApplicationTaskSave(context.Background(), &task); err != nil {
-			log.Error().Msgf("Fish: Application %s: Task: Error during update the task %s with result: %v", res.ApplicationUid, task.Uid, err)
+			tasklogger.Error("Error during update the task with result", "err", err)
 		}
 	}
 
@@ -563,7 +573,8 @@ func (f *Fish) applicationTimeoutSet(uid typesv2.ApplicationUID, to time.Time) {
 	f.applicationsTimeoutsMutex.Lock()
 	defer f.applicationsTimeoutsMutex.Unlock()
 
-	log.Info().Msgf("Fish: Application %s will be deallocated by timeout in %s at %s", uid, time.Until(to).Round(time.Second), to)
+	logger := log.WithFunc("fish", "applicationTimeoutSet").With("app_uid", uid.String())
+	logger.Info("Application will be deallocated by timeout", "in", time.Until(to).Round(time.Second), "timeout", to)
 
 	// Checking if the provided timeout is prior to everything else in the timeouts list
 	// If one of the timeouts in the list is earlier then the new timeout - no need to send update
@@ -624,7 +635,8 @@ func (f *Fish) applicationTimeoutProcess(ctx context.Context) {
 	f.routines.Add(1)
 	f.routinesMutex.Unlock()
 	defer f.routines.Done()
-	defer log.Info().Msg("Fish: applicationTimeoutProcess stopped")
+	logger := log.WithFunc("fish", "applicationTimeoutProcess")
+	defer logger.Info("applicationTimeoutProcess stopped")
 
 	appUID, appTimeout := f.applicationTimeoutNext()
 
@@ -635,23 +647,24 @@ func (f *Fish) applicationTimeoutProcess(ctx context.Context) {
 		case <-f.applicationsTimeoutsUpdated:
 			appUID, appTimeout = f.applicationTimeoutNext()
 		case timeout := <-appTimeout:
-			log.Debug().Msgf("Fish: applicationTimeoutProcess: Reached timeout for Application %s", appUID)
+			applogger := logger.With("app_uid", appUID)
+			applogger.Debug("Reached timeout for Application")
 			if appUID != uuid.Nil {
 				// We need to check Application is still allocated before deallocation
 				appState, err := f.db.ApplicationStateGetByApplication(ctx, appUID)
 				if err != nil {
-					log.Debug().Msgf("Fish: applicationTimeoutProcess: Can't find Application %s to timeout: %v", appUID, err)
+					applogger.Debug("Can't find Application to timeout", "err", err)
 				} else if !f.db.ApplicationStateIsActive(appState.Status) {
-					log.Debug().Msgf("Fish: applicationTimeoutProcess: Application %s is not active to timeout", appUID)
+					applogger.Debug("Application is not active to timeout")
 				} else {
-					log.Warn().Msgf("Fish: applicationTimeoutProcess: Application %s reached deadline, sending timeout deallocate", appUID)
+					applogger.Warn("Application reached deadline, sending timeout deallocate")
 					appState = &typesv2.ApplicationState{
 						ApplicationUid: appUID,
 						Status:         typesv2.ApplicationState_DEALLOCATE,
 						Description:    fmt.Sprint("ApplicationResource reached it's timeout:", timeout),
 					}
 					if err := f.db.ApplicationStateCreate(ctx, appState); err != nil {
-						log.Error().Msgf("Fish: applicationTimeoutProcess: Application %s unable to create ApplicationState: %v", appUID, err)
+						applogger.Error("Application unable to create ApplicationState", "err", err)
 					}
 				}
 				f.applicationsTimeoutsMutex.Lock()
@@ -678,7 +691,7 @@ func (f *Fish) applicationTimeoutNext() (uid typesv2.ApplicationUID, to <-chan t
 		}
 	}
 
-	log.Debug().Msgf("Fish: applicationTimeoutProcess: Next timeout for Application %s at %s", uid, minTime)
+	log.WithFunc("fish", "applicationTimeoutNext").Debug("Next timeout for Application at", "app_uid", uid, "timeout", minTime)
 
 	return uid, time.After(time.Until(minTime))
 }

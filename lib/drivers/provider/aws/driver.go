@@ -152,11 +152,13 @@ func (d *Driver) ValidateDefinition(def typesv2.LabelDefinition) error {
 
 // AvailableCapacity allows Fish to ask the driver about it's capacity (free slots) of a specific definition
 func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ typesv2.Resources, def typesv2.LabelDefinition) int64 {
+	logger := log.WithFunc("aws", "AvailableCapacity").With("provider.name", d.name)
+
 	var instCount int64
 
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
-		log.Error().Msgf("AWS: %s: Unable to apply options: %v", d.name, err)
+		logger.Error("Unable to apply options", "err", err)
 		return -1
 	}
 
@@ -167,10 +169,10 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ typesv2.Resources, def typesv
 		// The pool is specified - let's check if it has the capacity
 		if p, ok := d.dedicatedPools[opts.Pool]; ok {
 			count := p.AvailableCapacity(opts.InstanceType)
-			log.Debug().Msgf("AWS: %s: AvailableCapacity: Pool: %s, Type: %s, Count: %d", d.name, opts.Pool, opts.InstanceType, count)
+			logger.Debug("AvailableCapacity: Pool", "pool", opts.Pool, "inst_type", opts.InstanceType, "count", count)
 			return count
 		}
-		log.Warn().Msgf("AWS: %s: Unable to locate dedicated pool: %s", d.name, opts.Pool)
+		logger.Warn("Unable to locate dedicated pool", "pool", opts.Pool)
 		return -1
 	} else if awsInstTypeAny(opts.InstanceType, "mac") {
 		// Ensure we have the available auto-placing dedicated hosts to use as base for resource.
@@ -192,7 +194,7 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ typesv2.Resources, def typesv
 		for p.HasMorePages() {
 			resp, err := p.NextPage(context.TODO())
 			if err != nil {
-				log.Error().Msgf("AWS: %s: Error during requesting hosts: %v", d.name, err)
+				logger.Error("Error during requesting hosts", "err", err)
 				return -1
 			}
 			if len(resp.Hosts) > 0 {
@@ -205,9 +207,7 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ typesv2.Resources, def typesv
 				}
 			}
 		}
-
-		log.Debug().Msgf("AWS: %s: AvailableCapacity for dedicated Mac: %s %d", d.name, opts.InstanceType, instCount)
-
+		logger.Debug("AvailableCapacity for dedicated Mac", "inst_type", opts.InstanceType, "count", instCount)
 		return instCount
 	}
 
@@ -219,7 +219,7 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ typesv2.Resources, def typesv
 	if upd, ok := d.typeCacheUpdated[opts.InstanceType]; ok {
 		if upd.After(time.Now().Add(-30 * time.Second)) {
 			if val, ok := d.typeCache[opts.InstanceType]; ok {
-				log.Debug().Msgf("AWS: %s: AvailableCapacity: Type: %s, Cache: %d", d.name, opts.InstanceType, val)
+				logger.Debug("AvailableCapacity: Type from cache", "inst_type", opts.InstanceType, "count", val)
 				return val
 			}
 		}
@@ -267,7 +267,7 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ typesv2.Resources, def typesv
 			cpuQuota = d.quotas["Running On-Demand Standard (A, C, D, H, I, M, R, T, Z) instances"]
 			instTypes = append(instTypes, "a", "c", "d", "h", "i", "m", "r", "t", "z")
 		} else {
-			log.Error().Msgf("AWS: %s: Driver does not support instance type: %s", d.name, opts.InstanceType)
+			logger.Error("Driver does not support instance type", "inst_type", opts.InstanceType)
 			return -1
 		}
 
@@ -286,11 +286,11 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ typesv2.Resources, def typesv
 	var ipCount int64
 	var err error
 	if _, ipCount, err = d.getSubnetID(connEc2, def.Resources.Network, ""); err != nil {
-		log.Error().Msgf("AWS: %s: Error during requesting subnet: %v", d.name, err)
+		logger.Error("Error during requesting subnet", "err", err)
 		return -1
 	}
 
-	log.Debug().Msgf("AWS: %s: AvailableCapacity: Type: %s, Quotas: %d, IP's: %d", d.name, opts.InstanceType, instCount, ipCount)
+	logger.Debug("AvailableCapacity", "type", opts.InstanceType, "quotas", instCount, "ips", ipCount)
 
 	// Return the most limiting value
 	result := instCount
@@ -314,6 +314,8 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 	buf := crypt.RandBytes(6)
 	iName := fmt.Sprintf("fish-%02x%02x%02x%02x%02x%02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5])
 
+	logger := log.WithFunc("aws", "Allocate").With("provider.name", d.name, "instance_name", iName)
+
 	var opts Options
 	if err := opts.Apply(def.Options); err != nil {
 		return nil, fmt.Errorf("AWS: %s: Unable to apply options: %v", iName, err)
@@ -327,7 +329,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 	if vmImage, err = d.getImageID(conn, vmImage); err != nil {
 		return nil, fmt.Errorf("AWS: %s: Unable to get image: %v", iName, err)
 	}
-	log.Info().Msgf("AWS: %s: Selected image: %q", iName, vmImage)
+	logger.Info("Selected image", "vm_image", vmImage)
 
 	// Preparing common tags used for instance resources
 	commonTags := []ec2types.Tag{}
@@ -398,19 +400,19 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 
 			result, err := conn.CreateKeyPair(context.TODO(), &keypairInput)
 			if err != nil {
-				log.Error().Msgf("AWS: %s: Unable to create keypair: %v", iName, err)
+				logger.Error("Unable to create keypair", "err", err)
 				return nil, fmt.Errorf("AWS: %s: Unable to create keypair: %v", iName, err)
 			}
 
 			input.KeyName = aws.String(keyName)
 			keyPem = aws.ToString(result.KeyMaterial)
-			log.Debug().Msgf("AWS: %s: Generated keypair: %q", iName, keyName)
+			logger.Debug("Generated keypair", "key_name", keyName)
 		} else {
-			log.Debug().Msgf("AWS: %s: Skipping key generation since no Authentication provided", iName)
+			logger.Debug("Skipping key generation since no Authentication provided")
 		}
 	} else if d.cfg.InstanceKey != "" {
 		input.KeyName = aws.String(d.cfg.InstanceKey)
-		log.Debug().Msgf("AWS: %s: Using keypair: %q", iName, d.cfg.InstanceKey)
+		logger.Debug("Using keypair", "key_name", d.cfg.InstanceKey)
 	}
 
 	var netZone string
@@ -429,7 +431,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 			Tenancy: ec2types.TenancyHost,
 			HostId:  aws.String(hostID),
 		}
-		log.Info().Msgf("AWS: %s: Utilizing pool %q host: %s", iName, opts.Pool, hostID)
+		logger.Info("Utilizing pool host", "pool", opts.Pool, "host_id", hostID)
 	} else if awsInstTypeAny(opts.InstanceType, "mac") {
 		// For mac machines only dedicated hosts are working, so set the tenancy
 		input.Placement = &ec2types.Placement{
@@ -440,9 +442,10 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 	// Checking the VPC exists or use default one
 	subnetID := def.Resources.Network
 	if subnetID, _, err = d.getSubnetID(conn, subnetID, netZone); err != nil {
+		logger.Error("Unable to get subnet", "err", err)
 		return nil, fmt.Errorf("AWS: %s: Unable to get subnet: %v", iName, err)
 	}
-	log.Info().Msgf("AWS: %s: Selected subnet: %q", iName, subnetID)
+	logger.Info("Selected subnet", "subnet_id", subnetID)
 
 	input.NetworkInterfaces = []ec2types.InstanceNetworkInterfaceSpecification{
 		{
@@ -463,7 +466,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 	}
 
 	if opts.SecurityGroup != "" {
-		log.Warn().Msgf("AWS: %s: security_group option is DEPRECATED, please use security_groups instead", iName)
+		logger.Warn("security_group option is DEPRECATED, please use security_groups instead")
 		opts.SecurityGroups = append(opts.SecurityGroups, opts.SecurityGroup)
 	}
 	for _, grp := range opts.SecurityGroups {
@@ -471,7 +474,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 		if vmSecgroup, err = d.getSecGroupID(conn, vmSecgroup); err != nil {
 			return nil, fmt.Errorf("AWS: %s: Unable to get security group: %v", iName, err)
 		}
-		log.Info().Msgf("AWS: %s: Selected security group: %q", iName, vmSecgroup)
+		logger.Info("Selected security group", "security_group", vmSecgroup)
 		input.NetworkInterfaces[0].Groups = append(input.NetworkInterfaces[0].Groups, vmSecgroup)
 	}
 
@@ -510,7 +513,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 			if vmSnapshot, err = d.getSnapshotID(conn, vmSnapshot); err != nil {
 				return nil, fmt.Errorf("AWS: %s: Unable to get snapshot: %v", iName, err)
 			}
-			log.Info().Msgf("AWS: %s: Selected snapshot: %q", iName, vmSnapshot)
+			logger.Info("Selected snapshot", "snapshot", vmSnapshot)
 			mapping.Ebs.SnapshotId = aws.String(vmSnapshot)
 		} else {
 			// Just create a new disk
@@ -521,7 +524,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 				if err != nil {
 					return nil, fmt.Errorf("AWS: %s: Unable to get encrypt key from KMS: %v", iName, err)
 				}
-				log.Info().Msgf("AWS: %s: Selected encryption key: %q for disk: %q", iName, keyID, name)
+				logger.Info("Selected encryption key", "key_id", keyID, "disk_name", name)
 				mapping.Ebs.KmsKeyId = aws.String(keyID)
 			}
 		}
@@ -531,7 +534,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 	// Run the instance
 	result, err := conn.RunInstances(context.TODO(), &input)
 	if err != nil {
-		log.Error().Msgf("AWS: %s: Unable to run instance: %v", iName, err)
+		logger.Error("Unable to run instance", "err", err)
 		return nil, fmt.Errorf("AWS: %s: Unable to run instance: %v", iName, err)
 	}
 
@@ -557,7 +560,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 				inst = instTmp
 			}
 			if err != nil {
-				log.Error().Msgf("AWS: %s: Error during getting instance while waiting for BlockDeviceMappings: %v", iName, err)
+				logger.Error("Error during getting instance while waiting for BlockDeviceMappings", "err", err)
 			}
 		}
 		for _, bd := range inst.BlockDeviceMappings {
@@ -584,7 +587,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 			}
 			if _, err := conn.CreateTags(context.TODO(), &tagsInput); err != nil {
 				// Do not fail hard here - the instance is already running
-				log.Warn().Msgf("AWS: %s: Unable to set tags for volume: %q, %q, %q", iName, aws.ToString(bd.Ebs.VolumeId), aws.ToString(bd.DeviceName), err)
+				logger.Warn("Unable to set tags for volume", "volume_id", aws.ToString(bd.Ebs.VolumeId), "device_name", aws.ToString(bd.DeviceName), "err", err)
 			}
 		}
 	}
@@ -607,7 +610,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 	timeout := 60
 	for {
 		if inst.PrivateIpAddress != nil {
-			log.Info().Msgf("AWS: %s: Allocate of instance completed: %q, %q", iName, aws.ToString(inst.InstanceId), aws.ToString(inst.PrivateIpAddress))
+			logger.Info("Allocate of instance completed", "instance_id", aws.ToString(inst.InstanceId), "private_ip", aws.ToString(inst.PrivateIpAddress))
 			res.Identifier = aws.ToString(inst.InstanceId)
 			res.IpAddr = aws.ToString(inst.PrivateIpAddress)
 			return res, nil
@@ -624,12 +627,12 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 			inst = instTmp
 		}
 		if err != nil {
-			log.Error().Msgf("AWS: %s: Error during getting instance while waiting for IP: %v, %q", iName, err, aws.ToString(inst.InstanceId))
+			logger.Error("Error during getting instance while waiting for IP", "err", err, "instance_id", aws.ToString(inst.InstanceId))
 		}
 	}
 
 	res.Identifier = aws.ToString(inst.InstanceId)
-	log.Error().Msgf("AWS: %s: Unable to locate the instance IP: %q", iName, aws.ToString(inst.InstanceId))
+	logger.Error("Unable to locate the instance IP", "instance_id", aws.ToString(inst.InstanceId))
 	return res, fmt.Errorf("AWS: %s: Unable to locate the instance IP: %q", iName, aws.ToString(inst.InstanceId))
 }
 
@@ -651,6 +654,8 @@ func (d *Driver) Status(res typesv2.ApplicationResource) (string, error) {
 
 // GetTask returns task struct by name
 func (d *Driver) GetTask(name, options string) provider.DriverTask {
+	logger := log.WithFunc("aws", "GetTask").With("provider.name", d.name)
+
 	// Look for the specified task name
 	var t provider.DriverTask
 	for _, task := range d.tasksList {
@@ -662,7 +667,7 @@ func (d *Driver) GetTask(name, options string) provider.DriverTask {
 	// Parse options json into task structure
 	if len(options) > 0 {
 		if err := json.Unmarshal([]byte(options), t); err != nil {
-			log.Error().Msgf("AWS: %s: Unable to apply the task options: %v", d.name, err)
+			logger.Error("Unable to apply the task options", "err", err)
 			return nil
 		}
 	}
@@ -672,6 +677,8 @@ func (d *Driver) GetTask(name, options string) provider.DriverTask {
 
 // Deallocate the resource
 func (d *Driver) Deallocate(res typesv2.ApplicationResource) error {
+	logger := log.WithFunc("aws", "Deallocate").With("provider.name", d.name, "instance_name", res.Identifier)
+
 	if res.Identifier == "" {
 		return fmt.Errorf("AWS: %s: Invalid resource: %v", d.name, res)
 	}
@@ -700,13 +707,13 @@ func (d *Driver) Deallocate(res typesv2.ApplicationResource) error {
 		result, err := conn.DeleteKeyPair(context.TODO(), &keypairInput)
 		if err != nil || result == nil || !aws.ToBool(result.Return) {
 			// It's not critical, but could leave some additional work for cleanup
-			log.Error().Msgf("AWS: %s: Unable to delete keypair %q: %v", res.Identifier, keyName, err)
+			logger.Error("Unable to delete keypair", "key_name", keyName, "err", err)
 		} else {
-			log.Debug().Msgf("AWS: %s: Removed generated keypair: %q", res.Identifier, keyName)
+			logger.Debug("Removed generated keypair", "key_name", keyName)
 		}
 	}
 
-	log.Info().Msgf("AWS: %s: Deallocate of instance completed: %s", res.Identifier, inst.CurrentState.Name)
+	logger.Info("Deallocate of instance completed", "instance_state", inst.CurrentState.Name)
 
 	return nil
 }

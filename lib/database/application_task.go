@@ -98,7 +98,7 @@ func (d *Database) applicationTaskCreateImpl(ctx context.Context, at *typesv2.Ap
 				// Successfully sent notification
 			default:
 				// Channel is closed or full, skip this subscriber
-				log.Debug().Msgf("Database: Failed to send ApplicationTask notification, channel closed or full")
+				log.WithFunc("database", "applicationTaskCreateImpl").Debug("Failed to send ApplicationTask notification, channel closed or full")
 			}
 		}
 	}(at)

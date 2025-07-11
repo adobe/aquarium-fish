@@ -51,7 +51,7 @@ type Options struct {
 // Apply takes json and applies it to the options structure
 func (o *Options) Apply(options util.UnparsedJSON) error {
 	if err := json.Unmarshal([]byte(options), o); err != nil {
-		log.Error().Msgf("Native: Unable to apply the driver definition: %v", err)
+		log.WithFunc("native", "Apply").Error("Unable to apply the driver definition", "err", err)
 		return fmt.Errorf("Native: Unable to apply the driver definition: %v", err)
 	}
 
@@ -80,12 +80,12 @@ func (o *Options) Validate() error {
 	if len(o.Groups) == 0 {
 		u, e := osuser.Current()
 		if e != nil {
-			log.Error().Msgf("Native: Unable to get the current system user: %v", e)
+			log.WithFunc("native", "Validate").Error("Unable to get the current system user", "err", e)
 			return fmt.Errorf("Native: Unable to get the current system user: %v", e)
 		}
 		group, e := osuser.LookupGroupId(u.Gid)
 		if e != nil {
-			log.Error().Msgf("Native: Unable to get the current system user group name %s: %v", u.Gid, e)
+			log.WithFunc("native", "Validate").Error("Unable to get the current system user group name", "user_gid", u.Gid, "err", e)
 			return fmt.Errorf("Native: Unable to get the current system user group name %s: %v", u.Gid, e)
 		}
 		o.Groups = append(o.Groups, group.Name)
@@ -95,7 +95,7 @@ func (o *Options) Validate() error {
 	var imgErr error
 	for index := range o.Images {
 		if err := o.Images[index].Validate(); err != nil {
-			log.Error().Msgf("Native: Error during image validation: %v", err)
+			log.WithFunc("native", "Validate").Error("Error during image validation", "err", err)
 			imgErr = fmt.Errorf("Native: Error during image validation: %v", err)
 		}
 	}

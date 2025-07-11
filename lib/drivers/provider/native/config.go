@@ -96,7 +96,7 @@ func (c *Config) Apply(config []byte) (err error) {
 		return err
 	}
 
-	log.Debug().Msgf("Native: Creating working directories: %s %s", c.ImagesPath, c.WorkspacePath)
+	log.WithFunc("native", "Apply").Debug("Creating working directories", "images_path", c.ImagesPath, "ws_path", c.WorkspacePath)
 	if err = os.MkdirAll(c.ImagesPath, 0o750); err != nil {
 		return err
 	}
@@ -321,7 +321,7 @@ func (c *Config) Validate(drv *Driver) (err error) {
 	}
 
 	if c.CPUAlter < 0 && cpuStat <= int(-c.CPUAlter) {
-		log.Error().Msgf("Native: |CpuAlter| can't be more or equal the available Host CPUs: |%d| > %d", c.CPUAlter, cpuStat)
+		log.WithFunc("native", "Validate").Error("|CpuAlter| can't be more or equal the available Host CPUs", "cpu_alter", c.CPUAlter, "cpu", cpuStat)
 		return fmt.Errorf("Native: |CpuAlter| can't be more or equal the available Host CPUs: |%d| > %d", c.CPUAlter, cpuStat)
 	}
 
@@ -332,7 +332,7 @@ func (c *Config) Validate(drv *Driver) (err error) {
 	ramStat := memStat.Total / 1073741824 // Getting GB from Bytes
 
 	if c.RAMAlter < 0 && ramStat <= uint64(-c.RAMAlter) {
-		log.Error().Msgf("Native: |RamAlter| can't be more or equal the available Host RAM: |%d| > %d", c.RAMAlter, ramStat)
+		log.WithFunc("native", "Validate").Error("|RamAlter| can't be more or equal the available Host RAM", "ram_alter", c.RAMAlter, "ram", ramStat)
 		return fmt.Errorf("Native: |RamAlter| can't be more or equal the available Host RAM: |%d| > %d", c.RAMAlter, ramStat)
 	}
 

@@ -71,13 +71,13 @@ type Database struct {
 // Init creates the database object by provided path
 func New(path string) (*Database, error) {
 	if err := os.MkdirAll(path, 0o750); err != nil {
-		log.Error().Msgf("DB: Can't create working directory %s: %v", path, err)
+		log.WithFunc("database", "New").Error("Can't create working directory", "path", path, "err", err)
 		return nil, fmt.Errorf("DB: Can't create working directory %s: %v", path, err)
 	}
 
 	be, err := bitcask.Open(filepath.Join(path, "bitcask.db"))
 	if err != nil {
-		log.Error().Msgf("DB: Unable to initialize database: %v", err)
+		log.WithFunc("database", "New").Error("Unable to initialize database", "err", err)
 		return nil, fmt.Errorf("DB: Unable to initialize database: %v", err)
 	}
 
@@ -119,8 +119,9 @@ func New(path string) (*Database, error) {
 
 // CompactDB runs stale Applications and data removing
 func (d *Database) CompactDB(ctx context.Context) error {
-	ctx, span := d.tracer.Start(ctx, "database.compact")
+	ctx, span := d.tracer.Start(ctx, "database.compactdb")
 	defer span.End()
+	logger := log.WithFunc("database", "CompactDB")
 
 	start := time.Now()
 	defer func() {
@@ -133,16 +134,16 @@ func (d *Database) CompactDB(ctx context.Context) error {
 		))
 	}()
 
-	log.Debug().Msg("DB: CompactDB locking...")
-	defer log.Debug().Msg("Fish: CompactDB done")
+	logger.DebugContext(ctx, "Locking...")
+	defer logger.DebugContext(ctx, "Done")
 
 	// Locking entire database
 	d.beMu.Lock()
 	defer d.beMu.Unlock()
-	log.Debug().Msg("DB: CompactDB running...")
+	logger.DebugContext(ctx, "Running...")
 
 	s, _ := d.be.Stats()
-	log.Debug().Msgf("DB: CompactDB: Before compaction: Datafiles: %d, Keys: %d, Size: %d, Reclaimable: %d", s.Datafiles, s.Keys, s.Size, s.Reclaimable)
+	logger.DebugContext(ctx, "Before compaction", "datafiles", s.Datafiles, "keys", s.Keys, "size", s.Size, "reclaimable", s.Reclaimable)
 
 	// Record metrics before compaction
 	d.dbSizeGauge.Record(ctx, int64(s.Size))
@@ -161,12 +162,13 @@ func (d *Database) CompactDB(ctx context.Context) error {
 			attribute.String("operation", "compact"),
 			attribute.String("result", "error"),
 		))
-		log.Error().Msgf("DB: CompactDB: Merge operation failed: %v", err)
+		logger.ErrorContext(ctx, "Merge operation failed", "err", err)
 		return fmt.Errorf("DB: CompactDB: Merge operation failed: %v", err)
 	}
 
 	s, _ = d.be.Stats()
-	log.Debug().Msgf("DB: CompactDB: After compaction: Datafiles: %d, Keys: %d, Size: %d, Reclaimable: %d", s.Datafiles, s.Keys, s.Size, s.Reclaimable)
+	// WARN: Used by integration tests
+	logger.DebugContext(ctx, "After compaction", "datafiles", s.Datafiles, "keys", s.Keys, "size", s.Size, "reclaimable", s.Reclaimable, "compactdb", "after")
 
 	// Record metrics after compaction
 	d.dbSizeGauge.Record(ctx, int64(s.Size))
@@ -196,7 +198,7 @@ func (d *Database) shutdownImpl(ctx context.Context) error {
 	defer d.beMu.Unlock()
 
 	if err := d.be.Close(); err != nil {
-		log.Error().Msgf("DB: Unable to close backend: %v", err)
+		log.WithFunc("database", "shutdownImpl").ErrorContext(ctx, "Unable to close backend", "err", err)
 		return fmt.Errorf("DB: Unable to close backend: %v", err)
 	}
 

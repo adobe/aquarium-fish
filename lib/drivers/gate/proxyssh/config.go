@@ -35,7 +35,7 @@ func (c *Config) Apply(config []byte, db *database.Database) error {
 	// Parse json
 	if len(config) > 0 {
 		if err := json.Unmarshal(config, c); err != nil {
-			log.Error().Msgf("PROXYSSH: Unable to apply the gate config: %v", err)
+			log.WithFunc("proxyssh", "Apply").Error("Unable to apply the gate config", "err", err)
 			return fmt.Errorf("PROXYSSH: Unable to apply the gate config: %v", err)
 		}
 	}

@@ -49,19 +49,13 @@ go generate -v .
 # If ONLYGEN is specified - skip the build
 [ -z "$ONLYGEN" ] || exit 0
 
-# Prepare version number as overrides during link
-mod_name=$(grep '^module' "${root_dir}/go.mod" | cut -d' ' -f 2)
-git_version="$(git describe --tags --match 'v*')$([ "$(git diff HEAD)" = '' ] || echo '-dirty')"
-version_flags="-X '$mod_name/lib/build.Version=${git_version}' -X '$mod_name/lib/build.Time=$(date -u +%y%m%d.%H%M%S)'"
-BINARY_NAME="aquarium-fish-$git_version"
-
 # Doing check after generation because generated sources requires additional modules
 [ "$SKIPCHECK" ] || ./check.sh
 
 echo
 echo "--- RUN UNIT TESTS ---"
 # Unit tests should not consume more then 5 sec per run - for that we have integration tests
-go test -v -failfast -count=1 -timeout=5s -ldflags="$version_flags" -v ./lib/...
+go test -v -failfast -count=1 -timeout=5s -v ./lib/...
 
 echo
 echo "--- BUILD ${BINARY_NAME} ($MAXJOBS in parallel) ---"
@@ -84,6 +78,12 @@ else
     # Unsetting cgo to allow -race to work propely
     unset CGO_ENABLED
 fi
+
+# Prepare version number as overrides during link
+mod_name=$(grep '^module' "${root_dir}/go.mod" | cut -d' ' -f 2)
+git_version="$(git describe --tags --match 'v*')$([ "$(git diff HEAD)" = '' ] || echo '-dirty')"
+version_flags="-X '$mod_name/lib/build.Version=${git_version}${debug_suffix}' -X '$mod_name/lib/build.Time=$(date -u +%y%m%d.%H%M%S)'"
+BINARY_NAME="aquarium-fish-$git_version"
 
 # Run parallel builds but no more than limit (gox doesn't support all the os/archs we need)
 pwait() {

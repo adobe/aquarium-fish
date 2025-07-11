@@ -88,7 +88,7 @@ func (d *Database) applicationResourceCreateImpl(ctx context.Context, r *typesv2
 				// Successfully sent notification
 			default:
 				// Channel is closed or full, skip this subscriber
-				log.Debug().Msgf("Database: Failed to send ApplicationResource notification, channel closed or full")
+				log.WithFunc("database", "applicationResourceCreateImpl").Debug("Failed to send ApplicationResource notification, channel closed or full")
 			}
 		}
 	}(r)
@@ -161,14 +161,14 @@ func isControlledNetwork(ip string) bool {
 
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		log.Error().Msgf("Unable to get the available network interfaces: %+v\n", err.Error())
+		log.WithFunc("database", "isControlledNetwork").Error("Unable to get the available network interfaces", "err", err.Error())
 		return false
 	}
 
 	for _, i := range ifaces {
 		addrs, err := i.Addrs()
 		if err != nil {
-			log.Error().Msgf("Unable to get available addresses of the interface %s: %+v\n", i.Name, err.Error())
+			log.WithFunc("database", "isControlledNetwork").Error("Unable to get available addresses of the interface", "net_if", i.Name, "err", err.Error())
 			continue
 		}
 
@@ -186,7 +186,7 @@ func (d *Database) applicationResourceGetByIPImpl(ctx context.Context, ip string
 	// Check by IP first
 	all, err := d.ApplicationResourceList(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("Fish: Unable to get any ApplicationResource")
+		return nil, fmt.Errorf("Unable to get any ApplicationResource")
 	}
 	for _, r := range all {
 		if r.NodeUid == d.GetNodeUID() && r.IpAddr == ip {
@@ -197,7 +197,7 @@ func (d *Database) applicationResourceGetByIPImpl(ctx context.Context, ip string
 	if res != nil {
 		// Check if the state is allocated to prevent old resources access
 		if d.ApplicationIsAllocated(ctx, res.ApplicationUid) != nil {
-			return nil, fmt.Errorf("Fish: Prohibited to access the ApplicationResource of not allocated Application")
+			return nil, fmt.Errorf("Prohibited to access the ApplicationResource of not allocated Application")
 		}
 
 		return res, nil
@@ -206,7 +206,7 @@ func (d *Database) applicationResourceGetByIPImpl(ctx context.Context, ip string
 	// Make sure the IP is the controlled network, otherwise someone from outside
 	// could become a local node resource, so let's be careful
 	if !isControlledNetwork(ip) {
-		return nil, fmt.Errorf("Fish: Prohibited to serve the ApplicationResource IP from not controlled network")
+		return nil, fmt.Errorf("Prohibited to serve the ApplicationResource IP from not controlled network")
 	}
 
 	// Check by MAC and update IP if found
@@ -222,15 +222,15 @@ func (d *Database) applicationResourceGetByIPImpl(ctx context.Context, ip string
 		}
 	}
 	if res == nil {
-		return nil, fmt.Errorf("Fish: No ApplicationResource with HW address %s", hwAddr)
+		return nil, fmt.Errorf("No ApplicationResource with HW address %s", hwAddr)
 	}
 
 	// Check if the state is allocated to prevent old resources access
 	if d.ApplicationIsAllocated(ctx, res.ApplicationUid) != nil {
-		return nil, fmt.Errorf("Fish: Prohibited to access the ApplicationResource of not allocated Application")
+		return nil, fmt.Errorf("Prohibited to access the ApplicationResource of not allocated Application")
 	}
 
-	log.Debug().Msgf("Fish: Update IP address for the ApplicationResource %s: %s", res.ApplicationUid, ip)
+	log.WithFunc("database", "applicationResourceGetByIPImpl").Debug("Update IP address for the ApplicationResource", "app_uid", res.ApplicationUid, "ip", ip)
 	res.IpAddr = ip
 	err = d.ApplicationResourceSave(ctx, res)
 

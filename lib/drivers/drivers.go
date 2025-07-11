@@ -47,16 +47,17 @@ var providerDrivers map[string]provider.Driver
 
 // Init loads and prepares all kind of available drivers
 func Init(db *database.Database, wd string, configs ConfigDrivers) error {
-	log.Debug().Msg("Drivers: Running init...")
-	defer log.Debug().Msg("Drivers: Init completed")
+	logger := log.WithFunc("drivers", "Init")
+	logger.Debug("Running init...")
+	defer logger.Debug("Init completed")
 
 	if err := load(db, configs); err != nil {
-		log.Error().Msgf("Drivers: Unable to load drivers: %v", err)
+		logger.Error("Unable to load drivers", "err", err)
 		return fmt.Errorf("Drivers: Unable to load drivers: %v", err)
 	}
 	ok, errs := prepare(wd, configs)
 	if len(errs) > 0 {
-		log.Error().Msgf("Drivers: Unable to prepare some provider drivers: %v", errs)
+		logger.Error("Unable to prepare some provider drivers", "errs", errs)
 	}
 	if !ok {
 		return fmt.Errorf("Drivers: Failed to prepare drivers")
@@ -66,8 +67,9 @@ func Init(db *database.Database, wd string, configs ConfigDrivers) error {
 
 // load making the drivers instances map with specified names
 func load(db *database.Database, configs ConfigDrivers) error {
-	log.Debug().Msg("Drivers: Running load...")
-	defer log.Debug().Msg("Drivers: Load completed")
+	logger := log.WithFunc("drivers", "load")
+	logger.Debug("Running load...")
+	defer logger.Debug("Load completed")
 
 	// Loading providers
 	providerInstances := make(map[string]provider.Driver)
@@ -76,7 +78,7 @@ func load(db *database.Database, configs ConfigDrivers) error {
 		// If no providers specified in the config - load all the providers
 		for _, fbr := range provider.FactoryList {
 			providerInstances[fbr.Name()] = fbr.New()
-			log.Info().Msgf("Drivers: Provider driver loaded: %s", fbr.Name())
+			logger.Info("Provider driver loaded", "name", fbr.Name())
 		}
 	} else {
 		for _, fbr := range provider.FactoryList {
@@ -85,7 +87,7 @@ func load(db *database.Database, configs ConfigDrivers) error {
 				if name == fbr.Name() || strings.HasPrefix(name, fbr.Name()+"/") {
 					providerInstances[name] = fbr.New()
 					providerInstances[name].SetName(name)
-					log.Info().Msgf("Drivers: Provider driver loaded: %s as %s", fbr.Name(), providerInstances[name].Name())
+					logger.Info("Provider driver loaded", "name", fbr.Name(), "provider.name", providerInstances[name].Name())
 				}
 			}
 		}
@@ -104,7 +106,7 @@ func load(db *database.Database, configs ConfigDrivers) error {
 		// If no gates specified in the config - load all the gates
 		for _, fbr := range gate.FactoryList {
 			gateInstances[fbr.Name()] = fbr.New(db)
-			log.Info().Msgf("Drivers: Gate driver loaded: %s", fbr.Name())
+			logger.Info("Gate driver loaded", "name", fbr.Name())
 		}
 	} else {
 		for _, fbr := range gate.FactoryList {
@@ -113,7 +115,7 @@ func load(db *database.Database, configs ConfigDrivers) error {
 				if name == fbr.Name() || strings.HasPrefix(name, fbr.Name()+"/") {
 					gateInstances[name] = fbr.New(db)
 					gateInstances[name].SetName(name)
-					log.Info().Msgf("Drivers: Gate driver loaded: %s as %s", fbr.Name(), gateInstances[name].Name())
+					logger.Info("Gate driver loaded", "name", fbr.Name(), "gate.name", gateInstances[name].Name())
 				}
 			}
 		}
@@ -130,8 +132,9 @@ func load(db *database.Database, configs ConfigDrivers) error {
 
 // prepare initializes the drivers with provided configs
 func prepare(wd string, configs ConfigDrivers) (ok bool, errs []error) {
-	log.Debug().Msg("Drivers: Running prepare...")
-	defer log.Debug().Msg("Drivers: Prepare completed")
+	logger := log.WithFunc("drivers", "prepare")
+	logger.Debug("Running prepare...")
+	defer logger.Debug("Prepare completed")
 	mandatoryDriversLoaded := true
 
 	// Activating providers
@@ -149,10 +152,10 @@ func prepare(wd string, configs ConfigDrivers) (ok bool, errs []error) {
 
 		if err := drv.Prepare(jsonCfg); err != nil {
 			errs = append(errs, err)
-			log.Error().Msgf("Drivers: Provider driver %q prepare failed: %v", drv.Name(), err)
+			logger.Error("Provider driver prepare failed", "provider.name", drv.Name(), "err", err)
 		} else {
 			activatedProviderInstances[name] = drv
-			log.Info().Msgf("Drivers: Provider driver activated: %s", drv.Name())
+			logger.Info("Provider driver activated", "provider.name", drv.Name())
 		}
 	}
 
@@ -175,10 +178,10 @@ func prepare(wd string, configs ConfigDrivers) (ok bool, errs []error) {
 		}
 
 		if err := drv.Prepare(wd, jsonCfg); err != nil {
-			log.Warn().Msgf("Drivers: Gate driver %q prepare failed: %s", drv.Name(), err)
+			logger.Warn("Gate driver prepare failed", "gate.name", drv.Name(), "err", err)
 			errs = append(errs, err, drv.Shutdown())
 		} else {
-			log.Info().Msgf("Drivers: Gate driver activated: %s", drv.Name())
+			logger.Info("Gate driver activated", "gate.name", drv.Name())
 			activatedGateInstances[name] = drv
 		}
 	}
@@ -194,7 +197,7 @@ func prepare(wd string, configs ConfigDrivers) (ok bool, errs []error) {
 // GetProvider returns specific provider driver by name
 func GetProvider(name string) provider.Driver {
 	if providerDrivers == nil {
-		log.Error().Msgf("Drivers: Provider drivers are not initialized to request the driver instance: %s", name)
+		log.WithFunc("drivers", "GetProvider").Error("Provider drivers are not initialized to request the driver instance", "provider.name", name)
 		return nil
 	}
 	drv := providerDrivers[name]
@@ -204,7 +207,7 @@ func GetProvider(name string) provider.Driver {
 // GetGate returns specific gate driver by name
 func GetGate(name string) gate.Driver {
 	if gateDrivers == nil {
-		log.Error().Msgf("Drivers: Gate drivers are not initialized to request the driver instance: %s", name)
+		log.WithFunc("drivers", "GetGate").Error("Gate drivers are not initialized to request the driver instance", "gate.name", name)
 		return nil
 	}
 	drv := gateDrivers[name]
@@ -216,14 +219,14 @@ func GetGateRPCServices() []gate.RPCService {
 	var services []gate.RPCService
 
 	if gateDrivers == nil {
-		log.Debug().Msg("Drivers: No gate drivers initialized")
+		log.WithFunc("drivers", "GetGateRPCServices").Debug("No gate drivers initialized")
 		return services
 	}
 
 	for name, drv := range gateDrivers {
 		drvServices := drv.GetRPCServices()
 		if len(drvServices) > 0 {
-			log.Debug().Msgf("Drivers: Gate driver %s registered %d RPC services", name, len(drvServices))
+			log.WithFunc("drivers", "GetGateRPCServices").Debug("Gate driver registered RPC services", "gate.name", name, "amount", len(drvServices))
 			services = append(services, drvServices...)
 		}
 	}
@@ -233,12 +236,13 @@ func GetGateRPCServices() []gate.RPCService {
 
 // Shutdown gracefully shutdowns the running drivers
 func Shutdown() (errs []error) {
+	logger := log.WithFunc("drivers", "Shutdown")
 	for name, drv := range gateDrivers {
 		if err := drv.Shutdown(); err != nil {
 			errs = append(errs, err)
-			log.Error().Msgf("Drivers: Gate driver %q shutdown failed: %s", name, err)
+			logger.Error("Gate driver shutdown failed", "gate.name", name, "err", err)
 		} else {
-			log.Info().Msgf("Drivers: Gate driver stopped: %s", name)
+			logger.Info("Gate driver stopped", "gate.name", name)
 		}
 	}
 

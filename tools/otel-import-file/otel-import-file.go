@@ -47,16 +47,16 @@ type Config struct {
 
 // TelemetryData represents the structure of our telemetry data
 type TelemetryData struct {
-	TraceID    string                 `json:"trace_id"`
-	SpanID     string                 `json:"span_id"`
-	ParentID   string                 `json:"parent_id"`
-	Name       string                 `json:"name"`
-	StartTime  time.Time              `json:"start_time"`
-	EndTime    time.Time              `json:"end_time"`
-	Duration   time.Duration          `json:"duration"`
-	Status     string                 `json:"status"`
-	Attributes map[string]interface{} `json:"attributes"`
-	Resource   map[string]interface{} `json:"resource"`
+	TraceID    string         `json:"trace_id"`
+	SpanID     string         `json:"span_id"`
+	ParentID   string         `json:"parent_id"`
+	Name       string         `json:"name"`
+	StartTime  time.Time      `json:"start_time"`
+	EndTime    time.Time      `json:"end_time"`
+	Duration   time.Duration  `json:"duration"`
+	Status     string         `json:"status"`
+	Attributes map[string]any `json:"attributes"`
+	Resource   map[string]any `json:"resource"`
 }
 
 // LogData represents the structure of our log data
@@ -68,9 +68,9 @@ type LogData struct {
 
 // MetricData represents the structure of our metric data
 type MetricData struct {
-	Timestamp time.Time              `json:"timestamp"`
-	Resource  map[string]interface{} `json:"resource"`
-	Metrics   interface{}            `json:"metrics"`
+	Timestamp time.Time      `json:"timestamp"`
+	Resource  map[string]any `json:"resource"`
+	Metrics   any            `json:"metrics"`
 }
 
 // Importer handles the import of telemetry data
@@ -448,7 +448,7 @@ func (i *Importer) processLogFile(ctx context.Context, filePath string) error {
 }
 
 // sendToPyroscope sends profiling data to Pyroscope (placeholder)
-func (i *Importer) sendToPyroscope(ctx context.Context, data interface{}) error {
+func (i *Importer) sendToPyroscope(ctx context.Context, data any) error {
 	if i.config.PyroscopeURL == "" {
 		return nil
 	}

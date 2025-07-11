@@ -45,44 +45,45 @@ type session struct {
 }
 
 func (d *Driver) serveConnection(clientConn net.Conn) error {
-	log.Info().Msgf("PROXYSSH: %s: %s: Starting new session", d.name, clientConn.RemoteAddr())
+	logger := log.WithFunc("proxyssh", "serveConnection").With("gate.name", d.name, "client_addr", clientConn.RemoteAddr())
+	logger.Info("Starting new session")
 
 	// Establish SSH connection
 	srcConn, srcConnChannels, srcConnReqs, err := d.establishConnection(clientConn)
 	if err != nil {
-		log.Error().Msgf("PROXYSSH: %s: %s: Failed to establish connection: %v", d.name, clientConn.RemoteAddr(), err)
+		logger.Error("Failed to establish connection", "err", err)
 		return fmt.Errorf("PROXYSSH: %s: %s: Failed to establish connection: %v", d.name, clientConn.RemoteAddr(), err)
 	}
 	defer srcConn.Close()
-	log.Debug().Msgf("PROXYSSH: %s: %s: Established new connection: %x", d.name, clientConn.RemoteAddr(), srcConn.SessionID())
+	logger.Debug("Established new connection", "src_session_id", srcConn.SessionID())
 
 	// Get session info from map
 	session, err := d.getSession(srcConn.SessionID())
 	if err != nil {
-		log.Error().Msgf("PROXYSSH: %s: %s: Failed to get session: %v", d.name, clientConn.RemoteAddr(), err)
+		logger.Error("Failed to get session", "err", err)
 		return fmt.Errorf("PROXYSSH: %s: %s: Failed to get session: %v", d.name, clientConn.RemoteAddr(), err)
 	}
 
 	if session.ResourceAccessor == nil {
-		log.Error().Msgf("PROXYSSH: %s: %s: No ResourceAccessor is set for the session", d.name, session.SrcAddr)
+		logger.Error("No ResourceAccessor is set for the session")
 		return fmt.Errorf("PROXYSSH: %s: %s: No ResourceAccessor is set for the session", d.name, session.SrcAddr)
 	}
 
 	// Getting the info about the destination resource
 	resource, err := d.db.ApplicationResourceGet(context.Background(), session.ResourceAccessor.ApplicationResourceUid)
 	if err != nil {
-		log.Error().Msgf("PROXYSSH: %s: %s: Unable to retrieve Resource %s: %v", d.name, session.SrcAddr, session.ResourceAccessor.ApplicationResourceUid, err)
+		logger.Error("Unable to retrieve Resource", "appres_uid", session.ResourceAccessor.ApplicationResourceUid, "err", err)
 		return fmt.Errorf("PROXYSSH: %s: %s: Unable to retrieve Resource %s: %v", d.name, session.SrcAddr, session.ResourceAccessor.ApplicationResourceUid, err)
 	}
 	if resource.Authentication == nil || resource.Authentication.Username == "" && resource.Authentication.Password == "" {
-		log.Error().Msgf("PROXYSSH: %s: %s: Resource Authentication not provided", d.name, session.SrcAddr)
+		logger.Error("Resource Authentication is not set")
 		return fmt.Errorf("PROXYSSH: %s: %s: Resource Authentication not provided", d.name, session.SrcAddr)
 	}
 
 	// Establish destination connection
 	dstConn, err := session.connectToDestination(resource)
 	if err != nil {
-		log.Error().Msgf("PROXYSSH: %s: %s: Unable to connect to destination: %v", d.name, session.SrcAddr, err)
+		logger.Error("Unable to connect to destination", "err", err)
 		return fmt.Errorf("PROXYSSH: %s: %s: Unable to connect to destination: %v", d.name, session.SrcAddr, err)
 	}
 	defer dstConn.Close()
@@ -98,14 +99,14 @@ func (d *Driver) serveConnection(clientConn net.Conn) error {
 
 	// Wait for goroutines to finish
 	session.wg.Wait()
-	log.Info().Msgf("PROXYSSH: %s: %s: Session closed", d.name, session.SrcAddr)
+	logger.Info("Session closed")
 	return nil
 }
 
 func (d *Driver) establishConnection(clientConn net.Conn) (*ssh.ServerConn, <-chan ssh.NewChannel, <-chan *ssh.Request, error) { //nolint:revive
 	srcConn, srcConnChannels, srcConnReqs, err := ssh.NewServerConn(clientConn, d.serverConfig)
 	if err != nil {
-		log.Error().Msgf("PROXYSSH: %s: %s: Failed to establish server connection: %v", d.name, clientConn.RemoteAddr(), err)
+		log.WithFunc("proxyssh", "establishConnection").With("gate.name", d.name).Error("Failed to establish server connection", "err", err)
 		return nil, nil, nil, fmt.Errorf("PROXYSSH: %s: %s: Failed to establish server connection: %v", d.name, clientConn.RemoteAddr(), err)
 	}
 	return srcConn, srcConnChannels, srcConnReqs, nil
@@ -125,6 +126,7 @@ func (d *Driver) getSession(sessionID []byte) (*session, error) {
 }
 
 func (s *session) connectToDestination(res *typesv2.ApplicationResource) (*ssh.Client, error) {
+	logger := log.WithFunc("proxyssh", "connectToDestination").With("gate.name", s.drv.name, "client_addr", s.SrcAddr)
 	dstAddr := net.JoinHostPort(res.IpAddr, strconv.Itoa(int(res.Authentication.Port)))
 	dstConfig := &ssh.ClientConfig{
 		User:            res.Authentication.Username,
@@ -141,7 +143,7 @@ func (s *session) connectToDestination(res *typesv2.ApplicationResource) (*ssh.C
 	if res.Authentication.Key != "" {
 		signer, err := ssh.ParsePrivateKey([]byte(res.Authentication.Key))
 		if err != nil {
-			log.Error().Msgf("PROXYSSH: %s: %s: Unable to parse private key len %d: %v", s.drv.name, s.SrcAddr, len(res.Authentication.Key), err)
+			logger.Error("Unable to parse private key len", "key_len", len(res.Authentication.Key), "err", err)
 			return nil, fmt.Errorf("PROXYSSH: %s: %s: Unable to parse private key len %d: %v", s.drv.name, s.SrcAddr, len(res.Authentication.Key), err)
 		}
 		dstConfig.Auth = append(dstConfig.Auth, ssh.PublicKeys(signer))
@@ -149,7 +151,7 @@ func (s *session) connectToDestination(res *typesv2.ApplicationResource) (*ssh.C
 
 	dstConn, err := ssh.Dial("tcp", dstAddr, dstConfig)
 	if err != nil {
-		log.Error().Msgf("PROXYSSH: %s: %s: Unable to dial destination %q: %v", s.drv.name, s.SrcAddr, dstAddr, err)
+		logger.Error("Unable to dial destination", "dst_addr", dstAddr, "err", err)
 		return nil, fmt.Errorf("PROXYSSH: %s: %s: Unable to dial destination %q: %v", s.drv.name, s.SrcAddr, dstAddr, err)
 	}
 	return dstConn, nil
@@ -157,31 +159,33 @@ func (s *session) connectToDestination(res *typesv2.ApplicationResource) (*ssh.C
 
 func (s *session) handleSourceRequests(srcConnReqs <-chan *ssh.Request, dstConn *ssh.Client) {
 	defer s.wg.Done()
-	log.Debug().Msgf("PROXYSSH: %s: %s: Handling source requests", s.drv.name, s.SrcAddr)
+	logger := log.WithFunc("proxyssh", "handleSourceRequests").With("gate.name", s.drv.name, "client_addr", s.SrcAddr)
+	logger.Debug("Handling source requests")
+	defer logger.Debug("Finished handling source requests")
 
 	for r := range srcConnReqs {
 		s.handleRequest(r, dstConn)
 	}
-	log.Debug().Msgf("PROXYSSH: %s: %s: Finished handling source requests", s.drv.name, s.SrcAddr)
 }
 
 func (s *session) handleChannel(ch ssh.NewChannel, dstConn ssh.Conn) {
 	defer s.wg.Done()
-	log.Debug().Msgf("PROXYSSH: %s: %s: Handling new channel: %s", s.drv.name, s.SrcAddr, ch.ChannelType())
+	logger := log.WithFunc("proxyssh", "handleChannel").With("gate.name", s.drv.name, "client_addr", s.SrcAddr, "dst_addr", dstConn.RemoteAddr())
+	logger.Debug("Handling new channel", "channel_type", ch.ChannelType())
 
 	// To prevent concurrent access to the channels
 	var chnMutex sync.Mutex
 
 	dstChn, dstChnRequests, dstChnErr := dstConn.OpenChannel(ch.ChannelType(), ch.ExtraData())
 	if dstChnErr != nil {
-		log.Error().Msgf("PROXYSSH: %s: %s: Could not open channel to destination: %v", s.drv.name, s.SrcAddr, dstChnErr)
+		logger.Error("Could not open channel to destination", "err", dstChnErr)
 		ch.Reject(ssh.ConnectionFailed, "Unable to connect to destination resource")
 		return
 	}
 
 	srcChn, srcChnRequests, srcChnErr := ch.Accept()
 	if srcChnErr != nil {
-		log.Error().Msgf("PROXYSSH: %s: %s: Could not accept source channel: %v", s.drv.name, s.SrcAddr, srcChnErr)
+		logger.Error("Could not accept source channel", "err", srcChnErr)
 		dstChn.Close()
 		ch.Reject(ssh.ConnectionFailed, "Unable to accept connection")
 		return
@@ -203,117 +207,118 @@ func (s *session) handleChannel(ch ssh.NewChannel, dstConn ssh.Conn) {
 			chnMutex.Unlock()
 		}()
 
-		log.Debug().Msgf("PROXYSSH: %s: %s: Starting to listen for channel requests", s.drv.name, s.SrcAddr)
+		logger.Debug("Starting to listen for channel requests")
+		defer logger.Debug("Stopped to listen for the channel requests")
 		for {
 			var request *ssh.Request
 			var targetChannel ssh.Channel
 
 			select {
 			case request = <-srcChnRequests:
-				//log.Debug().Msgf("PROXYSSH: %s: %s: Received src channel request: %v", s.drv.name, s.SrcAddr, request)
+				//logger.Debug("Received src channel request", "request", request)
 				targetChannel = dstChn
 			case request = <-dstChnRequests:
-				//log.Debug().Msgf("PROXYSSH: %s: %s: Received dst channel request: %v", s.drv.name, s.SrcAddr, request)
+				//logger.Debug("Received dst channel request", "request", request)
 				targetChannel = srcChn
 			}
 
 			// In the event that an SSH request gets killed (not exited),
 			// the request will be nil. Do not continue, exit the loop.
 			if request == nil {
-				log.Warn().Msgf("PROXYSSH: %s: %s: SSH connection terminated ungracefully...", s.drv.name, s.SrcAddr)
+				logger.Warn("SSH connection terminated ungracefully...")
 				break
 			}
 
 			requestValid, requestError := targetChannel.SendRequest(request.Type, request.WantReply, request.Payload)
 			if requestError != nil {
-				log.Error().Msgf("PROXYSSH: %s: %s: SendRequest error: %v", s.drv.name, s.SrcAddr, requestError)
+				logger.Error("SendRequest error", "err", requestError)
 				break
 			}
 
 			if request.WantReply {
 				if err := request.Reply(requestValid, nil); err != nil {
-					log.Error().Msgf("PROXYSSH: %s: %s: Unable to respond to request %s: %v", s.drv.name, s.SrcAddr, request.Type, err)
+					logger.Error("Unable to respond to request", "request_type", request.Type, "err", err)
 					break
 				}
 			}
 
-			log.Debug().Msgf("PROXYSSH: %s: %s: Request: Type=%q, WantReply='%t'.", s.drv.name, s.SrcAddr, request.Type, request.WantReply)
+			logger.Debug("Request", "request_type", request.Type, "want_reply", request.WantReply)
 			if request.Type == "exit-status" {
 				// Ending the channel requests processing
 				break
 			}
 		}
-
-		log.Debug().Msgf("PROXYSSH: %s: %s: Stopped to listen for the channel requests", s.drv.name, s.SrcAddr)
 	}()
 
-	log.Debug().Msgf("PROXYSSH: %s: %s: Begin streaming to and from %q.", s.drv.name, s.SrcAddr, dstConn.RemoteAddr())
+	logger.Debug("Begin streaming")
 
 	chWg.Add(1)
 	go func() {
 		defer chWg.Done()
-		log.Debug().Msgf("PROXYSSH: %s: %s: Starting dst->src stream copy", s.drv.name, s.SrcAddr)
+		logger.Debug("Starting dst->src stream copy")
 		if _, err := io.Copy(srcChn, dstChn); err != nil && err != io.EOF {
-			log.Error().Msgf("PROXYSSH: %s: %s: The dst->src channel was closed unexpectedly: %v", s.drv.name, s.SrcAddr, err)
+			logger.Error("The dst->src channel was closed unexpectedly", "err", err)
 		} else {
-			log.Debug().Msgf("PROXYSSH: %s: %s: The dst->src channel was closed: %v", s.drv.name, s.SrcAddr, err)
+			logger.Debug("The dst->src channel was closed", "err", err)
 		}
 		chnMutex.Lock()
 		defer chnMutex.Unlock()
 		// Properly closing the channel
 		if err := dstChn.CloseWrite(); err != nil {
-			log.Warn().Msgf("PROXYSSH: %s: %s: The dst->src closing write for dst channel did not go well: %v", s.drv.name, s.SrcAddr, err)
+			logger.Warn("The dst->src closing write for dst channel did not go well", "err", err)
 		}
 		if err := srcChn.CloseWrite(); err != nil {
-			log.Warn().Msgf("PROXYSSH: %s: %s: The dst->src closing write for src channel did not go well: %v", s.drv.name, s.SrcAddr, err)
+			logger.Warn("The dst->src closing write for src channel did not go well", "err", err)
 		}
 	}()
 
 	if _, err := io.Copy(dstChn, srcChn); err != nil && err != io.EOF {
-		log.Error().Msgf("PROXYSSH: %s: %s: The src->dst channel was closed unexpectedly: %v", s.drv.name, s.SrcAddr, err)
+		logger.Error("The src->dst channel was closed unexpectedly", "err", err)
 	} else {
-		log.Debug().Msgf("PROXYSSH: %s: %s: The src->dst channel was closed", s.drv.name, s.SrcAddr)
+		logger.Debug("The src->dst channel was closed", "err", err)
 	}
 	// Properly closing the channel
 	chnMutex.Lock()
 	if err := dstChn.CloseWrite(); err != nil {
-		log.Warn().Msgf("PROXYSSH: %s: %s: The src->dst closing write for dst channel did not go well: %v", s.drv.name, s.SrcAddr, err)
+		logger.Warn("The src->dst closing write for dst channel did not go well", "err", err)
 	}
 	if err := srcChn.CloseWrite(); err != nil {
-		log.Warn().Msgf("PROXYSSH: %s: %s: The src->dst closing write for src channel did not go well: %v", s.drv.name, s.SrcAddr, err)
+		logger.Warn("The src->dst closing write for src channel did not go well", "err", err)
 	}
 	chnMutex.Unlock()
 
 	chWg.Wait()
-	log.Debug().Msgf("PROXYSSH: %s: %s: Completed processing channel: %s", s.drv.name, s.SrcAddr, ch.ChannelType())
+	logger.Debug("Completed processing channel", "channel_type", ch.ChannelType())
 }
 
 func (s *session) handleRequest(r *ssh.Request, c *ssh.Client) {
-	log.Debug().Msgf("PROXYSSH: %s: %s: Handling src request: %s", s.drv.name, s.SrcAddr, r.Type)
+	logger := log.WithFunc("proxyssh", "handleRequest").With("gate.name", s.drv.name, "client_addr", s.SrcAddr)
+	logger.Debug("Handling src request", "request_type", r.Type)
 
 	// Proxy to destination
 	ok, data, err := c.SendRequest(r.Type, r.WantReply, r.Payload)
 	if nil != err {
-		log.Error().Msgf("PROXYSSH: %s: %s: Unable to proxy request %s: %v", s.drv.name, s.SrcAddr, r.Type, err)
+		logger.Error("Unable to proxy request", "request_type", r.Type, "err", err)
 		return
 	}
 
 	// Pass to src
 	if r.WantReply {
 		if err := r.Reply(ok, data); nil != err {
-			log.Error().Msgf("PROXYSSH: %s: %s: Unable to respond to request %s: %v", s.drv.name, s.SrcAddr, r.Type, err)
+			logger.Error("Unable to respond to request", "request_type", r.Type, "err", err)
 			return
 		}
 	}
 }
 
 func (d *Driver) passwordCallback(incomingConn ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
+	logger := log.WithFunc("proxyssh", "passwordCallback").With("gate.name", d.name, "client_addr", incomingConn.RemoteAddr())
 	user := incomingConn.User()
-	log.Debug().Msgf("PROXYSSH: %s: %s: Login attempt for user %q.", d.name, incomingConn.RemoteAddr(), user)
+	logger.Debug("Login attempt for user", "user", user)
 
 	fishUser, err := d.db.UserGet(context.Background(), user)
 	if err != nil {
-		log.Error().Msgf("PROXYSSH: %s: %s: Unrecognized user %q", d.name, incomingConn.RemoteAddr(), user)
+		logger.Error("Unrecognized user", "user", user)
 		return nil, fmt.Errorf("Invalid access")
 	}
 
@@ -324,7 +329,7 @@ func (d *Driver) passwordCallback(incomingConn ssh.ConnMetadata, pass []byte) (*
 
 	ra, err := d.db.GateProxySSHAccessSingleUsePasswordHash(fishUser.Name, passHashStr)
 	if err != nil {
-		log.Error().Msgf("PROXYSSH: %s: %s: Invalid access for user %q: %v", d.name, incomingConn.RemoteAddr(), fishUser.Name, err)
+		logger.Error("Invalid access for user", "user", fishUser.Name, "err", err)
 		return nil, fmt.Errorf("Invalid access")
 	}
 
@@ -342,12 +347,13 @@ func (d *Driver) passwordCallback(incomingConn ssh.ConnMetadata, pass []byte) (*
 }
 
 func (d *Driver) publicKeyCallback(incomingConn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+	logger := log.WithFunc("proxyssh", "publicKeyCallback").With("gate.name", d.name, "client_addr", incomingConn.RemoteAddr())
 	user := incomingConn.User()
-	log.Debug().Msgf("PROXYSSH: %s: %s: Login attempt for user %q.", d.name, incomingConn.RemoteAddr(), user)
+	logger.Debug("Login attempt for user", "user", user)
 
 	fishUser, err := d.db.UserGet(context.Background(), user)
 	if err != nil {
-		log.Error().Msgf("PROXYSSH: %s: %s: Unrecognized user %q", d.name, incomingConn.RemoteAddr(), user)
+		logger.Error("Unrecognized user", "user", user)
 		return nil, fmt.Errorf("Invalid access")
 	}
 
@@ -355,7 +361,7 @@ func (d *Driver) publicKeyCallback(incomingConn ssh.ConnMetadata, key ssh.Public
 
 	ra, err := d.db.GateProxySSHAccessSingleUseKey(fishUser.Name, stringKey)
 	if err != nil {
-		log.Error().Msgf("PROXYSSH: %s: %s: Invalid access for user %q: %v", d.name, incomingConn.RemoteAddr(), fishUser.Name, err)
+		logger.Error("Invalid access for user", "user", fishUser.Name, "err", err)
 		return nil, fmt.Errorf("Invalid access")
 	}
 
@@ -374,13 +380,14 @@ func (d *Driver) publicKeyCallback(incomingConn ssh.ConnMetadata, key ssh.Public
 
 // Init starts SSH proxy and returns the actual listening address and error if happened
 func (d *Driver) proxyInit(keyPath string) (string, error) {
+	logger := log.WithFunc("proxyssh", "proxyInit").With("gate.name", d.name)
 	// First, try and read the file if it exists already. Otherwise, it is the
 	// first execution, generate the private / public keys. The SSH server
 	// requires at least one identity loaded to run.
 	privateBytes, err := os.ReadFile(keyPath)
 	if err != nil {
 		// If it cannot be loaded, this is the first execution, generate it.
-		log.Info().Msgf("PROXYSSH: %s: Could not load %q, generating...", d.name, keyPath)
+		logger.Info("Could not load key, generating...", "key_path", keyPath)
 		pemKey, err := crypt.GenerateSSHKey()
 		if err != nil {
 			return "", fmt.Errorf("PROXYSSH: %s: Could not generate private key: %w", d.name, err)
@@ -411,19 +418,19 @@ func (d *Driver) proxyInit(keyPath string) (string, error) {
 	// Create the listener and let it wait for new connections in a separated goroutine
 	listener, err := net.Listen("tcp", d.cfg.BindAddress)
 	if err != nil {
-		log.Error().Msgf("PROXYSSH: %s: Unable to bind to address %q: %v", d.name, d.cfg.BindAddress, err)
+		logger.Error("Unable to bind to address", "bind_address", d.cfg.BindAddress, "err", err)
 		return "", fmt.Errorf("PROXYSSH: %s: Unable to bind to address %q: %v", d.name, d.cfg.BindAddress, err)
 	}
 
 	go func() {
-		log.Debug().Msgf("PROXYSSH: %s: Start listening for the incoming connections", d.name)
+		logger.Debug("Start listening for the incoming connections")
 		defer listener.Close()
 
 		// Indefinitely accept new connections, process them concurrently
 		for {
 			incomingConn, err := listener.Accept() // Blocks until new connection comes
 			if err != nil {
-				log.Error().Msgf("PROXYSSH: %s: Unable to accept the incoming connection: %v", d.name, err)
+				logger.Error("Unable to accept the incoming connection", "err", err)
 				continue
 			}
 
@@ -431,7 +438,8 @@ func (d *Driver) proxyInit(keyPath string) (string, error) {
 		}
 	}()
 
-	log.Info().Msgf("PROXYSSH listening on: %s", listener.Addr())
+	// WARN: Used by integration tests
+	logger.Info("ProxySSH listening", "addr", listener.Addr())
 
 	return listener.Addr().String(), nil
 }

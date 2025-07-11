@@ -60,7 +60,7 @@ type Config struct {
 func (c *Config) Apply(config []byte) error {
 	if len(config) > 0 {
 		if err := json.Unmarshal(config, c); err != nil {
-			log.Error().Msgf("DOCKER: Unable to apply the driver config: %v", err)
+			log.WithFunc("docker", "Apply").Error("Unable to apply the driver config", "err", err)
 			return fmt.Errorf("DOCKER: Unable to apply the driver config: %v", err)
 		}
 	}
@@ -69,11 +69,12 @@ func (c *Config) Apply(config []byte) error {
 
 // Validate makes sure the config have the required defaults & that the required fields are set
 func (c *Config) Validate() (err error) {
+	logger := log.WithFunc("docker", "Validate")
 	// Check that values of the config is filled at least with defaults
 	if c.DockerPath == "" {
 		// Look in the PATH
 		if c.DockerPath, err = exec.LookPath("docker"); err != nil {
-			log.Error().Msgf("DOCKER: Unable to locate `docker` path: %v", err)
+			logger.Error("Unable to locate `docker` path", "err", err)
 			return fmt.Errorf("DOCKER: Unable to locate `docker` path: %v", err)
 		}
 	}
@@ -93,7 +94,7 @@ func (c *Config) Validate() (err error) {
 		return err
 	}
 
-	log.Debug().Msgf("DOCKER: Creating working directories: %s %s", c.ImagesPath, c.WorkspacePath)
+	logger.Debug("Creating working directories", "images_path", c.ImagesPath, "ws_path", c.WorkspacePath)
 	if err := os.MkdirAll(c.ImagesPath, 0o750); err != nil {
 		return err
 	}

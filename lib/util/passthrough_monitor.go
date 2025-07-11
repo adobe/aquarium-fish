@@ -15,6 +15,7 @@
 package util
 
 import (
+	"fmt"
 	"io"
 	"time"
 
@@ -45,7 +46,7 @@ func (pt *PassThruMonitor) Read(p []byte) (int, error) {
 		percentage := float64(pt.total) / float64(pt.Length) * float64(100)
 		if percentage-pt.progress > 10 || time.Since(pt.printTs) > 30*time.Second {
 			// Show status every 10% or 30 sec
-			log.Info().Msgf("%s: %v%% (%dB)", pt.Name, int(percentage), pt.total)
+			log.WithFunc("util", "PassThruMonitor.Read").Info(fmt.Sprintf("%s: %v%% (%dB)", pt.Name, int(percentage), pt.total))
 			pt.progress = percentage
 			pt.printTs = time.Now()
 		}

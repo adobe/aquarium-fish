@@ -25,12 +25,12 @@ require (
 	github.com/hpcloud/tail v1.0.0
 	github.com/mostlygeek/arp v0.0.0-20170424181311-541a2129847a
 	github.com/pkg/sftp v1.13.7
-	github.com/rs/zerolog v1.33.0
 	github.com/shirou/gopsutil/v4 v4.25.1
 	github.com/spf13/cobra v1.8.0
 	github.com/steinfletcher/apitest v1.5.15
 	github.com/ulikunitz/xz v0.5.11
 	go.mills.io/bitcask/v2 v2.1.3
+	go.opentelemetry.io/contrib/bridges/otelslog v0.12.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.62.0
 	go.opentelemetry.io/otel v1.37.0
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.13.0
@@ -82,8 +82,6 @@ require (
 	github.com/kr/fs v0.1.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/mattetti/filebuffer v1.0.1 // indirect
-	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect

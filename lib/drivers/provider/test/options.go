@@ -36,7 +36,7 @@ type Options struct {
 // Apply takes json and applies it to the options structure
 func (o *Options) Apply(options util.UnparsedJSON) error {
 	if err := json.Unmarshal([]byte(options), o); err != nil {
-		log.Error().Msgf("TEST: Unable to apply the driver options: %v", err)
+		log.WithFunc("test", "Apply").Error("Unable to apply the driver options", "err", err)
 		return fmt.Errorf("TEST: Unable to apply the driver options: %v", err)
 	}
 

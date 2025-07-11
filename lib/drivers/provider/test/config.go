@@ -48,7 +48,7 @@ func (c *Config) Apply(config []byte) error {
 	// Parse json
 	if len(config) > 0 {
 		if err := json.Unmarshal(config, c); err != nil {
-			log.Error().Msgf("TEST: Unable to apply the driver config: %v", err)
+			log.WithFunc("test", "Apply").Error("Unable to apply the driver config", "err", err)
 			return fmt.Errorf("TEST: Unable to apply the driver config: %v", err)
 		}
 	}
@@ -64,7 +64,7 @@ func (c *Config) Validate() (err error) {
 	if c.WorkspacePath, err = filepath.Abs(c.WorkspacePath); err != nil {
 		return err
 	}
-	log.Debug().Msgf("TEST: Creating working directory: %s", c.WorkspacePath)
+	log.WithFunc("test", "Validate").Debug("Creating working directory", "path", c.WorkspacePath)
 	if err := os.MkdirAll(c.WorkspacePath, 0o750); err != nil {
 		return err
 	}

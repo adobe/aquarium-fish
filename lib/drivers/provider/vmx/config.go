@@ -68,7 +68,7 @@ func (c *Config) Apply(config []byte) error {
 	// Parse json
 	if len(config) > 0 {
 		if err := json.Unmarshal(config, c); err != nil {
-			log.Error().Msgf("VMX: Unable to apply the driver config: %v", err)
+			log.WithFunc("vmx", "Apply").Error("Unable to apply the driver config", "err", err)
 			return fmt.Errorf("VMX: Unable to apply the driver config: %v", err)
 		}
 	}
@@ -77,11 +77,12 @@ func (c *Config) Apply(config []byte) error {
 
 // Validate makes sure the config have the required defaults & that the required fields are set
 func (c *Config) Validate() (err error) {
+	logger := log.WithFunc("vmx", "Validate")
 	// Check that values of the config is filled at least with defaults
 	if c.VmrunPath == "" {
 		// Look in the PATH
 		if c.VmrunPath, err = exec.LookPath("vmrun"); err != nil {
-			log.Error().Msgf("VMX: Unable to locate `vmrun` path: %v", err)
+			logger.Error("Unable to locate `vmrun` path", "err", err)
 			return fmt.Errorf("VMX: Unable to locate `vmrun` path: %v", err)
 		}
 	}
@@ -89,7 +90,7 @@ func (c *Config) Validate() (err error) {
 		// Use VmrunPath to get the path
 		c.VdiskmanagerPath = filepath.Join(filepath.Dir(filepath.Dir(c.VmrunPath)), "Library", "vmware-vdiskmanager")
 		if _, err := os.Stat(c.VdiskmanagerPath); os.IsNotExist(err) {
-			log.Error().Msgf("VMX: Unable to locate `vmware-vdiskmanager` path: %v", err)
+			logger.Error("Unable to locate `vmware-vdiskmanager` path", "err", err)
 			return fmt.Errorf("VMX: Unable to locate `vmware-vdiskmanager` path: %v", err)
 		}
 	}
@@ -108,7 +109,7 @@ func (c *Config) Validate() (err error) {
 		return err
 	}
 
-	log.Debug().Msgf("VMX: Creating working directories: %s %s", c.ImagesPath, c.WorkspacePath)
+	logger.Debug("Creating working directories", "images_path", c.ImagesPath, "ws_path", c.WorkspacePath)
 	if err := os.MkdirAll(c.ImagesPath, 0o750); err != nil {
 		return err
 	}
@@ -123,7 +124,7 @@ func (c *Config) Validate() (err error) {
 	}
 
 	if c.CPUAlter < 0 && cpuStat <= int(-c.CPUAlter) {
-		log.Error().Msgf("VMX: |CpuAlter| can't be more or equal the available Host CPUs: |%d| > %d", c.CPUAlter, cpuStat)
+		logger.Error("|CpuAlter| can't be more or equal the available Host CPUs", "cpu_alter", c.CPUAlter, "cpu", cpuStat)
 		return fmt.Errorf("VMX: |CpuAlter| can't be more or equal the available Host CPUs: |%d| > %d", c.CPUAlter, cpuStat)
 	}
 
@@ -134,7 +135,7 @@ func (c *Config) Validate() (err error) {
 	ramStat := memStat.Total / 1073741824 // Getting GB from Bytes
 
 	if c.RAMAlter < 0 && ramStat <= uint64(-c.RAMAlter) {
-		log.Error().Msgf("VMX: |RamAlter| can't be more or equal the available Host RAM: |%d| > %d", c.RAMAlter, ramStat)
+		logger.Error("|RamAlter| can't be more or equal the available Host RAM", "ram_later", c.RAMAlter, "ram", ramStat)
 		return fmt.Errorf("VMX: |RamAlter| can't be more or equal the available Host RAM: |%d| > %d", c.RAMAlter, ramStat)
 	}
 

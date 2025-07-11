@@ -353,10 +353,8 @@ type StreamingServiceSubscribeRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// List of object types to subscribe to
 	SubscriptionTypes []SubscriptionType `protobuf:"varint,1,rep,packed,name=subscription_types,json=subscriptionTypes,proto3,enum=aquarium.v2.SubscriptionType" json:"subscription_types,omitempty"`
-	// Optional filters for subscription (e.g., application_uid, owner_name)
-	Filters       map[string]string `protobuf:"bytes,2,rep,name=filters,proto3" json:"filters,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *StreamingServiceSubscribeRequest) Reset() {
@@ -392,13 +390,6 @@ func (*StreamingServiceSubscribeRequest) Descriptor() ([]byte, []int) {
 func (x *StreamingServiceSubscribeRequest) GetSubscriptionTypes() []SubscriptionType {
 	if x != nil {
 		return x.SubscriptionTypes
-	}
-	return nil
-}
-
-func (x *StreamingServiceSubscribeRequest) GetFilters() map[string]string {
-	if x != nil {
-		return x.Filters
 	}
 	return nil
 }
@@ -541,13 +532,9 @@ const file_aquarium_v2_streaming_proto_rawDesc = "" +
 	"\x06_error\";\n" +
 	"\vStreamError\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\x82\x02\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"p\n" +
 	" StreamingServiceSubscribeRequest\x12L\n" +
-	"\x12subscription_types\x18\x01 \x03(\x0e2\x1d.aquarium.v2.SubscriptionTypeR\x11subscriptionTypes\x12T\n" +
-	"\afilters\x18\x02 \x03(\v2:.aquarium.v2.StreamingServiceSubscribeRequest.FiltersEntryR\afilters\x1a:\n" +
-	"\fFiltersEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x8e\x02\n" +
+	"\x12subscription_types\x18\x01 \x03(\x0e2\x1d.aquarium.v2.SubscriptionTypeR\x11subscriptionTypes\"\x8e\x02\n" +
 	"!StreamingServiceSubscribeResponse\x12>\n" +
 	"\vobject_type\x18\x01 \x01(\x0e2\x1d.aquarium.v2.SubscriptionTypeR\n" +
 	"objectType\x128\n" +
@@ -594,7 +581,7 @@ func file_aquarium_v2_streaming_proto_rawDescGZIP() []byte {
 }
 
 var file_aquarium_v2_streaming_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_aquarium_v2_streaming_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_aquarium_v2_streaming_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_aquarium_v2_streaming_proto_goTypes = []any{
 	(SubscriptionType)(0),                     // 0: aquarium.v2.SubscriptionType
 	(ChangeType)(0),                           // 1: aquarium.v2.ChangeType
@@ -604,29 +591,27 @@ var file_aquarium_v2_streaming_proto_goTypes = []any{
 	(*StreamingServiceSubscribeRequest)(nil),  // 5: aquarium.v2.StreamingServiceSubscribeRequest
 	(*StreamingServiceSubscribeResponse)(nil), // 6: aquarium.v2.StreamingServiceSubscribeResponse
 	(*StreamCreated)(nil),                     // 7: aquarium.v2.StreamCreated
-	nil,                                       // 8: aquarium.v2.StreamingServiceSubscribeRequest.FiltersEntry
-	(*anypb.Any)(nil),                         // 9: google.protobuf.Any
-	(*timestamppb.Timestamp)(nil),             // 10: google.protobuf.Timestamp
+	(*anypb.Any)(nil),                         // 8: google.protobuf.Any
+	(*timestamppb.Timestamp)(nil),             // 9: google.protobuf.Timestamp
 }
 var file_aquarium_v2_streaming_proto_depIdxs = []int32{
-	9,  // 0: aquarium.v2.StreamingServiceConnectRequest.request_data:type_name -> google.protobuf.Any
-	9,  // 1: aquarium.v2.StreamingServiceConnectResponse.response_data:type_name -> google.protobuf.Any
+	8,  // 0: aquarium.v2.StreamingServiceConnectRequest.request_data:type_name -> google.protobuf.Any
+	8,  // 1: aquarium.v2.StreamingServiceConnectResponse.response_data:type_name -> google.protobuf.Any
 	4,  // 2: aquarium.v2.StreamingServiceConnectResponse.error:type_name -> aquarium.v2.StreamError
 	0,  // 3: aquarium.v2.StreamingServiceSubscribeRequest.subscription_types:type_name -> aquarium.v2.SubscriptionType
-	8,  // 4: aquarium.v2.StreamingServiceSubscribeRequest.filters:type_name -> aquarium.v2.StreamingServiceSubscribeRequest.FiltersEntry
-	0,  // 5: aquarium.v2.StreamingServiceSubscribeResponse.object_type:type_name -> aquarium.v2.SubscriptionType
-	1,  // 6: aquarium.v2.StreamingServiceSubscribeResponse.change_type:type_name -> aquarium.v2.ChangeType
-	10, // 7: aquarium.v2.StreamingServiceSubscribeResponse.timestamp:type_name -> google.protobuf.Timestamp
-	9,  // 8: aquarium.v2.StreamingServiceSubscribeResponse.object_data:type_name -> google.protobuf.Any
-	2,  // 9: aquarium.v2.StreamingService.Connect:input_type -> aquarium.v2.StreamingServiceConnectRequest
-	5,  // 10: aquarium.v2.StreamingService.Subscribe:input_type -> aquarium.v2.StreamingServiceSubscribeRequest
-	3,  // 11: aquarium.v2.StreamingService.Connect:output_type -> aquarium.v2.StreamingServiceConnectResponse
-	6,  // 12: aquarium.v2.StreamingService.Subscribe:output_type -> aquarium.v2.StreamingServiceSubscribeResponse
-	11, // [11:13] is the sub-list for method output_type
-	9,  // [9:11] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	0,  // 4: aquarium.v2.StreamingServiceSubscribeResponse.object_type:type_name -> aquarium.v2.SubscriptionType
+	1,  // 5: aquarium.v2.StreamingServiceSubscribeResponse.change_type:type_name -> aquarium.v2.ChangeType
+	9,  // 6: aquarium.v2.StreamingServiceSubscribeResponse.timestamp:type_name -> google.protobuf.Timestamp
+	8,  // 7: aquarium.v2.StreamingServiceSubscribeResponse.object_data:type_name -> google.protobuf.Any
+	2,  // 8: aquarium.v2.StreamingService.Connect:input_type -> aquarium.v2.StreamingServiceConnectRequest
+	5,  // 9: aquarium.v2.StreamingService.Subscribe:input_type -> aquarium.v2.StreamingServiceSubscribeRequest
+	3,  // 10: aquarium.v2.StreamingService.Connect:output_type -> aquarium.v2.StreamingServiceConnectResponse
+	6,  // 11: aquarium.v2.StreamingService.Subscribe:output_type -> aquarium.v2.StreamingServiceSubscribeResponse
+	10, // [10:12] is the sub-list for method output_type
+	8,  // [8:10] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_aquarium_v2_streaming_proto_init() }
@@ -642,7 +627,7 @@ func file_aquarium_v2_streaming_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aquarium_v2_streaming_proto_rawDesc), len(file_aquarium_v2_streaming_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   7,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

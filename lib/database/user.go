@@ -81,12 +81,12 @@ func (d *Database) userAuthImpl(ctx context.Context, name string, password strin
 	// TODO: Make auth process to take constant time in case of failure
 	user, err := d.UserGet(ctx, name)
 	if err != nil {
-		log.Warn().Msgf("Fish: User not exists: %s", name)
+		log.WithFunc("database", "userAuthImpl").WarnContext(ctx, "User does not exists", "name", name)
 		return nil
 	}
 
 	if hash, err := user.GetHash(); err != nil || !hash.IsEqual(password) {
-		log.Warn().Msgf("Fish: Incorrect user password: %s, %v", name, err)
+		log.WithFunc("database", "userAuthImpl").WarnContext(ctx, "Incorrect user password", "name", name, "err", err)
 		return nil
 	}
 
@@ -103,12 +103,12 @@ func (d *Database) userNewImpl(ctx context.Context, name string, password string
 		Name: name,
 	}
 	if err := user.SetHash(crypt.NewHash(password, nil)); err != nil {
-		log.Error().Msgf("Fish: Unable to set hash for new user %q: %v", name, err)
+		log.WithFunc("database", "userNewImpl").ErrorContext(ctx, "Unable to set hash for new user", "name", name, "err", err)
 		return "", nil, fmt.Errorf("Fish: Unable to set hash for new user %q: %v", name, err)
 	}
 
 	if err := d.UserCreate(ctx, user); err != nil {
-		log.Error().Msgf("Fish: Unable to create new user %q: %v", name, err)
+		log.WithFunc("database", "userNewImpl").ErrorContext(ctx, "Unable to create new user", "name", name, "err", err)
 		return "", nil, fmt.Errorf("Fish: Unable to create new user %q: %v", name, err)
 	}
 

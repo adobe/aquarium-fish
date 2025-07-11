@@ -71,7 +71,7 @@ func (c *Config) Apply(config []byte) error {
 	// Parse json
 	if len(config) > 0 {
 		if err := json.Unmarshal(config, c); err != nil {
-			log.Error().Msgf("GITHUB: Unable to apply the gate config: %v", err)
+			log.WithFunc("github", "Apply").Error("Unable to apply the gate config", "err", err)
 			return fmt.Errorf("GITHUB: Unable to apply the gate config: %v", err)
 		}
 	}

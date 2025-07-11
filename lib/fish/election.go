@@ -14,8 +14,8 @@
 
 package fish
 
-import "context"
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -42,7 +42,8 @@ func (f *Fish) maybeRunElectionProcess(appState *typesv2.ApplicationState) {
 	if _, ok := f.activeVotes[appState.ApplicationUid]; ok {
 		return
 	}
-	log.Info().Msgf("Fish: Application with no Vote: %s %s", appState.ApplicationUid, appState.CreatedAt)
+	logger := log.WithFunc("fish", "maybeRunElectionProcess").With("app_uid", appState.ApplicationUid)
+	logger.Info("Application with no Vote", "created_at", appState.CreatedAt)
 
 	// Create new Vote and run background vote process
 	f.activeVotes[appState.ApplicationUid] = f.voteNew(appState.ApplicationUid)
@@ -55,10 +56,11 @@ func (f *Fish) electionProcess(appUID typesv2.ApplicationUID) error {
 	ctx := context.Background()
 	// It's not a waited Fish routine - because doesn't actually hold anything valuable, so
 	// could be terminated at any time with no particular harm to the rest of the system.
+	logger := log.WithFunc("fish", "electionProcess").With("app_uid", appUID)
 
 	myvote := f.activeVotesGet(appUID)
 	if myvote == nil {
-		log.Error().Msgf("Fish: Election %s: Fatal: Unable to get the Vote for Application", appUID)
+		logger.Error("Fatal: Unable to get the Vote for Application")
 		return fmt.Errorf("Fish: Election %s: Fatal: Unable to get the Vote for Application", appUID)
 	}
 	// Make sure the active vote will be removed in case error happens to restart the process next time
@@ -66,14 +68,14 @@ func (f *Fish) electionProcess(appUID typesv2.ApplicationUID) error {
 
 	app, err := f.db.ApplicationGet(ctx, appUID)
 	if err != nil {
-		log.Error().Msgf("Fish: Election %s: Fatal: Unable to get the Application: %v", appUID, err)
+		logger.Error("Fatal: Unable to get the Application", "err", err)
 		return fmt.Errorf("Fish: Election %s: Fatal: Unable to get the Application: %v", appUID, err)
 	}
 
 	// Get label with the definitions
 	label, err := f.db.LabelGet(ctx, app.LabelUid)
 	if err != nil {
-		log.Error().Msgf("Fish: Election %s: Fatal: Unable to get the Label %s: %v", appUID, app.LabelUid, err)
+		logger.Error("Fatal: Unable to get the Label", "label_uid", app.LabelUid, "err", err)
 		return fmt.Errorf("Fish: Election %s: Fatal: Unable to get the Label %s: %v", appUID, app.LabelUid, err)
 	}
 
@@ -91,7 +93,7 @@ func (f *Fish) electionProcess(appUID typesv2.ApplicationUID) error {
 		if activeVote == nil {
 			// Vote was removed by another goroutine, exit
 			f.activeVotesMutex.Unlock()
-			log.Error().Msgf("Fish: Election %s: Active vote was removed during process", appUID)
+			logger.Error("Active vote was removed during process")
 			return fmt.Errorf("Fish: Election %s: Active vote was removed during process", appUID)
 		}
 		activeVote.Round = f.voteCurrentRoundGet(app.CreatedAt)
@@ -106,7 +108,7 @@ func (f *Fish) electionProcess(appUID typesv2.ApplicationUID) error {
 			// If the cleanup is set to very tight limit (< ElectionRoundTime) - the Application
 			// can actually complete it's journey before election process confirms it's state, so
 			// not existing Application can't be elected anymore and we can safely drop here
-			log.Info().Msgf("Fish: Election %s: Application state is missing, dropping the election: %v", appUID, err)
+			logger.Info("Application state is missing, dropping the election", "err", err)
 			f.activeVotesRemove(myvote.Uid)
 			f.storageVotesCleanup()
 			return nil
@@ -122,14 +124,14 @@ func (f *Fish) electionProcess(appUID typesv2.ApplicationUID) error {
 					// Since the node could get into election right in the middle of ELECTED countdown
 					// we syncing the nodes to the same amount of rounds to wait by State created time.
 					electedRoundsToWait = int32(f.cfg.ElectedRoundsToWait) - int32(f.voteCurrentRoundGet(appState.CreatedAt))
-					log.Debug().Msgf("Fish: Election %s: Starting to wait in ELECTED state for %d rounds...", appUID, electedRoundsToWait)
+					logger.Debug("Starting to wait in ELECTED state for rounds", "elected_rounds_to_wait", electedRoundsToWait)
 				} else {
-					log.Debug().Msgf("Fish: Election %s: No luck in recovering from old ELECTED, trying again in round %d...", appUID, electedRoundsToWait)
+					logger.Debug("No luck in recovering from old ELECTED, trying again in round", "elected_rounds_to_wait", electedRoundsToWait)
 				}
 			}
 
 			if electedRoundsToWait > 0 {
-				log.Debug().Msgf("Fish: Election %s: Wait in ELECTED state (left: %d)...", appUID, electedRoundsToWait)
+				logger.Debug("Wait in ELECTED state (left)", "elected_rounds_to_wait", electedRoundsToWait)
 				electedRoundsToWait--
 				time.Sleep(time.Until(roundEndsAt))
 				continue
@@ -139,17 +141,17 @@ func (f *Fish) electionProcess(appUID typesv2.ApplicationUID) error {
 			// for the new executor now to run the Application. We can't change the state,
 			// of the Application (since no primary executor is here), so just continue to
 			// use ELECTED state.
-			log.Warn().Msgf("Fish: Election %s: Elected node did not allocated the Application, reruning election on round %d", appUID, myvote.Round)
+			logger.Warn("Elected node did not allocate the Application, rerunning election", "round", myvote.Round)
 			electedRoundsToWait = -1
 		} else if appState.Status != typesv2.ApplicationState_NEW {
-			log.Debug().Msgf("Fish: Election %s: Completed with status: %s", appUID, appState.Status)
+			logger.Debug("Completed with status", "status", appState.Status)
 			// The Application state went after
 			f.activeVotesRemove(myvote.Uid)
 			f.storageVotesCleanup()
 			return nil
 		}
 
-		log.Info().Msgf("Fish: Election %s: Starting Application election round %d", appUID, myvote.Round)
+		logger.Info("Starting Application election round", "round", myvote.Round)
 
 		// Determine answer for this round, it will try find the first possible definition to serve
 		// Access vote fields with proper synchronization to avoid race conditions
@@ -158,7 +160,7 @@ func (f *Fish) electionProcess(appUID typesv2.ApplicationUID) error {
 		if activeVote == nil {
 			// Vote was removed by another goroutine, exit
 			f.activeVotesMutex.Unlock()
-			log.Error().Msgf("Fish: Election %s: Active vote was removed during process", appUID)
+			logger.Error("Active vote was removed during process")
 			return fmt.Errorf("Fish: Election %s: Active vote was removed during process", appUID)
 		}
 		activeVote.Available = int32(f.isNodeAvailableForDefinitions(label.Definitions))
@@ -167,7 +169,7 @@ func (f *Fish) electionProcess(appUID typesv2.ApplicationUID) error {
 
 		// Create and Sync vote with the other nodes
 		if err := f.voteCreate(myvote); err != nil {
-			log.Error().Msgf("Fish: Election %s: Fatal: Unable to sync vote: %v", appUID, err)
+			logger.Error("Fatal: Unable to sync vote", "err", err)
 			return fmt.Errorf("Fish: Election %s: Fatal: Unable to sync vote: %v", appUID, err)
 		}
 
@@ -176,24 +178,24 @@ func (f *Fish) electionProcess(appUID typesv2.ApplicationUID) error {
 			// Check all the cluster nodes voted
 			nodes, err := f.db.NodeActiveList(ctx)
 			if err != nil {
-				log.Error().Msgf("Fish: Election %s: Fatal: Unable to get the Node list: %v", appUID, err)
+				logger.Error("Fatal: Unable to get the Node list", "err", err)
 				return fmt.Errorf("Fish: Election %s: Fatal: Unable to get the Node list: %v", appUID, err)
 			}
 			votes := f.voteListGetApplicationRound(appUID, myvote.Round)
 			if err != nil {
-				log.Error().Msgf("Fish: Election %s: Fatal: Unable to get the Vote list: %v", appUID, err)
+				logger.Error("Fatal: Unable to get the Vote list", "err", err)
 				return fmt.Errorf("Fish: Election %s: Fatal: Unable to get the Vote list: %v", appUID, err)
 			}
 			if len(votes) < len(nodes) {
-				log.Debug().Msgf("Fish: Election %s: Some nodes didn't vote in round %d (%d < %d), waiting till %v...", appUID, myvote.Round, len(votes), len(nodes), roundEndsAt)
+				logger.Debug("Some nodes didn't vote in round, waiting till round ends", "round", myvote.Round, "votes", len(votes), "nodes", len(nodes), "round_ends_at", roundEndsAt)
 				if len(votes) == 0 {
-					log.Warn().Msgf("Fish: Election %q: Something weird happened (votes len can't be 0), here is additional info:", appUID)
-					log.Warn().Msgf("Fish: Election %q:   Vote UID: %s", appUID, myvote.Uid)
+					logger.Warn("Something weird happened (votes len can't be 0), here is additional info")
+					logger.Warn("Vote UID info", "vote_uid", myvote.Uid)
 					f.activeVotesMutex.Lock()
-					log.Warn().Msgf("Fish: Election %q:   List of active votes: %+v", appUID, f.activeVotes)
+					logger.Warn("List of active votes info", "active_votes", f.activeVotes)
 					f.activeVotesMutex.Unlock()
 					f.storageVotesMutex.Lock()
-					log.Warn().Msgf("Fish: Election %q:   List of storage votes: %+v", appUID, f.storageVotes)
+					logger.Warn("List of storage votes info", "storage_votes", f.storageVotes)
 					f.storageVotesMutex.Unlock()
 
 					// Recovering
@@ -211,9 +213,9 @@ func (f *Fish) electionProcess(appUID typesv2.ApplicationUID) error {
 
 			// Checking the best vote
 			if bestVote.Uid == uuid.Nil {
-				log.Info().Msgf("Fish: Election %s: No candidates in round %d", appUID, myvote.Round)
+				logger.Info("No candidates in round", "round", myvote.Round)
 			} else if bestVote.NodeUid == f.db.GetNodeUID() {
-				log.Info().Msgf("Fish: Election %s: I won the election", appUID)
+				logger.Info("I won the election")
 
 				// Adding the vote to won ones - it should be present before state is passed
 				f.wonVotesAdd(bestVote)
@@ -225,11 +227,11 @@ func (f *Fish) electionProcess(appUID typesv2.ApplicationUID) error {
 					Description:    "Elected node: " + f.db.GetNodeName(),
 				}
 				if err := f.db.ApplicationStateCreate(ctx, &appState); err != nil {
-					log.Error().Msgf("Fish: Election %s: Unable to set Application state: %v", app.Uid, err)
+					logger.Error("Unable to set Application state", "err", err)
 					return fmt.Errorf("Fish: Election %s: Unable to set Application state: %v", app.Uid, err)
 				}
 			} else {
-				log.Info().Msgf("Fish: Election %s: I lost the election to Node %s", appUID, myvote.NodeUid)
+				logger.Info("I lost the election to Node", "node_uid", myvote.NodeUid)
 			}
 
 			// Wait till the next round
@@ -267,7 +269,8 @@ func (*Fish) electionBestVote(votes []typesv2.Vote) (bestVote typesv2.Vote) {
 				if v.Rand < bestVote.Rand {
 					continue
 				} else if v.Rand == bestVote.Rand {
-					log.Warn().Msgf("Fish: Election %s: This round is a lucky one! Rands are equal for nodes %s and %s", v.ApplicationUid, v.NodeUid, bestVote.NodeUid)
+					logger := log.WithFunc("fish", "electionBestVote").With("app_uid", v.ApplicationUid)
+					logger.Warn("This round is a lucky one! Rands are equal for nodes", "node_uid", v.NodeUid, "best_node_uid", bestVote.NodeUid)
 					bestVote.Uid = uuid.Nil
 					break
 				}

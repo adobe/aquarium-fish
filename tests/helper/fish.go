@@ -30,10 +30,6 @@ import (
 	"time"
 
 	"github.com/shirou/gopsutil/v4/process"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/trace"
 )
 
 // detectProjectRoot finds the project root directory by walking up from the current file
@@ -110,65 +106,6 @@ func initFishPath(tb testing.TB) string {
 	return detectedPath
 }
 
-// TestMonitor provides monitoring capabilities for test execution
-type TestMonitor struct {
-	tracer trace.Tracer
-	ctx    context.Context
-	span   trace.Span
-	start  time.Time
-}
-
-// NewTestMonitor creates a new test monitor for the given test
-func NewTestMonitor(tb testing.TB) *TestMonitor {
-	tracer := otel.Tracer("aquarium-fish-tests")
-	ctx, span := tracer.Start(context.Background(), fmt.Sprintf("test.%s", tb.Name()))
-
-	span.SetAttributes(
-		attribute.String("test.name", tb.Name()),
-		attribute.String("test.package", extractPackageName(tb.Name())),
-	)
-
-	return &TestMonitor{
-		tracer: tracer,
-		ctx:    ctx,
-		span:   span,
-		start:  time.Now(),
-	}
-}
-
-// Finish completes the test monitoring
-func (tm *TestMonitor) Finish(tb testing.TB) {
-	if tm.span != nil {
-		duration := time.Since(tm.start)
-		tm.span.SetAttributes(
-			attribute.Int64("test.duration_ms", duration.Milliseconds()),
-			attribute.Bool("test.failed", tb.Failed()),
-		)
-
-		if tb.Failed() {
-			tm.span.SetStatus(codes.Error, "Test failed")
-		} else {
-			tm.span.SetStatus(codes.Ok, "Test passed")
-		}
-
-		tm.span.End()
-	}
-}
-
-// Context returns the test context for tracing
-func (tm *TestMonitor) Context() context.Context {
-	return tm.ctx
-}
-
-// extractPackageName extracts package name from test name
-func extractPackageName(testName string) string {
-	parts := strings.Split(testName, "/")
-	if len(parts) > 0 {
-		return parts[0]
-	}
-	return "unknown"
-}
-
 // AFInstance saves state of the running Aquarium Fish for particular test
 type AFInstance struct {
 	workspace string
@@ -191,9 +128,6 @@ type AFInstance struct {
 
 	// Mutex to protect configuration fields set during initialization
 	configMu sync.RWMutex
-
-	// Test monitoring
-	testMonitor *TestMonitor
 }
 
 // NewAquariumFish simple creates and run the fish node
@@ -210,14 +144,7 @@ func NewAquariumFish(tb testing.TB, name, cfg string, args ...string) *AFInstanc
 func NewStoppedAquariumFish(tb testing.TB, name, cfg string) *AFInstance {
 	tb.Helper()
 
-	// Initialize test monitoring
-	monitor := NewTestMonitor(tb)
-	tb.Cleanup(func() {
-		monitor.Finish(tb)
-	})
-
 	afi := NewAfInstance(tb, name, cfg)
-	afi.testMonitor = monitor
 
 	return afi
 }
@@ -239,22 +166,30 @@ func NewAfInstance(tb testing.TB, name, cfg string) *AFInstance {
 	}
 	tb.Log("INFO: Created workspace:", afi.nodeName, afi.workspace)
 
-	// Add monitoring configuration to the fish config
-	/*monitoringCfg := `
-	# Monitoring configuration for tests
-	monitoring:
-	  enabled: true
-	  otlp_endpoint: "localhost:4317"
-	  pyroscope_url: "http://localhost:4040"
-	  service_name: "aquarium-fish-test"
-	  enable_tracing: true
-	  enable_metrics: true
-	  enable_logs: false
-	  enable_profiling: true
-	  sample_rate: 1.0
-	  metrics_interval: "5s"
-	`
-		cfg += monitoringCfg*/
+	// Enabling monitoring if env variable FISH_MONITORING is set
+	if envAddr, ok := os.LookupEnv("FISH_MONITORING"); ok {
+		if strings.Contains(cfg, "monitoring:") {
+			tb.Log("WARN: Unable to enable monitoring due to config has monitoring already")
+		} else {
+			if envAddr != "" {
+				tb.Logf("Enabling Fish remote OTLP/Pyroscope monitoring: %s", envAddr)
+			} else {
+				tb.Logf("Enabling Fish file-based monitoring")
+			}
+			monitoringCfg := fmt.Sprintf(`
+monitoring:
+  enabled: true
+
+  otlp_endpoint: %s:4317
+  pyroscope_url: http://%s:4040
+
+  sample_rate: 1.0
+  metrics_interval: "5s"
+  profiling_interval: "10s"`, envAddr, envAddr)
+			// Add monitoring configuration to the fish config
+			cfg += monitoringCfg
+		}
+	}
 	cfg += fmt.Sprintf("\nnode_name: %q", afi.nodeName)
 	os.WriteFile(filepath.Join(afi.workspace, "config.yml"), []byte(cfg), 0o600)
 	tb.Log("INFO: Stored config:", cfg)
@@ -506,7 +441,7 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 		return true
 	})
 
-	afi.WaitForLog("API listening on: ", func(substring, line string) bool {
+	afi.WaitForLog(` server.addr=`, func(substring, line string) bool {
 		data := strings.SplitN(strings.TrimSpace(line), substring, 2)
 		addrport, err := netip.ParseAddrPort(data[1])
 		if err != nil {
@@ -520,7 +455,7 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 
 		return true
 	})
-	afi.WaitForLog("Fish initialized", func(substring, line string) bool {
+	afi.WaitForLog(` main.fish_init=completed`, func(substring, line string) bool {
 		if !strings.HasSuffix(line, substring) {
 			return false
 		}

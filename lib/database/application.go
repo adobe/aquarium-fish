@@ -104,7 +104,7 @@ func (d *Database) applicationDeallocateImpl(ctx context.Context, appUID typesv2
 
 	if !d.ApplicationStateIsActive(out.Status) {
 		// Since app can't be deallocated - it's not really an error, treating as precaution
-		log.Warn().Msgf("DB: Unable to deallocate the Application %q with status: %s", appUID, out.Status)
+		log.WithFunc("database", "applicationDeallocateImpl").Warn("Can't deallocate the Application with status", "app_uid", appUID, "status", out.Status)
 		return out, nil
 	}
 

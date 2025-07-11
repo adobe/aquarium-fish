@@ -84,7 +84,7 @@ func (d *Driver) Prepare(wd string, config []byte) (err error) {
 		keyPath = filepath.Join(wd, keyPath)
 	}
 	if d.cfg.BindAddress, err = d.proxyInit(keyPath); err != nil {
-		log.Error().Msgf("PROXYSSH: %s: Unable to init proxyssh gate: %v", d.name, err)
+		log.WithFunc("proxyssh", "Prepare").Error("Unable to init proxyssh gate", "gate.name", d.name, "err", err)
 		return fmt.Errorf("PROXYSSH: %s: Unable to init proxyssh gate: %v", d.name, err)
 	}
 

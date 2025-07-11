@@ -187,7 +187,7 @@ monitoring:
   enable_tracing: true
 
   otlp_endpoint: ""  # You can specify the OTLP GRPC remote here (ex. "localhost:4317")
-  pyroscope_endpoint: ""  # Since OTLP profiling is still experimental (ex. "localhost:4040")
+  pyroscope_endpoint: ""  # Since OTLP profiling is still experimental (ex. "http://localhost:4040")
   file_export_path: ""  # Where to store the telemetry files, will be used if `otlp_endpoint` unset
 
   sample_rate: 1.0  # 0.0-1.0 rate to reduce the amount of traffic
@@ -308,11 +308,17 @@ The integration tests needs aquarium-fish* binary, so prior to execution please 
 
 * To verify that everything works as expected you can run integration tests like that:
    ```sh
-   $ go test -v -failfast -parallel 4 -count 1 ./tests/...
+   $ go test -json -v -parallel 4 -count=1 -skip '_stress$' -race ./tests/... | go run ./tools/go-test-formatter/go-test-formatter.go -stdout_timestamp test -stdout_color -stdout_filter failed
    ```
 * To run just one test of the suite on specific aquarium-fish binary:
    ```sh
    $ FISH_PATH=$PWD/aquarium-fish.darwin_amd64 go test -v -failfast -count 1 -run '^TEST_NAME$' ./tests
+   ```
+* To run the tests with monitoring - you can use `FISH_MONITORING` env variable. Set it to empty
+  value if you want to store telemetry in the workspace as files or specify localhost to connect to
+  the local OTLP/Pyroscope service (in docker container for example):
+   ```sh
+   $ FISH_MONITORING=localhost go test -json -v -parallel 1 -count=1 -skip '_stress$' -race ./tests/...
    ```
 
 ### Benchmarks

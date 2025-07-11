@@ -41,7 +41,7 @@ type Options struct {
 // Apply takes json and applies it to the options structure
 func (o *Options) Apply(options util.UnparsedJSON) error {
 	if err := json.Unmarshal([]byte(options), o); err != nil {
-		log.Error().Msgf("VMX: Unable to apply the driver options: %v", err)
+		log.WithFunc("vmx", "Apply").Error("Unable to apply the driver options", "err", err)
 		return fmt.Errorf("VMX: Unable to apply the driver options: %v", err)
 	}
 
@@ -54,7 +54,7 @@ func (o *Options) Validate() error {
 	var imgErr error
 	for index := range o.Images {
 		if err := o.Images[index].Validate(); err != nil {
-			log.Error().Msgf("VMX: Error during image validation: %v", err)
+			log.WithFunc("vmx", "Validate").Error("Error during image validation", "err", err)
 			imgErr = fmt.Errorf("VMX: Error during image validation: %v", err)
 		}
 	}

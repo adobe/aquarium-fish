@@ -50,13 +50,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/adobe/aquarium-fish/lib/build"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/util"
-)
-
-const (
-	serviceName    = "aquarium-fish"
-	serviceVersion = "1.0.0" // This will be updated with build info
 )
 
 // Config defines monitoring configuration
@@ -70,6 +66,8 @@ type Config struct {
 	OTLPEndpoint   string `json:"otlp_endpoint"`    // OTLP endpoint for traces, metrics, logs
 	PyroscopeURL   string `json:"pyroscope_url"`    // Pyroscope URL for profiling
 	FileExportPath string `json:"file_export_path"` // Path to export telemetry data to files (when no remote endpoints configured)
+
+	LogsLevel string `json:"logs_level"` // Min level of the logs to stream (default: "info")
 
 	SampleRate        float64       `json:"sample_rate"`        // Trace sampling rate (0.0 to 1.0)
 	MetricsInterval   util.Duration `json:"metrics_interval"`   // Metrics collection interval
@@ -96,8 +94,10 @@ func (c *Config) InitDefaults() {
 	c.PyroscopeURL = ""
 	c.FileExportPath = "" // Will be set to fish ws directory + "telemetry" if not configured
 
-	c.ServiceName = serviceName
-	c.ServiceVersion = serviceVersion
+	c.LogsLevel = "info"
+
+	c.ServiceName = "aquarium-fish"
+	c.ServiceVersion = fmt.Sprintf("%s (%s)", build.Version, build.Time)
 	c.SampleRate = 1.0 // 100% sampling for development
 	c.MetricsInterval = util.Duration(15 * time.Second)
 	c.ProfilingInterval = util.Duration(30 * time.Second)
@@ -121,12 +121,13 @@ type Monitor struct {
 
 // Initialize sets up OpenTelemetry monitoring
 func Initialize(ctx context.Context, config *Config) (*Monitor, error) {
+	logger := log.WithFunc("monitoring", "Initialize")
+
 	if !config.Enabled {
-		log.Info().Msg("Monitoring: Disabled")
+		logger.Info("Monitoring: Disabled")
 		return &Monitor{config: config}, nil
 	}
-
-	log.Info().Msg("Monitoring: Initializing OpenTelemetry...")
+	logger.Debug("Initializing with config", "config", config)
 
 	m := &Monitor{
 		config:        config,
@@ -145,49 +146,51 @@ func Initialize(ctx context.Context, config *Config) (*Monitor, error) {
 		return nil, fmt.Errorf("failed to setup file export: %w", err)
 	}
 
-	// Initialize tracing
+	// Initialize tracing if enabled
 	if config.EnableTracing {
 		if err := m.initTracing(ctx, res); err != nil {
 			return nil, fmt.Errorf("failed to initialize tracing: %w", err)
 		}
-		log.Info().Msg("Monitoring: Tracing initialized")
+		logger.Info("Tracing initialized")
 	}
 
-	// Initialize metrics
+	// Initialize metrics if enabled
 	if config.EnableMetrics {
 		if err := m.initMetrics(ctx, res); err != nil {
 			return nil, fmt.Errorf("failed to initialize metrics: %w", err)
 		}
-		log.Info().Msg("Monitoring: Metrics initialized")
+		logger.Info("Metrics initialized")
 	}
 
-	// Initialize logging
+	// Initialize logging integration if enabled
 	if config.EnableLogs {
 		if err := m.initLogging(ctx, res); err != nil {
 			return nil, fmt.Errorf("failed to initialize logging: %w", err)
 		}
-		// Setup OpenTelemetry integration with zerolog
-		log.SetupOtelIntegration("info")
-		log.Info().Msg("Monitoring: Logging initialized")
+
+		// Setup OpenTelemetry integration with slog
+		logger.Info("Setting up logging integration", "level", config.LogsLevel)
+		log.SetupOtelIntegration(config.LogsLevel)
+		logger.Info("Logging integration setup completed")
 	}
 
-	// Initialize profiling
+	// Initialize profiling if enabled
 	if config.EnableProfiling {
 		if err := m.initProfiling(); err != nil {
 			return nil, fmt.Errorf("failed to initialize profiling: %w", err)
 		}
-		log.Info().Msg("Monitoring: Profiling initialized")
+		logger.Info("Profiling initialized")
 	}
 
-	// Initialize metrics collection
+	// Initialize metrics collection if enabled
 	if config.EnableMetrics {
 		if err := m.initMetricsCollection(); err != nil {
 			return nil, fmt.Errorf("failed to initialize metrics collection: %w", err)
 		}
-		log.Info().Msg("Monitoring: Metrics collection initialized")
+		logger.Info("Metrics collection initialized")
 	}
 
-	log.Info().Msg("Monitoring: OpenTelemetry initialization complete")
+	logger.Info("OpenTelemetry initialization complete")
 	return m, nil
 }
 
@@ -202,7 +205,8 @@ func (m *Monitor) createResource() (*resource.Resource, error) {
 		attribute.String("node.uid", m.config.NodeUID),
 		attribute.String("node.location", m.config.NodeLocation),
 	)
-	log.Debug().Msgf("Monitoring: Merging 2 resources: %s and %s", res1, res2)
+	logger := log.WithFunc("monitoring", "createResource")
+	logger.Debug("Merging 2 resources", "res1", &res1, "res2", &res2)
 	return resource.Merge(res1, res2)
 }
 
@@ -226,7 +230,8 @@ func (m *Monitor) setupFileExport() error {
 		}
 	}
 
-	log.Info().Msgf("Monitoring: File export path set to %s", m.config.FileExportPath)
+	logger := log.WithFunc("monitoring", "setupFileExport")
+	logger.Info("File export path set", "path", m.config.FileExportPath)
 	return nil
 }
 
@@ -237,6 +242,7 @@ func (m *Monitor) shouldUseFileExport() bool {
 
 // initTracing initializes OpenTelemetry tracing
 func (m *Monitor) initTracing(ctx context.Context, res *resource.Resource) error {
+	logger := log.WithFunc("monitoring", "initTracing")
 	var traceExporter trace.SpanExporter
 	var err error
 
@@ -247,7 +253,7 @@ func (m *Monitor) initTracing(ctx context.Context, res *resource.Resource) error
 		if err != nil {
 			return fmt.Errorf("failed to create file trace exporter: %w", err)
 		}
-		log.Info().Msgf("Monitoring: Using file trace exporter: %s", tracesFile)
+		logger.Info("Using file trace exporter", "file", tracesFile)
 	} else {
 		// Create OTLP trace exporter
 		conn, err := grpc.NewClient(m.config.OTLPEndpoint,
@@ -260,7 +266,7 @@ func (m *Monitor) initTracing(ctx context.Context, res *resource.Resource) error
 		if err != nil {
 			return fmt.Errorf("failed to create trace exporter: %w", err)
 		}
-		log.Info().Msgf("Monitoring: Using OTLP trace exporter: %s", m.config.OTLPEndpoint)
+		logger.Info("Using OTLP trace exporter", "endpoint", m.config.OTLPEndpoint)
 	}
 
 	// Create trace provider
@@ -286,6 +292,7 @@ func (m *Monitor) initTracing(ctx context.Context, res *resource.Resource) error
 
 // initMetrics initializes OpenTelemetry metrics
 func (m *Monitor) initMetrics(ctx context.Context, res *resource.Resource) error {
+	logger := log.WithFunc("monitoring", "initMetrics")
 	if m.shouldUseFileExport() {
 		// Create Prometheus exporter for local scraping
 		promExporter, err := prometheus.New()
@@ -310,7 +317,7 @@ func (m *Monitor) initMetrics(ctx context.Context, res *resource.Resource) error
 
 		m.shutdownFuncs = append(m.shutdownFuncs, meterProvider.Shutdown)
 
-		log.Info().Msgf("Monitoring: Using file metrics exporter: %s", metricsFile)
+		logger.Info("Using file metrics exporter", "file", metricsFile)
 	} else {
 		// Create OTLP metrics exporter
 		conn, err := grpc.NewClient(m.config.OTLPEndpoint,
@@ -345,7 +352,7 @@ func (m *Monitor) initMetrics(ctx context.Context, res *resource.Resource) error
 
 		m.shutdownFuncs = append(m.shutdownFuncs, meterProvider.Shutdown)
 
-		log.Info().Msgf("Monitoring: Using OTLP metrics exporter: %s", m.config.OTLPEndpoint)
+		logger.Info("Using OTLP metrics exporter", "endpoint", m.config.OTLPEndpoint)
 	}
 
 	return nil
@@ -353,6 +360,7 @@ func (m *Monitor) initMetrics(ctx context.Context, res *resource.Resource) error
 
 // initLogging initializes OpenTelemetry logging
 func (m *Monitor) initLogging(ctx context.Context, res *resource.Resource) error {
+	logger := log.WithFunc("monitoring", "initLogging")
 	if m.shouldUseFileExport() {
 		// Create file-based log exporter
 		logsFile := filepath.Join(m.config.FileExportPath, "logs", "logs.jsonl")
@@ -372,7 +380,7 @@ func (m *Monitor) initLogging(ctx context.Context, res *resource.Resource) error
 
 		m.shutdownFuncs = append(m.shutdownFuncs, loggerProvider.Shutdown)
 
-		log.Info().Msgf("Monitoring: Using file log exporter: %s", logsFile)
+		logger.Info("Using file log exporter", "file", logsFile)
 	} else {
 		// Create OTLP log exporter
 		conn, err := grpc.NewClient(m.config.OTLPEndpoint,
@@ -397,7 +405,7 @@ func (m *Monitor) initLogging(ctx context.Context, res *resource.Resource) error
 
 		m.shutdownFuncs = append(m.shutdownFuncs, loggerProvider.Shutdown)
 
-		log.Info().Msgf("Monitoring: Using OTLP log exporter: %s", m.config.OTLPEndpoint)
+		logger.Info("Using OTLP log exporter", "endpoint", m.config.OTLPEndpoint)
 	}
 
 	return nil
@@ -416,6 +424,7 @@ func (m *Monitor) initProfiling() error {
 
 // initRemoteProfiling initializes Pyroscope profiling with OpenTelemetry integration
 func (m *Monitor) initRemoteProfiling() error {
+	logger := log.WithFunc("monitoring", "initRemoteProfiling")
 	var serverAddress string
 	if m.config.PyroscopeURL != "" {
 		serverAddress = m.config.PyroscopeURL
@@ -432,7 +441,6 @@ func (m *Monitor) initRemoteProfiling() error {
 			"node_uid":      m.config.NodeUID,
 			"node_location": m.config.NodeLocation,
 			"version":       m.config.ServiceVersion,
-			"otel_enabled":  "true",
 		},
 		ProfileTypes: []pyroscope.ProfileType{
 			pyroscope.ProfileCPU,
@@ -456,12 +464,13 @@ func (m *Monitor) initRemoteProfiling() error {
 		return profiler.Stop()
 	})
 
-	log.Info().Msgf("Monitoring: Using remote profiling with OpenTelemetry integration: %s", serverAddress)
+	logger.Info("Using remote profiling with OpenTelemetry integration", "server_address", serverAddress)
 	return nil
 }
 
 // initFileBasedProfiling initializes file-based profiling export
 func (m *Monitor) initFileBasedProfiling() error {
+	logger := log.WithFunc("monitoring", "initFileBasedProfiling")
 	profilingDir := filepath.Join(m.config.FileExportPath, "profiling")
 	if err := os.MkdirAll(profilingDir, 0755); err != nil {
 		return fmt.Errorf("failed to create profiling directory: %w", err)
@@ -470,7 +479,7 @@ func (m *Monitor) initFileBasedProfiling() error {
 	// Start periodic profiling collection to files
 	go m.startPeriodicProfilingExport(profilingDir)
 
-	log.Info().Msgf("Monitoring: Using file-based profiling export: %s", profilingDir)
+	logger.Info("Using file-based profiling", "dir", profilingDir)
 	return nil
 }
 
@@ -491,21 +500,22 @@ func (m *Monitor) startPeriodicProfilingExport(profilingDir string) {
 
 // collectProfilesToFile collects various profiles and writes them to files
 func (m *Monitor) collectProfilesToFile(profilingDir string) {
+	logger := log.WithFunc("monitoring", "collectProfilesToFile")
 	timestamp := time.Now().Format("20060102-150405")
 
 	// CPU profile
 	if err := m.collectCPUProfile(filepath.Join(profilingDir, fmt.Sprintf("cpu-%s.pprof", timestamp))); err != nil {
-		log.Debug().Msgf("Monitoring: Failed to collect CPU profile: %v", err)
+		logger.Error("Failed to collect CPU profile", "err", err)
 	}
 
 	// Memory profile
 	if err := m.collectMemoryProfile(filepath.Join(profilingDir, fmt.Sprintf("heap-%s.pprof", timestamp))); err != nil {
-		log.Debug().Msgf("Monitoring: Failed to collect memory profile: %v", err)
+		logger.Error("Failed to collect memory profile", "err", err)
 	}
 
 	// Goroutine profile
 	if err := m.collectGoroutineProfile(filepath.Join(profilingDir, fmt.Sprintf("goroutine-%s.pprof", timestamp))); err != nil {
-		log.Debug().Msgf("Monitoring: Failed to collect goroutine profile: %v", err)
+		logger.Error("Failed to collect goroutine profile", "err", err)
 	}
 }
 
@@ -594,12 +604,13 @@ func (m *Monitor) RecordMetric(ctx context.Context, name string, value float64, 
 	if m.metrics == nil {
 		return
 	}
-	// This will be implemented by specific metric recorders
+	// TODO: This will be implemented by specific metric recorders
 }
 
 // Shutdown gracefully shuts down the monitoring system
 func (m *Monitor) Shutdown(ctx context.Context) error {
-	log.Info().Msg("Monitoring: Shutting down...")
+	logger := log.WithFunc("monitoring", "Shutdown")
+	logger.Info("Shutting down...")
 
 	// Signal shutdown to background goroutines
 	if m.shutdownCh != nil {
@@ -617,7 +628,7 @@ func (m *Monitor) Shutdown(ctx context.Context) error {
 		return fmt.Errorf("shutdown errors: %v", errs)
 	}
 
-	log.Info().Msg("Monitoring: Shutdown complete")
+	logger.Info("Shutdown complete")
 	return nil
 }
 
@@ -648,7 +659,7 @@ func (f *FileTraceExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 
 	for _, span := range spans {
 		// Convert span to a simple JSON structure
-		spanData := map[string]interface{}{
+		spanData := map[string]any{
 			"trace_id":   span.SpanContext().TraceID().String(),
 			"span_id":    span.SpanContext().SpanID().String(),
 			"parent_id":  span.Parent().SpanID().String(),
@@ -682,8 +693,8 @@ func (f *FileTraceExporter) Shutdown(ctx context.Context) error {
 }
 
 // attributesToMap converts OpenTelemetry attributes to a map
-func attributesToMap(attrs []attribute.KeyValue) map[string]interface{} {
-	result := make(map[string]interface{})
+func attributesToMap(attrs []attribute.KeyValue) map[string]any {
+	result := make(map[string]any)
 	for _, attr := range attrs {
 		result[string(attr.Key)] = attr.Value.AsInterface()
 	}
@@ -691,8 +702,8 @@ func attributesToMap(attrs []attribute.KeyValue) map[string]interface{} {
 }
 
 // resourceToMap converts OpenTelemetry resource to a map
-func resourceToMap(res *resource.Resource) map[string]interface{} {
-	result := make(map[string]interface{})
+func resourceToMap(res *resource.Resource) map[string]any {
+	result := make(map[string]any)
 	for _, attr := range res.Attributes() {
 		result[string(attr.Key)] = attr.Value.AsInterface()
 	}
@@ -715,7 +726,7 @@ func NewFileMetricExporter(filename string) (*FileMetricExporter, error) {
 }
 
 // WriteMetrics writes metrics data to the file
-func (f *FileMetricExporter) WriteMetrics(metricsData map[string]interface{}) error {
+func (f *FileMetricExporter) WriteMetrics(metricsData map[string]any) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -740,12 +751,13 @@ func (f *FileMetricExporter) Shutdown(ctx context.Context) error {
 
 // startPeriodicMetricsFileExport starts a goroutine that periodically exports metrics to a file
 func (m *Monitor) startPeriodicMetricsFileExport(metricsFile string) {
+	logger := log.WithFunc("monitoring", "startPeriodicMetricsFileExport")
 	ticker := time.NewTicker(time.Duration(m.config.MetricsInterval))
 	defer ticker.Stop()
 
 	fileExporter, err := NewFileMetricExporter(metricsFile)
 	if err != nil {
-		log.Error().Msgf("Monitoring: Failed to create metrics file exporter: %v", err)
+		logger.Error("Failed to create metrics file exporter", "err", err)
 		return
 	}
 	defer fileExporter.Shutdown(context.Background())
@@ -757,7 +769,7 @@ func (m *Monitor) startPeriodicMetricsFileExport(metricsFile string) {
 			if m.promExporter != nil {
 				metricsData := m.collectPrometheusMetrics()
 				if err := fileExporter.WriteMetrics(metricsData); err != nil {
-					log.Debug().Msgf("Monitoring: Failed to write metrics to file: %v", err)
+					logger.Debug("Failed to write metrics to file", "err", err)
 				}
 			}
 		case <-m.shutdownCh:
@@ -767,15 +779,15 @@ func (m *Monitor) startPeriodicMetricsFileExport(metricsFile string) {
 }
 
 // collectPrometheusMetrics collects metrics from the Prometheus registry
-func (m *Monitor) collectPrometheusMetrics() map[string]interface{} {
-	metricsData := map[string]interface{}{
+func (m *Monitor) collectPrometheusMetrics() map[string]any {
+	metricsData := map[string]any{
 		"timestamp": time.Now().Format(time.RFC3339),
 		"source":    "prometheus",
-		"service": map[string]interface{}{
+		"service": map[string]any{
 			"name":    m.config.ServiceName,
 			"version": m.config.ServiceVersion,
 		},
-		"node": map[string]interface{}{
+		"node": map[string]any{
 			"name":     m.config.NodeName,
 			"uid":      m.config.NodeUID,
 			"location": m.config.NodeLocation,
@@ -800,8 +812,8 @@ func (m *Monitor) collectPrometheusMetrics() map[string]interface{} {
 }
 
 // collectCurrentSystemMetrics collects current system metrics
-func (m *Monitor) collectCurrentSystemMetrics(ctx context.Context) map[string]interface{} {
-	systemMetrics := make(map[string]interface{})
+func (m *Monitor) collectCurrentSystemMetrics(ctx context.Context) map[string]any {
+	systemMetrics := make(map[string]any)
 
 	// CPU metrics
 	if cpuPercent, err := cpu.Percent(0, false); err == nil && len(cpuPercent) > 0 {
@@ -836,11 +848,11 @@ func (m *Monitor) collectCurrentSystemMetrics(ctx context.Context) map[string]in
 }
 
 // collectCurrentRuntimeMetrics collects current Go runtime metrics
-func (m *Monitor) collectCurrentRuntimeMetrics() map[string]interface{} {
+func (m *Monitor) collectCurrentRuntimeMetrics() map[string]any {
 	var stats runtime.MemStats
 	runtime.ReadMemStats(&stats)
 
-	return map[string]interface{}{
+	return map[string]any{
 		"goroutines_count":    runtime.NumGoroutine(),
 		"gc_cycles":           stats.NumGC,
 		"heap_alloc_bytes":    stats.HeapAlloc,
@@ -879,7 +891,7 @@ func (f *FileLogExporter) Export(ctx context.Context, records []otellog.Record) 
 
 	for _, record := range records {
 		// Convert log to a simple JSON structure
-		logData := map[string]interface{}{
+		logData := map[string]any{
 			"timestamp": record.Timestamp(),
 			"severity":  record.Severity().String(),
 			"body":      record.Body().AsString(),

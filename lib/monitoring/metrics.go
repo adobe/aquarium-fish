@@ -33,7 +33,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 
-	fishlog "github.com/adobe/aquarium-fish/lib/log"
+	"github.com/adobe/aquarium-fish/lib/log"
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
@@ -572,7 +572,7 @@ func (m *Metrics) RecordElectionRound(ctx context.Context, outcome string) {
 func (m *Metrics) UpdateCertificateExpiry(ctx context.Context, certType, certPath string) {
 	expiry, err := m.getCertificateExpiry(certPath)
 	if err != nil {
-		fishlog.Debug().Msgf("Monitoring: Failed to get certificate expiry for %s: %v", certPath, err)
+		log.WithFunc("monitoring", "UpdateCertificateExpiry").Debug("Failed to get certificate expiry", "cert_path", certPath, "err", err)
 		return
 	}
 
@@ -727,7 +727,7 @@ func (m *Metrics) UpdateCertificateDirectory(ctx context.Context, certDir string
 	})
 
 	if err != nil {
-		fishlog.Debug().Msgf("Monitoring: Failed to scan certificate directory %s: %v", certDir, err)
+		log.WithFunc("monitoring", "UpdateCertificateDirectory").Debug("Failed to scan certificate directory", "dir", certDir, "err", err)
 	}
 }
 

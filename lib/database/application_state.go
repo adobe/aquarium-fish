@@ -83,7 +83,7 @@ func (d *Database) applicationStateCreateImpl(ctx context.Context, as *typesv2.A
 				// Successfully sent notification
 			default:
 				// Channel is closed or full, skip this subscriber
-				log.Debug().Msgf("Database: Failed to send ApplicationState notification, channel closed or full")
+				log.WithFunc("database", "applicationStateCreateImpl").Debug("Failed to send ApplicationState notification, channel closed or full")
 			}
 		}
 	}(as)
@@ -134,7 +134,7 @@ func (d *Database) applicationStateListByApplicationImpl(ctx context.Context, ap
 func (d *Database) applicationStateNewCountImpl(ctx context.Context, appUID typesv2.ApplicationUID) (count uint) {
 	all, err := d.ApplicationStateList(ctx)
 	if err != nil {
-		log.Error().Msgf("Unable to get ApplicationState list: %v", err)
+		log.WithFunc("database", "applicationStateNewCountImpl").Error("Unable to get ApplicationState list", "err", err)
 		return count
 	}
 	for _, as := range all {

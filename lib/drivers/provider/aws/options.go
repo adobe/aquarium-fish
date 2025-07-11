@@ -51,7 +51,7 @@ type Options struct {
 // Apply takes json and applies it to the options structure
 func (o *Options) Apply(options util.UnparsedJSON) error {
 	if err := json.Unmarshal([]byte(options), o); err != nil {
-		log.Error().Msgf("AWS: Unable to apply the driver options: %v", err)
+		log.WithFunc("aws", "Apply").Error("Unable to apply the driver options", "err", err)
 		return fmt.Errorf("AWS: Unable to apply the driver options: %v", err)
 	}
 

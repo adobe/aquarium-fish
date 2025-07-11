@@ -58,7 +58,7 @@ drivers:
     test:`)
 
 	var proxysshEndpoint string
-	afi.WaitForLog("PROXYSSH listening on: ", func(substring, line string) bool {
+	afi.WaitForLog(" proxyssh.addr=", func(substring, line string) bool {
 		data := strings.SplitN(strings.TrimSpace(line), substring, 2)
 		addrport, err := netip.ParseAddrPort(data[1])
 		if err != nil {
@@ -302,7 +302,7 @@ drivers:
     test:`)
 
 	var proxysshEndpoint string
-	afi.WaitForLog("PROXYSSH listening on: ", func(substring, line string) bool {
+	afi.WaitForLog(" proxyssh.addr=", func(substring, line string) bool {
 		data := strings.SplitN(strings.TrimSpace(line), substring, 2)
 		addrport, err := netip.ParseAddrPort(data[1])
 		if err != nil {
@@ -649,7 +649,7 @@ drivers:
     test:`)
 
 	var proxysshEndpoint string
-	afi.WaitForLog("PROXYSSH listening on: ", func(substring, line string) bool {
+	afi.WaitForLog(" proxyssh.addr=", func(substring, line string) bool {
 		data := strings.SplitN(strings.TrimSpace(line), substring, 2)
 		addrport, err := netip.ParseAddrPort(data[1])
 		if err != nil {
@@ -987,7 +987,7 @@ drivers:
     test:`)
 
 	var proxysshEndpoint string
-	afi.WaitForLog("PROXYSSH listening on: ", func(substring, line string) bool {
+	afi.WaitForLog(" proxyssh.addr=", func(substring, line string) bool {
 		data := strings.SplitN(strings.TrimSpace(line), substring, 2)
 		addrport, err := netip.ParseAddrPort(data[1])
 		if err != nil {

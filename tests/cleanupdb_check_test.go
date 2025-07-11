@@ -176,32 +176,35 @@ drivers:
 	t.Run("Application should be cleaned from DB and compacted", func(t *testing.T) {
 		// Wait for the next 3 cleanupdb completed which should cleanup the deallocated application
 		cleaned := make(chan any)
-		for range 3 {
-			afi.WaitForLog("Fish: CleanupDB completed", func(substring, line string) bool {
-				cleaned <- nil
-				return true
-			})
+		afi.WaitForLog(` fish.cleanupdb=completed`, func(substring, line string) bool {
+			t.Logf("Found cleanup: %q", substring)
+			cleaned <- struct{}{}
+			return false
+		})
+		for range 4 {
 			<-cleaned
 		}
+		afi.WaitForLogDelete(` fish.cleanupdb=completed`)
 
 		compacted := make(chan error)
-		afi.WaitForLog("DB: CompactDB: After compaction: ", func(substring, line string) bool {
+		afi.WaitForLog(" database.compactdb=after", func(substring, line string) bool {
+			t.Logf("Found compact db result: %s", line)
 			// Check the Keys get back to normal
-			spl := strings.Split(line, ", ")
+			spl := strings.Split(line, " ")
 			for _, val := range spl {
-				if !strings.Contains(val, "Keys: ") {
+				if !strings.HasPrefix(val, "database.keys=") {
 					continue
 				}
-				spl = strings.Split(val, ": ")
+				spl = strings.Split(val, "=")
 				// Database should have just 6 keys left: user/admin, label/UID and node/node-1,
 				// role/Administrator, role/User, role/Power
 				if spl[1] != "6" {
 					t.Errorf("Wrong amount of keys left in the database: %s != 6", spl[1])
-					break
 				}
+				break
 			}
-			if spl[0] != "Keys" {
-				t.Errorf("Unable to locate database compaction result for Keys: %s", spl[0])
+			if spl[0] != "database.keys" {
+				t.Errorf("Unable to locate database compaction result for database.keys: %s", spl[0])
 			}
 			compacted <- nil
 			return true
