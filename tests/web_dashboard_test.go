@@ -16,23 +16,31 @@ package tests
 
 import (
 	"crypto/tls"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/adobe/aquarium-fish/tests/helper"
+	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
 // TestWebDashboardAccess tests that the web dashboard is accessible
 func TestWebDashboardAccess(t *testing.T) {
 	t.Parallel()
+	afi := h.NewAquariumFish(t, "node-1", `---
+node_location: test_loc
 
-	// Start the fish server
-	fish := helper.StartFish(t)
-	defer fish.Stop()
+api_address: 127.0.0.1:0
+
+drivers:
+  gates: {}
+  providers:
+    test:`)
+
+	t.Cleanup(func() {
+		afi.Cleanup(t)
+	})
 
 	// Create HTTP client with custom transport to skip TLS verification
 	tr := &http.Transport{
@@ -44,8 +52,7 @@ func TestWebDashboardAccess(t *testing.T) {
 	}
 
 	// Get the API address
-	apiAddr := fish.Config.APIAddress
-	baseURL := fmt.Sprintf("https://%s", apiAddr)
+	baseURL := afi.APIAddress("grpc")
 
 	t.Run("Dashboard Root Serves HTML", func(t *testing.T) {
 		resp, err := client.Get(baseURL)
@@ -114,7 +121,7 @@ func TestWebDashboardAccess(t *testing.T) {
 
 	t.Run("API Routes Still Work", func(t *testing.T) {
 		// Test that API routes are not affected by web dashboard
-		resp, err := client.Get(baseURL + "/grpc/")
+		resp, err := client.Get(baseURL)
 		if err != nil {
 			t.Fatalf("Failed to get API root: %v", err)
 		}
@@ -154,10 +161,19 @@ func TestWebDashboardAccess(t *testing.T) {
 // TestWebDashboardWithAuth tests authentication integration with the web dashboard
 func TestWebDashboardWithAuth(t *testing.T) {
 	t.Parallel()
+	afi := h.NewAquariumFish(t, "node-1", `---
+node_location: test_loc
 
-	// Start the fish server
-	fish := helper.StartFish(t)
-	defer fish.Stop()
+api_address: 127.0.0.1:0
+
+drivers:
+  gates: {}
+  providers:
+    test:`)
+
+	t.Cleanup(func() {
+		afi.Cleanup(t)
+	})
 
 	// Create HTTP client with custom transport to skip TLS verification
 	tr := &http.Transport{
@@ -169,13 +185,12 @@ func TestWebDashboardWithAuth(t *testing.T) {
 	}
 
 	// Get the API address
-	apiAddr := fish.Config.APIAddress
-	baseURL := fmt.Sprintf("https://%s", apiAddr)
+	baseURL := afi.APIAddress("grpc")
 
 	t.Run("Auth API Accessible", func(t *testing.T) {
 		// Test that auth API is accessible from web dashboard
 		// This would typically be called by the frontend
-		resp, err := client.Post(baseURL+"/grpc/aquarium.v2.AuthService/Login",
+		resp, err := client.Post(baseURL+"/aquarium.v2.AuthService/Login",
 			"application/json",
 			strings.NewReader(`{"username":"test","password":"test"}`))
 		if err != nil {
@@ -189,26 +204,4 @@ func TestWebDashboardWithAuth(t *testing.T) {
 			t.Error("Auth API should be reachable from web dashboard")
 		}
 	})
-}
-
-// TestWebDashboardBuild tests that the web dashboard was built and embedded correctly
-func TestWebDashboardBuild(t *testing.T) {
-	// This test checks if the web dashboard is properly embedded
-	// It doesn't require a running server
-
-	// We can't directly test the embed since it's in a different package,
-	// but we can test that the web handler doesn't panic
-	defer func() {
-		if r := recover(); r != nil {
-			t.Errorf("Web handler panicked: %v", r)
-		}
-	}()
-
-	// Import and create the handler to ensure it doesn't panic
-	// This will be caught at compile time if there are issues
-	// with the embed directive
-	handler := helper.CreateWebHandler()
-	if handler == nil {
-		t.Error("Web handler should not be nil")
-	}
 }

@@ -54,6 +54,9 @@ if [ -d "web" ]; then
     cd web
     ./build.sh
     cd ..
+
+    rm -rf lib/web/dist
+    cp -a web/build/client lib/web/dist
     echo "Web dashboard build completed"
 else
     echo "Web directory not found, skipping web build"

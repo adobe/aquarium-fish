@@ -132,4 +132,4 @@ message AuthServiceValidateTokenResponse {
   string message = 2;
   // User session information if token is valid
   optional UserSession session = 3;
-} 
+}

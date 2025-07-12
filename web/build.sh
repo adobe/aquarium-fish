@@ -22,21 +22,21 @@ echo "=== Building Web Dashboard ==="
 # Check if we should only generate protobuf code
 if [ "$1" = "gen-only" ]; then
     echo "Generating protobuf code only..."
-    
+
     # Generate protobuf code using Docker
     docker run --rm \
         -v "${SCRIPT_DIR}:/workspace:rw" \
         -v "${SCRIPT_DIR}/../proto:/workspace/proto:ro" \
         -w /workspace \
-        node:18-alpine \
+        node:24-alpine \
         sh -c "
             # Install buf & generator plugin
             npm install -g @bufbuild/buf @bufbuild/protoc-gen-es
-            
+
             # Generate protobuf code for web
             buf generate proto/
         "
-    
+
     echo "Protobuf code generation completed"
     exit 0
 fi
@@ -52,24 +52,24 @@ docker run --rm \
     -v "${SCRIPT_DIR}:/workspace:rw" \
     -v "${SCRIPT_DIR}/../proto:/workspace/proto:ro" \
     -w /workspace \
-    node:18-alpine \
+    node:24-alpine \
     sh -c "
         set -e
-        
+
         echo 'Installing dependencies...'
         npm install
-        
+
         echo 'Generating protobuf code...'
         # Install protobuf tools
         npm install -g @bufbuild/buf @bufbuild/protoc-gen-es
-        
+
         # Generate protobuf code
         buf generate proto/
-        
+
         echo 'Building application...'
         npm run build
-        
+
         echo 'Build completed successfully'
     "
 
-echo "=== Web Dashboard Build Completed ===" 
+echo "=== Web Dashboard Build Completed ==="
