@@ -1,6 +1,6 @@
-import { createPromiseClient } from '@connectrpc/connect'
+import { createClient } from '@connectrpc/connect'
 import { createConnectTransport } from '@connectrpc/connect-web'
-import { AuthService as AuthServiceClient } from '../../gen/aquarium/v2/auth_connect'
+import { AuthService as AuthServiceClient } from '../../gen/aquarium/v2/auth_pb'
 import type { User, UserPermission } from '../contexts/AuthContext'
 
 // Create transport for ConnectRPC
@@ -19,7 +19,7 @@ const transport = createConnectTransport({
 })
 
 // Create client
-const client = createPromiseClient(AuthServiceClient, transport)
+const client = createClient(AuthServiceClient, transport)
 
 export interface LoginResult {
   success: boolean
