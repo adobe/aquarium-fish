@@ -1,0 +1,135 @@
+// Copyright 2025 Adobe. All rights reserved.
+// This file is licensed to you under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may obtain a copy
+// of the License at http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software distributed under
+// the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR REPRESENTATIONS
+// OF ANY KIND, either express or implied. See the License for the specific language
+// governing permissions and limitations under the License.
+
+// Author: Sergei Parshev (@sparshev)
+
+syntax = "proto3";
+
+package aquarium.v2;
+
+import "google/protobuf/timestamp.proto";
+import "aquarium/v2/rbac.proto";
+
+option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2";
+
+// AuthService handles authentication and authorization operations
+service AuthService {
+  // Login authenticates a user and returns a JWT token
+  rpc Login(AuthServiceLoginRequest) returns (AuthServiceLoginResponse) {
+    option (access_control) = {
+      no_permission_needed: true,
+    };
+  }
+
+  // RefreshToken refreshes an existing JWT token
+  rpc RefreshToken(AuthServiceRefreshTokenRequest) returns (AuthServiceRefreshTokenResponse) {
+    option (access_control) = {
+      no_permission_needed: true,
+    };
+  }
+
+  // GetPermissions returns the current user's permissions
+  rpc GetPermissions(AuthServiceGetPermissionsRequest) returns (AuthServiceGetPermissionsResponse) {
+    option (access_control) = {
+      no_permission_needed: true,
+    };
+  }
+
+  // ValidateToken validates a JWT token
+  rpc ValidateToken(AuthServiceValidateTokenRequest) returns (AuthServiceValidateTokenResponse) {
+    option (access_control) = {
+      no_permission_needed: true,
+    };
+  }
+}
+
+// JWT token response containing the token and metadata
+message JWTToken {
+  // The JWT token string
+  string token = 1;
+  // Token expiration time
+  google.protobuf.Timestamp expires_at = 2;
+  // Refresh token for getting new access tokens
+  string refresh_token = 3;
+  // Refresh token expiration time
+  google.protobuf.Timestamp refresh_expires_at = 4;
+}
+
+// User permission information
+message UserPermission {
+  // Resource or service name
+  string resource = 1;
+  // Action allowed on the resource
+  string action = 2;
+  // Human-readable description of the permission
+  string description = 3;
+}
+
+// Complete user session information
+message UserSession {
+  // User name
+  string user_name = 1;
+  // User roles
+  repeated string roles = 2;
+  // User permissions derived from roles
+  repeated UserPermission permissions = 3;
+  // Session metadata
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp last_used = 5;
+}
+
+message AuthServiceLoginRequest {
+  // Username for authentication
+  string username = 1;
+  // Password for authentication
+  string password = 2;
+}
+
+message AuthServiceLoginResponse {
+  bool status = 1;
+  string message = 2;
+  // JWT token information if login successful
+  optional JWTToken token = 3;
+  // User session information if login successful
+  optional UserSession session = 4;
+}
+
+message AuthServiceRefreshTokenRequest {
+  // Refresh token to use for getting new access token
+  string refresh_token = 1;
+}
+
+message AuthServiceRefreshTokenResponse {
+  bool status = 1;
+  string message = 2;
+  // New JWT token if refresh successful
+  optional JWTToken token = 3;
+}
+
+message AuthServiceGetPermissionsRequest {}
+
+message AuthServiceGetPermissionsResponse {
+  bool status = 1;
+  string message = 2;
+  // User session information including permissions
+  optional UserSession session = 3;
+}
+
+message AuthServiceValidateTokenRequest {
+  // JWT token to validate
+  string token = 1;
+}
+
+message AuthServiceValidateTokenResponse {
+  bool status = 1;
+  string message = 2;
+  // User session information if token is valid
+  optional UserSession session = 3;
+} 

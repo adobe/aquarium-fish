@@ -46,6 +46,19 @@ fi
 # Run code generation
 go generate -v .
 
+echo
+echo "--- BUILD WEB DASHBOARD ---"
+# Build the web dashboard
+if [ -d "web" ]; then
+    echo "Building web dashboard..."
+    cd web
+    ./build.sh
+    cd ..
+    echo "Web dashboard build completed"
+else
+    echo "Web directory not found, skipping web build"
+fi
+
 # If ONLYGEN is specified - skip the build
 [ -z "$ONLYGEN" ] || exit 0
 

@@ -91,6 +91,11 @@ func NewServer(f *fish.Fish, additionalServices []gate.RPCService) *Server {
 		interceptorOpts...,
 	))
 
+	s.mux.Handle(aquariumv2connect.NewAuthServiceHandler(
+		NewAuthService(f),
+		interceptorOpts...,
+	))
+
 	// Create and store streaming service
 	streamingService := NewStreamingService(f)
 	s.streamingService = streamingService

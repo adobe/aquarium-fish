@@ -18,6 +18,7 @@ require (
 	github.com/creack/pty v1.1.24
 	github.com/ghodss/yaml v1.0.0
 	github.com/gliderlabs/ssh v0.3.7
+	github.com/golang-jwt/jwt/v4 v4.5.1
 	github.com/google/go-github/v71 v71.0.0
 	github.com/google/uuid v1.6.0
 	github.com/grafana/otel-profiling-go v0.5.1
@@ -70,7 +71,6 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/gofrs/flock v0.8.1 // indirect
-	github.com/golang-jwt/jwt/v4 v4.5.1 // indirect
 	github.com/google/go-github/v69 v69.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/grafana/pyroscope-go/godeltaprof v0.1.8 // indirect

@@ -36,6 +36,13 @@ const (
 	ApplicationServiceListTask       = "ListTask"
 	ApplicationServiceListTaskAll    = "ListTaskAll"
 
+	// AuthService service constants
+	AuthService               = "AuthService"
+	AuthServiceGetPermissions = "GetPermissions"
+	AuthServiceLogin          = "Login"
+	AuthServiceRefreshToken   = "RefreshToken"
+	AuthServiceValidateToken  = "ValidateToken"
+
 	// GateProxySSHService service constants
 	GateProxySSHService                     = "GateProxySSHService"
 	GateProxySSHServiceGetResourceAccess    = "GetResourceAccess"
@@ -82,6 +89,13 @@ const (
 
 // RBAC-excluded services and methods
 var rbacExcluded = map[string][]string{
+	"AuthService": {
+		"GetPermissions",
+		"Login",
+		"RefreshToken",
+		"ValidateToken",
+	},
+
 	"UserService": {
 		"GetMe",
 	},

@@ -21,9 +21,12 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"github.com/adobe/aquarium-fish/lib/web"
 )
 
 // CreateRandomFiles will take directory and put there as much random files as you want
@@ -123,4 +126,9 @@ func fileHash(file string) ([]byte, error) {
 		return nil, err
 	}
 	return hash.Sum(nil), nil
+}
+
+// CreateWebHandler creates a web handler for testing
+func CreateWebHandler() http.Handler {
+	return web.Handler()
 }

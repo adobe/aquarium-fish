@@ -33,6 +33,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/rpc"
 	"github.com/adobe/aquarium-fish/lib/server/meta"
+	"github.com/adobe/aquarium-fish/lib/web"
 )
 
 // Wrapper wraps both HTTP and RPC servers for coordinated shutdown
@@ -82,6 +83,10 @@ func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*Wrapper,
 
 	// Handle metadata requests on /meta/v1/data
 	mux.Handle("/meta/", http.StripPrefix("/meta", metaServer))
+
+	// Handle web dashboard at root
+	webHandler := web.Handler()
+	mux.Handle("/", webHandler)
 
 	// Handle pprof debug endpoints if compiled as debug
 	serverConnectPprofIfDebug(mux)

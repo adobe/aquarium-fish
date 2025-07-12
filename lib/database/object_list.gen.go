@@ -25,6 +25,7 @@ const (
 	ObjectDiskUsage              = "DiskUsage"
 	ObjectGateProxySSHAccess     = "GateProxySSHAccess"
 	ObjectHostInfo               = "HostInfo"
+	ObjectJWTToken               = "JWTToken"
 	ObjectLabel                  = "Label"
 	ObjectLabelDefinition        = "LabelDefinition"
 	ObjectMemoryInfo             = "MemoryInfo"
@@ -40,5 +41,7 @@ const (
 	ObjectStreamError            = "StreamError"
 	ObjectSubscribeConfig        = "SubscribeConfig"
 	ObjectUser                   = "User"
+	ObjectUserPermission         = "UserPermission"
+	ObjectUserSession            = "UserSession"
 	ObjectVote                   = "Vote"
 )
