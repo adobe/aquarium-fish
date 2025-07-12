@@ -2,11 +2,6 @@ version: v2
 plugins:
   - local: protoc-gen-es
     out: gen
+    include_imports: true
     opt:
       - target=ts
-      - import_extension=none
-  - local: protoc-gen-connect-es
-    out: gen
-    opt:
-      - target=ts
-      - import_extension=none 

@@ -30,8 +30,8 @@ if [ "$1" = "gen-only" ]; then
         -w /workspace \
         node:18-alpine \
         sh -c "
-            # Install required packages
-            npm install -g @bufbuild/buf @bufbuild/protoc-gen-es @bufbuild/protobuf @connectrpc/connect @connectrpc/protoc-gen-connect-es
+            # Install buf & generator plugin
+            npm install -g @bufbuild/buf @bufbuild/protoc-gen-es
             
             # Generate protobuf code for web
             buf generate proto/
@@ -61,7 +61,7 @@ docker run --rm \
         
         echo 'Generating protobuf code...'
         # Install protobuf tools
-        npm install -g @bufbuild/buf @bufbuild/protoc-gen-es @bufbuild/protobuf @connectrpc/connect @connectrpc/protoc-gen-connect-es
+        npm install -g @bufbuild/buf @bufbuild/protoc-gen-es
         
         # Generate protobuf code
         buf generate proto/
