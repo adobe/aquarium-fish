@@ -14,8 +14,8 @@
 
 package fish
 
-import "context"
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -150,7 +150,7 @@ func (f *Fish) maybeRunApplicationTask(appUID typesv2.ApplicationUID, appTask *t
 		defer logger.Info("executeApplicationTasks stopped")
 
 		// Execute the existing ApplicationTasks on the change
-		f.executeApplicationTasks(driver, &labelDef, res, appState.Status)
+		f.executeApplicationTasks(ctx, driver, &labelDef, res, appState.Status)
 	}()
 
 	return nil
@@ -272,7 +272,7 @@ func (f *Fish) executeApplicationStart(appUID typesv2.ApplicationUID, defIndex i
 				appState = &typesv2.ApplicationState{ApplicationUid: app.Uid, Status: typesv2.ApplicationState_ERROR,
 					Description: fmt.Sprint("Unable to merge metadata:", err),
 				}
-				f.db.ApplicationStateCreate(context.Background(), appState)
+				f.db.ApplicationStateCreate(ctx, appState)
 			}
 			res = &typesv2.ApplicationResource{
 				ApplicationUid: app.Uid,
@@ -458,7 +458,7 @@ func (f *Fish) executeApplicationStop(appUID typesv2.ApplicationUID) error {
 
 		// Execute the existing ApplicationTasks. It will be executed prior to executing
 		// deallocation by DEALLOCATE which is useful for `snapshot` and `image` tasks.
-		f.executeApplicationTasks(driver, &labelDef, res, appState.Status)
+		f.executeApplicationTasks(ctx, driver, &labelDef, res, appState.Status)
 
 		// Locking the application transition state
 		lock.Lock()
@@ -515,7 +515,7 @@ func (f *Fish) executeApplicationStop(appUID typesv2.ApplicationUID) error {
 // execute them if the State of the Application fits
 // The important thing here - that the task exec have to be blocking for the Application processes
 // that are running - means no other task or deallocation could happen during task execution.
-func (f *Fish) executeApplicationTasks(drv provider.Driver, def *typesv2.LabelDefinition, res *typesv2.ApplicationResource, appStatus typesv2.ApplicationState_Status) error {
+func (f *Fish) executeApplicationTasks(ctx context.Context, drv provider.Driver, def *typesv2.LabelDefinition, res *typesv2.ApplicationResource, appStatus typesv2.ApplicationState_Status) error {
 	// Locking specific Application to prevent any other actions to be performed on it
 	f.applicationsMutex.Lock()
 	lock, ok := f.applications[res.ApplicationUid]
@@ -533,7 +533,7 @@ func (f *Fish) executeApplicationTasks(drv provider.Driver, def *typesv2.LabelDe
 	defer lock.Unlock()
 
 	// Execute the associated ApplicationTasks if there is some
-	tasks, err := f.db.ApplicationTaskListByApplicationAndWhen(context.Background(), res.ApplicationUid, appStatus)
+	tasks, err := f.db.ApplicationTaskListByApplicationAndWhen(ctx, res.ApplicationUid, appStatus)
 	if err != nil {
 		logger.Error("Unable to get ApplicationTasks", "err", err)
 		return fmt.Errorf("Fish: Application %s: Task: Unable to get ApplicationTasks: %v", res.ApplicationUid, err)
@@ -560,7 +560,7 @@ func (f *Fish) executeApplicationTasks(drv provider.Driver, def *typesv2.LabelDe
 			task.Result = util.UnparsedJSON(result)
 			tasklogger.Debug("Executing task completed")
 		}
-		if err := f.db.ApplicationTaskSave(context.Background(), &task); err != nil {
+		if err := f.db.ApplicationTaskSave(ctx, &task); err != nil {
 			tasklogger.Error("Error during update the task with result", "err", err)
 		}
 	}

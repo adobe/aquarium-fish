@@ -23,7 +23,7 @@ import (
 )
 
 // roleListImpl returns a list of all roles
-func (d *Database) roleListImpl(ctx context.Context) (rs []typesv2.Role, err error) {
+func (d *Database) roleListImpl(_ context.Context) (rs []typesv2.Role, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -32,7 +32,7 @@ func (d *Database) roleListImpl(ctx context.Context) (rs []typesv2.Role, err err
 }
 
 // roleGetImpl returns a role by name
-func (d *Database) roleGetImpl(ctx context.Context, name string) (r *typesv2.Role, err error) {
+func (d *Database) roleGetImpl(_ context.Context, name string) (r *typesv2.Role, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -41,7 +41,7 @@ func (d *Database) roleGetImpl(ctx context.Context, name string) (r *typesv2.Rol
 }
 
 // roleCreateImpl makes a new role
-func (d *Database) roleCreateImpl(ctx context.Context, r *typesv2.Role) error {
+func (d *Database) roleCreateImpl(_ context.Context, r *typesv2.Role) error {
 	if r.Name == "" {
 		return fmt.Errorf("Fish: Role.Name can't be empty")
 	}
@@ -55,7 +55,7 @@ func (d *Database) roleCreateImpl(ctx context.Context, r *typesv2.Role) error {
 }
 
 // roleSaveImpl saves a role
-func (d *Database) roleSaveImpl(ctx context.Context, r *typesv2.Role) error {
+func (d *Database) roleSaveImpl(_ context.Context, r *typesv2.Role) error {
 	if r.Name == "" {
 		return fmt.Errorf("Fish: Role.Name can't be empty")
 	}
@@ -71,7 +71,7 @@ func (d *Database) roleSaveImpl(ctx context.Context, r *typesv2.Role) error {
 }
 
 // roleDeleteImpl deletes a role
-func (d *Database) roleDeleteImpl(ctx context.Context, name string) error {
+func (d *Database) roleDeleteImpl(_ context.Context, name string) error {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 

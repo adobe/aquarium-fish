@@ -26,7 +26,7 @@ import (
 )
 
 // applicationListImpl lists Applications by filter
-func (d *Database) applicationListImpl(ctx context.Context) (as []typesv2.Application, err error) {
+func (d *Database) applicationListImpl(_ context.Context) (as []typesv2.Application, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -66,7 +66,7 @@ func (d *Database) applicationCreateImpl(ctx context.Context, a *typesv2.Applica
 }*/
 
 // applicationGetImpl returns Application by UID
-func (d *Database) applicationGetImpl(ctx context.Context, uid typesv2.ApplicationUID) (a *typesv2.Application, err error) {
+func (d *Database) applicationGetImpl(_ context.Context, uid typesv2.ApplicationUID) (a *typesv2.Application, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -75,7 +75,7 @@ func (d *Database) applicationGetImpl(ctx context.Context, uid typesv2.Applicati
 }
 
 // applicationDeleteImpl removes the Application
-func (d *Database) applicationDeleteImpl(ctx context.Context, uid typesv2.ApplicationUID) (err error) {
+func (d *Database) applicationDeleteImpl(_ context.Context, uid typesv2.ApplicationUID) (err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 

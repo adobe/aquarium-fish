@@ -62,7 +62,7 @@ func (h *AuthHandler) Handler(next http.Handler) http.Handler {
 		username, password := parts[0], parts[1]
 		logger.Debug("New HTTP request received", "user", username, "url_path", r.URL.Path)
 
-		user := h.db.UserAuth(context.Background(), username, password)
+		user := h.db.UserAuth(r.Context(), username, password)
 		if user == nil {
 			logger.Debug("Authentication failed for user", "user", username)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)

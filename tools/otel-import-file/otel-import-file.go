@@ -195,9 +195,7 @@ func (i *Importer) ImportAll(ctx context.Context) error {
 
 	// Import profiling data
 	profilingDir := filepath.Join(i.config.OtelDir, "profiling")
-	if err := i.importProfiling(ctx, profilingDir); err != nil {
-		return fmt.Errorf("failed to import profiling: %w", err)
-	}
+	i.importProfiling(ctx, profilingDir)
 
 	fmt.Println("Import completed successfully!")
 	return nil
@@ -279,13 +277,13 @@ func (i *Importer) importLogs(ctx context.Context, logsDir string) error {
 }
 
 // importProfiling imports profiling data from the profiling directory
-func (i *Importer) importProfiling(ctx context.Context, profilingDir string) error {
+func (i *Importer) importProfiling(ctx context.Context, profilingDir string) {
 	fmt.Printf("Importing profiling data from: %s\n", profilingDir)
 
 	files, err := os.ReadDir(profilingDir)
 	if err != nil {
 		fmt.Printf("Warning: Could not read profiling directory %s: %v\n", profilingDir, err)
-		return nil // Don't fail if profiling directory doesn't exist
+		return
 	}
 
 	pprofFiles := 0
@@ -311,12 +309,10 @@ func (i *Importer) importProfiling(ctx context.Context, profilingDir string) err
 	} else {
 		fmt.Printf("Processed %d profiling files\n", pprofFiles)
 	}
-
-	return nil
 }
 
 // processProfilingFile processes a single profiling file
-func (i *Importer) processProfilingFile(ctx context.Context, filePath string) error {
+func (i *Importer) processProfilingFile(_ context.Context, filePath string) error {
 	// Get file info
 	fileInfo, err := os.Stat(filePath)
 	if err != nil {
@@ -339,7 +335,7 @@ func (i *Importer) processProfilingFile(ctx context.Context, filePath string) er
 }
 
 // processTraceFile processes a single trace file
-func (i *Importer) processTraceFile(ctx context.Context, filePath string) error {
+func (*Importer) processTraceFile(_ context.Context, filePath string) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to open trace file: %w", err)
@@ -376,7 +372,7 @@ func (i *Importer) processTraceFile(ctx context.Context, filePath string) error 
 }
 
 // processMetricFile processes a single metric file
-func (i *Importer) processMetricFile(ctx context.Context, filePath string) error {
+func (*Importer) processMetricFile(_ context.Context, filePath string) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to open metric file: %w", err)
@@ -412,7 +408,7 @@ func (i *Importer) processMetricFile(ctx context.Context, filePath string) error
 }
 
 // processLogFile processes a single log file
-func (i *Importer) processLogFile(ctx context.Context, filePath string) error {
+func (*Importer) processLogFile(_ context.Context, filePath string) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %w", err)
@@ -444,16 +440,6 @@ func (i *Importer) processLogFile(ctx context.Context, filePath string) error {
 	}
 
 	fmt.Printf("Processed %d log lines from %s\n", lineCount, filePath)
-	return nil
-}
-
-// sendToPyroscope sends profiling data to Pyroscope (placeholder)
-func (i *Importer) sendToPyroscope(ctx context.Context, data any) error {
-	if i.config.PyroscopeURL == "" {
-		return nil
-	}
-
-	fmt.Printf("Would send profiling data to Pyroscope: %s\n", i.config.PyroscopeURL)
 	return nil
 }
 

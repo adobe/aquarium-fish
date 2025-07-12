@@ -67,7 +67,7 @@ type Metrics struct {
 	// Driver metrics
 	awsPoolSize      metric.Int64Gauge
 	awsPoolUsage     metric.Int64Gauge
-	awsInstanceCpu   metric.Float64Gauge
+	awsInstanceCPU   metric.Float64Gauge
 	awsInstanceDisk  metric.Float64Gauge
 	awsInstanceNet   metric.Int64Counter
 	driverOperations metric.Int64Counter
@@ -85,7 +85,7 @@ type Metrics struct {
 	dbCompactions metric.Int64Counter
 
 	// Synchronization
-	mu sync.RWMutex
+	//mu sync.RWMutex
 
 	// Background collection
 	stopCh   chan struct{}
@@ -206,7 +206,7 @@ func NewMetrics(meter metric.Meter) (*Metrics, error) {
 		return nil, fmt.Errorf("failed to create aws_pool_usage metric: %w", err)
 	}
 
-	if m.awsInstanceCpu, err = meter.Float64Gauge("fish_aws_instance_cpu_percent"); err != nil {
+	if m.awsInstanceCPU, err = meter.Float64Gauge("fish_aws_instance_cpu_percent"); err != nil {
 		return nil, fmt.Errorf("failed to create aws_instance_cpu metric: %w", err)
 	}
 
@@ -474,14 +474,14 @@ func (m *Metrics) collectLoop(ctx context.Context, interval time.Duration) {
 		case <-m.stopCh:
 			return
 		case <-ticker.C:
-			m.collectSystemMetrics(ctx)
-			m.collectRuntimeMetrics(ctx)
+			m.collectSystemHWMetrics(ctx)
+			m.collectRuntimeHWMetrics(ctx)
 		}
 	}
 }
 
-// collectSystemMetrics collects system-level metrics
-func (m *Metrics) collectSystemMetrics(ctx context.Context) {
+// collectSystemHWMetrics collects system-level metrics
+func (m *Metrics) collectSystemHWMetrics(ctx context.Context) {
 	// CPU metrics
 	if cpuPercent, err := cpu.Percent(0, false); err == nil && len(cpuPercent) > 0 {
 		m.cpuUsage.Record(ctx, cpuPercent[0])
@@ -506,8 +506,8 @@ func (m *Metrics) collectSystemMetrics(ctx context.Context) {
 	}
 }
 
-// collectRuntimeMetrics collects Go runtime metrics
-func (m *Metrics) collectRuntimeMetrics(ctx context.Context) {
+// collectRuntimeHWMetrics collects Go runtime metrics
+func (m *Metrics) collectRuntimeHWMetrics(ctx context.Context) {
 	// Goroutines
 	m.goroutines.Record(ctx, int64(runtime.NumGoroutine()))
 
@@ -586,7 +586,7 @@ func (m *Metrics) UpdateCertificateExpiry(ctx context.Context, certType, certPat
 }
 
 // getCertificateExpiry extracts expiry time from a PEM certificate file
-func (m *Metrics) getCertificateExpiry(certPath string) (time.Time, error) {
+func (*Metrics) getCertificateExpiry(certPath string) (time.Time, error) {
 	data, err := os.ReadFile(certPath)
 	if err != nil {
 		return time.Time{}, err
@@ -616,12 +616,12 @@ func (m *Metrics) UpdateAWSPoolMetrics(ctx context.Context, poolName string, siz
 }
 
 // UpdateAWSInstanceMetrics updates AWS instance metrics
-func (m *Metrics) UpdateAWSInstanceMetrics(ctx context.Context, instanceId string, cpuPercent, diskPercent float64, networkBytes int64) {
+func (m *Metrics) UpdateAWSInstanceMetrics(ctx context.Context, instanceID string, cpuPercent, diskPercent float64, networkBytes int64) {
 	attrs := []attribute.KeyValue{
-		attribute.String("instance_id", instanceId),
+		attribute.String("instance_id", instanceID),
 	}
 
-	m.awsInstanceCpu.Record(ctx, cpuPercent, metric.WithAttributes(attrs...))
+	m.awsInstanceCPU.Record(ctx, cpuPercent, metric.WithAttributes(attrs...))
 	m.awsInstanceDisk.Record(ctx, diskPercent, metric.WithAttributes(attrs...))
 	m.awsInstanceNet.Add(ctx, networkBytes, metric.WithAttributes(attrs...))
 }
@@ -711,13 +711,9 @@ func (m *Metrics) UpdateCertificateDirectory(ctx context.Context, certDir string
 
 		// Check for certificate files
 		if filepath.Ext(path) == ".crt" || filepath.Ext(path) == ".pem" {
-			certType := "unknown"
-			if filepath.Base(path) == "ca.crt" {
+			certType := "node"
+			if filepath.Base(path) == "ca.crt" || filepath.Base(path) == "ca.pem" {
 				certType = "ca"
-			} else if filepath.Base(path) == "ca.pem" {
-				certType = "ca"
-			} else {
-				certType = "node"
 			}
 
 			m.UpdateCertificateExpiry(ctx, certType, path)

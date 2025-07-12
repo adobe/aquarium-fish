@@ -26,7 +26,7 @@ import (
 )
 
 // nodeListImpl returns list of Nodes that fits filter
-func (d *Database) nodeListImpl(ctx context.Context) (ns []typesv2.Node, err error) {
+func (d *Database) nodeListImpl(_ context.Context) (ns []typesv2.Node, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -35,7 +35,7 @@ func (d *Database) nodeListImpl(ctx context.Context) (ns []typesv2.Node, err err
 }
 
 // nodeGetImpl returns Node by it's unique name
-func (d *Database) nodeGetImpl(ctx context.Context, name string) (node *typesv2.Node, err error) {
+func (d *Database) nodeGetImpl(_ context.Context, name string) (node *typesv2.Node, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -60,7 +60,7 @@ func (d *Database) nodeActiveListImpl(ctx context.Context) (ns []typesv2.Node, e
 }
 
 // nodeCreateImpl makes new Node
-func (d *Database) nodeCreateImpl(ctx context.Context, n *typesv2.Node) error {
+func (d *Database) nodeCreateImpl(_ context.Context, n *typesv2.Node) error {
 	if n.Name == "" {
 		return fmt.Errorf("Fish: Name can't be empty")
 	}
@@ -81,7 +81,7 @@ func (d *Database) nodeCreateImpl(ctx context.Context, n *typesv2.Node) error {
 }
 
 // nodeSaveImpl stores Node
-func (d *Database) nodeSaveImpl(ctx context.Context, node *typesv2.Node) error {
+func (d *Database) nodeSaveImpl(_ context.Context, node *typesv2.Node) error {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 

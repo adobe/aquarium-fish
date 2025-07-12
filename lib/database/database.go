@@ -146,14 +146,14 @@ func (d *Database) CompactDB(ctx context.Context) error {
 	logger.DebugContext(ctx, "Before compaction", "datafiles", s.Datafiles, "keys", s.Keys, "size", s.Size, "reclaimable", s.Reclaimable)
 
 	// Record metrics before compaction
-	d.dbSizeGauge.Record(ctx, int64(s.Size))
+	d.dbSizeGauge.Record(ctx, s.Size)
 	d.dbKeysGauge.Record(ctx, int64(s.Keys))
-	d.dbReclaimableGauge.Record(ctx, int64(s.Reclaimable))
+	d.dbReclaimableGauge.Record(ctx, s.Reclaimable)
 
 	span.SetAttributes(
-		attribute.Int64("db.size_before", int64(s.Size)),
+		attribute.Int64("db.size_before", s.Size),
 		attribute.Int64("db.keys_before", int64(s.Keys)),
-		attribute.Int64("db.reclaimable_before", int64(s.Reclaimable)),
+		attribute.Int64("db.reclaimable_before", s.Reclaimable),
 	)
 
 	if err := d.be.Merge(); err != nil {
@@ -171,14 +171,14 @@ func (d *Database) CompactDB(ctx context.Context) error {
 	logger.DebugContext(ctx, "After compaction", "datafiles", s.Datafiles, "keys", s.Keys, "size", s.Size, "reclaimable", s.Reclaimable, "compactdb", "after")
 
 	// Record metrics after compaction
-	d.dbSizeGauge.Record(ctx, int64(s.Size))
+	d.dbSizeGauge.Record(ctx, s.Size)
 	d.dbKeysGauge.Record(ctx, int64(s.Keys))
-	d.dbReclaimableGauge.Record(ctx, int64(s.Reclaimable))
+	d.dbReclaimableGauge.Record(ctx, s.Reclaimable)
 
 	span.SetAttributes(
-		attribute.Int64("db.size_after", int64(s.Size)),
+		attribute.Int64("db.size_after", s.Size),
 		attribute.Int64("db.keys_after", int64(s.Keys)),
-		attribute.Int64("db.reclaimable_after", int64(s.Reclaimable)),
+		attribute.Int64("db.reclaimable_after", s.Reclaimable),
 	)
 
 	d.dbOperationCounter.Add(ctx, 1, metric.WithAttributes(

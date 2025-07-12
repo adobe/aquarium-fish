@@ -27,9 +27,7 @@ import (
 	"strings"
 	"sync"
 
-	//"github.com/phsym/console-slog"
-	otelslog "go.opentelemetry.io/contrib/bridges/otelslog"
-	otellog "go.opentelemetry.io/otel/log"
+	"go.opentelemetry.io/contrib/bridges/otelslog"
 )
 
 type Level = slog.Level
@@ -41,7 +39,7 @@ const (
 	LevelError Level = slog.LevelError
 )
 
-var levels []Level = []Level{LevelDebug, LevelInfo, LevelWarn, LevelError}
+var levels = []Level{LevelDebug, LevelInfo, LevelWarn, LevelError}
 
 // Global logger instance
 var (
@@ -58,31 +56,15 @@ func init() {
 	_ = Initialize(DefaultConfig())
 }
 
-// mapLevelToOtel maps slog levels to OpenTelemetry severity levels
-func mapLevelToOtel(level Level) otellog.Severity {
-	switch level {
-	case LevelDebug:
-		return otellog.SeverityDebug
-	case LevelInfo:
-		return otellog.SeverityInfo
-	case LevelWarn:
-		return otellog.SeverityWarn
-	case LevelError:
-		return otellog.SeverityError
-	}
-	return otellog.SeverityInfo
-}
-
 // Configuration
 type Config struct {
-	Level        string `json:"level"`          // Log level (debug, info, warn, error)
-	Format       string `json:"format"`         // Output format (console, json)
-	UseTimestamp bool   `json:"use_timestamp"`  // Include timestamp in logs
-	UseColor     bool   `json:"use_color"`      // Use colors in console output
-	UseModule    bool   `json:"use_module"`     // Include module information
-	UseCaller    bool   `json:"use_caller"`     // Include caller information
-	OtelEnabled  bool   `json:"otel_enabled"`   // Enable OpenTelemetry integration
-	OtelMinLevel string `json:"otel_min_level"` // Minimum level for OpenTelemetry logs
+	Level        string `json:"level"`         // Log level (debug, info, warn, error)
+	Format       string `json:"format"`        // Output format (console, json)
+	UseTimestamp bool   `json:"use_timestamp"` // Include timestamp in logs
+	UseColor     bool   `json:"use_color"`     // Use colors in console output
+	UseModule    bool   `json:"use_module"`    // Include module information
+	UseCaller    bool   `json:"use_caller"`    // Include caller information
+	OtelEnabled  bool   `json:"otel_enabled"`  // Enable OpenTelemetry integration
 }
 
 // DefaultConfig returns default logging configuration
@@ -91,11 +73,10 @@ func DefaultConfig() *Config {
 		Level:        "info",
 		Format:       "console",
 		UseTimestamp: true,
-		UseColor:     false, // Disabled by default due to tests don't like it
+		UseColor:     true,
 		UseModule:    true,
 		UseCaller:    false,
 		OtelEnabled:  false,
-		OtelMinLevel: "info",
 	}
 }
 
@@ -140,7 +121,7 @@ func Initialize(config *Config) error {
 		if !ok {
 			return fmt.Errorf("unable to determine project root directory")
 		}
-		opts.ReplaceAttr = func(groups []string, a slog.Attr) slog.Attr {
+		opts.ReplaceAttr = func(_ /*groups*/ []string, a slog.Attr) slog.Attr {
 			if a.Key == slog.SourceKey {
 				if source, ok := a.Value.Any().(*slog.Source); ok {
 					relPath, _ := filepath.Rel(projectDir, source.File)
@@ -154,8 +135,10 @@ func Initialize(config *Config) error {
 	// Create handler
 	var handler slog.Handler
 	if config.Format == "console" {
-		//handler = NewConsoleHandler(opts)
-		handler = slog.NewTextHandler(output, opts)
+		consoleHandler := NewConsoleHandler(output, opts)
+		// Color for now is set automatically depends on the stdout is PTY or not
+		//consoleHandler.SetUseColor(config.UseColor)
+		handler = consoleHandler
 	} else {
 		handler = slog.NewJSONHandler(output, opts)
 	}
@@ -170,7 +153,7 @@ func Initialize(config *Config) error {
 
 	// Set up OpenTelemetry integration if enabled
 	if config.OtelEnabled {
-		if err := SetupOtelIntegration(config.OtelMinLevel); err != nil {
+		if err := SetupOtelIntegration(); err != nil {
 			return fmt.Errorf("unable to setup otel for logging: %w", err)
 		}
 	}
@@ -180,7 +163,7 @@ func Initialize(config *Config) error {
 
 // SetupOtelIntegration sets up OpenTelemetry integration for logging
 // This is called from the monitoring package when OpenTelemetry is initialized
-func SetupOtelIntegration(minLevel string) error {
+func SetupOtelIntegration() error {
 	loggerMu.Lock()
 	defer loggerMu.Unlock()
 

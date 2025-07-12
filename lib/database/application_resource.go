@@ -30,7 +30,7 @@ import (
 )
 
 // applicationResourceListImpl returns a list of all known ApplicationResource objects
-func (d *Database) applicationResourceListImpl(ctx context.Context) (rs []typesv2.ApplicationResource, err error) {
+func (d *Database) applicationResourceListImpl(_ context.Context) (rs []typesv2.ApplicationResource, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -52,7 +52,7 @@ func (d *Database) applicationResourceListNodeImpl(ctx context.Context, nodeUID 
 }
 
 // applicationResourceCreateImpl makes new Resource
-func (d *Database) applicationResourceCreateImpl(ctx context.Context, r *typesv2.ApplicationResource) error {
+func (d *Database) applicationResourceCreateImpl(_ context.Context, r *typesv2.ApplicationResource) error {
 	if r.ApplicationUid == uuid.Nil {
 		return fmt.Errorf("Fish: ApplicationUID can't be unset")
 	}
@@ -97,7 +97,7 @@ func (d *Database) applicationResourceCreateImpl(ctx context.Context, r *typesv2
 }
 
 // applicationResourceDeleteImpl removes Resource
-func (d *Database) applicationResourceDeleteImpl(ctx context.Context, uid typesv2.ApplicationResourceUID) error {
+func (d *Database) applicationResourceDeleteImpl(_ context.Context, uid typesv2.ApplicationResourceUID) error {
 	// First delete any references to this resource. We don't care about the error if it's happened.
 	_ = d.GateProxySSHAccessDeleteByResource(uid)
 
@@ -109,7 +109,7 @@ func (d *Database) applicationResourceDeleteImpl(ctx context.Context, uid typesv
 }
 
 // applicationResourceSaveImpl stores ApplicationResource
-func (d *Database) applicationResourceSaveImpl(ctx context.Context, res *typesv2.ApplicationResource) error {
+func (d *Database) applicationResourceSaveImpl(_ context.Context, res *typesv2.ApplicationResource) error {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -118,7 +118,7 @@ func (d *Database) applicationResourceSaveImpl(ctx context.Context, res *typesv2
 }
 
 // applicationResourceGetImpl returns Resource by it's UID
-func (d *Database) applicationResourceGetImpl(ctx context.Context, uid typesv2.ApplicationResourceUID) (res *typesv2.ApplicationResource, err error) {
+func (d *Database) applicationResourceGetImpl(_ context.Context, uid typesv2.ApplicationResourceUID) (res *typesv2.ApplicationResource, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -251,14 +251,14 @@ func (d *Database) applicationResourceGetByApplicationImpl(ctx context.Context, 
 }
 
 // subscribeApplicationResourceImpl adds a channel to the subscription list
-func (d *Database) subscribeApplicationResourceImpl(ctx context.Context, ch chan *typesv2.ApplicationResource) {
+func (d *Database) subscribeApplicationResourceImpl(_ context.Context, ch chan *typesv2.ApplicationResource) {
 	d.subsMu.Lock()
 	defer d.subsMu.Unlock()
 	d.subsApplicationResource = append(d.subsApplicationResource, ch)
 }
 
 // unsubscribeApplicationResourceImpl removes a channel from the subscription list
-func (d *Database) unsubscribeApplicationResourceImpl(ctx context.Context, ch chan *typesv2.ApplicationResource) {
+func (d *Database) unsubscribeApplicationResourceImpl(_ context.Context, ch chan *typesv2.ApplicationResource) {
 	d.subsMu.Lock()
 	defer d.subsMu.Unlock()
 	for i, existing := range d.subsApplicationResource {

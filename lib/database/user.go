@@ -25,7 +25,7 @@ import (
 )
 
 // userListImpl returns list of users
-func (d *Database) userListImpl(ctx context.Context) (us []typesv2.User, err error) {
+func (d *Database) userListImpl(_ context.Context) (us []typesv2.User, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -34,7 +34,7 @@ func (d *Database) userListImpl(ctx context.Context) (us []typesv2.User, err err
 }
 
 // userCreateImpl makes new User
-func (d *Database) userCreateImpl(ctx context.Context, u *typesv2.User) error {
+func (d *Database) userCreateImpl(_ context.Context, u *typesv2.User) error {
 	if u.Name == "" {
 		return fmt.Errorf("Fish: Name can't be empty")
 	}
@@ -51,7 +51,7 @@ func (d *Database) userCreateImpl(ctx context.Context, u *typesv2.User) error {
 }
 
 // userSaveImpl stores User
-func (d *Database) userSaveImpl(ctx context.Context, u *typesv2.User) error {
+func (d *Database) userSaveImpl(_ context.Context, u *typesv2.User) error {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -60,7 +60,7 @@ func (d *Database) userSaveImpl(ctx context.Context, u *typesv2.User) error {
 }
 
 // userGetImpl returns User by unique name
-func (d *Database) userGetImpl(ctx context.Context, name string) (u *typesv2.User, err error) {
+func (d *Database) userGetImpl(_ context.Context, name string) (u *typesv2.User, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -69,7 +69,7 @@ func (d *Database) userGetImpl(ctx context.Context, name string) (u *typesv2.Use
 }
 
 // userDeleteImpl removes User
-func (d *Database) userDeleteImpl(ctx context.Context, name string) error {
+func (d *Database) userDeleteImpl(_ context.Context, name string) error {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 

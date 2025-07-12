@@ -67,8 +67,6 @@ type Config struct {
 	PyroscopeURL   string `json:"pyroscope_url"`    // Pyroscope URL for profiling
 	FileExportPath string `json:"file_export_path"` // Path to export telemetry data to files (when no remote endpoints configured)
 
-	LogsLevel string `json:"logs_level"` // Min level of the logs to stream (default: "info")
-
 	SampleRate        float64       `json:"sample_rate"`        // Trace sampling rate (0.0 to 1.0)
 	MetricsInterval   util.Duration `json:"metrics_interval"`   // Metrics collection interval
 	ProfilingInterval util.Duration `json:"profiling_interval"` // Profiling file export interval
@@ -93,8 +91,6 @@ func (c *Config) InitDefaults() {
 	c.OTLPEndpoint = ""
 	c.PyroscopeURL = ""
 	c.FileExportPath = "" // Will be set to fish ws directory + "telemetry" if not configured
-
-	c.LogsLevel = "info"
 
 	c.ServiceName = "aquarium-fish"
 	c.ServiceVersion = fmt.Sprintf("%s (%s)", build.Version, build.Time)
@@ -169,8 +165,8 @@ func Initialize(ctx context.Context, config *Config) (*Monitor, error) {
 		}
 
 		// Setup OpenTelemetry integration with slog
-		logger.Info("Setting up logging integration", "level", config.LogsLevel)
-		log.SetupOtelIntegration(config.LogsLevel)
+		logger.Info("Setting up logging integration")
+		log.SetupOtelIntegration()
 		logger.Info("Logging integration setup completed")
 	}
 
@@ -309,7 +305,7 @@ func (m *Monitor) initMetrics(ctx context.Context, res *resource.Resource) error
 
 		// Set up periodic metrics file export using Prometheus data
 		metricsFile := filepath.Join(m.config.FileExportPath, "metrics", "metrics.jsonl")
-		go m.startPeriodicMetricsFileExport(metricsFile)
+		go m.startPeriodicMetricsFileExport(ctx, metricsFile)
 
 		otel.SetMeterProvider(meterProvider)
 		m.meterProvider = meterProvider
@@ -416,10 +412,9 @@ func (m *Monitor) initProfiling() error {
 	if m.shouldUseFileExport() {
 		// Use file-based profiling when no remote endpoint is configured
 		return m.initFileBasedProfiling()
-	} else {
-		// Use Pyroscope with OpenTelemetry integration for remote profiling
-		return m.initRemoteProfiling()
 	}
+	// Use Pyroscope with OpenTelemetry integration for remote profiling
+	return m.initRemoteProfiling()
 }
 
 // initRemoteProfiling initializes Pyroscope profiling with OpenTelemetry integration
@@ -460,7 +455,7 @@ func (m *Monitor) initRemoteProfiling() error {
 	}
 
 	m.pyroscope = profiler
-	m.shutdownFuncs = append(m.shutdownFuncs, func(ctx context.Context) error {
+	m.shutdownFuncs = append(m.shutdownFuncs, func(_ context.Context) error {
 		return profiler.Stop()
 	})
 
@@ -520,7 +515,7 @@ func (m *Monitor) collectProfilesToFile(profilingDir string) {
 }
 
 // collectCPUProfile collects a CPU profile
-func (m *Monitor) collectCPUProfile(filename string) error {
+func (*Monitor) collectCPUProfile(filename string) error {
 	f, err := os.Create(filename)
 	if err != nil {
 		return err
@@ -539,7 +534,7 @@ func (m *Monitor) collectCPUProfile(filename string) error {
 }
 
 // collectMemoryProfile collects a memory profile
-func (m *Monitor) collectMemoryProfile(filename string) error {
+func (*Monitor) collectMemoryProfile(filename string) error {
 	f, err := os.Create(filename)
 	if err != nil {
 		return err
@@ -550,7 +545,7 @@ func (m *Monitor) collectMemoryProfile(filename string) error {
 }
 
 // collectGoroutineProfile collects a goroutine profile
-func (m *Monitor) collectGoroutineProfile(filename string) error {
+func (*Monitor) collectGoroutineProfile(filename string) error {
 	f, err := os.Create(filename)
 	if err != nil {
 		return err
@@ -591,16 +586,8 @@ func (m *Monitor) GetPrometheusHandler() *prometheus.Exporter {
 	return m.promExporter
 }
 
-// StartSpan starts a new span with the given name
-func (m *Monitor) StartSpan(ctx context.Context, name string, opts ...oteltrace.SpanStartOption) (context.Context, oteltrace.Span) {
-	if m.tracer == nil {
-		return ctx, oteltrace.SpanFromContext(ctx)
-	}
-	return m.tracer.Start(ctx, name, opts...)
-}
-
 // RecordMetric records a metric value
-func (m *Monitor) RecordMetric(ctx context.Context, name string, value float64, attrs ...attribute.KeyValue) {
+func (m *Monitor) RecordMetric(_ context.Context, _ /*name*/ string, _ /*value*/ float64, _ /*attrs*/ ...attribute.KeyValue) {
 	if m.metrics == nil {
 		return
 	}
@@ -653,7 +640,7 @@ func NewFileTraceExporter(filename string) (*FileTraceExporter, error) {
 }
 
 // ExportSpans exports spans to the file
-func (f *FileTraceExporter) ExportSpans(ctx context.Context, spans []trace.ReadOnlySpan) error {
+func (f *FileTraceExporter) ExportSpans(_ context.Context, spans []trace.ReadOnlySpan) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -686,7 +673,7 @@ func (f *FileTraceExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 }
 
 // Shutdown closes the file
-func (f *FileTraceExporter) Shutdown(ctx context.Context) error {
+func (f *FileTraceExporter) Shutdown(_ context.Context) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.file.Close()
@@ -743,14 +730,14 @@ func (f *FileMetricExporter) WriteMetrics(metricsData map[string]any) error {
 }
 
 // Shutdown closes the file
-func (f *FileMetricExporter) Shutdown(ctx context.Context) error {
+func (f *FileMetricExporter) Shutdown(_ context.Context) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.file.Close()
 }
 
 // startPeriodicMetricsFileExport starts a goroutine that periodically exports metrics to a file
-func (m *Monitor) startPeriodicMetricsFileExport(metricsFile string) {
+func (m *Monitor) startPeriodicMetricsFileExport(ctx context.Context, metricsFile string) {
 	logger := log.WithFunc("monitoring", "startPeriodicMetricsFileExport")
 	ticker := time.NewTicker(time.Duration(m.config.MetricsInterval))
 	defer ticker.Stop()
@@ -760,14 +747,14 @@ func (m *Monitor) startPeriodicMetricsFileExport(metricsFile string) {
 		logger.Error("Failed to create metrics file exporter", "err", err)
 		return
 	}
-	defer fileExporter.Shutdown(context.Background())
+	defer fileExporter.Shutdown(ctx)
 
 	for {
 		select {
 		case <-ticker.C:
 			// Collect actual metrics data from Prometheus registry
 			if m.promExporter != nil {
-				metricsData := m.collectPrometheusMetrics()
+				metricsData := m.collectPrometheusMetrics(ctx)
 				if err := fileExporter.WriteMetrics(metricsData); err != nil {
 					logger.Debug("Failed to write metrics to file", "err", err)
 				}
@@ -779,7 +766,7 @@ func (m *Monitor) startPeriodicMetricsFileExport(metricsFile string) {
 }
 
 // collectPrometheusMetrics collects metrics from the Prometheus registry
-func (m *Monitor) collectPrometheusMetrics() map[string]any {
+func (m *Monitor) collectPrometheusMetrics(ctx context.Context) map[string]any {
 	metricsData := map[string]any{
 		"timestamp": time.Now().Format(time.RFC3339),
 		"source":    "prometheus",
@@ -799,7 +786,6 @@ func (m *Monitor) collectPrometheusMetrics() map[string]any {
 	// you might want to use the Prometheus client API to get actual metric values
 	if m.metrics != nil {
 		// Collect system metrics
-		ctx := context.Background()
 		systemMetrics := m.collectCurrentSystemMetrics(ctx)
 		metricsData["system"] = systemMetrics
 
@@ -812,7 +798,7 @@ func (m *Monitor) collectPrometheusMetrics() map[string]any {
 }
 
 // collectCurrentSystemMetrics collects current system metrics
-func (m *Monitor) collectCurrentSystemMetrics(ctx context.Context) map[string]any {
+func (*Monitor) collectCurrentSystemMetrics(_ context.Context) map[string]any {
 	systemMetrics := make(map[string]any)
 
 	// CPU metrics
@@ -848,7 +834,7 @@ func (m *Monitor) collectCurrentSystemMetrics(ctx context.Context) map[string]an
 }
 
 // collectCurrentRuntimeMetrics collects current Go runtime metrics
-func (m *Monitor) collectCurrentRuntimeMetrics() map[string]any {
+func (*Monitor) collectCurrentRuntimeMetrics() map[string]any {
 	var stats runtime.MemStats
 	runtime.ReadMemStats(&stats)
 
@@ -885,7 +871,7 @@ func NewFileLogExporter(filename string) (*FileLogExporter, error) {
 }
 
 // Export exports logs to the file
-func (f *FileLogExporter) Export(ctx context.Context, records []otellog.Record) error {
+func (f *FileLogExporter) Export(_ context.Context, records []otellog.Record) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -911,14 +897,14 @@ func (f *FileLogExporter) Export(ctx context.Context, records []otellog.Record) 
 }
 
 // ForceFlush forces a flush of the log exporter
-func (f *FileLogExporter) ForceFlush(ctx context.Context) error {
+func (f *FileLogExporter) ForceFlush(_ context.Context) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.file.Sync()
 }
 
 // Shutdown closes the file
-func (f *FileLogExporter) Shutdown(ctx context.Context) error {
+func (f *FileLogExporter) Shutdown(_ context.Context) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.file.Close()

@@ -30,7 +30,7 @@ type LabelListParams struct {
 }
 
 // labelListImpl returns list of Labels that fits filters
-func (d *Database) labelListImpl(ctx context.Context, filters LabelListParams) (labels []typesv2.Label, err error) {
+func (d *Database) labelListImpl(_ context.Context, filters LabelListParams) (labels []typesv2.Label, err error) {
 	d.beMu.RLock()
 	err = d.be.Collection(ObjectLabel).List(&labels)
 	d.beMu.RUnlock()
@@ -112,7 +112,7 @@ func (d *Database) labelCreateImpl(ctx context.Context, l *typesv2.Label) error 
 
 // Intentionally disabled - labels can be created once and can't be updated
 // Create label with incremented version instead
-/*func (d *Database) labelSaveImpl(ctx context.Context, label *typesv2.Label) error {
+/*func (d *Database) labelSaveImpl(_ context.Context, label *typesv2.Label) error {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -120,7 +120,7 @@ func (d *Database) labelCreateImpl(ctx context.Context, l *typesv2.Label) error 
 }*/
 
 // labelGetImpl returns Label by UID
-func (d *Database) labelGetImpl(ctx context.Context, uid typesv2.LabelUID) (label *typesv2.Label, err error) {
+func (d *Database) labelGetImpl(_ context.Context, uid typesv2.LabelUID) (label *typesv2.Label, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -129,7 +129,7 @@ func (d *Database) labelGetImpl(ctx context.Context, uid typesv2.LabelUID) (labe
 }
 
 // labelDeleteImpl deletes the Label by UID
-func (d *Database) labelDeleteImpl(ctx context.Context, uid typesv2.LabelUID) error {
+func (d *Database) labelDeleteImpl(_ context.Context, uid typesv2.LabelUID) error {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 

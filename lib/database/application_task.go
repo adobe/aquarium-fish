@@ -25,14 +25,14 @@ import (
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
-func (d *Database) subscribeApplicationTaskImpl(ctx context.Context, ch chan *typesv2.ApplicationTask) {
+func (d *Database) subscribeApplicationTaskImpl(_ context.Context, ch chan *typesv2.ApplicationTask) {
 	d.subsMu.Lock()
 	defer d.subsMu.Unlock()
 	d.subsApplicationTask = append(d.subsApplicationTask, ch)
 }
 
 // unsubscribeApplicationTaskImpl removes a channel from the subscription list
-func (d *Database) unsubscribeApplicationTaskImpl(ctx context.Context, ch chan *typesv2.ApplicationTask) {
+func (d *Database) unsubscribeApplicationTaskImpl(_ context.Context, ch chan *typesv2.ApplicationTask) {
 	d.subsMu.Lock()
 	defer d.subsMu.Unlock()
 	for i, existing := range d.subsApplicationTask {
@@ -45,7 +45,7 @@ func (d *Database) unsubscribeApplicationTaskImpl(ctx context.Context, ch chan *
 }
 
 // applicationTaskListImpl returns all known ApplicationTasks
-func (d *Database) applicationTaskListImpl(ctx context.Context) (at []typesv2.ApplicationTask, err error) {
+func (d *Database) applicationTaskListImpl(_ context.Context) (at []typesv2.ApplicationTask, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -67,7 +67,7 @@ func (d *Database) applicationTaskListByApplicationImpl(ctx context.Context, app
 }
 
 // applicationTaskCreateImpl makes a new ApplicationTask
-func (d *Database) applicationTaskCreateImpl(ctx context.Context, at *typesv2.ApplicationTask) error {
+func (d *Database) applicationTaskCreateImpl(_ context.Context, at *typesv2.ApplicationTask) error {
 	if at.ApplicationUid == uuid.Nil {
 		return fmt.Errorf("Fish: ApplicationUID can't be unset")
 	}
@@ -107,7 +107,7 @@ func (d *Database) applicationTaskCreateImpl(ctx context.Context, at *typesv2.Ap
 }
 
 // applicationTaskSaveImpl stores the ApplicationTask
-func (d *Database) applicationTaskSaveImpl(ctx context.Context, at *typesv2.ApplicationTask) error {
+func (d *Database) applicationTaskSaveImpl(_ context.Context, at *typesv2.ApplicationTask) error {
 	if at.Uid == uuid.Nil {
 		return fmt.Errorf("Fish: UID can't be unset")
 	}
@@ -119,7 +119,7 @@ func (d *Database) applicationTaskSaveImpl(ctx context.Context, at *typesv2.Appl
 }
 
 // applicationTaskGetImpl returns the ApplicationTask by ApplicationTaskUID
-func (d *Database) applicationTaskGetImpl(ctx context.Context, uid typesv2.ApplicationTaskUID) (at *typesv2.ApplicationTask, err error) {
+func (d *Database) applicationTaskGetImpl(_ context.Context, uid typesv2.ApplicationTaskUID) (at *typesv2.ApplicationTask, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -128,7 +128,7 @@ func (d *Database) applicationTaskGetImpl(ctx context.Context, uid typesv2.Appli
 }
 
 // applicationTaskDeleteImpl removes the ApplicationTask
-func (d *Database) applicationTaskDeleteImpl(ctx context.Context, uid typesv2.ApplicationTaskUID) (err error) {
+func (d *Database) applicationTaskDeleteImpl(_ context.Context, uid typesv2.ApplicationTaskUID) (err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 

@@ -25,14 +25,14 @@ import (
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
-func (d *Database) subscribeApplicationStateImpl(ctx context.Context, ch chan *typesv2.ApplicationState) {
+func (d *Database) subscribeApplicationStateImpl(_ context.Context, ch chan *typesv2.ApplicationState) {
 	d.subsMu.Lock()
 	defer d.subsMu.Unlock()
 	d.subsApplicationState = append(d.subsApplicationState, ch)
 }
 
 // unsubscribeApplicationStateImpl removes a channel from the subscription list
-func (d *Database) unsubscribeApplicationStateImpl(ctx context.Context, ch chan *typesv2.ApplicationState) {
+func (d *Database) unsubscribeApplicationStateImpl(_ context.Context, ch chan *typesv2.ApplicationState) {
 	d.subsMu.Lock()
 	defer d.subsMu.Unlock()
 	for i, existing := range d.subsApplicationState {
@@ -45,7 +45,7 @@ func (d *Database) unsubscribeApplicationStateImpl(ctx context.Context, ch chan 
 }
 
 // applicationStateListImpl returns list of ApplicationStates
-func (d *Database) applicationStateListImpl(ctx context.Context) (ass []typesv2.ApplicationState, err error) {
+func (d *Database) applicationStateListImpl(_ context.Context) (ass []typesv2.ApplicationState, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -54,7 +54,7 @@ func (d *Database) applicationStateListImpl(ctx context.Context) (ass []typesv2.
 }
 
 // applicationStateCreateImpl makes new ApplicationState
-func (d *Database) applicationStateCreateImpl(ctx context.Context, as *typesv2.ApplicationState) error {
+func (d *Database) applicationStateCreateImpl(_ context.Context, as *typesv2.ApplicationState) error {
 	if as.ApplicationUid == uuid.Nil {
 		return fmt.Errorf("Fish: ApplicationUID can't be unset")
 	}
@@ -92,7 +92,7 @@ func (d *Database) applicationStateCreateImpl(ctx context.Context, as *typesv2.A
 }
 
 // Intentionally disabled, application state can't be updated
-/*func (d *Database) applicationStateSaveImpl(ctx context.Context, as *typesv2.ApplicationState) error {
+/*func (d *Database) applicationStateSaveImpl(_ context.Context, as *typesv2.ApplicationState) error {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -100,7 +100,7 @@ func (d *Database) applicationStateCreateImpl(ctx context.Context, as *typesv2.A
 }*/
 
 // applicationStateGetImpl returns specific ApplicationState
-func (d *Database) applicationStateGetImpl(ctx context.Context, uid typesv2.ApplicationStateUID) (as *typesv2.ApplicationState, err error) {
+func (d *Database) applicationStateGetImpl(_ context.Context, uid typesv2.ApplicationStateUID) (as *typesv2.ApplicationState, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -109,7 +109,7 @@ func (d *Database) applicationStateGetImpl(ctx context.Context, uid typesv2.Appl
 }
 
 // applicationStateDeleteImpl removes the ApplicationState
-func (d *Database) applicationStateDeleteImpl(ctx context.Context, uid typesv2.ApplicationStateUID) (err error) {
+func (d *Database) applicationStateDeleteImpl(_ context.Context, uid typesv2.ApplicationStateUID) (err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
