@@ -109,7 +109,7 @@ func (d *Driver) processHookDeliveries(deliveries []*github.HookDelivery, owner,
 	logger := log.WithFunc("github", "processHookDeliveries").With("gate.name", d.name, "repo", owner+"/"+repo, "hook_id", hookID)
 	var jobs []*github.WorkflowJob
 	for _, delivery := range deliveries {
-		logger.Debug("Getting full delivery for webhook", "delivery", delivery.String())
+		logger.Debug("Getting full delivery for webhook", "delivery", delivery)
 
 		// Receiving full delivery body
 		fullDelivery, err := d.apiGetFullDelivery(owner, repo, hookID, delivery.GetID())

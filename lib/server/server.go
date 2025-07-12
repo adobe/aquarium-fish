@@ -131,7 +131,7 @@ func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*Wrapper,
 	}()
 
 	// WARN: Used by integration tests
-	logger.Info("API listening", "addr", tlsListener.Addr().String())
+	logger.Info("API listening", "addr", tlsListener.Addr())
 
 	return &Wrapper{httpServer: s, rpcServer: rpcServer}, nil
 }

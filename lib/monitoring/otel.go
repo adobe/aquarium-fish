@@ -201,8 +201,6 @@ func (m *Monitor) createResource() (*resource.Resource, error) {
 		attribute.String("node.uid", m.config.NodeUID),
 		attribute.String("node.location", m.config.NodeLocation),
 	)
-	logger := log.WithFunc("monitoring", "createResource")
-	logger.Debug("Merging 2 resources", "res1", &res1, "res2", &res2)
 	return resource.Merge(res1, res2)
 }
 

@@ -573,7 +573,7 @@ func (f *Fish) applicationTimeoutSet(uid typesv2.ApplicationUID, to time.Time) {
 	f.applicationsTimeoutsMutex.Lock()
 	defer f.applicationsTimeoutsMutex.Unlock()
 
-	logger := log.WithFunc("fish", "applicationTimeoutSet").With("app_uid", uid.String())
+	logger := log.WithFunc("fish", "applicationTimeoutSet").With("app_uid", uid)
 	logger.Info("Application will be deallocated by timeout", "in", time.Until(to).Round(time.Second), "timeout", to)
 
 	// Checking if the provided timeout is prior to everything else in the timeouts list

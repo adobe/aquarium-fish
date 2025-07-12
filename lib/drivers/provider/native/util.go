@@ -354,7 +354,7 @@ func (d *Driver) userRun(envData *EnvData, user, entry string, metadata map[stri
 	if cmd.ProcessState != nil && !cmd.ProcessState.Success() {
 		systime := cmd.ProcessState.SystemTime()
 		usertime := cmd.ProcessState.UserTime()
-		logger.Error("The process ended quickly with non-zero exit code", "exit_code", cmd.ProcessState.ExitCode(), "pid", cmd.ProcessState.Pid(), "systime", systime, "usertime", usertime, "stderr", cmd.ProcessState.String())
+		logger.Error("The process ended quickly with non-zero exit code", "exit_code", cmd.ProcessState.ExitCode(), "pid", cmd.ProcessState.Pid(), "systime", systime, "usertime", usertime, "stderr", cmd.ProcessState)
 		err = fmt.Errorf("NATIVE: %s: The process for %q ended quickly with non-zero exit code: code:%d, pid:%d, systime:%s, usertime:%s : %s",
 			d.name, user, cmd.ProcessState.ExitCode(), cmd.ProcessState.Pid(), cmd.ProcessState.SystemTime(), cmd.ProcessState.UserTime(), cmd.ProcessState.String())
 	}

@@ -103,7 +103,7 @@ func main() {
 				runtime.GOMAXPROCS(int(cfg.CPULimit))
 			}
 			if cfg.MemTarget > 0 {
-				logger.Info("Fish MEM targeted", "mem_target", cfg.MemTarget.String())
+				logger.Info("Fish MEM targeted", "mem_target", cfg.MemTarget)
 				debug.SetMemoryLimit(int64(cfg.MemTarget.Bytes()))
 			}
 

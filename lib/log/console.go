@@ -201,7 +201,29 @@ func (h *ConsoleHandler) appendAttr(buf *strings.Builder, attr slog.Attr) {
 		}
 	}
 
+	// Handle group attributes
+	if attr.Value.Kind() == slog.KindGroup {
+		// Recursively process group attributes
+		groupAttrs := attr.Value.Group()
+		for _, a := range groupAttrs {
+			// Create a new attribute with the group name as prefix
+			groupedAttr := slog.Attr{
+				Key:   attr.Key + "." + a.Key,
+				Value: a.Value,
+			}
+			h.appendAttr(buf, groupedAttr)
+		}
+		return
+	}
+
 	buf.WriteString(" ")
+
+	// Add group prefix if we have groups
+	if len(h.groups) > 0 {
+		buf.WriteString(strings.Join(h.groups, "."))
+		buf.WriteString(".")
+	}
+
 	buf.WriteString(attr.Key)
 	buf.WriteString("=")
 
@@ -221,10 +243,20 @@ func (h *ConsoleHandler) appendAttr(buf *strings.Builder, attr slog.Attr) {
 		buf.WriteString(attr.Value.Time().Format(time.RFC3339))
 	case slog.KindDuration:
 		buf.WriteString(attr.Value.Duration().String())
-	case slog.KindAny, slog.KindGroup, slog.KindLogValuer:
-		buf.WriteString(fmt.Sprintf("%v", attr.Value.Any()))
-	default:
-		buf.WriteString(fmt.Sprintf("%v", attr.Value.Any()))
+	case slog.KindAny:
+		if attr.Value.Any() == nil {
+			buf.WriteString("nil")
+		} else {
+			// Special processors for values
+			switch v := attr.Value.Any().(type) {
+			case fmt.Stringer:
+				buf.WriteString(v.String())
+			default:
+				buf.WriteString(fmt.Sprintf("%#v", v))
+			}
+		}
+	case slog.KindGroup, slog.KindLogValuer:
+		buf.WriteString(fmt.Sprintf("%#v", attr.Value.Any()))
 	}
 }
 
