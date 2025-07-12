@@ -28,11 +28,10 @@ docker run -v $PWD:/ws -w /ws --rm -it golang:1.23.1 sh -exc "
 [ 'x$NOBUILD' != 'x' ] || SKIPCHECK=1 ./build.sh
 
 counter=0
-fish_bin=\$(ls -t aquarium-fish-*.linux_amd64 | head -1)
 
 while true
 do
-    FISH_PATH=\$PWD/\$fish_bin go test -v -failfast -parallel 1 -count=1 $test_cmd ./tests
+    go test -v -failfast -parallel 1 -count=1 $test_cmd ./tests || sh
 
     counter=\$((\$counter+1))
     if [ \$counter -ge 50 ]; then

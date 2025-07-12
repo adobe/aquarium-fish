@@ -15,6 +15,7 @@
 package database
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -24,14 +25,14 @@ import (
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
-func (d *Database) SubscribeApplicationTask(ch chan *typesv2.ApplicationTask) {
+func (d *Database) subscribeApplicationTaskImpl(_ context.Context, ch chan *typesv2.ApplicationTask) {
 	d.subsMu.Lock()
 	defer d.subsMu.Unlock()
 	d.subsApplicationTask = append(d.subsApplicationTask, ch)
 }
 
-// UnsubscribeApplicationTask removes a channel from the subscription list
-func (d *Database) UnsubscribeApplicationTask(ch chan *typesv2.ApplicationTask) {
+// unsubscribeApplicationTaskImpl removes a channel from the subscription list
+func (d *Database) unsubscribeApplicationTaskImpl(_ context.Context, ch chan *typesv2.ApplicationTask) {
 	d.subsMu.Lock()
 	defer d.subsMu.Unlock()
 	for i, existing := range d.subsApplicationTask {
@@ -43,8 +44,8 @@ func (d *Database) UnsubscribeApplicationTask(ch chan *typesv2.ApplicationTask) 
 	}
 }
 
-// ApplicationTaskList returns all known ApplicationTasks
-func (d *Database) ApplicationTaskList() (at []typesv2.ApplicationTask, err error) {
+// applicationTaskListImpl returns all known ApplicationTasks
+func (d *Database) applicationTaskListImpl(_ context.Context) (at []typesv2.ApplicationTask, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -52,9 +53,9 @@ func (d *Database) ApplicationTaskList() (at []typesv2.ApplicationTask, err erro
 	return at, err
 }
 
-// ApplicationTaskFindByApplication allows to find all the ApplicationTasks by ApplicationUID
-func (d *Database) ApplicationTaskListByApplication(appUID typesv2.ApplicationUID) (at []typesv2.ApplicationTask, err error) {
-	all, err := d.ApplicationTaskList()
+// applicationTaskListByApplicationImpl allows to find all the ApplicationTasks by ApplicationUID
+func (d *Database) applicationTaskListByApplicationImpl(ctx context.Context, appUID typesv2.ApplicationUID) (at []typesv2.ApplicationTask, err error) {
+	all, err := d.ApplicationTaskList(ctx)
 	if err == nil {
 		for _, a := range all {
 			if a.ApplicationUid == appUID {
@@ -65,8 +66,8 @@ func (d *Database) ApplicationTaskListByApplication(appUID typesv2.ApplicationUI
 	return at, err
 }
 
-// ApplicationTaskCreate makes a new ApplicationTask
-func (d *Database) ApplicationTaskCreate(at *typesv2.ApplicationTask) error {
+// applicationTaskCreateImpl makes a new ApplicationTask
+func (d *Database) applicationTaskCreateImpl(_ context.Context, at *typesv2.ApplicationTask) error {
 	if at.ApplicationUid == uuid.Nil {
 		return fmt.Errorf("Fish: ApplicationUID can't be unset")
 	}
@@ -97,7 +98,7 @@ func (d *Database) ApplicationTaskCreate(at *typesv2.ApplicationTask) error {
 				// Successfully sent notification
 			default:
 				// Channel is closed or full, skip this subscriber
-				log.Debugf("Database: Failed to send ApplicationTask notification, channel closed or full")
+				log.WithFunc("database", "applicationTaskCreateImpl").Debug("Failed to send ApplicationTask notification, channel closed or full")
 			}
 		}
 	}(at)
@@ -105,8 +106,8 @@ func (d *Database) ApplicationTaskCreate(at *typesv2.ApplicationTask) error {
 	return err
 }
 
-// ApplicationTaskSave stores the ApplicationTask
-func (d *Database) ApplicationTaskSave(at *typesv2.ApplicationTask) error {
+// applicationTaskSaveImpl stores the ApplicationTask
+func (d *Database) applicationTaskSaveImpl(_ context.Context, at *typesv2.ApplicationTask) error {
 	if at.Uid == uuid.Nil {
 		return fmt.Errorf("Fish: UID can't be unset")
 	}
@@ -117,8 +118,8 @@ func (d *Database) ApplicationTaskSave(at *typesv2.ApplicationTask) error {
 	return d.be.Collection(ObjectApplicationTask).Add(at.Uid.String(), at)
 }
 
-// ApplicationTaskGet returns the ApplicationTask by ApplicationTaskUID
-func (d *Database) ApplicationTaskGet(uid typesv2.ApplicationTaskUID) (at *typesv2.ApplicationTask, err error) {
+// applicationTaskGetImpl returns the ApplicationTask by ApplicationTaskUID
+func (d *Database) applicationTaskGetImpl(_ context.Context, uid typesv2.ApplicationTaskUID) (at *typesv2.ApplicationTask, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -126,17 +127,17 @@ func (d *Database) ApplicationTaskGet(uid typesv2.ApplicationTaskUID) (at *types
 	return at, err
 }
 
-// ApplicationTaskDelete removes the ApplicationTask
-func (d *Database) ApplicationTaskDelete(uid typesv2.ApplicationTaskUID) (err error) {
+// applicationTaskDeleteImpl removes the ApplicationTask
+func (d *Database) applicationTaskDeleteImpl(_ context.Context, uid typesv2.ApplicationTaskUID) (err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
 	return d.be.Collection(ObjectApplicationTask).Delete(uid.String())
 }
 
-// ApplicationTaskListByApplicationAndWhen returns list of ApplicationTasks by ApplicationUID and When it need to be executed
-func (d *Database) ApplicationTaskListByApplicationAndWhen(appUID typesv2.ApplicationUID, when typesv2.ApplicationState_Status) (at []typesv2.ApplicationTask, err error) {
-	all, err := d.ApplicationTaskListByApplication(appUID)
+// applicationTaskListByApplicationAndWhenImpl returns list of ApplicationTasks by ApplicationUID and When it need to be executed
+func (d *Database) applicationTaskListByApplicationAndWhenImpl(ctx context.Context, appUID typesv2.ApplicationUID, when typesv2.ApplicationState_Status) (at []typesv2.ApplicationTask, err error) {
+	all, err := d.ApplicationTaskListByApplication(ctx, appUID)
 	if err == nil {
 		for _, a := range all {
 			if a.When == when {

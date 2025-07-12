@@ -18,9 +18,11 @@ package main
 // Generating everything from protobuf specs for RPC interface
 //go:generate buf generate
 //go:generate buf generate --template buf.gen2.yaml
+//go:generate go run ./tools/trace-gen-functions/trace-gen-functions.go ./lib
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -35,12 +37,13 @@ import (
 	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
+	"github.com/adobe/aquarium-fish/lib/monitoring"
 	"github.com/adobe/aquarium-fish/lib/server"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 func main() {
-	log.Infof("Aquarium Fish %s (%s)", build.Version, build.Time)
+	fmt.Printf("Aquarium Fish %s (%s)\n", build.Version, build.Time)
 
 	var apiAddress string
 	var nodeAddress string
@@ -56,19 +59,19 @@ func main() {
 		Short: "Aquarium fish",
 		Long:  `Part of the Aquarium suite - a distributed resources manager`,
 		PersistentPreRunE: func(_ /*cmd*/ *cobra.Command, _ /*args*/ []string) (err error) {
-			if err = log.SetVerbosity(logVerbosity); err != nil {
-				return err
-			}
-			log.UseTimestamp = logTimestamp
-
-			return log.InitLoggers()
+			logCfg := log.DefaultConfig()
+			logCfg.Level = logVerbosity
+			logCfg.UseTimestamp = logTimestamp
+			return log.Initialize(logCfg)
 		},
 		RunE: func(_ /*cmd*/ *cobra.Command, _ /*args*/ []string) (err error) {
-			log.Info("Fish init...")
+			logger := log.WithFunc("main", "RunE")
+			logger.Info("Fish init...")
 
 			cfg := &fish.Config{}
 			if err = cfg.ReadConfigFile(cfgPath); err != nil {
-				return log.Error("Fish: Unable to apply config file:", cfgPath, err)
+				logger.Error("Fish: Unable to apply config file", "chg_path", cfgPath, "err", err)
+				return fmt.Errorf("Fish: Unable to apply config file %s: %v", cfgPath, err)
 			}
 			if apiAddress != "" {
 				cfg.APIAddress = apiAddress
@@ -82,33 +85,35 @@ func main() {
 			if cpuLimit != "" {
 				val, err := strconv.ParseUint(cpuLimit, 10, 16)
 				if err != nil {
-					return log.Errorf("Fish: Unable to parse cpu limit value: %v", err)
+					logger.Error("Fish: Unable to parse cpu limit value", "err", err)
+					return fmt.Errorf("Fish: Unable to parse cpu limit value: %v", err)
 				}
 				cfg.CPULimit = uint16(val)
 			}
 			if memTarget != "" {
 				if cfg.MemTarget, err = util.NewHumanSize(memTarget); err != nil {
-					return log.Errorf("Fish: Unable to parse mem target value: %v", err)
+					logger.Error("Fish: Unable to parse mem target value", "err", err)
+					return fmt.Errorf("Fish: Unable to parse mem target value: %v", err)
 				}
 			}
 
 			// Set Fish Node resources limits
 			if cfg.CPULimit > 0 {
-				log.Info("Fish CPU limited:", cfg.CPULimit)
+				logger.Info("Fish CPU limited", "cpu_limit", cfg.CPULimit)
 				runtime.GOMAXPROCS(int(cfg.CPULimit))
 			}
 			if cfg.MemTarget > 0 {
-				log.Info("Fish MEM targeted:", cfg.MemTarget.String())
+				logger.Info("Fish MEM targeted", "mem_target", cfg.MemTarget)
 				debug.SetMemoryLimit(int64(cfg.MemTarget.Bytes()))
 			}
 
-			log.Info("Fish init DB...")
+			logger.Info("Fish init DB...")
 			db, err := database.New(filepath.Join(cfg.Directory, cfg.NodeAddress))
 			if err != nil {
 				return err
 			}
 
-			log.Info("Fish init TLS...")
+			logger.Info("Fish init TLS...")
 			caPath := cfg.TLSCaCrt
 			if !filepath.IsAbs(caPath) {
 				caPath = filepath.Join(cfg.Directory, caPath)
@@ -125,35 +130,76 @@ func main() {
 				return err
 			}
 
-			log.Info("Fish starting node...")
+			logger.Info("Fish starting node...")
 			fish, err := fish.New(db, cfg)
 			if err != nil {
 				return err
 			}
 
-			log.Info("Fish starting API...")
+			logger.Info("Fish initializing monitoring...")
+			// Initialize monitoring configuration and overriding values from fish info
+			monitoringConfig := &cfg.Monitoring
+			if monitoringConfig.ServiceName == "" {
+				monitoringConfig.ServiceName = "aquarium-fish"
+			}
+			if monitoringConfig.ServiceVersion == "" {
+				monitoringConfig.ServiceVersion = build.Version
+			}
+			monitoringConfig.NodeUID = db.GetNodeUID().String()
+			monitoringConfig.NodeName = cfg.NodeName
+			monitoringConfig.NodeLocation = cfg.NodeLocation
+
+			// Set up file export path if not configured and no remote endpoints are set
+			if monitoringConfig.FileExportPath == "" && monitoringConfig.Enabled {
+				if monitoringConfig.OTLPEndpoint == "" {
+					monitoringConfig.FileExportPath = "telemetry"
+					logger.Info("Fish: Setting file export path to", "path", monitoringConfig.FileExportPath)
+				}
+			}
+
+			// Initialize monitoring
+			monitor, err := monitoring.Initialize(context.Background(), monitoringConfig)
+			if err != nil {
+				logger.Error("Fish: Unable to initialize monitoring", "err", err)
+				return fmt.Errorf("Fish: Unable to initialize monitoring: %v", err)
+			}
+			defer func() {
+				if monitor != nil {
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+					if err := monitor.Shutdown(ctx); err != nil {
+						logger.Error("Fish: Error shutting down monitoring", "err", err)
+					}
+				}
+			}()
+
+			// Set the monitor on the Fish instance
+			fish.SetMonitor(monitor)
+
+			logger.Info("Fish starting API...")
 			srv, err := server.Init(fish, cfg.APIAddress, caPath, certPath, keyPath)
 			if err != nil {
 				return err
 			}
 
-			log.Info("Fish initialized")
+			// WARN: Used by integration tests
+			logger.Info("Fish initialized", "fish_init", "completed")
 
 			// Wait for signal to quit
 			<-fish.Quit
 
-			log.Info("Fish stopping...")
+			logger.Info("Fish stopping...")
 
 			// Shutdown the server (RPC server will handle streaming connections gracefully)
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 			if err := srv.Shutdown(ctx); err != nil {
-				log.Error("Fish forced to shutdown:", err)
+				logger.Error("Fish forced to shutdown", "err", err)
 			}
 
-			fish.Close()
+			fish.Close(context.Background())
 
-			log.Info("Fish stopped")
+			logger.Info("Fish stopped")
 
 			return nil
 		},

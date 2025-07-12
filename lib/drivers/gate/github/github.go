@@ -15,6 +15,7 @@
 package github
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"path"
@@ -67,11 +68,12 @@ type dbJob struct {
 // isWebhookProcessed makes sure there is no duplication in webhooks processing
 // It's a quick check because all the DB keys are stored in memory
 func (d *Driver) isWebhookProcessed(guid string) bool {
+	logger := log.WithFunc("github", "isWebhookProcessed").With("gate.name", d.name)
 	if ok, err := d.db.Has(dbPrefixHook, guid); ok {
-		//log.Debugf("GITHUB: %s: Skipping processing of duplicated webhook request: %q", d.name, guid)
+		//logger.Debug("Skipping processing of duplicated webhook request", "hook_guid", guid)
 		return true
 	} else if err != nil {
-		log.Errorf("GITHUB: %s: Unable to check availability of the delivery in DB: %v", d.name, err)
+		logger.Error("Unable to check availability of the delivery in DB", "err", err)
 		return true
 	}
 	return false
@@ -82,6 +84,7 @@ func (d *Driver) extractJob(req *github.HookRequest, failOnSecretUnset bool) (*g
 	if req == nil {
 		return nil, fmt.Errorf("Request is empty")
 	}
+	logger := log.WithFunc("github", "extractJob").With("gate.name", d.name)
 
 	headers := req.GetHeaders()
 
@@ -110,7 +113,7 @@ func (d *Driver) extractJob(req *github.HookRequest, failOnSecretUnset bool) (*g
 	}
 	d.webhooksMutex.Unlock()
 
-	log.Debugf("GITHUB: %s: Extracting new job from webhook: %s", d.name, guid)
+	logger.Debug("Extracting new job from webhook", "hook_guid", guid)
 
 	sig, ok := headers[github.SHA256SignatureHeader]
 	if !ok {
@@ -163,7 +166,7 @@ func (d *Driver) extractJob(req *github.HookRequest, failOnSecretUnset bool) (*g
 	}
 
 	// Here we know the webhook is valid so we can return the job back
-	log.Debugf("GITHUB: %s: Extracted the job for webrequest %q: %s", d.name, guid, github.Stringify(workflowJobEvent.GetWorkflowJob()))
+	logger.Debug("Extracted the job for webrequest", "hook_guid", guid, "job", github.Stringify(workflowJobEvent.GetWorkflowJob()))
 
 	return workflowJobEvent.GetWorkflowJob(), nil
 }
@@ -171,7 +174,8 @@ func (d *Driver) extractJob(req *github.HookRequest, failOnSecretUnset bool) (*g
 // executeJob is in charge of actual action over the received webhook job, so here magic is happening
 func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 	runJobID := fmt.Sprintf("%d-%d", job.GetRunID(), job.GetID())
-	log.Debugf("GITHUB: %s: Executing the job %s for repo %s/%s: %s", d.name, runJobID, owner, repo, job.GetStatus())
+	logger := log.WithFunc("github", "executeJob").With("gate.name", d.name, "job_id", runJobID, "repo", owner+"/"+repo)
+	logger.Debug("Executing the job", "job_status", job.GetStatus())
 
 	// Let's find the job in DB or create it if action "queue"
 	record := dbJob{}
@@ -181,7 +185,7 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 	if err == database.ErrObjectNotFound && job.GetStatus() == jobQueued {
 		// Checking labels on the job to link the right one
 		if len(job.Labels) < 2 || job.Labels[0] != "self-hosted" {
-			log.Infof("GITHUB: %s: Skipping the job %s in repo %s/%s due to incorrect labels provided: %q", d.name, runJobID, owner, repo, job.Labels)
+			logger.Info("Skipping the job due to incorrect labels provided", "labels", job.Labels)
 			// We returning nil here because it's not Fish fault someone made a mistake in workflow
 			return nil
 		}
@@ -196,9 +200,9 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 			params.Name = &spl[0]
 			params.Version = &spl[1]
 		}
-		labels, err := d.db.LabelList(params)
+		labels, err := d.db.LabelList(context.Background(), params)
 		if err != nil || len(labels) < 1 {
-			log.Infof("GITHUB: %s: Skipping the job %s on repo %s/%s: Unable to find the requested label %q", d.name, runJobID, owner, repo, job.Labels[1])
+			logger.Info("Skipping the job: Unable to find the requested label", "label", job.Labels[1])
 			// We returning nil here because it's not Fish fault someone made a mistake in workflow
 			return nil //nolint:nilerr
 		}
@@ -211,10 +215,10 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 			return fmt.Errorf("Unable to create runner config: %v", err)
 		}
 		fishName := fmt.Sprintf("fish-%s", crypt.RandString(8))
-		log.Debugf("GITHUB: %s: Job %s of repo %s/%s: Created runner token for Fish %q: %q", d.name, runJobID, owner, repo, fishName, runnerToken.GetToken())
+		logger.Debug("Created runner token for Fish", "fish_id", fishName, "token", runnerToken.GetToken())
 
 		// Sending allocation request to the Fish core to write down the ApplicationUID
-		log.Debugf("GITHUB: %s: Job %s of repo %s/%s: Creating Application using Label %q", d.name, runJobID, owner, repo, labels[0].Uid)
+		logger.Debug("Creating Application using Label", "label_uid", labels[0].Uid)
 		metadata, err := json.Marshal(map[string]string{
 			"GITHUB_RUNNER_URL":       fmt.Sprintf("%s/%s/%s", d.githubURL, owner, repo),
 			"GITHUB_RUNNER_NAME":      fishName,
@@ -229,7 +233,7 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 			OwnerName: d.name,
 			Metadata:  util.UnparsedJSON(metadata),
 		}
-		if err := d.db.ApplicationCreate(&app); err != nil {
+		if err := d.db.ApplicationCreate(context.Background(), &app); err != nil {
 			return fmt.Errorf("Unable to create Application: %v", err)
 		}
 
@@ -258,7 +262,7 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 		// Ok the node is connected and workload started execution
 		// The node could be taken from a different webhook, because there is (sadly) no pinning
 
-		log.Infof("GITHUB: %s: The runner %q (%d) was allocated and executing job: %s", d.name, job.GetRunnerName(), job.GetRunnerID(), runJobID)
+		logger.Info("The runner was allocated and executing job", "runner_name", job.GetRunnerName(), "runner_id", job.GetRunnerID())
 
 		// Updating the record in database to reflect the successful allocation
 		j := dbJob{
@@ -280,10 +284,10 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 	// Processing completed job
 	if err == nil && job.GetStatus() == jobCompleted {
 		// Job completed, so it's time to deallocate the worker and make sure no residue is left
-		log.Infof("GITHUB: %s: The job %s is completed as %q, runner should be gone: %d", d.name, runJobID, job.GetConclusion(), record.RunnerID)
+		logger.Info("Job is completed, runner should be gone", "job_conclusion", job.GetConclusion(), "runner_id", record.RunnerID)
 
 		// Requesting deallocate of the Application
-		if _, err := d.db.ApplicationDeallocate(record.ApplicationUID, fmt.Sprintf("gate/%s", d.name)); err != nil {
+		if _, err := d.db.ApplicationDeallocate(context.Background(), record.ApplicationUID, fmt.Sprintf("gate/%s", d.name)); err != nil {
 			return err
 		}
 
@@ -304,7 +308,7 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 		return nil
 	}
 
-	log.Debugf("GITHUB: %s: Job %s with status %q was skipped: doesn't fit the regular workflow: %v", d.name, runJobID, job.GetStatus(), err)
+	logger.Debug("Job was skipped: doesn't fit the regular workflow", "job_status", job.GetStatus(), "err", err)
 
 	return nil
 }
@@ -312,16 +316,17 @@ func (d *Driver) executeJob(owner, repo string, job *github.WorkflowJob) error {
 // cleanupDBProcess makes sure github data in DB stays not for long - but just for the time needed
 // It's a separated process to keep it for both webhooks & API.
 func (d *Driver) cleanupDBProcess() {
+	logger := log.WithFunc("github", "cleanupDBProcess").With("gate.name", d.name)
 	d.routinesMutex.Lock()
 	d.routines.Add(1)
 	d.routinesMutex.Unlock()
 	defer d.routines.Done()
-	defer log.Infof("GITHUB: %s: cleanupDBProcess stopped", d.name)
+	defer logger.Info("cleanupDBProcess stopped")
 
 	interval := time.Duration(d.cfg.DeliveryValidInterval)
 	cleanupTicker := time.NewTicker(interval)
 	defer cleanupTicker.Stop()
-	log.Infof("GITHUB: %s: cleanupDBProcess: Triggering cleanupDB once per %s", d.name, interval)
+	logger.Info("cleanupDBProcess: Triggering cleanupDB once per", "interval", interval)
 
 	for {
 		select {
@@ -335,6 +340,7 @@ func (d *Driver) cleanupDBProcess() {
 
 // cleanupDB cleans the outdated hooks & jobs
 func (d *Driver) cleanupDB() {
+	logger := log.WithFunc("github", "cleanupDB").With("gate.name", d.name)
 	// Counters to keep statistics
 	counterFound := 0
 	counterRemoved := 0
@@ -350,7 +356,7 @@ func (d *Driver) cleanupDB() {
 		var hook dbWebhook
 		d.db.Get(dbPrefixHook, key, &hook)
 		if hook.CreatedAt.Before(deliveryCutTime) {
-			log.Debugf("GITHUB: %s: cleanupDB: Cleaning webhook record: %s:%s", d.name, dbPrefixHook, key)
+			logger.Debug("Cleaning webhook record", "record", dbPrefixHook+":"+key)
 			d.db.Del(dbPrefixHook, key)
 			counterMutex.Lock()
 			counterRemoved++
@@ -373,9 +379,9 @@ func (d *Driver) cleanupDB() {
 			switch job.Status {
 			case jobCompleted:
 				// The easiest case is with completed jobs - means the application is deallocated
-				log.Debugf("GITHUB: %s: cleanupDB: Cleaning job %s record: %s:%s", d.name, job.Status, dbPrefixJob, key)
+				logger.Debug("Cleaning job record", "job_status", job.Status, "record", dbPrefixJob+":"+key)
 				if err := d.db.Del(dbPrefixJob, key); err != nil {
-					log.Errorf("GITHUB: %s: cleanupDB: Cleaning job %s record: %s:%s failed: %v", d.name, job.Status, dbPrefixJob, key, err)
+					logger.Error("Cleaning job record failed", "job_status", job.Status, "record", dbPrefixJob+":"+key, "err", err)
 				} else {
 					counterMutex.Lock()
 					counterRemoved++
@@ -386,16 +392,16 @@ func (d *Driver) cleanupDB() {
 				// the monitoring to kep the gears rolling. In case it's stall - we will clean it
 				// in DefaultJobMaxLifetime
 				if job.CreatedAt.Before(defaultStaleCutTime) {
-					log.Warnf("GITHUB: %s: cleanupDB: Forcefully removing stale %s job: %s, Application: %s", d.name, job.Status, key, job.ApplicationUID)
+					logger.Warn("Forcefully removing stale job", "job_status", job.Status, "key", key, "app_uid", job.ApplicationUID)
 
 					// Requesting deallocate of the Application
-					if _, err := d.db.ApplicationDeallocate(job.ApplicationUID, fmt.Sprintf("gate/%s", d.name)); err != nil {
-						log.Errorf("GITHUB: %s: cleanupDB: Unable to deallocate Application %s for job %s: %v", d.name, job.ApplicationUID, key, err)
+					if _, err := d.db.ApplicationDeallocate(context.Background(), job.ApplicationUID, fmt.Sprintf("gate/%s", d.name)); err != nil {
+						logger.Error("Unable to deallocate Application for job", "app_uid", job.ApplicationUID, "key", key, "err", err)
 						// Will try next time
 						return nil
 					}
 					if err := d.db.Del(dbPrefixJob, key); err != nil {
-						log.Errorf("GITHUB: %s: cleanupDB: Cleaning job %s record: %s:%s failed: %v", d.name, job.Status, dbPrefixJob, key, err)
+						logger.Error("Cleaning job record failed", "job_status", job.Status, "record", dbPrefixJob+":"+key, "err", err)
 					} else {
 						counterMutex.Lock()
 						counterRemoved++
@@ -408,11 +414,11 @@ func (d *Driver) cleanupDB() {
 				// DefaultJobMaxLifetime), and then removing and deallocating the Application as well
 
 				// First check if the app resource is here at all
-				appRes, err := d.db.ApplicationResourceGetByApplication(job.ApplicationUID)
+				appRes, err := d.db.ApplicationResourceGetByApplication(context.Background(), job.ApplicationUID)
 				if err != nil {
-					log.Warnf("GITHUB: %s: cleanupDB: Forcefully removing stale %s job: %s, Application: %s : %v", d.name, job.Status, key, job.ApplicationUID, err)
+					logger.Warn("Forcefully removing stale job", "job_status", job.Status, "key", key, "app_uid", job.ApplicationUID, "err", err)
 					if err := d.db.Del(dbPrefixJob, key); err != nil {
-						log.Errorf("GITHUB: %s: cleanupDB: Cleaning job %s record: %s:%s failed: %v", d.name, job.Status, dbPrefixJob, key, err)
+						logger.Error("Cleaning job record failed", "job_status", job.Status, "record", dbPrefixJob+":"+key, "err", err)
 					} else {
 						counterMutex.Lock()
 						counterRemoved++
@@ -422,11 +428,11 @@ func (d *Driver) cleanupDB() {
 				}
 
 				// Next if the app is not allocated
-				appState, err := d.db.ApplicationStateGetByApplication(job.ApplicationUID)
+				appState, err := d.db.ApplicationStateGetByApplication(context.Background(), job.ApplicationUID)
 				if err != nil || !d.db.ApplicationStateIsActive(appState.Status) {
-					log.Warnf("GITHUB: %s: cleanupDB: Forcefully removing stale %s job: %s, Application: %s : %v", d.name, job.Status, key, job.ApplicationUID, err)
+					logger.Warn("Forcefully removing stale job", "job_status", job.Status, "key", key, "app_uid", job.ApplicationUID, "err", err)
 					if err := d.db.Del(dbPrefixJob, key); err != nil {
-						log.Errorf("GITHUB: %s: cleanupDB: Cleaning job %s record: %s:%s failed: %v", d.name, job.Status, dbPrefixJob, key, err)
+						logger.Error("Cleaning job record failed", "job_status", job.Status, "record", dbPrefixJob+":"+key, "err", err)
 					} else {
 						counterMutex.Lock()
 						counterRemoved++
@@ -446,16 +452,16 @@ func (d *Driver) cleanupDB() {
 				}
 
 				if appTimeout.Before(time.Now()) {
-					log.Warnf("GITHUB: %s: cleanupDB: Forcefully removing stale %s job: %s, Application: %s", d.name, job.Status, key, job.ApplicationUID)
+					logger.Warn("Forcefully removing stale job", "job_status", job.Status, "key", key, "app_uid", job.ApplicationUID)
 
 					// Requesting deallocate of the Application
-					if _, err := d.db.ApplicationDeallocate(job.ApplicationUID, fmt.Sprintf("gate/%s", d.name)); err != nil {
-						log.Errorf("GITHUB: %s: cleanupDB: Unable to deallocate Application %s for job %s: %v", d.name, job.ApplicationUID, key, err)
+					if _, err := d.db.ApplicationDeallocate(context.Background(), job.ApplicationUID, fmt.Sprintf("gate/%s", d.name)); err != nil {
+						logger.Error("Unable to deallocate Application for job", "app_uid", job.ApplicationUID, "key", key, "err", err)
 						// Will try next time
 						return nil
 					}
 					if err := d.db.Del(dbPrefixJob, key); err != nil {
-						log.Errorf("GITHUB: %s: cleanupDB: Cleaning job %s record: %s:%s failed: %v", d.name, job.Status, dbPrefixJob, key, err)
+						logger.Error("Cleaning job record failed", "job_status", job.Status, "record", dbPrefixJob+":"+key, "err", err)
 					} else {
 						counterMutex.Lock()
 						counterRemoved++
@@ -467,17 +473,18 @@ func (d *Driver) cleanupDB() {
 		return nil
 	})
 
-	log.Debugf("GITHUB: %s: cleanupDB: found %d records and cleaned %d", d.name, counterFound, counterRemoved)
+	logger.Debug("Found records and cleaned", "records", counterFound, "cleaned", counterRemoved)
 }
 
 // Init for token
 func (d *Driver) init() error {
+	logger := log.WithFunc("github", "init").With("gate.name", d.name)
 	// Starting webhook listener first to quickly recover after restart
 	if d.cfg.isWebhookEnabled() {
 		// TODO: Listen for webhook
 		// It's easy to do - just listen for post requests on BindAddress from config and send to
 		// existing procesing function d.extractJob and then to d.executeJob
-		log.Warnf("GITHUB: %s: WebHook listener not yet implemented", d.name)
+		logger.Warn("WebHook listener not yet implemented")
 	}
 
 	// Now running relatively slow API repo updater to ensure the creds are working correctly
@@ -485,22 +492,26 @@ func (d *Driver) init() error {
 		// Validating client
 		var err error
 		if d.cl, err = d.createClient(); err != nil {
-			return log.Errorf("GITHUB: %s: Failed to create client: %v", d.name, err)
+			logger.Error("Failed to create client", "err", err)
+			return fmt.Errorf("GITHUB: %s: Failed to create client: %v", d.name, err)
 		}
 
 		// Receiving hooks from github - checking if the API connectivity works correctly
 		if err = d.updateHooks(); err != nil {
-			return log.Errorf("GITHUB: %s: Failed to update the repositories list: %v", d.name, err)
+			logger.Error("Failed to update the repositories list", "err", err)
+			return fmt.Errorf("GITHUB: %s: Failed to update the repositories list: %v", d.name, err)
 		}
 
 		// Checking for the stale runners
 		if err := d.cleanupRunners(); err != nil {
-			return log.Errorf("GITHUB: %s: Failed to check stale runners: %v", d.name, err)
+			logger.Error("Failed to check stale runners", "err", err)
+			return fmt.Errorf("GITHUB: %s: Failed to check stale runners: %v", d.name, err)
 		}
 
 		// Checking if there is new deliveries
 		if err := d.checkDeliveries(); err != nil {
-			return log.Errorf("GITHUB: %s: Failed to check deliveries: %v", d.name, err)
+			logger.Error("Failed to check deliveries", "err", err)
+			return fmt.Errorf("GITHUB: %s: Failed to check deliveries: %v", d.name, err)
 		}
 
 		// Run schedule to update deliveries periodically

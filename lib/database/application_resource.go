@@ -15,6 +15,7 @@
 package database
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -28,8 +29,8 @@ import (
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
-// ApplicationResourceList returns a list of all known ApplicationResource objects
-func (d *Database) ApplicationResourceList() (rs []typesv2.ApplicationResource, err error) {
+// applicationResourceListImpl returns a list of all known ApplicationResource objects
+func (d *Database) applicationResourceListImpl(_ context.Context) (rs []typesv2.ApplicationResource, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -37,9 +38,9 @@ func (d *Database) ApplicationResourceList() (rs []typesv2.ApplicationResource, 
 	return rs, err
 }
 
-// ApplicationResourceListNode returns list of resources for provided NodeUID
-func (d *Database) ApplicationResourceListNode(nodeUID typesv2.NodeUID) (rs []typesv2.ApplicationResource, err error) {
-	all, err := d.ApplicationResourceList()
+// applicationResourceListNodeImpl returns list of resources for provided NodeUID
+func (d *Database) applicationResourceListNodeImpl(ctx context.Context, nodeUID typesv2.NodeUID) (rs []typesv2.ApplicationResource, err error) {
+	all, err := d.ApplicationResourceList(ctx)
 	if err == nil {
 		for _, r := range all {
 			if r.NodeUid == nodeUID {
@@ -50,8 +51,8 @@ func (d *Database) ApplicationResourceListNode(nodeUID typesv2.NodeUID) (rs []ty
 	return rs, err
 }
 
-// ApplicationResourceCreate makes new Resource
-func (d *Database) ApplicationResourceCreate(r *typesv2.ApplicationResource) error {
+// applicationResourceCreateImpl makes new Resource
+func (d *Database) applicationResourceCreateImpl(_ context.Context, r *typesv2.ApplicationResource) error {
 	if r.ApplicationUid == uuid.Nil {
 		return fmt.Errorf("Fish: ApplicationUID can't be unset")
 	}
@@ -87,7 +88,7 @@ func (d *Database) ApplicationResourceCreate(r *typesv2.ApplicationResource) err
 				// Successfully sent notification
 			default:
 				// Channel is closed or full, skip this subscriber
-				log.Debugf("Database: Failed to send ApplicationResource notification, channel closed or full")
+				log.WithFunc("database", "applicationResourceCreateImpl").Debug("Failed to send ApplicationResource notification, channel closed or full")
 			}
 		}
 	}(r)
@@ -95,8 +96,8 @@ func (d *Database) ApplicationResourceCreate(r *typesv2.ApplicationResource) err
 	return err
 }
 
-// ApplicationResourceDelete removes Resource
-func (d *Database) ApplicationResourceDelete(uid typesv2.ApplicationResourceUID) error {
+// applicationResourceDeleteImpl removes Resource
+func (d *Database) applicationResourceDeleteImpl(_ context.Context, uid typesv2.ApplicationResourceUID) error {
 	// First delete any references to this resource. We don't care about the error if it's happened.
 	_ = d.GateProxySSHAccessDeleteByResource(uid)
 
@@ -107,8 +108,8 @@ func (d *Database) ApplicationResourceDelete(uid typesv2.ApplicationResourceUID)
 	return d.be.Collection(ObjectApplicationResource).Delete(uid.String())
 }
 
-// ApplicationResourceSave stores ApplicationResource
-func (d *Database) ApplicationResourceSave(res *typesv2.ApplicationResource) error {
+// applicationResourceSaveImpl stores ApplicationResource
+func (d *Database) applicationResourceSaveImpl(_ context.Context, res *typesv2.ApplicationResource) error {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -116,8 +117,8 @@ func (d *Database) ApplicationResourceSave(res *typesv2.ApplicationResource) err
 	return d.be.Collection(ObjectApplicationResource).Add(res.Uid.String(), res)
 }
 
-// ApplicationResourceGet returns Resource by it's UID
-func (d *Database) ApplicationResourceGet(uid typesv2.ApplicationResourceUID) (res *typesv2.ApplicationResource, err error) {
+// applicationResourceGetImpl returns Resource by it's UID
+func (d *Database) applicationResourceGetImpl(_ context.Context, uid typesv2.ApplicationResourceUID) (res *typesv2.ApplicationResource, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -160,14 +161,14 @@ func isControlledNetwork(ip string) bool {
 
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		log.Errorf("Unable to get the available network interfaces: %+v\n", err.Error())
+		log.WithFunc("database", "isControlledNetwork").Error("Unable to get the available network interfaces", "err", err.Error())
 		return false
 	}
 
 	for _, i := range ifaces {
 		addrs, err := i.Addrs()
 		if err != nil {
-			log.Errorf("Unable to get available addresses of the interface %s: %+v\n", i.Name, err.Error())
+			log.WithFunc("database", "isControlledNetwork").Error("Unable to get available addresses of the interface", "net_if", i.Name, "err", err.Error())
 			continue
 		}
 
@@ -180,12 +181,12 @@ func isControlledNetwork(ip string) bool {
 	return false
 }
 
-// ApplicationResourceGetByIP returns Resource by it's IP address
-func (d *Database) ApplicationResourceGetByIP(ip string) (res *typesv2.ApplicationResource, err error) {
+// applicationResourceGetByIPImpl returns Resource by it's IP address
+func (d *Database) applicationResourceGetByIPImpl(ctx context.Context, ip string) (res *typesv2.ApplicationResource, err error) {
 	// Check by IP first
-	all, err := d.ApplicationResourceList()
+	all, err := d.ApplicationResourceList(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("Fish: Unable to get any ApplicationResource")
+		return nil, fmt.Errorf("Unable to get any ApplicationResource")
 	}
 	for _, r := range all {
 		if r.NodeUid == d.GetNodeUID() && r.IpAddr == ip {
@@ -195,8 +196,8 @@ func (d *Database) ApplicationResourceGetByIP(ip string) (res *typesv2.Applicati
 	}
 	if res != nil {
 		// Check if the state is allocated to prevent old resources access
-		if d.ApplicationIsAllocated(res.ApplicationUid) != nil {
-			return nil, fmt.Errorf("Fish: Prohibited to access the ApplicationResource of not allocated Application")
+		if d.ApplicationIsAllocated(ctx, res.ApplicationUid) != nil {
+			return nil, fmt.Errorf("Prohibited to access the ApplicationResource of not allocated Application")
 		}
 
 		return res, nil
@@ -205,7 +206,7 @@ func (d *Database) ApplicationResourceGetByIP(ip string) (res *typesv2.Applicati
 	// Make sure the IP is the controlled network, otherwise someone from outside
 	// could become a local node resource, so let's be careful
 	if !isControlledNetwork(ip) {
-		return nil, fmt.Errorf("Fish: Prohibited to serve the ApplicationResource IP from not controlled network")
+		return nil, fmt.Errorf("Prohibited to serve the ApplicationResource IP from not controlled network")
 	}
 
 	// Check by MAC and update IP if found
@@ -221,24 +222,24 @@ func (d *Database) ApplicationResourceGetByIP(ip string) (res *typesv2.Applicati
 		}
 	}
 	if res == nil {
-		return nil, fmt.Errorf("Fish: No ApplicationResource with HW address %s", hwAddr)
+		return nil, fmt.Errorf("No ApplicationResource with HW address %s", hwAddr)
 	}
 
 	// Check if the state is allocated to prevent old resources access
-	if d.ApplicationIsAllocated(res.ApplicationUid) != nil {
-		return nil, fmt.Errorf("Fish: Prohibited to access the ApplicationResource of not allocated Application")
+	if d.ApplicationIsAllocated(ctx, res.ApplicationUid) != nil {
+		return nil, fmt.Errorf("Prohibited to access the ApplicationResource of not allocated Application")
 	}
 
-	log.Debug("Fish: Update IP address for the ApplicationResource", res.ApplicationUid, ip)
+	log.WithFunc("database", "applicationResourceGetByIPImpl").Debug("Update IP address for the ApplicationResource", "app_uid", res.ApplicationUid, "ip", ip)
 	res.IpAddr = ip
-	err = d.ApplicationResourceSave(res)
+	err = d.ApplicationResourceSave(ctx, res)
 
 	return res, err
 }
 
-// ApplicationResourceGetByApplication returns ApplicationResource by ApplicationUID
-func (d *Database) ApplicationResourceGetByApplication(appUID typesv2.ApplicationUID) (res *typesv2.ApplicationResource, err error) {
-	all, err := d.ApplicationResourceList()
+// applicationResourceGetByApplicationImpl returns ApplicationResource by ApplicationUID
+func (d *Database) applicationResourceGetByApplicationImpl(ctx context.Context, appUID typesv2.ApplicationUID) (res *typesv2.ApplicationResource, err error) {
+	all, err := d.ApplicationResourceList(ctx)
 	if err == nil {
 		for _, r := range all {
 			if r.ApplicationUid == appUID {
@@ -249,15 +250,15 @@ func (d *Database) ApplicationResourceGetByApplication(appUID typesv2.Applicatio
 	return res, fmt.Errorf("Fish: Unable to find ApplicationResource with requested Application UID: %s", appUID.String())
 }
 
-// SubscribeApplicationResource adds a channel to the subscription list
-func (d *Database) SubscribeApplicationResource(ch chan *typesv2.ApplicationResource) {
+// subscribeApplicationResourceImpl adds a channel to the subscription list
+func (d *Database) subscribeApplicationResourceImpl(_ context.Context, ch chan *typesv2.ApplicationResource) {
 	d.subsMu.Lock()
 	defer d.subsMu.Unlock()
 	d.subsApplicationResource = append(d.subsApplicationResource, ch)
 }
 
-// UnsubscribeApplicationResource removes a channel from the subscription list
-func (d *Database) UnsubscribeApplicationResource(ch chan *typesv2.ApplicationResource) {
+// unsubscribeApplicationResourceImpl removes a channel from the subscription list
+func (d *Database) unsubscribeApplicationResourceImpl(_ context.Context, ch chan *typesv2.ApplicationResource) {
 	d.subsMu.Lock()
 	defer d.subsMu.Unlock()
 	for i, existing := range d.subsApplicationResource {

@@ -38,6 +38,7 @@ func isYAMLContentType(contentType string) bool {
 // YAMLToJSONHandler is a HTTP middleware that converts YAML to JSON
 func YAMLToJSONHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logger := log.WithFunc("rpc", "YAMLToJSONHandler")
 		// Check if request has YAML content type
 		contentType := r.Header.Get("Content-Type")
 		if !isYAMLContentType(contentType) {
@@ -56,7 +57,7 @@ func YAMLToJSONHandler(next http.Handler) http.Handler {
 		// Convert YAML to JSON
 		var yamlData any
 		if err := yaml.Unmarshal(body, &yamlData); err != nil {
-			log.Debugf("YAML: Failed to unmarshal YAML: %v", err)
+			logger.Debug("Failed to unmarshal YAML", "err", err)
 			http.Error(w, "Invalid YAML format", http.StatusBadRequest)
 			return
 		}
@@ -64,12 +65,12 @@ func YAMLToJSONHandler(next http.Handler) http.Handler {
 		// Convert to JSON
 		jsonData, err := json.Marshal(yamlData)
 		if err != nil {
-			log.Debugf("YAML: Failed to marshal to JSON: %v", err)
+			logger.Debug("Failed to marshal to JSON", "err", err)
 			http.Error(w, "Failed to convert YAML to JSON", http.StatusInternalServerError)
 			return
 		}
 
-		log.Debugf("YAML: Successfully converted YAML to JSON for %s", r.URL.Path)
+		logger.Debug("Successfully converted YAML to JSON", "path", r.URL.Path)
 
 		// Update request
 		r.Body = io.NopCloser(bytes.NewReader(jsonData))

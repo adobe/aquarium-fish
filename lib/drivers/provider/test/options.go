@@ -16,6 +16,7 @@ package test
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/util"
@@ -35,7 +36,8 @@ type Options struct {
 // Apply takes json and applies it to the options structure
 func (o *Options) Apply(options util.UnparsedJSON) error {
 	if err := json.Unmarshal([]byte(options), o); err != nil {
-		return log.Error("TEST: Unable to apply the driver options:", err)
+		log.WithFunc("test", "Apply").Error("Unable to apply the driver options", "err", err)
+		return fmt.Errorf("TEST: Unable to apply the driver options: %v", err)
 	}
 
 	if err := o.Validate(); err != nil {

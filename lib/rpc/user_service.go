@@ -54,8 +54,8 @@ func (*UserService) GetMe(ctx context.Context, _ /*req*/ *connect.Request[aquari
 }
 
 // List implements the List RPC
-func (s *UserService) List(_ /*ctx*/ context.Context, _ /*req*/ *connect.Request[aquariumv2.UserServiceListRequest]) (*connect.Response[aquariumv2.UserServiceListResponse], error) {
-	users, err := s.fish.DB().UserList()
+func (s *UserService) List(ctx context.Context, _ /*req*/ *connect.Request[aquariumv2.UserServiceListRequest]) (*connect.Response[aquariumv2.UserServiceListResponse], error) {
+	users, err := s.fish.DB().UserList(ctx)
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceListResponse{
 			Status: false, Message: "Failed to list users: " + err.Error(),
@@ -80,8 +80,8 @@ func (s *UserService) List(_ /*ctx*/ context.Context, _ /*req*/ *connect.Request
 }
 
 // Get implements the Get RPC
-func (s *UserService) Get(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.UserServiceGetRequest]) (*connect.Response[aquariumv2.UserServiceGetResponse], error) {
-	user, err := s.fish.DB().UserGet(req.Msg.GetUserName())
+func (s *UserService) Get(ctx context.Context, req *connect.Request[aquariumv2.UserServiceGetRequest]) (*connect.Response[aquariumv2.UserServiceGetResponse], error) {
+	user, err := s.fish.DB().UserGet(ctx, req.Msg.GetUserName())
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceGetResponse{
 			Status: false, Message: "User not found: " + err.Error(),
@@ -99,7 +99,7 @@ func (s *UserService) Get(_ /*ctx*/ context.Context, req *connect.Request[aquari
 }
 
 // Create implements the Create RPC
-func (s *UserService) Create(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.UserServiceCreateRequest]) (*connect.Response[aquariumv2.UserServiceCreateResponse], error) {
+func (s *UserService) Create(ctx context.Context, req *connect.Request[aquariumv2.UserServiceCreateRequest]) (*connect.Response[aquariumv2.UserServiceCreateResponse], error) {
 	msgUser := req.Msg.GetUser()
 	if msgUser == nil {
 		return connect.NewResponse(&aquariumv2.UserServiceCreateResponse{
@@ -113,7 +113,7 @@ func (s *UserService) Create(_ /*ctx*/ context.Context, req *connect.Request[aqu
 	}
 
 	// Create new user
-	password, user, err := s.fish.DB().UserNew(msgUser.GetName(), password)
+	password, user, err := s.fish.DB().UserNew(ctx, msgUser.GetName(), password)
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceCreateResponse{
 			Status: false, Message: "Failed to create user: " + err.Error(),
@@ -124,7 +124,7 @@ func (s *UserService) Create(_ /*ctx*/ context.Context, req *connect.Request[aqu
 	if msgUser.Roles != nil {
 		user.Roles = msgUser.GetRoles()
 
-		if err := s.fish.DB().UserSave(user); err != nil {
+		if err := s.fish.DB().UserSave(ctx, user); err != nil {
 			return connect.NewResponse(&aquariumv2.UserServiceCreateResponse{
 				Status: false, Message: "Failed to update user: " + err.Error(),
 			}), connect.NewError(connect.CodeInternal, err)
@@ -160,7 +160,7 @@ func (s *UserService) Update(ctx context.Context, req *connect.Request[aquariumv
 			Status: false, Message: "Permission denied",
 		}), connect.NewError(connect.CodePermissionDenied, fmt.Errorf("Permission denied"))
 	}
-	user, err := s.fish.DB().UserGet(msgUser.GetName())
+	user, err := s.fish.DB().UserGet(ctx, msgUser.GetName())
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceUpdateResponse{
 			Status: false, Message: "User not found: " + err.Error(),
@@ -180,7 +180,7 @@ func (s *UserService) Update(ctx context.Context, req *connect.Request[aquariumv
 		user.Roles = msgUser.GetRoles()
 	}
 
-	if err := s.fish.DB().UserSave(user); err != nil {
+	if err := s.fish.DB().UserSave(ctx, user); err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceUpdateResponse{
 			Status: false, Message: "Failed to update user: " + err.Error(),
 		}), connect.NewError(connect.CodeInternal, err)
@@ -197,8 +197,8 @@ func (s *UserService) Update(ctx context.Context, req *connect.Request[aquariumv
 }
 
 // Delete implements the Delete RPC
-func (s *UserService) Delete(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.UserServiceDeleteRequest]) (*connect.Response[aquariumv2.UserServiceDeleteResponse], error) {
-	if err := s.fish.DB().UserDelete(req.Msg.GetUserName()); err != nil {
+func (s *UserService) Delete(ctx context.Context, req *connect.Request[aquariumv2.UserServiceDeleteRequest]) (*connect.Response[aquariumv2.UserServiceDeleteResponse], error) {
+	if err := s.fish.DB().UserDelete(ctx, req.Msg.GetUserName()); err != nil {
 		return connect.NewResponse(&aquariumv2.UserServiceDeleteResponse{
 			Status: false, Message: "Failed to delete user: " + err.Error(),
 		}), connect.NewError(connect.CodeNotFound, err)

@@ -66,9 +66,9 @@ func (*Processor) Return(w http.ResponseWriter, r *http.Request, code int, obj m
 // DataGetList returns metadata assigned to the Resource
 func (p *Processor) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Only the existing local resource access it's metadata
-	res, err := p.fish.DB().ApplicationResourceGetByIP(strings.TrimSpace(strings.Split(r.RemoteAddr, ":")[0]))
+	res, err := p.fish.DB().ApplicationResourceGetByIP(r.Context(), strings.TrimSpace(strings.Split(r.RemoteAddr, ":")[0]))
 	if err != nil {
-		log.Warn("API META: Unauthorized access to meta:", err)
+		log.WithFunc("meta", "ServeHTTP").Warn("Unauthorized access to meta", "err", err)
 		p.Return(w, r, http.StatusUnauthorized, H{"message": "Unauthorized"})
 		return
 	}
@@ -76,7 +76,7 @@ func (p *Processor) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var metadata map[string]any
 
 	if err = json.Unmarshal([]byte(res.Metadata), &metadata); err != nil {
-		log.Errorf("Unable to parse metadata of Resource: %s %s: %w", res.Uid, res.Metadata, err)
+		log.WithFunc("meta", "ServeHTTP").Error("Unable to parse metadata of Resource", "res_uid", res.Uid, "res_metadata", res.Metadata, "err", err)
 		p.Return(w, r, http.StatusNotFound, H{"message": "Unable to parse metadata json"})
 		return
 	}

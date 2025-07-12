@@ -16,12 +16,19 @@
 package database
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"go.mills.io/bitcask/v2"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/adobe/aquarium-fish/lib/log"
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
@@ -48,55 +55,151 @@ type Database struct {
 	subsApplicationState    []chan *typesv2.ApplicationState
 	subsApplicationTask     []chan *typesv2.ApplicationTask
 	subsApplicationResource []chan *typesv2.ApplicationResource
+
+	// OpenTelemetry instrumentation
+	tracer trace.Tracer
+	meter  metric.Meter
+
+	// Metrics
+	dbOperationDuration metric.Float64Histogram
+	dbOperationCounter  metric.Int64Counter
+	dbSizeGauge         metric.Int64Gauge
+	dbKeysGauge         metric.Int64Gauge
+	dbReclaimableGauge  metric.Int64Gauge
 }
 
 // Init creates the database object by provided path
 func New(path string) (*Database, error) {
 	if err := os.MkdirAll(path, 0o750); err != nil {
-		return nil, log.Errorf("DB: Can't create working directory %s: %v", path, err)
+		log.WithFunc("database", "New").Error("Can't create working directory", "path", path, "err", err)
+		return nil, fmt.Errorf("DB: Can't create working directory %s: %v", path, err)
 	}
 
 	be, err := bitcask.Open(filepath.Join(path, "bitcask.db"))
 	if err != nil {
-		return nil, log.Errorf("DB: Unable to initialize database: %v", err)
+		log.WithFunc("database", "New").Error("Unable to initialize database", "err", err)
+		return nil, fmt.Errorf("DB: Unable to initialize database: %v", err)
 	}
 
-	return &Database{be: be}, nil
+	db := &Database{be: be}
+
+	// Initialize OpenTelemetry instrumentation
+	db.tracer = otel.Tracer("aquarium-fish-database")
+	db.meter = otel.Meter("aquarium-fish-database")
+
+	// Create metrics
+	db.dbOperationDuration, _ = db.meter.Float64Histogram(
+		"aquarium_fish_db_operation_duration_seconds",
+		metric.WithDescription("Duration of database operations"),
+		metric.WithUnit("s"),
+	)
+
+	db.dbOperationCounter, _ = db.meter.Int64Counter(
+		"aquarium_fish_db_operations_total",
+		metric.WithDescription("Total number of database operations"),
+	)
+
+	db.dbSizeGauge, _ = db.meter.Int64Gauge(
+		"aquarium_fish_db_size_bytes",
+		metric.WithDescription("Current database size in bytes"),
+	)
+
+	db.dbKeysGauge, _ = db.meter.Int64Gauge(
+		"aquarium_fish_db_keys_total",
+		metric.WithDescription("Total number of keys in database"),
+	)
+
+	db.dbReclaimableGauge, _ = db.meter.Int64Gauge(
+		"aquarium_fish_db_reclaimable_bytes",
+		metric.WithDescription("Reclaimable space in database"),
+	)
+
+	return db, nil
 }
 
 // CompactDB runs stale Applications and data removing
-func (d *Database) CompactDB() error {
-	log.Debug("DB: CompactDB locking...")
-	defer log.Debug("Fish: CompactDB done")
+func (d *Database) CompactDB(ctx context.Context) error {
+	ctx, span := d.tracer.Start(ctx, "database.compactdb")
+	defer span.End()
+	logger := log.WithFunc("database", "CompactDB")
+
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start).Seconds()
+		d.dbOperationDuration.Record(ctx, duration, metric.WithAttributes(
+			attribute.String("operation", "compact"),
+		))
+		d.dbOperationCounter.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("operation", "compact"),
+		))
+	}()
+
+	logger.DebugContext(ctx, "Locking...")
+	defer logger.DebugContext(ctx, "Done")
 
 	// Locking entire database
 	d.beMu.Lock()
 	defer d.beMu.Unlock()
-	log.Debug("DB: CompactDB running...")
+	logger.DebugContext(ctx, "Running...")
 
 	s, _ := d.be.Stats()
-	log.Debugf("DB: CompactDB: Before compaction: Datafiles: %d, Keys: %d, Size: %d, Reclaimable: %d", s.Datafiles, s.Keys, s.Size, s.Reclaimable)
+	logger.DebugContext(ctx, "Before compaction", "datafiles", s.Datafiles, "keys", s.Keys, "size", s.Size, "reclaimable", s.Reclaimable)
+
+	// Record metrics before compaction
+	d.dbSizeGauge.Record(ctx, s.Size)
+	d.dbKeysGauge.Record(ctx, int64(s.Keys))
+	d.dbReclaimableGauge.Record(ctx, s.Reclaimable)
+
+	span.SetAttributes(
+		attribute.Int64("db.size_before", s.Size),
+		attribute.Int64("db.keys_before", int64(s.Keys)),
+		attribute.Int64("db.reclaimable_before", s.Reclaimable),
+	)
 
 	if err := d.be.Merge(); err != nil {
-		return log.Errorf("DB: CompactDB: Merge operation failed: %v", err)
+		span.RecordError(err)
+		d.dbOperationCounter.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("operation", "compact"),
+			attribute.String("result", "error"),
+		))
+		logger.ErrorContext(ctx, "Merge operation failed", "err", err)
+		return fmt.Errorf("DB: CompactDB: Merge operation failed: %v", err)
 	}
 
 	s, _ = d.be.Stats()
-	log.Debugf("DB: CompactDB: After compaction: Datafiles: %d, Keys: %d, Size: %d, Reclaimable: %d", s.Datafiles, s.Keys, s.Size, s.Reclaimable)
+	// WARN: Used by integration tests
+	logger.DebugContext(ctx, "After compaction", "datafiles", s.Datafiles, "keys", s.Keys, "size", s.Size, "reclaimable", s.Reclaimable, "compactdb", "after")
+
+	// Record metrics after compaction
+	d.dbSizeGauge.Record(ctx, s.Size)
+	d.dbKeysGauge.Record(ctx, int64(s.Keys))
+	d.dbReclaimableGauge.Record(ctx, s.Reclaimable)
+
+	span.SetAttributes(
+		attribute.Int64("db.size_after", s.Size),
+		attribute.Int64("db.keys_after", int64(s.Keys)),
+		attribute.Int64("db.reclaimable_after", s.Reclaimable),
+	)
+
+	d.dbOperationCounter.Add(ctx, 1, metric.WithAttributes(
+		attribute.String("operation", "compact"),
+		attribute.String("result", "success"),
+	))
 
 	return nil
 }
 
-// Shutdown compacts database backend and closes it
-func (d *Database) Shutdown() error {
-	d.CompactDB()
+// shutdownImpl compacts database backend and closes it
+func (d *Database) shutdownImpl(ctx context.Context) error {
+	d.CompactDB(ctx)
 
 	// Waiting for all the current requests to be done by acquiring write lock and closing the DB
 	d.beMu.Lock()
 	defer d.beMu.Unlock()
 
 	if err := d.be.Close(); err != nil {
-		return log.Errorf("DB: Unable to close backend: %v", err)
+		log.WithFunc("database", "shutdownImpl").ErrorContext(ctx, "Unable to close backend", "err", err)
+		return fmt.Errorf("DB: Unable to close backend: %v", err)
 	}
 
 	return nil

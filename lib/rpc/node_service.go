@@ -31,8 +31,8 @@ type NodeService struct {
 }
 
 // List returns a list of nodes
-func (s *NodeService) List(_ /*ctx*/ context.Context, _ /*req*/ *connect.Request[aquariumv2.NodeServiceListRequest]) (*connect.Response[aquariumv2.NodeServiceListResponse], error) {
-	out, err := s.fish.DB().NodeList()
+func (s *NodeService) List(ctx context.Context, _ /*req*/ *connect.Request[aquariumv2.NodeServiceListRequest]) (*connect.Response[aquariumv2.NodeServiceListResponse], error) {
+	out, err := s.fish.DB().NodeList(ctx)
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.NodeServiceListResponse{
 			Status: false, Message: fmt.Sprintf("Unable to get the node list: %v", err),

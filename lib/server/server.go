@@ -19,11 +19,14 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"syscall"
 	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/fish"
@@ -42,12 +45,12 @@ type Wrapper struct {
 func (sw *Wrapper) Shutdown(ctx context.Context) error {
 	// First shutdown RPC server (which handles streaming connections)
 	if err := sw.rpcServer.Shutdown(ctx); err != nil {
-		log.Errorf("API: Error during RPC server shutdown: %v", err)
+		log.WithFunc("server", "Shutdown").Error("Error during RPC server shutdown", "err", err)
 	}
 
 	// Then shutdown HTTP server
 	if err := sw.httpServer.Shutdown(ctx); err != nil {
-		log.Errorf("API: Error during HTTP server shutdown: %v", err)
+		log.WithFunc("server", "Shutdown").Error("Error during HTTP server shutdown", "err", err)
 		return err
 	}
 
@@ -56,6 +59,7 @@ func (sw *Wrapper) Shutdown(ctx context.Context) error {
 
 // Init startups the API server to listen for incoming requests
 func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*Wrapper, error) {
+	logger := log.WithFunc("server", "Init")
 	caPool := x509.NewCertPool()
 	if caBytes, err := os.ReadFile(caPath); err == nil {
 		caPool.AppendCertsFromPEM(caBytes)
@@ -82,9 +86,16 @@ func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*Wrapper,
 	// Handle pprof debug endpoints if compiled as debug
 	serverConnectPprofIfDebug(mux)
 
+	// Wrap with OpenTelemetry HTTP instrumentation if monitoring is enabled
+	var handler http.Handler = mux
+	if monitor := f.GetMonitor(); monitor != nil && monitor.IsEnabled() {
+		handler = otelhttp.NewHandler(handler, "aquarium-fish-api")
+		logger.Info("API: OpenTelemetry HTTP instrumentation enabled")
+	}
+
 	s := &http.Server{
 		Addr:    apiAddress,
-		Handler: mux,
+		Handler: handler,
 		TLSConfig: &tls.Config{ // #nosec G402 , keep the compatibility high since not public access
 			ClientAuth: tls.RequestClientCert, // Need for the client certificate auth
 			ClientCAs:  caPool,                // Verify client certificate with the cluster CA
@@ -103,7 +114,8 @@ func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*Wrapper,
 
 	tlsListener, err := net.Listen("tcp", s.Addr)
 	if err != nil {
-		return &Wrapper{httpServer: s, rpcServer: rpcServer}, log.Error("API: Unable to start listener:", err)
+		logger.Error("Unable to start listener", "err", err)
+		return &Wrapper{httpServer: s, rpcServer: rpcServer}, fmt.Errorf("API: Unable to start listener: %v", err)
 	}
 
 	// There is a bit of chance that API server will not startup properly,
@@ -112,13 +124,14 @@ func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*Wrapper,
 		defer tlsListener.Close()
 
 		if err := s.ServeTLS(tlsListener, certPath, keyPath); err != http.ErrServerClosed {
-			log.Error("API: Unable to start API server:", err)
+			logger.Error("Unable to start API server", "err", err)
 			errChan <- err
 			f.Quit <- syscall.SIGQUIT
 		}
 	}()
 
-	log.Info("API listening on:", tlsListener.Addr())
+	// WARN: Used by integration tests
+	logger.Info("API listening", "addr", tlsListener.Addr())
 
 	return &Wrapper{httpServer: s, rpcServer: rpcServer}, nil
 }

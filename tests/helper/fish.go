@@ -18,6 +18,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -115,8 +116,7 @@ type AFInstance struct {
 	nodeName   string
 	adminToken string
 
-	apiEndpoint      string
-	proxysshEndpoint string
+	apiEndpoint string
 
 	waitForLog   map[string]func(string, string) bool
 	waitForLogMu sync.RWMutex
@@ -133,8 +133,18 @@ type AFInstance struct {
 // NewAquariumFish simple creates and run the fish node
 func NewAquariumFish(tb testing.TB, name, cfg string, args ...string) *AFInstance {
 	tb.Helper()
-	afi := NewAfInstance(tb, name, cfg)
+
+	afi := NewStoppedAquariumFish(tb, name, cfg)
 	afi.Start(tb, args...)
+
+	return afi
+}
+
+// NewStoppedAquariumFish creates the fish node
+func NewStoppedAquariumFish(tb testing.TB, name, cfg string) *AFInstance {
+	tb.Helper()
+
+	afi := NewAfInstance(tb, name, cfg)
 
 	return afi
 }
@@ -156,6 +166,30 @@ func NewAfInstance(tb testing.TB, name, cfg string) *AFInstance {
 	}
 	tb.Log("INFO: Created workspace:", afi.nodeName, afi.workspace)
 
+	// Enabling monitoring if env variable FISH_MONITORING is set
+	if envAddr, ok := os.LookupEnv("FISH_MONITORING"); ok {
+		if strings.Contains(cfg, "monitoring:") {
+			tb.Log("WARN: Unable to enable monitoring due to config has monitoring already")
+		} else {
+			if envAddr != "" {
+				tb.Logf("Enabling Fish remote OTLP/Pyroscope monitoring: %s", envAddr)
+			} else {
+				tb.Logf("Enabling Fish file-based monitoring")
+			}
+			monitoringCfg := fmt.Sprintf(`
+monitoring:
+  enabled: true
+
+  otlp_endpoint: %s:4317
+  pyroscope_url: http://%s:4040
+
+  sample_rate: 1.0
+  metrics_interval: "5s"
+  profiling_interval: "10s"`, envAddr, envAddr)
+			// Add monitoring configuration to the fish config
+			cfg += monitoringCfg
+		}
+	}
 	cfg += fmt.Sprintf("\nnode_name: %q", afi.nodeName)
 	os.WriteFile(filepath.Join(afi.workspace, "config.yml"), []byte(cfg), 0o600)
 	tb.Log("INFO: Stored config:", cfg)
@@ -196,13 +230,6 @@ func (afi *AFInstance) APIEndpoint() string {
 	afi.configMu.RLock()
 	defer afi.configMu.RUnlock()
 	return afi.apiEndpoint
-}
-
-// ProxySSHEndpoint will return IP:PORT
-func (afi *AFInstance) ProxySSHEndpoint() string {
-	afi.configMu.RLock()
-	defer afi.configMu.RUnlock()
-	return afi.proxysshEndpoint
 }
 
 // APIAddress will return url to access API of AquariumFish
@@ -267,7 +294,6 @@ func (afi *AFInstance) Stop(tb testing.TB) {
 	defer func() {
 		// Not cleaning adminToken, because it's created just one time for DB
 		afi.apiEndpoint = ""
-		afi.proxysshEndpoint = ""
 	}()
 
 	// Send interrupt signal
@@ -415,33 +441,21 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 		return true
 	})
 
-	afi.WaitForLog("API listening on: ", func(substring, line string) bool {
-		val := strings.SplitN(strings.TrimSpace(line), substring, 2)
-		if len(val) < 2 {
-			initDone <- fmt.Sprintf("ERROR: No address after %q", substring)
+	afi.WaitForLog(` server.addr=`, func(substring, line string) bool {
+		data := strings.SplitN(strings.TrimSpace(line), substring, 2)
+		addrport, err := netip.ParseAddrPort(data[1])
+		if err != nil {
+			initDone <- fmt.Sprintf("ERROR: Unable to parse address:port from data %q: %v", data[1], err)
 			return false
 		}
 		afi.configMu.Lock()
-		afi.apiEndpoint = val[1]
+		afi.apiEndpoint = addrport.String()
 		afi.configMu.Unlock()
-		tb.Logf("Located api endpoint: %q", val[1])
+		tb.Logf("Located api endpoint: %q", afi.apiEndpoint)
 
 		return true
 	})
-	afi.WaitForLog("PROXYSSH listening on: ", func(substring, line string) bool {
-		val := strings.SplitN(strings.TrimSpace(line), substring, 2)
-		if len(val) < 2 {
-			initDone <- fmt.Sprintf("ERROR: No address after %q", substring)
-			return false
-		}
-		afi.configMu.Lock()
-		afi.proxysshEndpoint = val[1]
-		afi.configMu.Unlock()
-		tb.Logf("Located proxyssh endpoint: %q", val[1])
-
-		return true
-	})
-	afi.WaitForLog("Fish initialized", func(substring, line string) bool {
+	afi.WaitForLog(` main.fish_init=completed`, func(substring, line string) bool {
 		if !strings.HasSuffix(line, substring) {
 			return false
 		}

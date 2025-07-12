@@ -73,15 +73,16 @@ func (d *Driver) newDedicatedPoolWorker(name string, record DedicatedPoolRecord)
 
 	go worker.backgroundProcess()
 
-	log.Debugf("AWS: %s: Created dedicated pool: %q", d.name, worker.name)
+	log.WithFunc("aws", "newDedicatedPoolWorker").Debug("Created dedicated pool", "provider.name", d.name, "dedicated", worker.name)
 
 	return worker
 }
 
 func (w *dedicatedPoolWorker) AvailableCapacity(instanceType string) int64 {
+	logger := log.WithFunc("aws", "AvailableCapacity").With("provider.name", w.driver.name, "dedicated", w.name)
 	// Check if instance type fits the pool type
 	if instanceType != w.record.Type {
-		log.Warnf("AWS: %s: dedicated %q: Incorrect pool type requested: %s", w.driver.name, w.name, instanceType)
+		logger.Warn("Incorrect pool type requested", "inst_type", instanceType)
 		return -1
 	}
 
@@ -89,7 +90,7 @@ func (w *dedicatedPoolWorker) AvailableCapacity(instanceType string) int64 {
 
 	if err := w.updateDedicatedHosts(); err != nil {
 		w.activeHostsMu.RLock()
-		log.Warnf("AWS: %s: dedicated %q: Unable to update dedicated hosts list, continue with %q: %v", w.driver.name, w.activeHostsUpdated, err)
+		logger.Warn("Unable to update dedicated hosts list, continue", "updated", w.activeHostsUpdated, "err", err)
 		w.activeHostsMu.RUnlock()
 	}
 
@@ -104,15 +105,16 @@ func (w *dedicatedPoolWorker) AvailableCapacity(instanceType string) int64 {
 	// Let's add the amount of instances we can allocate
 	instCount += (int64(w.record.Max) - int64(len(w.activeHosts))) * int64(w.instancesPerHost)
 
-	log.Debugf("AWS: %s: dedicated %q: AvailableCapacity for dedicated host type %q: %d", w.driver.name, w.name, w.record.Type, instCount)
+	logger.Debug("AvailableCapacity for dedicated host type", "type", w.record.Type, "capacity", instCount)
 
 	return instCount
 }
 
 // Internally reserves the existing dedicated host if possible till the next list update
 func (w *dedicatedPoolWorker) ReserveHost(instanceType string) (string, string) {
+	logger := log.WithFunc("aws", "ReserveHost").With("provider.name", w.driver.name, "dedicated", w.name)
 	if instanceType != w.record.Type {
-		log.Warnf("AWS: %s: dedicated %q: Incorrect pool type requested: %s", w.driver.name, w.name, instanceType)
+		logger.Warn("Incorrect pool type requested", "type", instanceType)
 		return "", ""
 	}
 
@@ -130,7 +132,7 @@ func (w *dedicatedPoolWorker) ReserveHost(instanceType string) (string, string) 
 	}
 
 	if len(availableHosts) < 1 {
-		log.Infof("AWS: %s: dedicated %q: No available hosts found in the current active list", w.driver.name, w.name)
+		logger.Info("No available hosts found in the current active list")
 		return "", ""
 	}
 
@@ -144,20 +146,21 @@ func (w *dedicatedPoolWorker) ReserveHost(instanceType string) (string, string) 
 
 // Allocates the new dedicated host if possible
 func (w *dedicatedPoolWorker) AllocateHost(instanceType string) (string, string) {
+	logger := log.WithFunc("aws", "AllocateHost").With("provider.name", w.driver.name, "dedicated", w.name)
 	if instanceType != w.record.Type {
-		log.Warnf("AWS: %s: dedicated %q: Incorrect pool type requested: %s", w.driver.name, w.name, instanceType)
+		logger.Warn("Incorrect pool type requested", "type", instanceType)
 		return "", ""
 	}
 
 	currActiveHosts := len(w.activeHosts)
 	if w.record.Max <= uint(currActiveHosts) {
-		log.Warnf("AWS: %s: dedicated %q: Unable to request new host due to reached the maximum limit: %d <= %d", w.driver.name, w.name, w.record.Max, currActiveHosts)
+		logger.Warn("Unable to request new host due to reached the maximum limit", "max", w.record.Max, "curr", currActiveHosts)
 		return "", ""
 	}
 
 	host, zone, err := w.allocateDedicatedHost()
 	if err != nil || host == "" {
-		log.Errorf("AWS: %s: dedicated %q: Failed to allocate the new host: %v", w.driver.name, w.name, err)
+		logger.Error("Failed to allocate the new host", "err", err)
 		return "", ""
 	}
 
@@ -167,7 +170,8 @@ func (w *dedicatedPoolWorker) AllocateHost(instanceType string) (string, string)
 // Will reserve existing or allocate the new host
 func (w *dedicatedPoolWorker) ReserveAllocateHost(instanceType string) (string, string) {
 	if instanceType != w.record.Type {
-		log.Warnf("AWS: %s: dedicated %q: Incorrect pool type requested: %s", w.driver.name, w.name, instanceType)
+		logger := log.WithFunc("aws", "ReserveAllocateHost").With("provider.name", w.driver.name, "dedicated", w.name)
+		logger.Warn("Incorrect pool type requested", "type", instanceType)
 		return "", ""
 	}
 
@@ -179,6 +183,7 @@ func (w *dedicatedPoolWorker) ReserveAllocateHost(instanceType string) (string, 
 }
 
 func (w *dedicatedPoolWorker) fetchInstancesPerHost() {
+	logger := log.WithFunc("aws", "fetchInstancesPerHost").With("provider.name", w.driver.name, "dedicated", w.name)
 	if strings.HasSuffix(w.record.Type, ".metal") {
 		// We don't need to continue because metal == metal and means 1:1 capacity
 		w.instancesPerHost = 1
@@ -200,7 +205,7 @@ func (w *dedicatedPoolWorker) fetchInstancesPerHost() {
 	for {
 		instTypes, err := w.driver.getTypes(conn, types)
 		if err != nil {
-			log.Errorf("AWS: %s: dedicated %q: Unable to get types %q (will retry): %v", w.driver.name, w.name, types, err)
+			logger.Error("Unable to get types, will retry", "types", types, "err", err)
 			time.Sleep(10 * time.Second)
 			continue
 		}
@@ -208,14 +213,15 @@ func (w *dedicatedPoolWorker) fetchInstancesPerHost() {
 		instVcpus := aws.ToInt32(instTypes[w.record.Type].VCpuInfo.DefaultVCpus)
 		hostVcpus := aws.ToInt32(instTypes[hostType].VCpuInfo.DefaultVCpus)
 		w.instancesPerHost = uint(hostVcpus / instVcpus)
-		log.Debugf("AWS: %s: dedicated %q: Fetched amount of instances per host: %d", w.driver.name, w.name, w.instancesPerHost)
+		logger.Debug("Fetched amount of instances per host", "amount", w.instancesPerHost)
 		return
 	}
 }
 
 // Runs function which holds the dedicated pool worker and executes it's processes
 func (w *dedicatedPoolWorker) backgroundProcess() {
-	defer log.Infof("AWS: %s: dedicated %q: Exited backgroundProcess()", w.driver.name, w.name)
+	logger := log.WithFunc("aws", "backgroundProcess").With("provider.name", w.driver.name, "dedicated", w.name)
+	defer logger.Info("Exited backgroundProcess()")
 
 	// Updating hosts and start background process for periodic update
 	w.updateDedicatedHosts()
@@ -234,6 +240,7 @@ func (w *dedicatedPoolWorker) backgroundProcess() {
 func (w *dedicatedPoolWorker) manageHosts() []string {
 	w.activeHostsMu.RLock()
 	defer w.activeHostsMu.RUnlock()
+	logger := log.WithFunc("aws", "manageHosts").With("provider.name", w.driver.name, "dedicated", w.name)
 
 	// List of hosts to clean from w.to_manage_at list
 	var toClean []string
@@ -295,19 +302,20 @@ func (w *dedicatedPoolWorker) manageHosts() []string {
 		} else {
 			w.toManageAt[hostID] = time.Now()
 		}
-		log.Debugf("AWS: %s: dedicated %q: Added new host to be managed out: %q at %q", w.driver.name, w.name, hostID, w.toManageAt[hostID])
+		logger.Debug("Added new host to be managed out", "host_id", hostID, "at", w.toManageAt[hostID])
 	}
 
 	return toRelease
 }
 
 func (w *dedicatedPoolWorker) releaseHosts(releaseHosts []string) {
+	logger := log.WithFunc("aws", "releaseHosts").With("provider.name", w.driver.name, "dedicated", w.name)
 	if len(releaseHosts) < 1 {
 		// Skipping since there is nothing to do
 		return
 	}
 
-	log.Debugf("AWS: %s: dedicated %q: Dealing with hosts to release: %v", w.driver.name, w.name, releaseHosts)
+	logger.Debug("Dealing with hosts to release", "hosts", releaseHosts)
 
 	// Function removes the items from the active hosts map to optimize the processes
 	w.activeHostsMu.Lock()
@@ -336,7 +344,7 @@ func (w *dedicatedPoolWorker) releaseHosts(releaseHosts []string) {
 	// Run the release process for multiple hosts
 	releaseFailed, err := w.releaseDedicatedHosts(toRelease)
 	if err != nil {
-		log.Errorf("AWS: %s: dedicated %q: Unable to send request for release of the hosts %v: %v", w.driver.name, w.name, toRelease, err)
+		logger.Error("Unable to send request for release of the hosts", "hosts", toRelease, "err", err)
 		// Not fatal, because we still need to deal with mac hosts
 	}
 
@@ -367,7 +375,7 @@ func (w *dedicatedPoolWorker) releaseHosts(releaseHosts []string) {
 
 			// Triggering the scrubbing process
 			if err := w.driver.triggerHostScrubbing(hostID, aws.ToString(host.HostProperties.InstanceType)); err != nil {
-				log.Errorf("AWS: %s: dedicated %q: Unable to run scrubbing for host %q: %v", w.driver.name, w.name, hostID, err)
+				logger.Error("Unable to run scrubbing for host", "host_id", hostID, "err", err)
 				continue
 			}
 
@@ -424,7 +432,8 @@ func getHostCapacity(host *ec2types.Host) uint {
 
 // Updates the hosts list every 5 minutes
 func (w *dedicatedPoolWorker) updateDedicatedHostsProcess() ([]ec2types.Host, error) {
-	defer log.Infof("AWS: %s: dedicated %q: Exited updateDedicatedHostsProcess()", w.driver.name, w.name)
+	logger := log.WithFunc("aws", "updateDedicatedHostsProcess").With("provider.name", w.driver.name, "dedicated", w.name)
+	defer logger.Info("Exited updateDedicatedHostsProcess()")
 
 	// Balancing the regular update delay based on the scrubbing optimization because it needs to
 	// record the time of host state change and only then the timer to scrubbing will start ticking
@@ -445,7 +454,7 @@ func (w *dedicatedPoolWorker) updateDedicatedHostsProcess() ([]ec2types.Host, er
 				if t.Before(time.Now()) {
 					delete(w.activeHostsPendingAvailable, hostID)
 					if host, ok := w.activeHosts[hostID]; ok {
-						log.Debugf("AWS: %s: dedicated %q: Making host %s available after pending", w.driver.name, w.name, hostID)
+						logger.Debug("Making host available after pending", "host_id", hostID)
 						host.State = ec2types.AllocationStateAvailable
 						w.activeHosts[hostID] = host
 					}
@@ -461,7 +470,7 @@ func (w *dedicatedPoolWorker) updateDedicatedHostsProcess() ([]ec2types.Host, er
 		w.activeHostsMu.RUnlock()
 		if lastUpdate.Before(time.Now().Add(-updateDelay)) {
 			if err := w.updateDedicatedHosts(); err != nil {
-				log.Warnf("AWS: %s dedicated %q: Error happened during the regular hosts update, continue with updated on %q: %v", w.driver.name, w.name, lastUpdate, err)
+				logger.Warn("Error happened during the regular hosts update, continue with updated", "updated", lastUpdate, "err", err)
 			}
 		}
 	}
@@ -471,6 +480,7 @@ func (w *dedicatedPoolWorker) updateDedicatedHostsProcess() ([]ec2types.Host, er
 func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 	w.activeHostsMu.Lock()
 	defer w.activeHostsMu.Unlock()
+	logger := log.WithFunc("aws", "updateDedicatedHosts").With("provider.name", w.driver.name, "dedicated", w.name)
 
 	// We should not update the list too often
 	readyForUpdate := w.activeHostsUpdated.Before(time.Now().Add(-30 * time.Second))
@@ -478,7 +488,7 @@ func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 		return nil
 	}
 
-	log.Debugf("AWS: %s: dedicated %q: Updating dedicated pool hosts list", w.driver.name, w.name)
+	logger.Debug("Updating dedicated pool hosts list")
 	conn := w.driver.newEC2Conn()
 
 	input := ec2.DescribeHostsInput{
@@ -514,7 +524,8 @@ func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 	for p.HasMorePages() {
 		resp, err := p.NextPage(context.TODO())
 		if err != nil {
-			return log.Errorf("AWS: %s: dedicated %q: Error during requesting dedicated hosts: %v", w.driver.name, w.name, err)
+			logger.Error("Error during requesting dedicated hosts", "err", err)
+			return fmt.Errorf("AWS: %s: dedicated %q: Error during requesting dedicated hosts: %v", w.driver.name, w.name, err)
 		}
 
 		for _, rh := range resp.Hosts {
@@ -527,7 +538,7 @@ func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 					if ah.State == ec2types.AllocationStatePending && rh.State == ec2types.AllocationStateAvailable {
 						if _, ok := w.activeHostsPendingAvailable[hostID]; !ok {
 							delayTill := time.Now().Add(time.Duration(w.record.PendingToAvailableDelay))
-							log.Debugf("AWS: %s: dedicated %q: Delaying availability of host %s till %s", w.driver.name, w.name, hostID, delayTill)
+							logger.Debug("Delaying availability of host till", "host_id", hostID, "delay", delayTill)
 							w.activeHostsPendingAvailable[hostID] = delayTill
 						}
 						// Updating the status each run to make sure it will not switch to Available before delay is out
@@ -537,7 +548,7 @@ func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 					} else if rh.State != ec2types.AllocationStateAvailable {
 						// If the state changed from Available - removing the item
 						if _, ok := w.activeHostsPendingAvailable[hostID]; ok {
-							log.Debugf("AWS: %s: dedicated %q: Host state changed, so removing host %s from activeHostsPendingAvailable", w.driver.name, w.name, hostID)
+							logger.Debug("Host state changed, so removing host from activeHostsPendingAvailable", "host_id", hostID)
 							delete(w.activeHostsPendingAvailable, hostID)
 						}
 					}
@@ -551,10 +562,10 @@ func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 	w.activeHosts = currActiveHosts
 
 	// Printing list for debug purposes
-	if log.GetVerbosity() == log.VerbosityDebug {
-		log.Debugf("AWS: %s: dedicated %q: Amount of active hosts in pool: %d", w.driver.name, w.name, len(w.activeHosts))
+	if log.GetLevel() == log.LevelDebug {
+		logger.Debug("Amount of active hosts in pool", "amount", len(w.activeHosts))
 		for hostID, host := range w.activeHosts {
-			log.Debugf("AWS: %s: dedicated %q: active_hosts item: host_id:%q, allocated:%q, state:%q, capacity:%d (%d)", w.driver.name, w.name, hostID, host.AllocationTime, host.State, getHostCapacity(&host), w.instancesPerHost)
+			logger.Debug("active_hosts item", "host_id", hostID, "allocated", host.AllocationTime, "state", host.State, "capacity", getHostCapacity(&host), "amount", w.instancesPerHost)
 		}
 	}
 
@@ -562,7 +573,8 @@ func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 }
 
 func (w *dedicatedPoolWorker) allocateDedicatedHost() (string, string, error) {
-	log.Infof("AWS: %s: dedicated %q: Allocating dedicated host of type %q", w.driver.name, w.name, w.record.Type)
+	logger := log.WithFunc("aws", "allocateDedicatedHost").With("provider.name", w.driver.name, "dedicated", w.name)
+	logger.Info("Allocating dedicated host of type", "type", w.record.Type)
 
 	// Storing happened issues to later show in log as error
 	errors := []string{}
@@ -597,16 +609,17 @@ func (w *dedicatedPoolWorker) allocateDedicatedHost() (string, string, error) {
 			if !slices.Contains(errors, err.Error()) {
 				errors = append(errors, err.Error())
 			}
-			log.Debugf("AWS: %s: dedicated %q: Unable to allocate dedicated hosts in zone %s: %v", w.driver.name, w.name, zone, err)
+			logger.Debug("Unable to allocate dedicated hosts in zone", "zone", zone, "err", err)
 			continue
 		}
 
-		log.Infof("AWS: %s: dedicated %q: Allocated host in zone %s: %v", w.driver.name, w.name, zone, resp.HostIds[0])
+		logger.Info("Allocated host in zone", "zone", zone, "host_id", resp.HostIds[0])
 
 		return resp.HostIds[0], zone, nil
 	}
 
-	return "", "", log.Errorf("AWS: %s: dedicated %q: Unable to allocate dedicated hosts in zones %s: %v", w.driver.name, w.name, w.record.Zones, errors)
+	logger.Error("Unable to allocate dedicated hosts in zones", "zones", w.record.Zones, "errs", errors)
+	return "", "", fmt.Errorf("AWS: %s: dedicated %q: Unable to allocate dedicated hosts in zones %s: %v", w.driver.name, w.name, w.record.Zones, errors)
 }
 
 // Will request a release for a bunch of hosts and return unsuccessful id's or error
@@ -614,7 +627,8 @@ func (w *dedicatedPoolWorker) releaseDedicatedHosts(ids []string) ([]string, err
 	if len(ids) < 1 {
 		return ids, nil
 	}
-	log.Infof("AWS: %s: dedicated %q: Releasing %d dedicated hosts: %v", w.driver.name, w.name, len(ids), ids)
+	logger := log.WithFunc("aws", "releaseDedicatedHosts").With("provider.name", w.driver.name, "dedicated", w.name)
+	logger.Info("Releasing dedicated hosts", "amount", len(ids), "host_ids", ids)
 
 	conn := w.driver.newEC2Conn()
 
@@ -622,7 +636,8 @@ func (w *dedicatedPoolWorker) releaseDedicatedHosts(ids []string) ([]string, err
 
 	resp, err := conn.ReleaseHosts(context.TODO(), &input)
 	if err != nil {
-		return ids, log.Errorf("AWS: %s: dedicated %q: Unable to release dedicated hosts: %v", w.driver.name, w.name, err)
+		logger.Error("Unable to release dedicated hosts", "err", err)
+		return ids, fmt.Errorf("AWS: %s: dedicated %q: Unable to release dedicated hosts: %v", w.driver.name, w.name, err)
 	}
 
 	var unsuccessful []string
@@ -633,9 +648,9 @@ func (w *dedicatedPoolWorker) releaseDedicatedHosts(ids []string) ([]string, err
 			unsuccessful = append(unsuccessful, aws.ToString(item.ResourceId))
 		}
 
-		log.Warnf("AWS: %s: dedicated %q: Not all the hosts were released as requested:\n%v", w.driver.name, w.name, failedInfo)
+		logger.Warn("Not all the hosts were released as requested", "failed", failedInfo)
 	}
-	log.Infof("AWS: %s: dedicated %q: Released hosts: %v", w.driver.name, w.name, resp.Successful)
+	logger.Info("Released hosts", "host_ids", resp.Successful)
 
 	return unsuccessful, nil
 }

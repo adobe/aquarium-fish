@@ -91,7 +91,7 @@ func (d *Database) GateProxySSHAccessSingleUsePasswordHash(username string, hash
 				// caller with a valid `ra`.  However, see ssh_proxy/proxy.go usage,
 				// in the event that our deletion failed (but nothing else), the single
 				// use connection ultimately gets rejected.
-				log.Errorf("Fish: Unable to remove GateProxySSHAccess %s: %v", ra.Uid.String(), err)
+				log.WithFunc("proxyssh", "GateProxySSHAccessSingleUsePasswordHash").Error("Unable to remove GateProxySSHAccess", "access_uid", ra.Uid, "err", err)
 			}
 			return &ra, d.GateProxySSHAccessDelete(ra.Uid)
 		}
@@ -113,7 +113,7 @@ func (d *Database) GateProxySSHAccessSingleUseKey(username string, key string) (
 				// caller with a valid `ra`.  However, see ssh_proxy/proxy.go usage,
 				// in the event that our deletion failed (but nothing else), the single
 				// use connection ultimately gets rejected.
-				log.Errorf("Fish: Unable to remove GateProxySSHAccess %s: %v", ra.Uid.String(), err)
+				log.WithFunc("proxyssh", "GateProxySSHAccessSingleUseKey").Error("Unable to remove GateProxySSHAccess", "access_uid", ra.Uid, "err", err)
 			}
 			return &ra, d.GateProxySSHAccessDelete(ra.Uid)
 		}

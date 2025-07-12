@@ -34,12 +34,13 @@ import (
 // lockClient locks client to be sure no parallel operations will be executed to conform with
 // github.com recommendations on using REST APIand repeats client creation until it's connected
 func (d *Driver) lockClient() {
+	logger := log.WithFunc("github", "lockClient").With("gate.name", d.name)
 	d.clMutex.Lock()
 
 	// In case REST API requested to back off for a bit
 	for time.Now().Before(d.clDelayTill) {
 		toSleep := time.Until(d.clDelayTill)
-		log.Warnf("GITHUB: %s: REST API operations suspended for the next %s", toSleep)
+		logger.Warn("REST API operations suspended", "sleep_duration", toSleep)
 		if toSleep > 31*time.Second {
 			toSleep = 30 * time.Second
 		}
@@ -50,7 +51,7 @@ func (d *Driver) lockClient() {
 	for d.cl == nil {
 		d.cl, err = d.createClient()
 		if err != nil {
-			log.Errorf("GITHUB: %s: Unable to create github client (waiting for 30s): %v", d.name, err)
+			logger.Error("Unable to create github client (waiting for 30s)", "err", err)
 			time.Sleep(30 * time.Second)
 		}
 	}
@@ -58,7 +59,8 @@ func (d *Driver) lockClient() {
 
 // createClient returns a client based on the provided gate configuration
 func (d *Driver) createClient() (client *github.Client, err error) {
-	log.Debugf("GITHUB: %s: Creating new client", d.name)
+	logger := log.WithFunc("github", "createClient").With("gate.name", d.name)
+	logger.Debug("Creating new client")
 	// App auth in priority as superior to token one
 	if d.cfg.isAppAuth() {
 		// Creating our own transport to recover on failure - DefaultTransport is quite hard to
@@ -87,7 +89,8 @@ func (d *Driver) createClient() (client *github.Client, err error) {
 		// Using Fine-grained token access
 		client = github.NewClient(nil).WithAuthToken(d.cfg.APIToken)
 	} else {
-		return nil, log.Errorf("GITHUB: %s: No auth is available", d.name)
+		logger.Error("No auth is available")
+		return nil, fmt.Errorf("GITHUB: %s: No auth is available", d.name)
 	}
 
 	if d.cfg.EnterpriseBaseURL != "" && d.cfg.EnterpriseUploadURL != "" {
@@ -110,11 +113,12 @@ func (d *Driver) createClient() (client *github.Client, err error) {
 // apiCheckResponse makes sure response is ok
 // WARNING: the client should be already locked by the function clientLock
 func (d *Driver) apiCheckResponse(resp *github.Response, err error) error {
+	logger := log.WithFunc("github", "apiCheckResponse").With("gate.name", d.name)
 	if resp != nil {
 		d.apiRateMutex.Lock()
 		d.apiRate = resp.Rate
 		d.apiRateMutex.Unlock()
-		log.Debugf("GITHUB: %s: Resp rate: lim:%d, rem:%d, rst:%s", d.name, resp.Rate.Limit, resp.Rate.Remaining, resp.Rate.Reset)
+		logger.Debug("Resp rate", "lim", resp.Rate.Limit, "rem", resp.Rate.Remaining, "rst", resp.Rate.Reset)
 	}
 
 	// Check errors and response to get the data off it
@@ -122,17 +126,18 @@ func (d *Driver) apiCheckResponse(resp *github.Response, err error) error {
 		if _, ok := err.(*github.AbuseRateLimitError); ok {
 			// Since we hit secondary rate limit - wait a minute for the next request
 			d.clDelayTill = time.Now().Add(time.Minute)
-			log.Errorf("GITHUB: %s: Hit REST API frequency rate limit, delay next request by 1m", d.name)
+			logger.Error("Hit REST API frequency rate limit, delay next request by 1m")
 		}
 		if _, ok := err.(*github.RateLimitError); ok {
 			// Since we hit the rate limit - waiting until the next reset + 30 seconds in case time is off
 			d.clDelayTill = resp.Rate.Reset.Add(30 * time.Second)
-			log.Errorf("GITHUB: %s: Hit REST API rate limit, delay next request till next reset: %v", d.name, time.Until(d.clDelayTill))
+			logger.Error("Hit REST API rate limit, delay next request till next reset", "delay_till", time.Until(d.clDelayTill))
 		}
 
-		log.Debugf("GITHUB: %s: Resetting client", d.name)
+		logger.Debug("Resetting client")
 		d.cl = nil
-		return log.Errorf("GITHUB: %s: Request: %v", d.name, err)
+		logger.Error("Request", "err", err)
+		return fmt.Errorf("GITHUB: %s: Request: %v", d.name, err)
 	}
 
 	return nil
@@ -140,6 +145,7 @@ func (d *Driver) apiCheckResponse(resp *github.Response, err error) error {
 
 // Will return a list of repos through API depends on what kind of auth you using and filter them
 func (d *Driver) apiGetRepos() (repos []string, err error) {
+	logger := log.WithFunc("github", "apiGetRepos").With("gate.name", d.name)
 	opts := github.ListOptions{PerPage: d.cfg.APIPerPage}
 	opts2 := github.RepositoryListByAuthenticatedUserOptions{
 		ListOptions: opts,
@@ -172,7 +178,7 @@ func (d *Driver) apiGetRepos() (repos []string, err error) {
 		err = d.apiCheckResponse(resp, err)
 		d.clMutex.Unlock()
 		if err != nil {
-			log.Errorf("GITHUB: %s: Receiving repos list: %v", d.name, err)
+			logger.Error("Failed to receive repos list", "err", err)
 			break
 		}
 
@@ -201,7 +207,7 @@ func (d *Driver) apiGetRepos() (repos []string, err error) {
 		}
 	}
 	if len(repos) > 0 {
-		log.Debugf("GITHUB: %s: Located repos: %s", d.name, repos)
+		logger.Debug("Located repos", "repos", repos)
 	}
 
 	return repos, err
@@ -209,6 +215,7 @@ func (d *Driver) apiGetRepos() (repos []string, err error) {
 
 // Will return a list of IDs of active webhooks in the repository
 func (d *Driver) apiGetHooks(owner, repo string) (hooks []*github.Hook, err error) {
+	logger := log.WithFunc("github", "apiGetHooks").With("gate.name", d.name)
 	opts := github.ListOptions{PerPage: d.cfg.APIPerPage}
 
 	for {
@@ -225,7 +232,7 @@ func (d *Driver) apiGetHooks(owner, repo string) (hooks []*github.Hook, err erro
 			if hook.GetActive() && slices.Contains(hook.Events, "workflow_job") {
 				// Make sure URL is set for the hook - otherwise it will be hard to use while check
 				if hook.URL == nil {
-					log.Warnf("GITHUB: %s: Found null URL hook in repo %q: %d", d.name, repo, hook.GetID())
+					logger.Warn("Found null URL hook in repo", "repo", repo, "hook_id", hook.GetID())
 					continue
 				}
 				hooks = append(hooks, hook)

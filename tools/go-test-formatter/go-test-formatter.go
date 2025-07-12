@@ -727,12 +727,20 @@ func (f *Formatter) printTestResult(pkg *packageResult, test *testResult) {
 		// Organize and print output with subtests if not filtered
 		f.printOrganizedOutput(test, 1)
 
-		out = fmt.Sprintf("╘━ %s %s (%s) - %.3fs\n", icon, displayName, status, test.Elapsed)
+		out = fmt.Sprintf("╘━ %s %s (%s) - %.3fs", icon, displayName, status, test.Elapsed)
 		if f.config.StdoutTimestamp {
 			fmt.Printf("[%s] %s", test.EndTime.Format("15:04:05.000"), out)
 		} else {
 			fmt.Print(out)
 		}
+
+		// Add package in the end so it's easier to identify where the test from
+		if f.config.StdoutColor {
+			fmt.Printf(" (%s%s%s %s%s%s)\n", colorBlue, pkgIcon, colorReset, colorBold, pkg.Name, colorReset)
+		} else {
+			fmt.Printf(" (%s %s)\n", pkgIcon, pkg.Name)
+		}
+
 		fmt.Println()
 	}
 }

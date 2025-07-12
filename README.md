@@ -171,6 +171,36 @@ on gRPC service methods. Each role is granted specific permissions for resources
 For advanced setups, you can create custom roles with specific permission combinations using the
 Role management API.
 
+### Monitoring
+
+Aquarium-Fish supports full OpenTelemetry spectrum: Metrics, Logging, Tracing and Profiling. It can
+be paired with remote OTLP GRPC telemetry receiver or store the telemetry locally with an ability
+to sync it later with the remote using tool `tools/otel-import-file/otel-import-file.go`.
+
+The monitoring could be enabled in Fish configuration by specifying the next block:
+```yaml
+monitoring:
+  enabled: false  # General killswitch, set it true to enable monitoring
+  enable_logs: true
+  enable_metrics: true
+  enable_profiling: true
+  enable_tracing: true
+
+  otlp_endpoint: ""  # You can specify the OTLP GRPC remote here (ex. "localhost:4317")
+  pyroscope_endpoint: ""  # Since OTLP profiling is still experimental (ex. "http://localhost:4040")
+  file_export_path: ""  # Where to store the telemetry files, will be used if `otlp_endpoint` unset
+
+  sample_rate: 1.0  # 0.0-1.0 rate to reduce the amount of traffic
+  metrics_interval: "15s"  # How often to take measurements
+  profiling_interval: "30s"  # How often to capture profiling info
+```
+
+Good example of the server you can find in https://github.com/grafana/docker-otel-lgtm - it
+integrates grafana as UI and prometheus, tempo, loki, pyroscope as DB backend. You can run it as:
+```sh
+$ docker run --name lgtm -p 3000:3000 -p 4317:4317 -p 4040:4040 --rm -ti -e GF_PATHS_DATA=/data/grafana grafana/otel-lgtm
+```
+
 ## Implementation
 
 Go was initially chosen because of go-dqlite, but became quite useful and modern way of making a
@@ -278,11 +308,17 @@ The integration tests needs aquarium-fish* binary, so prior to execution please 
 
 * To verify that everything works as expected you can run integration tests like that:
    ```sh
-   $ go test -v -failfast -parallel 4 -count 1 ./tests/...
+   $ go test -json -v -parallel 4 -count=1 -skip '_stress$' -race ./tests/... | go run ./tools/go-test-formatter/go-test-formatter.go -stdout_timestamp test -stdout_color -stdout_filter failed
    ```
 * To run just one test of the suite on specific aquarium-fish binary:
    ```sh
    $ FISH_PATH=$PWD/aquarium-fish.darwin_amd64 go test -v -failfast -count 1 -run '^TEST_NAME$' ./tests
+   ```
+* To run the tests with monitoring - you can use `FISH_MONITORING` env variable. Set it to empty
+  value if you want to store telemetry in the workspace as files or specify localhost to connect to
+  the local OTLP/Pyroscope service (in docker container for example):
+   ```sh
+   $ FISH_MONITORING=localhost go test -json -v -parallel 1 -count=1 -skip '_stress$' -race ./tests/...
    ```
 
 ### Benchmarks
@@ -304,7 +340,7 @@ Benchmark_hash_isequal-2   	      32	  34741325 ns/op	67122526 B/op	     179 all
 CI stores the previous results in branch gh-pages in json format. Unfortunately GitHub actions
 workers perfromance is not stable, so it's recommended to execute the benchmarks on standaline.
 
-### Profiling
+### Direct Profiling
 
 Standard go pprof profiling is enabled only in debug builds. It's available on unauthorized
 endpoint https://localhost:8001/debug/pprof/ - so please don't use in production.

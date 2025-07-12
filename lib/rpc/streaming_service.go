@@ -56,12 +56,13 @@ func NewSubscriptionPermissionCache() *SubscriptionPermissionCache {
 func (spc *SubscriptionPermissionCache) GrantAccess(userName string, appUID typesv2.ApplicationUID) {
 	spc.mu.Lock()
 	defer spc.mu.Unlock()
+	logger := log.WithFunc("rpc", "GrantAccess")
 
 	if spc.userAppAccess[userName] == nil {
 		spc.userAppAccess[userName] = make(map[typesv2.ApplicationUID]bool)
 	}
 	spc.userAppAccess[userName][appUID] = true
-	log.Debugf("Streaming: Cache granted access to user %s for app %s", userName, appUID)
+	logger.Debug("Cache granted access to user for app", "user", userName, "app_uid", appUID)
 }
 
 // HasAccess checks if a user has cached access to an application UID
@@ -80,10 +81,11 @@ func (spc *SubscriptionPermissionCache) HasAccess(userName string, appUID typesv
 func (spc *SubscriptionPermissionCache) RevokeAccess(userName string, appUID typesv2.ApplicationUID) {
 	spc.mu.Lock()
 	defer spc.mu.Unlock()
+	logger := log.WithFunc("rpc", "RevokeAccess")
 
 	if userApps, exists := spc.userAppAccess[userName]; exists {
 		delete(userApps, appUID)
-		log.Debugf("Streaming: Cache revoked access for user %s from app %s", userName, appUID)
+		logger.Debug("Cache revoked access for user from app", "user", userName, "app_uid", appUID)
 	}
 }
 
@@ -91,6 +93,7 @@ func (spc *SubscriptionPermissionCache) RevokeAccess(userName string, appUID typ
 func (spc *SubscriptionPermissionCache) CleanupStaleEntries(f *fish.Fish) {
 	spc.mu.Lock()
 	defer spc.mu.Unlock()
+	logger := log.WithFunc("rpc", "CleanupStaleEntries")
 
 	now := time.Now()
 	// Only cleanup every 5 minutes to avoid excessive database calls
@@ -99,13 +102,13 @@ func (spc *SubscriptionPermissionCache) CleanupStaleEntries(f *fish.Fish) {
 	}
 	spc.lastCleanup = now
 
-	log.Debugf("Streaming: Starting permission cache cleanup")
+	logger.Debug("Starting permission cache cleanup")
 	removedCount := 0
 
 	for userName, userApps := range spc.userAppAccess {
 		for appUID := range userApps {
 			// Check if application still exists
-			_, err := f.DB().ApplicationGet(appUID)
+			_, err := f.DB().ApplicationGet(context.Background(), appUID)
 			if err != nil {
 				// Application doesn't exist anymore, remove from cache
 				delete(userApps, appUID)
@@ -118,7 +121,7 @@ func (spc *SubscriptionPermissionCache) CleanupStaleEntries(f *fish.Fish) {
 		}
 	}
 
-	log.Debugf("Streaming: Permission cache cleanup completed, removed %d stale entries", removedCount)
+	logger.Debug("Permission cache cleanup completed", "removed_count", removedCount)
 }
 
 // StreamingService implements the streaming service
@@ -154,7 +157,6 @@ type subscription struct {
 	streamMutex   sync.Mutex // Protects concurrent access to stream.Send()
 	stream        *connect.ServerStream[aquariumv2.StreamingServiceSubscribeResponse]
 	subscriptions []aquariumv2.SubscriptionType
-	filters       map[string]string
 	userName      string
 	ctx           context.Context //nolint:containedctx // Is used for sending stop for goroutines
 	cancel        context.CancelFunc
@@ -262,13 +264,15 @@ func NewStreamingService(f *fish.Fish) *StreamingService {
 func (s *StreamingService) Connect(ctx context.Context, stream *connect.BidiStream[aquariumv2.StreamingServiceConnectRequest, aquariumv2.StreamingServiceConnectResponse]) error {
 	userName := rpcutil.GetUserName(ctx)
 	connectionUID := fmt.Sprintf("%s-%s", userName, uuid.NewString())
-	log.Debugf("Streaming: New bidirectional connection for user: %s (UID: %s)", userName, connectionUID)
+	logger := log.WithFunc("rpc", "Connect").With("conn_uid", connectionUID)
+	logger.Debug("New bidirectional connection for user", "user", userName)
+	defer logger.Debug("Completed bidirectional connection for user", "user", userName)
 
 	// Check if server is shutting down
 	s.shutdownMutex.RLock()
 	if s.isShuttingDown {
 		s.shutdownMutex.RUnlock()
-		log.Debugf("Streaming: Rejecting new connection during shutdown: %s", connectionUID)
+		logger.Debug("Rejecting new connection during shutdown")
 		return connect.NewError(connect.CodeUnavailable, fmt.Errorf("server is shutting down"))
 	}
 	s.shutdownMutex.RUnlock()
@@ -294,7 +298,7 @@ func (s *StreamingService) Connect(ctx context.Context, stream *connect.BidiStre
 		delete(s.connections, connectionUID)
 		s.connectionsMutex.Unlock()
 		cancel()
-		log.Debugf("Streaming: Cleaned up bidirectional connection: %s", connectionUID)
+		logger.Debug("Cleaned up bidirectional connection")
 	}()
 
 	// Create a channel to handle incoming requests
@@ -307,15 +311,15 @@ func (s *StreamingService) Connect(ctx context.Context, stream *connect.BidiStre
 			req, err := stream.Receive()
 			if err != nil {
 				if errors.Is(err, io.EOF) {
-					log.Debugf("Streaming: Client closed bidirectional connection gracefully")
+					logger.Debug("Client closed bidirectional connection gracefully")
 					return
 				}
 				// Check if context was cancelled (expected during shutdown)
 				if connCtx.Err() != nil {
-					log.Debugf("Streaming: Connection context cancelled, stopping receive loop")
+					logger.Debug("Connection context cancelled, stopping receive loop")
 					return
 				}
-				log.Errorf("Streaming: Error receiving request: %v", err)
+				logger.Error("Error receiving request", "err", err)
 				return
 			}
 
@@ -334,19 +338,19 @@ func (s *StreamingService) Connect(ctx context.Context, stream *connect.BidiStre
 	for {
 		select {
 		case <-connCtx.Done():
-			log.Debugf("Streaming: Bidirectional connection context cancelled for user: %s (ID: %s)", userName, connectionUID)
+			logger.Debug("Bidirectional connection context cancelled for user", "user", userName)
 			return nil
 
 		case <-keepAliveTicker.C:
 			// Send keep-alive ping to prevent connection timeout
-			log.Debugf("Streaming: Sending keep-alive ping to client")
+			logger.Debug("Sending keep-alive ping to client")
 			// We can send a special keep-alive response that clients can ignore
 			keepAliveResp := &aquariumv2.StreamingServiceConnectResponse{
 				RequestId:    "keep-alive",
 				ResponseType: "KeepAliveResponse",
 			}
 			if err := conn.safeSend(keepAliveResp); err != nil {
-				log.Errorf("Streaming: Error sending keep-alive: %v", err)
+				logger.Error("Error sending keep-alive", "err", err)
 				return connect.NewError(connect.CodeInternal, fmt.Errorf("failed to send keep-alive: %w", err))
 			}
 
@@ -356,7 +360,7 @@ func (s *StreamingService) Connect(ctx context.Context, stream *connect.BidiStre
 				return nil
 			}
 
-			log.Debugf("Streaming: Received request - ID: %s, Type: %s", req.GetRequestId(), req.GetRequestType())
+			logger.Debug("Received request", "req_id", req.GetRequestId(), "req_type", req.GetRequestType())
 
 			// Process request asynchronously using the connection context
 			go s.processStreamRequest(connCtx, conn, req)
@@ -366,12 +370,13 @@ func (s *StreamingService) Connect(ctx context.Context, stream *connect.BidiStre
 
 // processStreamRequest processes a single streaming request asynchronously
 func (s *StreamingService) processStreamRequest(ctx context.Context, conn *bidirectionalConnection, req *aquariumv2.StreamingServiceConnectRequest) {
-	log.Debugf("Streaming: Processing request - ID: %s, Type: %s", req.GetRequestId(), req.GetRequestType())
+	logger := log.WithFunc("rpc", "processStreamRequest").With("req_id", req.GetRequestId(), "req_type", req.GetRequestType())
+	logger.Debug("Processing request")
 
 	// Check RBAC permissions and set proper context for target service
 	targetCtx, err := s.prepareTargetServiceContext(ctx, req.GetRequestType())
 	if err != nil {
-		log.Errorf("Streaming: RBAC permission denied for request %s: %v", req.GetRequestId(), err)
+		logger.Error("RBAC permission denied for request", "err", err)
 		// Create error response
 		response := &aquariumv2.StreamingServiceConnectResponse{
 			RequestId:    req.GetRequestId(),
@@ -382,7 +387,7 @@ func (s *StreamingService) processStreamRequest(ctx context.Context, conn *bidir
 			},
 		}
 		if sendErr := conn.safeSend(response); sendErr != nil {
-			log.Errorf("Streaming: Error sending permission denied response for request %s: %v", req.GetRequestId(), sendErr)
+			logger.Error("Error sending permission denied response for request", "err", sendErr)
 		}
 		return
 	}
@@ -392,7 +397,7 @@ func (s *StreamingService) processStreamRequest(ctx context.Context, conn *bidir
 
 	var response *aquariumv2.StreamingServiceConnectResponse
 	if err != nil {
-		log.Errorf("Streaming: Error processing request %s: %v", req.GetRequestId(), err)
+		logger.Error("Error processing request", "err", err)
 		// Create error response
 		response = &aquariumv2.StreamingServiceConnectResponse{
 			RequestId:    req.GetRequestId(),
@@ -403,7 +408,7 @@ func (s *StreamingService) processStreamRequest(ctx context.Context, conn *bidir
 			},
 		}
 	} else {
-		log.Debugf("Streaming: Successfully processed request %s", req.GetRequestId())
+		logger.Debug("Successfully processed request")
 		// Create success response
 		response = &aquariumv2.StreamingServiceConnectResponse{
 			RequestId:    req.GetRequestId(),
@@ -412,12 +417,12 @@ func (s *StreamingService) processStreamRequest(ctx context.Context, conn *bidir
 		}
 	}
 
-	log.Debugf("Streaming: Sending response for request %s", req.GetRequestId())
+	logger.Debug("Sending response for request")
 	// Send response back to client
 	if err := conn.safeSend(response); err != nil {
-		log.Errorf("Streaming: Error sending response for request %s: %v", req.GetRequestId(), err)
+		logger.Error("Error sending response for request", "err", err)
 	} else {
-		log.Debugf("Streaming: Successfully sent response for request %s", req.GetRequestId())
+		logger.Debug("Successfully sent response for request")
 	}
 }
 
@@ -432,11 +437,12 @@ func (s *StreamingService) prepareTargetServiceContext(ctx context.Context, requ
 	service := serviceMethod.service
 	method := serviceMethod.method
 
-	log.Debugf("Streaming: Checking RBAC permission for %s.%s", service, method)
+	logger := log.WithFunc("rpc", "prepareTargetServiceContext").With("rpc_service", service, "rpc_method", method)
+	logger.Debug("Checking RBAC permission")
 
 	// Check if this service/method is excluded from RBAC
 	if auth.IsEcludedFromRBAC(service, method) {
-		log.Debugf("Streaming: Service/method %s.%s is excluded from RBAC", service, method)
+		logger.Debug("Service/method is excluded from RBAC")
 		// Still set the context for consistency
 		return s.setServiceMethodContext(ctx, service, method), nil
 	}
@@ -458,7 +464,7 @@ func (s *StreamingService) prepareTargetServiceContext(ctx context.Context, requ
 			user.Name, user.Roles, service, method)
 	}
 
-	log.Debugf("Streaming: RBAC permission granted for user %s: %s.%s", user.Name, service, method)
+	logger.Debug("RBAC permission granted for user", "user", user.Name)
 
 	// Set the target service and method in context (like RBACHandler does)
 	return s.setServiceMethodContext(ctx, service, method), nil
@@ -481,13 +487,15 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 	// Generating SubscriptionID with NodeUID prefix to later figure out where the user come from
 	subscriptionUID := fmt.Sprintf("%s-%s", userName, s.fish.DB().NewUID())
 
-	log.Debugf("Subscription %s: New subscription from user %s", subscriptionUID, userName)
+	logger := log.WithFunc("rpc", "Subscribe").With("subs_uid", subscriptionUID)
+	logger.Debug("New subscription from user", "user", userName)
+	defer logger.Debug("Completed subscription from user", "user", userName)
 
 	// Check if server is shutting down
 	s.shutdownMutex.RLock()
 	if s.isShuttingDown {
 		s.shutdownMutex.RUnlock()
-		log.Debugf("Subscription %s: Rejecting new subscription during shutdown", subscriptionUID)
+		logger.Debug("Rejecting new subscription during shutdown")
 		return connect.NewError(connect.CodeUnavailable, fmt.Errorf("server is shutting down"))
 	}
 	s.shutdownMutex.RUnlock()
@@ -500,7 +508,6 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 		id:            subscriptionUID,
 		stream:        stream,
 		subscriptions: req.Msg.GetSubscriptionTypes(),
-		filters:       req.Msg.GetFilters(),
 		userName:      userName,
 		ctx:           subCtx,
 		cancel:        cancel,
@@ -524,21 +531,21 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 		cancel()
 
 		// Wait for all relay goroutines to finish before closing channels
-		log.Debugf("Subscription %s: Waiting for relay goroutines to finish", subscriptionUID)
+		logger.Debug("Waiting for relay goroutines to finish")
 		sub.relayWg.Wait()
-		log.Debugf("Subscription %s: All relay goroutines finished, waiting for listenChannels", subscriptionUID)
+		logger.Debug("All relay goroutines finished, waiting for listenChannels")
 
 		// Wait for listenChannels goroutine to finish
 		sub.listenChannelsWg.Wait()
-		log.Debugf("Subscription %s: All goroutines finished, closing channels", subscriptionUID)
+		logger.Debug("All goroutines finished, closing channels")
 
 		// Close subscription channels (relay goroutines have finished)
 		sub.channels.Close()
-		log.Debugf("Subscription %s: Cleaned up", subscriptionUID)
+		logger.Debug("Cleaned up")
 	}()
 
 	// Send initial heartbeat to confirm subscription is active
-	log.Debugf("Subscription %s: Established and ready for events", subscriptionUID)
+	logger.Debug("Established and ready for events")
 
 	// Send initial confirmation message to client to confirm subscription is active
 	err := s.sendSubscriptionResponse(sub,
@@ -549,10 +556,10 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 		},
 	)
 	if err != nil {
-		log.Errorf("Subscription %s: Error sending subscription confirmation: %v", subscriptionUID, err)
+		logger.Error("Error sending subscription confirmation", "err", err)
 		return err
 	}
-	log.Debugf("Subscription %s: Sent subscription confirmation to client", subscriptionUID)
+	logger.Debug("Sent subscription confirmation to client")
 
 	// Create a ticker for periodic keepalives
 	keepAliveTicker := time.NewTicker(60 * time.Second)
@@ -567,14 +574,14 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 	for {
 		select {
 		case <-subCtx.Done():
-			log.Debugf("Subscription %s: Cancelled", subscriptionUID)
+			logger.Debug("Cancelled")
 
 			// Check if cancellation was due to buffer overflow
 			if sub.isClientOverflowing() {
-				log.Warnf("Subscription %s: Client disconnected due to buffer overflow", subscriptionUID)
+				logger.Warn("Client disconnected due to buffer overflow")
 				// Send buffer overflow error notification
 				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED, aquariumv2.ChangeType_CHANGE_TYPE_UNSPECIFIED, nil); err != nil {
-					log.Debugf("Subscription %s: Failed to send buffer overflow notification: %v", subscriptionUID, err)
+					logger.Debug("Failed to send buffer overflow notification", "err", err)
 				}
 				// Return error to signal client disconnect due to overflow
 				return connect.NewError(connect.CodeResourceExhausted,
@@ -582,35 +589,37 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 			} else {
 				// Normal shutdown notification
 				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED, aquariumv2.ChangeType_CHANGE_TYPE_DELETED, nil); err != nil {
-					log.Debugf("Subscription %s: Failed to send subscription shutdown notification: %v", subscriptionUID, err)
+					logger.Debug("Failed to send subscription shutdown notification", "err", err)
 				}
 			}
 			return nil
 
 		case <-ctx.Done():
-			log.Debugf("Subscription %s: Context cancelled", subscriptionUID)
+			logger.Debug("Context cancelled")
 			return nil
 
 		case <-keepAliveTicker.C:
 			// Periodic keepalive logging
-			log.Debugf("Subscription %s: Still active, waiting for events...", subscriptionUID)
+			logger.Debug("Still active, waiting for events...")
 		}
 	}
 }
 
 // checkApplicationAccess checks if a user has access to an application (owner or RBAC permission)
 func (s *StreamingService) checkApplicationAccess(sub *subscription, appUID typesv2.ApplicationUID, rbacMethod string) bool {
+	logger := log.WithFunc("rpc", "checkApplicationAccess").With("app_uid", appUID)
+
 	userName := sub.userName
 
-	// First check cache for quick lookup
+	// Check cache first
 	if s.permissionCache.HasAccess(userName, appUID) {
 		return true
 	}
 
-	// Not in cache, need to validate through database + RBAC
-	app, err := s.fish.DB().ApplicationGet(appUID)
+	// Get application to check ownership
+	app, err := s.fish.DB().ApplicationGet(context.Background(), appUID)
 	if err != nil {
-		log.Debugf("Streaming: Failed to get application %s for permission check: %v", appUID, err)
+		logger.Debug("Failed to get application for permission check", "err", err)
 		return false
 	}
 
@@ -627,8 +636,7 @@ func (s *StreamingService) checkApplicationAccess(sub *subscription, appUID type
 
 	hasAccess := isOwner || hasRBACPermission
 
-	log.Debugf("Streaming: Permission check for user %s -> app %s: owner=%t, rbac=%t, access=%t",
-		userName, appUID, isOwner, hasRBACPermission, hasAccess)
+	logger.Debug("Permission check for user", "user", userName, "owner", isOwner, "rbac", hasRBACPermission, "access", hasAccess)
 
 	// Cache the result for future use
 	if hasAccess {
@@ -640,14 +648,6 @@ func (s *StreamingService) checkApplicationAccess(sub *subscription, appUID type
 
 // shouldSendApplicationObject checks if application-related object should be sent based on ownership and RBAC permissions
 func (s *StreamingService) shouldSendApplicationObject(sub *subscription, appUID typesv2.ApplicationUID, objectType aquariumv2.SubscriptionType) bool {
-	// Check application filters
-	if appUIDFilter, exists := sub.filters["application_uid"]; exists {
-		if appUID.String() != appUIDFilter {
-			log.Debugf("Streaming: Object filtered out by application_uid filter: %s != %s", appUID.String(), appUIDFilter)
-			return false
-		}
-	}
-
 	// Get the appropriate RBAC method from the generated helper
 	rbacMethod := s.getSubscriptionPermissionMethod(objectType)
 
@@ -665,7 +665,8 @@ func (*StreamingService) sendSubscriptionResponse(sub *subscription, objectType 
 	// Check if context is cancelled
 	select {
 	case <-sub.ctx.Done():
-		log.Warnf("Streaming %s: Subscription context cancelled, skipping sending response", sub.id)
+		logger := log.WithFunc("rpc", "sendSubscriptionResponse").With("subs_uid", sub.id)
+		logger.Warn("Subscription context cancelled, skipping sending response")
 		return nil
 	default:
 	}
@@ -696,7 +697,8 @@ func (*StreamingService) sendSubscriptionResponse(sub *subscription, objectType 
 
 // GracefulShutdown initiates graceful shutdown of all streaming connections
 func (s *StreamingService) GracefulShutdown(ctx context.Context) {
-	log.Info("Streaming: Starting graceful shutdown of all connections...")
+	logger := log.WithFunc("rpc", "GracefulShutdown")
+	logger.Info("Starting graceful shutdown of all connections")
 
 	// Set shutdown flag to reject new connections
 	s.shutdownMutex.Lock()
@@ -717,7 +719,7 @@ func (s *StreamingService) GracefulShutdown(ctx context.Context) {
 		}
 		s.connectionsMutex.RUnlock()
 
-		log.Debugf("Streaming: Signaling %d bidirectional connections to shutdown", len(connections))
+		logger.Debug("Signaling bidirectional connections to shutdown", "count", len(connections))
 		for _, conn := range connections {
 			// Send shutdown message to client
 			shutdownMsg := &aquariumv2.StreamingServiceConnectResponse{
@@ -730,7 +732,7 @@ func (s *StreamingService) GracefulShutdown(ctx context.Context) {
 			}
 
 			if err := conn.stream.Send(shutdownMsg); err != nil {
-				log.Debugf("Streaming: Failed to send shutdown message: %v", err)
+				logger.Debug("Failed to send shutdown message", "err", err)
 			}
 
 			// Cancel the connection context to trigger graceful closure
@@ -745,7 +747,7 @@ func (s *StreamingService) GracefulShutdown(ctx context.Context) {
 		}
 		s.subscriptionsMutex.RUnlock()
 
-		log.Debugf("Streaming: Signaling %d subscriptions to shutdown", len(subscriptions))
+		logger.Debug("Signaling subscriptions to shutdown", "count", len(subscriptions))
 		for _, sub := range subscriptions {
 			// Cancel subscription context - this will trigger the subscription goroutine
 			// to send the shutdown notification itself, avoiding race conditions
@@ -770,10 +772,10 @@ func (s *StreamingService) GracefulShutdown(ctx context.Context) {
 				s.subscriptionsMutex.RUnlock()
 
 				if connCount == 0 && subCount == 0 {
-					log.Info("Streaming: All connections closed gracefully")
+					logger.Info("All connections closed gracefully")
 					return
 				}
-				log.Debugf("Streaming: Waiting for %d connections and %d subscriptions to close", connCount, subCount)
+				logger.Debug("Waiting for connections and subscriptions to close", "connections", connCount, "subscriptions", subCount)
 			}
 		}
 	}()
@@ -781,19 +783,20 @@ func (s *StreamingService) GracefulShutdown(ctx context.Context) {
 	// Wait for graceful shutdown or timeout
 	select {
 	case <-done:
-		log.Info("Streaming: Graceful shutdown completed")
+		logger.Info("Graceful shutdown completed")
 	case <-ctx.Done():
 		s.forceCloseAllConnections()
-		log.Warn("Streaming: Graceful shutdown timeout, forced closure of remaining connections")
+		logger.Warn("Graceful shutdown timeout, forced closure of remaining connections")
 	}
 }
 
 // forceCloseAllConnections forcefully closes all remaining streaming connections
 func (s *StreamingService) forceCloseAllConnections() {
+	logger := log.WithFunc("rpc", "forceCloseAllConnections")
 	// Force close all bidirectional connections
 	s.connectionsMutex.Lock()
 	for id, conn := range s.connections {
-		log.Debugf("Streaming: Force closing bidirectional connection: %s", id)
+		logger.Debug("Force closing bidirectional connection", "id", id)
 		conn.cancel()
 		delete(s.connections, id)
 	}
@@ -802,11 +805,11 @@ func (s *StreamingService) forceCloseAllConnections() {
 	// Force close all subscriptions
 	s.subscriptionsMutex.Lock()
 	for id, sub := range s.subscriptions {
-		log.Debugf("Streaming: Force closing subscription: %s", id)
+		logger.Debug("Force closing subscription", "id", id)
 		sub.cancel()
 		delete(s.subscriptions, id)
 	}
 	s.subscriptionsMutex.Unlock()
 
-	log.Info("Streaming: All connections forcefully closed")
+	logger.Info("All connections forcefully closed")
 }

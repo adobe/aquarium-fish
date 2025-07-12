@@ -151,7 +151,8 @@ func (s *StreamingService) route{{ .Name }}Request(ctx context.Context, requestT
 			userName := rpcutil.GetUserName(ctx)
 			appUID := stringToUUID(resp.Msg.Data.Uid)
 			s.permissionCache.GrantAccess(userName, appUID)
-			log.Debugf("Streaming: Cached permission for app creator %s -> %s", userName, appUID)
+			logger := log.WithFunc("rpc", "route{{ $service.Name }}Request")
+			logger.Debug("Streaming: Cached permission for app creator", "user", userName, "app_uid", appUID)
 		}
 {{- end }}
 
@@ -166,7 +167,8 @@ func (s *StreamingService) route{{ .Name }}Request(ctx context.Context, requestT
 
 // routeRequest routes a request to the appropriate service handler
 func (s *StreamingService) routeRequest(ctx context.Context, requestType string, requestData *anypb.Any) (*anypb.Any, error) {
-	log.Debugf("Streaming: Routing request type: %s", requestType)
+	logger := log.WithFunc("rpc", "routeRequest")
+	logger.Debug("Streaming: Routing request type", "req_type", requestType)
 
 	// Route to the appropriate service using generated routing methods
 	switch {
@@ -185,33 +187,34 @@ func (s *StreamingService) routeRequest(ctx context.Context, requestType string,
 func (s *StreamingService) {{ .RelayMethodName }}(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan {{ .TypesPackageType }}) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
+	logger := log.WithFunc("rpc", "{{ .RelayMethodName }}").With("subs_uid", subscriptionID)
 
 	defer func() {
 		if r := recover(); r != nil {
-			log.Errorf("Subscription %s: {{ .MessageType }} relay goroutine panic: %v", subscriptionID, r)
+			logger.Error("{{ .MessageType }} relay goroutine panic", "panic", r)
 		}
 	}()
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Debugf("Subscription %s: {{ .MessageType }} relay stopping due to context cancellation", subscriptionID)
+			logger.Debug("{{ .MessageType }} relay stopping due to context cancellation")
 			return
 		case obj, ok := <-dbChannel:
 			if !ok {
-				log.Debugf("Subscription %s: {{ .MessageType }} relay stopping due to closed database channel", subscriptionID)
+				logger.Debug("{{ .MessageType }} relay stopping due to closed database channel")
 				return
 			}
 
 			// Check if client is already overflowing - skip notification to prevent further overflow
 			if sub.isClientOverflowing() {
-				log.Debugf("Subscription %s: Skipping {{ .MessageType | toLower }} notification due to client overflow", subscriptionID)
+				logger.Debug("Skipping {{ .MessageType | toLower }} notification due to client overflow")
 				continue
 			}
 
 			// Try to send safely - if this returns true, client should be disconnected
 			if shouldDisconnect := !sub.{{ .SafeSendMethod }}(obj); shouldDisconnect {
-				log.Errorf("Subscription %s: Disconnecting client due to excessive buffer overflow", subscriptionID)
+				logger.Error("Disconnecting client due to excessive buffer overflow")
 				sub.cancel() // This will cause the main subscription loop to exit
 				return
 			}
@@ -232,33 +235,34 @@ func (s *StreamingService) setupChannels() *subChannels {
 
 // listenChannels listen for database channels
 func (s *StreamingService) listenChannels(sub *subscription, ctx, subCtx context.Context) {
+	logger := log.WithFunc("rpc", "listenChannels").With("subs_uid", sub.id)
 	// Signal completion when this goroutine exits
 	defer sub.listenChannelsWg.Done()
 
 	defer func() {
 		if r := recover(); r != nil {
-			log.Errorf("Subscription %s: listenChannels goroutine panic: %v", sub.id, r)
+			logger.Error("goroutine panic", "panic", r)
 		}
 	}()
 
 	for {
 		select {
 		case <-subCtx.Done():
-			log.Debugf("Subscription %s: listenChannels stopping due to subscription context cancellation", sub.id)
+			logger.Debug("stopping due to subscription context cancellation", "subs_uid", sub.id)
 			return
 		case <-ctx.Done():
-			log.Debugf("Subscription %s: listenChannels stopping due to request context cancellation", sub.id)
+			logger.Debug("stopping due to request context cancellation", "subs_uid", sub.id)
 			return
 
 {{- range .Subscriptions }}
 		case msg := <-sub.channels.{{ .ChannelFieldName }}:
 			if s.shouldSendObject(sub, aquariumv2.{{ .SubscriptionType }}, msg) {
-				log.Debugf("Subscription %s: Sending {{ .MessageType }} notification for Application UID %s", sub.id, msg.ApplicationUid)
+				logger.Debug("Sending {{ .MessageType }} notification for Application UID", "app_uid", msg.ApplicationUid)
 				if err := s.sendSubscriptionResponse(sub, aquariumv2.{{ .SubscriptionType }}, aquariumv2.ChangeType_CHANGE_TYPE_CREATED, msg.{{ .ConversionMethod }}()); err != nil {
-					log.Errorf("Subscription %s: Error sending {{ .MessageType }} update: %v", sub.id, err)
+					logger.Error("Error sending {{ .MessageType }} update", "err", err)
 				}
 			} else {
-				log.Debugf("Subscription %s: Skipping {{ .MessageType }} notification for user %s", sub.id, sub.userName)
+				logger.Debug("Skipping {{ .MessageType }} notification for user", "user", sub.userName)
 			}
 {{- end }}
 		}
@@ -274,14 +278,15 @@ func (s *subChannels) Close() {
 
 // setupSubscriptions sets up database subscriptions and relay goroutines
 func (s *StreamingService) setupSubscriptions(subCtx context.Context, subscriptionID string, sub *subscription, subscriptionTypes []aquariumv2.SubscriptionType) {
+	logger := log.WithFunc("rpc", "setupSubscriptions").With("subs_uid", sub.id)
 	for _, subType := range subscriptionTypes {
 		switch subType {
 {{- range .Subscriptions }}
 		case aquariumv2.{{ .SubscriptionType }}:
 			// Create a safe wrapper channel for database notifications
 			dbChannel := make(chan {{ .TypesPackageType }}, 100)
-			s.fish.DB().{{ .DatabaseMethod }}(dbChannel)
-			log.Debugf("Subscription %s: Subscribed to {{ .MessageType }} changes", sub.id)
+			s.fish.DB().{{ .DatabaseMethod }}(subCtx, dbChannel)
+			logger.Debug("Subscribed to {{ .MessageType }} changes")
 
 			// Add to WaitGroup before starting goroutine
 			sub.relayWg.Add(1)
@@ -336,15 +341,16 @@ func (s *StreamingService) shouldSend{{ .MessageType }}(sub *subscription) bool 
 {{- range .Subscriptions }}
 // safeSendTo{{ .MessageType }}Channel attempts to send to state channel with overflow detection
 func (sub *subscription) safeSendTo{{ .MessageType }}Channel(msg {{ .TypesPackageType }}) bool {
+	logger := log.WithFunc("rpc", "safeSendTo{{ .MessageType }}Channel").With("subs_uid", sub.id, "sub_user", sub.userName)
 	select {
 	case sub.channels.{{ .ChannelFieldName }} <- msg:
 		sub.resetOverflow()
 		return true
 	case <-time.After(overflowTimeout):
-		log.Warnf("Subscription %s: {{ .MessageType }} channel send timeout (buffer overflow)", sub.userName)
+		logger.Warn("{{ .MessageType }} channel send timeout (buffer overflow)")
 		return sub.recordOverflow()
 	default:
-		log.Warnf("Subscription %s: {{ .MessageType }} channel full (buffer overflow)", sub.userName)
+		logger.Warn("{{ .MessageType }} channel full (buffer overflow)")
 		return sub.recordOverflow()
 	}
 }

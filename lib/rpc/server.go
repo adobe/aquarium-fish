@@ -19,6 +19,8 @@ import (
 	"net/http"
 	"time"
 
+	"connectrpc.com/connect"
+	"connectrpc.com/otelconnect"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
@@ -39,30 +41,54 @@ type Server struct {
 
 // NewServer creates a new Connect server
 func NewServer(f *fish.Fish, additionalServices []gate.RPCService) *Server {
+	logger := log.WithFunc("rpc", "NewServer")
 	s := &Server{
 		fish: f,
 		mux:  http.NewServeMux(),
 	}
 
-	// Register services WITHOUT interceptors (auth/rbac is handled at HTTP level)
+	// Create OpenTelemetry interceptor for tracing and metrics
+	otelInterceptor, err := otelconnect.NewInterceptor(
+		otelconnect.WithTrustRemote(), // Trust remote tracing information for internal microservices
+	)
+	if err != nil {
+		logger.Error("Failed to create OpenTelemetry interceptor", "err", err)
+		// Continue without instrumentation if OTEL fails
+		otelInterceptor = nil
+	}
+
+	// Create interceptor options
+	var interceptorOpts []connect.HandlerOption
+	if otelInterceptor != nil {
+		interceptorOpts = append(interceptorOpts, connect.WithInterceptors(otelInterceptor))
+		logger.Debug("OpenTelemetry interceptor enabled")
+	}
+
+	// Register services WITH OpenTelemetry interceptors
+	// Note: auth/rbac is still handled at HTTP level for better security
 	s.mux.Handle(aquariumv2connect.NewUserServiceHandler(
 		&UserService{fish: f},
+		interceptorOpts...,
 	))
 
 	s.mux.Handle(aquariumv2connect.NewRoleServiceHandler(
 		&RoleService{fish: f},
+		interceptorOpts...,
 	))
 
 	s.mux.Handle(aquariumv2connect.NewApplicationServiceHandler(
 		&ApplicationService{fish: f},
+		interceptorOpts...,
 	))
 
 	s.mux.Handle(aquariumv2connect.NewLabelServiceHandler(
 		&LabelService{fish: f},
+		interceptorOpts...,
 	))
 
 	s.mux.Handle(aquariumv2connect.NewNodeServiceHandler(
 		&NodeService{fish: f},
+		interceptorOpts...,
 	))
 
 	// Create and store streaming service
@@ -70,11 +96,12 @@ func NewServer(f *fish.Fish, additionalServices []gate.RPCService) *Server {
 	s.streamingService = streamingService
 	s.mux.Handle(aquariumv2connect.NewStreamingServiceHandler(
 		streamingService,
+		interceptorOpts...,
 	))
 
 	// Register additional services from gate drivers
 	for _, svc := range additionalServices {
-		log.Debugf("RPC: Registering additional service: %s", svc.Path)
+		logger.Debug("Registering additional service", "service_path", svc.Path)
 		s.mux.Handle(svc.Path, svc.Handler)
 	}
 
@@ -102,7 +129,7 @@ func (s *Server) Handler() http.Handler {
 
 // ListenAndServe starts the server
 func (s *Server) ListenAndServe(addr string, certFile, keyFile string) error {
-	log.Info("Starting Connect server on", addr)
+	log.WithFunc("rpc", "ListenAndServe").Info("Starting Connect server", "addr", addr)
 
 	handler := s.Handler()
 
@@ -114,7 +141,8 @@ func (s *Server) ListenAndServe(addr string, certFile, keyFile string) error {
 
 // Shutdown gracefully shuts down the server and all streaming connections
 func (s *Server) Shutdown(ctx context.Context) error {
-	log.Info("RPC: Starting graceful server shutdown...")
+	logger := log.WithFunc("rpc", "Shutdown")
+	logger.Info("Starting graceful server shutdown...")
 
 	// First, gracefully shutdown all streaming connections
 	// Use half the available context timeout for streaming shutdown
@@ -134,7 +162,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		}
 	}
 
-	log.Infof("RPC: Shutting down streaming connections with %v timeout...", streamingTimeout)
+	logger.Info("Shutting down streaming connections with timeout...", "timeout", streamingTimeout)
 	if s.streamingService != nil {
 		// Create a timeout context
 		streamingCtx, cancel := context.WithTimeout(ctx, streamingTimeout)
@@ -143,6 +171,6 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		s.streamingService.GracefulShutdown(streamingCtx)
 	}
 
-	log.Info("RPC: Server shutdown completed")
+	logger.Info("Server shutdown completed")
 	return nil
 }

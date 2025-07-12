@@ -36,7 +36,7 @@ func (d *Driver) getContainersResources(containerIDs []string) (*typesv2.Resourc
 	// Getting current running containers info - will return "<ncpu>,<mem_bytes>\n..." for each one
 	dockerArgs := []string{"inspect", "--format", "{{ .HostConfig.NanoCpus }},{{ .HostConfig.Memory }}"}
 	dockerArgs = append(dockerArgs, containerIDs...)
-	stdout, _, err := util.RunAndLog("DOCKER", 5*time.Second, nil, d.cfg.DockerPath, dockerArgs...)
+	stdout, _, err := util.RunAndLog("docker", 5*time.Second, nil, d.cfg.DockerPath, dockerArgs...)
 	if err != nil {
 		return out, fmt.Errorf("DOCKER: %s: Unable to inspect the containers to get used resources: %v", d.name, err)
 	}
@@ -72,7 +72,7 @@ func (d *Driver) getInitialUsage() (*typesv2.Resources, error) {
 	var out *typesv2.Resources
 	// The driver is configured as remote so collecting the current remote docker usage
 	// Listing the existing containers ID's to use in inpect command later
-	stdout, _, err := util.RunAndLog("DOCKER", 5*time.Second, nil, d.cfg.DockerPath, "ps", "--format", "{{ .ID }}")
+	stdout, _, err := util.RunAndLog("docker", 5*time.Second, nil, d.cfg.DockerPath, "ps", "--format", "{{ .ID }}")
 	if err != nil {
 		return out, fmt.Errorf("DOCKER: %s: Unable to list the running containers: %v", d.name, err)
 	}
@@ -131,11 +131,13 @@ func (*Driver) getContainerName(hwaddr string) string {
 }
 
 // Load images and returns the target image name:version to use by container
-func (d *Driver) loadImages(opts *Options) (string, error) {
+func (d *Driver) loadImages(cName string, opts *Options) (string, error) {
+	logger := log.WithFunc("docker", "loadImages").With("provider.name", d.name, "cont_name", cName)
+
 	// Download the images and unpack them
 	var wg sync.WaitGroup
 	for _, image := range opts.Images {
-		log.Infof("DOCKER: %s: Loading the required image %s %s: %s", d.name, image.Name, image.Version, image.URL)
+		logger.Info("Loading the required image", "image_name", image.Name, "image_version", image.Version, "image_url", image.URL)
 
 		// Running the background routine to download, unpack and process the image
 		// Success will be checked later by existence of the image in local docker registry
@@ -143,12 +145,12 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 		go func(image provider.Image) {
 			defer wg.Done()
 			if err := image.DownloadUnpack(d.cfg.ImagesPath, d.cfg.DownloadUser, d.cfg.DownloadPassword); err != nil {
-				log.Errorf("DOCKER: %s: Unable to download and unpack the image %s %s: %v", d.name, image.Name, image.URL, err)
+				logger.Error("Unable to download and unpack the image", "image_name", image.Name, "image_url", image.URL, "err", err)
 			}
 		}(image)
 	}
 
-	log.Debugf("DOCKER: %s: Wait for all the background image processes to be done...", d.name)
+	logger.Debug("Wait for all the background image processes to be done")
 	wg.Wait()
 
 	// Loading the image layers tar archive into the local docker registry
@@ -164,7 +166,7 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 		subdir := ""
 		items, err := os.ReadDir(imageUnpacked)
 		if err != nil {
-			log.Errorf("DOCKER: %s: Unable to read the unpacked directory %q: %v", d.name, imageUnpacked, err)
+			logger.Error("Unable to read the unpacked directory", "image_unpacked", imageUnpacked, "err", err)
 			return "", fmt.Errorf("DOCKER: %s: The image %q was unpacked incorrectly, please check log for the errors", d.name, image.Name)
 		}
 		for _, f := range items {
@@ -172,7 +174,7 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 				if f.Type()&fs.ModeSymlink != 0 {
 					// Potentially it can be a symlink (like used in local tests)
 					if _, err := os.Stat(filepath.Join(imageUnpacked, f.Name())); err != nil {
-						log.Warnf("DOCKER: %s: The image %q symlink is broken: %v", d.name, f.Name(), err)
+						logger.Warn("The image symlink is broken", "symlink", f.Name(), "err", err)
 						continue
 					}
 				}
@@ -181,7 +183,7 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 			}
 		}
 		if subdir == "" {
-			log.Errorf("DOCKER: %s: Unpacked image %q has no subfolder %q, only: %q", d.name, imageUnpacked, image.Name, items)
+			logger.Error("Unpacked image has no subfolder", "image_unpacked", imageUnpacked, "image_name", image.Name, "items", items)
 			return "", fmt.Errorf("DOCKER: %s: The image %q was unpacked incorrectly, please check log for the errors", d.name, image.Name)
 		}
 
@@ -190,7 +192,7 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 		if subdirVerEnd > 0 {
 			imageFound := ""
 			// Search the image by image ID prefix and list the image tags
-			imageTags, _, err := util.RunAndLog("DOCKER", 5*time.Second, nil, d.cfg.DockerPath, "image", "inspect",
+			imageTags, _, err := util.RunAndLog("docker", 5*time.Second, nil, d.cfg.DockerPath, "image", "inspect",
 				fmt.Sprintf("sha256:%s", subdir[subdirVerEnd+1:]),
 				"--format", "{{ range .RepoTags }}{{ println . }}{{ end }}",
 			)
@@ -212,7 +214,7 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 			}
 
 			if imageFound != "" {
-				log.Debugf("DOCKER: %s: The image was found in the local docker registry: %s", d.name, imageFound)
+				logger.Debug("The image was found in the local docker registry", "image_found", imageFound)
 				continue
 			}
 		}
@@ -220,9 +222,9 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 		// Load the docker image
 		// sha256 prefix the same
 		imageArchive := filepath.Join(imageUnpacked, subdir, image.Name+".tar")
-		stdout, _, err := util.RunAndLog("DOCKER", 5*time.Minute, nil, d.cfg.DockerPath, "image", "load", "-q", "-i", imageArchive)
+		stdout, _, err := util.RunAndLog("docker", 5*time.Minute, nil, d.cfg.DockerPath, "image", "load", "-q", "-i", imageArchive)
 		if err != nil {
-			log.Errorf("DOCKER: %s: Unable to load the image %q: %v", d.name, imageArchive, err)
+			logger.Error("Unable to load the image", "image_archive", imageArchive, "err", err)
 			return "", fmt.Errorf("DOCKER: %s: The image %q was unpacked incorrectly, please check log for the errors", d.name, image.Name)
 		}
 		for _, line := range strings.Split(stdout, "\n") {
@@ -241,11 +243,12 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 		}
 	}
 
-	log.Infof("DOCKER: %s: All the images are processed.", d.name)
+	logger.Info("All the images are processed")
 
 	// Check all the images are in place just by number of them
 	if len(opts.Images) != len(loadedImages) {
-		return "", log.Errorf("DOCKER: %s: Not all the images are ok (%d out of %d), please check log for the errors", d.name, len(loadedImages), len(opts.Images))
+		logger.Error("Not all the images are ok, please check log for the errors", "loaded_count", len(loadedImages), "total_count", len(opts.Images))
+		return "", fmt.Errorf("DOCKER: %s: Not all the images are ok (%d out of %d), please check log for the errors", d.name, len(loadedImages), len(opts.Images))
 	}
 
 	return targetOut, nil
@@ -254,7 +257,7 @@ func (d *Driver) loadImages(opts *Options) (string, error) {
 // Receives the container ID out of the container name
 func (d *Driver) getAllocatedContainerID(cName string) string {
 	// Probably it's better to store the current list in the memory
-	stdout, _, err := util.RunAndLog("DOCKER", 5*time.Second, nil, d.cfg.DockerPath, "ps", "-a", "-q", "--filter", "name="+cName)
+	stdout, _, err := util.RunAndLog("docker", 5*time.Second, nil, d.cfg.DockerPath, "ps", "-a", "-q", "--filter", "name="+cName)
 	if err != nil {
 		return ""
 	}
@@ -272,7 +275,7 @@ func (d *Driver) ensureNetwork(name string) error {
 			netArgs = append(netArgs, "--internal")
 		}
 		netArgs = append(netArgs, "aquarium-"+name)
-		if _, _, err := util.RunAndLog("DOCKER", 5*time.Second, nil, d.cfg.DockerPath, netArgs...); err != nil {
+		if _, _, err := util.RunAndLog("docker", 5*time.Second, nil, d.cfg.DockerPath, netArgs...); err != nil {
 			return err
 		}
 	}
@@ -282,9 +285,10 @@ func (d *Driver) ensureNetwork(name string) error {
 
 // Checks if the network is available
 func (d *Driver) isNetworkExists(name string) bool {
-	stdout, stderr, err := util.RunAndLog("DOCKER", 5*time.Second, nil, d.cfg.DockerPath, "network", "ls", "-q", "--filter", "name=aquarium-"+name)
+	stdout, stderr, err := util.RunAndLog("docker", 5*time.Second, nil, d.cfg.DockerPath, "network", "ls", "-q", "--filter", "name=aquarium-"+name)
 	if err != nil {
-		log.Errorf("DOCKER: %s: Unable to list the docker network: STDOUT:%s, STDERR:%s, %v", d.name, stdout, stderr, err)
+		logger := log.WithFunc("docker", "isNetworkExists").With("provider.name", d.name)
+		logger.Error("Unable to list the docker network", "stdout", stdout, "stderr", stderr, "err", err)
 		return false
 	}
 
@@ -293,6 +297,8 @@ func (d *Driver) isNetworkExists(name string) bool {
 
 // Creates disks directories described by the disks map
 func (d *Driver) disksCreate(cName string, runArgs *[]string, disks map[string]typesv2.ResourcesDisk) error {
+	logger := log.WithFunc("docker", "disksCreate").With("provider.name", d.name, "cont_name", cName)
+
 	// Create disks
 	diskPaths := make(map[string]string, len(disks))
 
@@ -346,21 +352,24 @@ func (d *Driver) disksCreate(cName string, runArgs *[]string, disks map[string]t
 				"-volname", label,
 				"-size", fmt.Sprintf("%dm", disk.Size*1024),
 			}
-			if _, _, err := util.RunAndLog("DOCKER", 10*time.Minute, nil, "/usr/bin/hdiutil", args...); err != nil {
-				return log.Errorf("DOCKER: %s: Unable to create dmg disk %q: %v", d.name, dmgPath, err)
+			if _, _, err := util.RunAndLog("docker", 10*time.Minute, nil, "/usr/bin/hdiutil", args...); err != nil {
+				logger.Error("Unable to create dmg disk", "dmg_path", dmgPath, "err", err)
+				return fmt.Errorf("DOCKER: %s: Unable to create dmg disk %q: %v", d.name, dmgPath, err)
 			}
 		}
 
 		mountPoint := filepath.Join("/Volumes", fmt.Sprintf("%s-%s", cName, dName))
 
 		// Attach & mount disk
-		if _, _, err := util.RunAndLog("DOCKER", 10*time.Second, nil, "/usr/bin/hdiutil", "attach", dmgPath, "-mountpoint", mountPoint); err != nil {
-			return log.Errorf("DOCKER: %s: Unable to attach dmg disk %q to %q: %v", d.name, dmgPath, mountPoint, err)
+		if _, _, err := util.RunAndLog("docker", 10*time.Second, nil, "/usr/bin/hdiutil", "attach", dmgPath, "-mountpoint", mountPoint); err != nil {
+			logger.Error("Unable to attach dmg disk", "dmg_path", dmgPath, "mount_point", mountPoint, "err", err)
+			return fmt.Errorf("DOCKER: %s: Unable to attach dmg disk %q to %q: %v", d.name, dmgPath, mountPoint, err)
 		}
 
 		// Allow anyone to modify the disk content
 		if err := os.Chmod(mountPoint, 0o777); err != nil {
-			return log.Errorf("DOCKER: %s: Unable to change the mount point %q access rights: %v", d.name, mountPoint, err)
+			logger.Error("Unable to change the mount point access rights", "mount_point", mountPoint, "err", err)
+			return fmt.Errorf("DOCKER: %s: Unable to change the mount point %q access rights: %v", d.name, mountPoint, err)
 		}
 
 		diskPaths[mountPoint] = disk.Label
@@ -384,13 +393,17 @@ func (d *Driver) disksCreate(cName string, runArgs *[]string, disks map[string]t
 
 // Creates the env file for the container out of metadata specification
 func (d *Driver) envCreate(cName string, metadata map[string]any) (string, error) {
+	logger := log.WithFunc("docker", "envCreate").With("provider.name", d.name, "cont_name", cName)
+
 	envFilePath := filepath.Join(d.cfg.WorkspacePath, cName, ".env")
 	if err := os.MkdirAll(filepath.Dir(envFilePath), 0o755); err != nil {
-		return "", log.Errorf("DOCKER: %s: Unable to create the container directory %q: %v", d.name, filepath.Dir(envFilePath), err)
+		logger.Error("Unable to create the container directory", "dir", filepath.Dir(envFilePath), "err", err)
+		return "", fmt.Errorf("DOCKER: %s: Unable to create the container directory %q: %v", d.name, filepath.Dir(envFilePath), err)
 	}
 	fd, err := os.OpenFile(envFilePath, os.O_WRONLY|os.O_CREATE, 0o640)
 	if err != nil {
-		return "", log.Errorf("DOCKER: %s: Unable to create env file %q: %v", d.name, envFilePath, err)
+		logger.Error("Unable to create env file", "env_file", envFilePath, "err", err)
+		return "", fmt.Errorf("DOCKER: %s: Unable to create env file %q: %v", d.name, envFilePath, err)
 	}
 	defer fd.Close()
 
@@ -398,7 +411,8 @@ func (d *Driver) envCreate(cName string, metadata map[string]any) (string, error
 	for key, value := range metadata {
 		data := []byte(fmt.Sprintf("%s=%s\n", key, value))
 		if _, err := fd.Write(data); err != nil {
-			return "", log.Errorf("DOCKER: %s: Unable to write env file data %q: %v", d.name, envFilePath, err)
+			logger.Error("Unable to write env file data", "env_file", envFilePath, "err", err)
+			return "", fmt.Errorf("DOCKER: %s: Unable to write env file data %q: %v", d.name, envFilePath, err)
 		}
 	}
 

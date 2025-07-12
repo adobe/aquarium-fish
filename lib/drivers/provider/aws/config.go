@@ -106,7 +106,8 @@ func (c *Config) Apply(config []byte) error {
 	// Parse json
 	if len(config) > 0 {
 		if err := json.Unmarshal(config, c); err != nil {
-			return log.Error("AWS: Unable to apply the driver config:", err)
+			log.WithFunc("aws", "Apply").Error("Unable to apply the driver config", "err", err)
+			return fmt.Errorf("AWS: Unable to apply the driver config: %v", err)
 		}
 	}
 
@@ -115,6 +116,7 @@ func (c *Config) Apply(config []byte) error {
 
 // Validate makes sure the config have the required defaults & that the required fields are set
 func (c *Config) Validate() (err error) {
+	logger := log.WithFunc("aws", "Validate")
 	// Check that values of the config is filled at least with defaults
 	if c.Region == "" {
 		return fmt.Errorf("AWS: No EC2 region is specified")
@@ -158,7 +160,7 @@ func (c *Config) Validate() (err error) {
 		counter++
 		if err != nil {
 			if counter < retries {
-				log.Warn("AWS: Retry after credentials validation error:", err)
+				logger.Warn("Retry after credentials validation error", "err", err)
 				// Give command 10 seconds to rest
 				time.Sleep(10 * time.Second)
 				continue
@@ -171,10 +173,10 @@ func (c *Config) Validate() (err error) {
 		break
 	}
 	if len(c.AccountIDs) > 0 && c.AccountIDs[0] != account {
-		log.Debug("AWS: Using Account IDs:", c.AccountIDs, "(real: ", account, ")")
+		logger.Debug("Using Account IDs", "acc_ids", c.AccountIDs, "real", account)
 	} else {
 		c.AccountIDs = []string{account}
-		log.Debug("AWS: Using Account IDs:", c.AccountIDs)
+		logger.Debug("Using Account IDs", "acc_ids", c.AccountIDs)
 	}
 
 	// Init empty instance tags in case its not set

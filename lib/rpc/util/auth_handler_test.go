@@ -15,6 +15,7 @@
 package util
 
 import (
+	"context"
 	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
@@ -43,7 +44,7 @@ func TestAuthHandler(t *testing.T) {
 	if err := testUser.SetHash(hash); err != nil {
 		t.Fatalf("Failed to set user hash: %v", err)
 	}
-	if err := db.UserCreate(testUser); err != nil {
+	if err := db.UserCreate(context.Background(), testUser); err != nil {
 		t.Fatalf("Failed to create test user: %v", err)
 	}
 

@@ -37,33 +37,34 @@ func NewAuthHandler(db *database.Database) *AuthHandler {
 // Handler implements HTTP middleware for authentication
 func (h *AuthHandler) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logger := log.WithFunc("rpc", "auth")
 		auth := r.Header.Get("Authorization")
 		if !strings.HasPrefix(auth, "Basic ") {
-			log.Debugf("RPC: HTTP Auth: No Basic auth header found")
+			logger.Debug("No Basic auth header found")
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
 		payload, err := base64.StdEncoding.DecodeString(auth[6:])
 		if err != nil {
-			log.Debugf("RPC: HTTP Auth: Failed to decode auth header: %v", err)
+			logger.Debug("Failed to decode auth header", "err", err)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
 		parts := strings.SplitN(string(payload), ":", 2)
 		if len(parts) != 2 {
-			log.Debugf("RPC: HTTP Auth: Invalid auth format")
+			logger.Debug("Invalid auth format")
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
 		username, password := parts[0], parts[1]
-		log.Debugf("RPC: %s: New HTTP request received: %s", username, r.URL.Path)
+		logger.Debug("New HTTP request received", "user", username, "url_path", r.URL.Path)
 
-		user := h.db.UserAuth(username, password)
+		user := h.db.UserAuth(r.Context(), username, password)
 		if user == nil {
-			log.Debugf("RPC: HTTP Auth: Authentication failed for user: %s", username)
+			logger.Debug("Authentication failed for user", "user", username)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}

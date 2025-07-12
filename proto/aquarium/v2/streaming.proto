@@ -77,9 +77,6 @@ message StreamError {
 message StreamingServiceSubscribeRequest {
   // List of object types to subscribe to
   repeated SubscriptionType subscription_types = 1;
-
-  // Optional filters for subscription (e.g., application_uid, owner_name)
-  map<string, string> filters = 2;
 }
 
 // StreamingServiceSubscribeResponse represents a database change notification

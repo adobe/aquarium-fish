@@ -145,7 +145,7 @@ func (f *Fish) StorageVotesAdd(votes []typesv2.Vote) {
 
 	for _, vote := range votes {
 		if err := vote.Validate(); err != nil {
-			log.Errorf("Fish: Validation error for Vote %s from Node %s: %v", vote.Uid, vote.NodeUid, err)
+			log.WithFunc("fish", "StorageVotesAdd").Error("Validation error for Vote from Node", "vote_uid", vote.Uid, "vote_node_uid", vote.NodeUid, "err", err)
 			continue
 		}
 		// Check the storage already holds the vote UID

@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"math/big"
 
 	"golang.org/x/crypto/argon2"
@@ -61,7 +62,7 @@ type properties struct {
 func RandBytes(size int) (data []byte) {
 	data = make([]byte, size)
 	if _, err := rand.Read(data); err != nil {
-		log.Error("Crypt: Unable to generate random bytes:", err)
+		log.WithFunc("crypt", "RandBytes").Error("Unable to generate random bytes", "err", err)
 	}
 	return
 }
@@ -78,7 +79,7 @@ func RandStringCharset(size int, charset string) string {
 	for i := range data {
 		charsetPos, err := rand.Int(rand.Reader, charsetLen)
 		if err != nil {
-			log.Error("Crypt: Failed to generate random string:", err)
+			log.WithFunc("crypt", "RandStringCharset").Error("Failed to generate random string", "err", err)
 		}
 		data[i] = charset[charsetPos.Int64()]
 	}
@@ -120,7 +121,8 @@ func (h *Hash) IsEmpty() bool {
 func (h Hash) Serialize() (util.UnparsedJSON, error) {
 	jsonHash, err := json.Marshal(h)
 	if err != nil {
-		return util.UnparsedJSON("{}"), log.Errorf("Unable to serialize Hash: %v", err)
+		log.WithFunc("crypt", "Serialize").Error("Unable to serialize Hash", "err", err)
+		return util.UnparsedJSON("{}"), fmt.Errorf("Unable to serialize Hash: %v", err)
 	}
 	return util.UnparsedJSON(jsonHash), nil
 }
@@ -128,7 +130,8 @@ func (h Hash) Serialize() (util.UnparsedJSON, error) {
 func (h *Hash) Deserialize(jsonHash util.UnparsedJSON) error {
 	err := json.Unmarshal([]byte(jsonHash), h)
 	if err != nil {
-		return log.Errorf("Unable to deserialize Hash: %v", err)
+		log.WithFunc("crypt", "Deserialize").Error("Unable to deserialize Hash", "err", err)
+		return fmt.Errorf("Unable to deserialize Hash: %v", err)
 	}
 	return nil
 }

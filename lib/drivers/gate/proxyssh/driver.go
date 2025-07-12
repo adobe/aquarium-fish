@@ -16,6 +16,7 @@
 package proxyssh
 
 import (
+	"fmt"
 	"path/filepath"
 	"sync"
 
@@ -83,7 +84,8 @@ func (d *Driver) Prepare(wd string, config []byte) (err error) {
 		keyPath = filepath.Join(wd, keyPath)
 	}
 	if d.cfg.BindAddress, err = d.proxyInit(keyPath); err != nil {
-		return log.Errorf("PROXYSSH: %s: Unable to init proxyssh gate: %v", d.name, err)
+		log.WithFunc("proxyssh", "Prepare").Error("Unable to init proxyssh gate", "gate.name", d.name, "err", err)
+		return fmt.Errorf("PROXYSSH: %s: Unable to init proxyssh gate: %v", d.name, err)
 	}
 
 	return nil

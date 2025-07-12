@@ -31,7 +31,7 @@ type LabelService struct {
 }
 
 // List returns a list of labels
-func (s *LabelService) List(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.LabelServiceListRequest]) (*connect.Response[aquariumv2.LabelServiceListResponse], error) {
+func (s *LabelService) List(ctx context.Context, req *connect.Request[aquariumv2.LabelServiceListRequest]) (*connect.Response[aquariumv2.LabelServiceListResponse], error) {
 	// Get labels from database
 	params := database.LabelListParams{}
 	if req.Msg.Name != nil {
@@ -42,7 +42,7 @@ func (s *LabelService) List(_ /*ctx*/ context.Context, req *connect.Request[aqua
 		version := req.Msg.GetVersion()
 		params.Version = &version
 	}
-	out, err := s.fish.DB().LabelList(params)
+	out, err := s.fish.DB().LabelList(ctx, params)
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.LabelServiceListResponse{
 			Status: false, Message: "Unable to get the label list: " + err.Error(),
@@ -62,9 +62,9 @@ func (s *LabelService) List(_ /*ctx*/ context.Context, req *connect.Request[aqua
 }
 
 // Get returns a label by name
-func (s *LabelService) Get(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.LabelServiceGetRequest]) (*connect.Response[aquariumv2.LabelServiceGetResponse], error) {
+func (s *LabelService) Get(ctx context.Context, req *connect.Request[aquariumv2.LabelServiceGetRequest]) (*connect.Response[aquariumv2.LabelServiceGetResponse], error) {
 	// Get labels with the specified uid
-	label, err := s.fish.DB().LabelGet(stringToUUID(req.Msg.GetLabelUid()))
+	label, err := s.fish.DB().LabelGet(ctx, stringToUUID(req.Msg.GetLabelUid()))
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.LabelServiceGetResponse{
 			Status: false, Message: "Unable to get the label: " + err.Error(),
@@ -78,10 +78,10 @@ func (s *LabelService) Get(_ /*ctx*/ context.Context, req *connect.Request[aquar
 }
 
 // Create creates a new label
-func (s *LabelService) Create(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.LabelServiceCreateRequest]) (*connect.Response[aquariumv2.LabelServiceCreateResponse], error) {
+func (s *LabelService) Create(ctx context.Context, req *connect.Request[aquariumv2.LabelServiceCreateRequest]) (*connect.Response[aquariumv2.LabelServiceCreateResponse], error) {
 	label := typesv2.FromLabel(req.Msg.GetLabel())
 
-	if err := s.fish.DB().LabelCreate(&label); err != nil {
+	if err := s.fish.DB().LabelCreate(ctx, &label); err != nil {
 		return connect.NewResponse(&aquariumv2.LabelServiceCreateResponse{
 			Status: false, Message: "Unable to create label: " + err.Error(),
 		}), connect.NewError(connect.CodeInternal, err)
@@ -94,28 +94,20 @@ func (s *LabelService) Create(_ /*ctx*/ context.Context, req *connect.Request[aq
 }
 
 // Delete deletes a label
-func (s *LabelService) Delete(_ /*ctx*/ context.Context, req *connect.Request[aquariumv2.LabelServiceDeleteRequest]) (*connect.Response[aquariumv2.LabelServiceDeleteResponse], error) {
+func (s *LabelService) Delete(ctx context.Context, req *connect.Request[aquariumv2.LabelServiceDeleteRequest]) (*connect.Response[aquariumv2.LabelServiceDeleteResponse], error) {
 	// Get labels with the specified name
-	labels, err := s.fish.DB().LabelListName(req.Msg.GetLabelUid())
+	label, err := s.fish.DB().LabelGet(ctx, stringToUUID(req.Msg.GetLabelUid()))
 	if err != nil {
 		return connect.NewResponse(&aquariumv2.LabelServiceDeleteResponse{
 			Status: false, Message: "Unable to get the label: " + err.Error(),
 		}), connect.NewError(connect.CodeInternal, err)
 	}
 
-	if len(labels) == 0 {
+	// Delete label
+	if err := s.fish.DB().LabelDelete(ctx, label.Uid); err != nil {
 		return connect.NewResponse(&aquariumv2.LabelServiceDeleteResponse{
-			Status: false, Message: "Label not found",
-		}), connect.NewError(connect.CodeNotFound, err)
-	}
-
-	// Delete all versions of the label
-	for _, label := range labels {
-		if err := s.fish.DB().LabelDelete(label.Uid); err != nil {
-			return connect.NewResponse(&aquariumv2.LabelServiceDeleteResponse{
-				Status: false, Message: "Unable to delete label: " + err.Error(),
-			}), connect.NewError(connect.CodeInternal, err)
-		}
+			Status: false, Message: "Unable to delete label: " + err.Error(),
+		}), connect.NewError(connect.CodeInternal, err)
 	}
 
 	return connect.NewResponse(&aquariumv2.LabelServiceDeleteResponse{

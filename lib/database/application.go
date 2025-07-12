@@ -15,6 +15,7 @@
 package database
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -24,8 +25,8 @@ import (
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
-// ApplicationFind lists Applications by filter
-func (d *Database) ApplicationList() (as []typesv2.Application, err error) {
+// applicationListImpl lists Applications by filter
+func (d *Database) applicationListImpl(_ context.Context) (as []typesv2.Application, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -33,8 +34,8 @@ func (d *Database) ApplicationList() (as []typesv2.Application, err error) {
 	return as, err
 }
 
-// ApplicationCreate makes new Application
-func (d *Database) ApplicationCreate(a *typesv2.Application) error {
+// applicationCreateImpl makes new Application
+func (d *Database) applicationCreateImpl(ctx context.Context, a *typesv2.Application) error {
 	if a.LabelUid == uuid.Nil {
 		return fmt.Errorf("Fish: LabelUID can't be unset")
 	}
@@ -51,19 +52,21 @@ func (d *Database) ApplicationCreate(a *typesv2.Application) error {
 	}
 
 	// Create ApplicationState NEW too
-	return d.ApplicationStateCreate(&typesv2.ApplicationState{
+	err = d.ApplicationStateCreate(ctx, &typesv2.ApplicationState{
 		ApplicationUid: a.Uid, Status: typesv2.ApplicationState_NEW,
 		Description: "Just created by Fish " + d.node.Name,
 	})
+
+	return err
 }
 
 // Intentionally disabled, application can't be updated
-/*func (d *Database) ApplicationSave(app *typesv2.Application) error {
+/*func (d *Database) applicationSaveImpl(app *typesv2.Application) error {
 	return d.be.Save(app).Error
 }*/
 
-// ApplicationGet returns Application by UID
-func (d *Database) ApplicationGet(uid typesv2.ApplicationUID) (a *typesv2.Application, err error) {
+// applicationGetImpl returns Application by UID
+func (d *Database) applicationGetImpl(_ context.Context, uid typesv2.ApplicationUID) (a *typesv2.Application, err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
@@ -71,34 +74,37 @@ func (d *Database) ApplicationGet(uid typesv2.ApplicationUID) (a *typesv2.Applic
 	return a, err
 }
 
-// ApplicationDelete removes the Application
-func (d *Database) ApplicationDelete(uid typesv2.ApplicationUID) (err error) {
+// applicationDeleteImpl removes the Application
+func (d *Database) applicationDeleteImpl(_ context.Context, uid typesv2.ApplicationUID) (err error) {
 	d.beMu.RLock()
 	defer d.beMu.RUnlock()
 
-	return d.be.Collection(ObjectApplication).Delete(uid.String())
+	err = d.be.Collection(ObjectApplication).Delete(uid.String())
+	return err
 }
 
-// ApplicationIsAllocated returns if specific Application is allocated
-func (d *Database) ApplicationIsAllocated(appUID typesv2.ApplicationUID) (err error) {
-	state, err := d.ApplicationStateGetByApplication(appUID)
+// applicationIsAllocatedImpl returns if specific Application is allocated
+func (d *Database) applicationIsAllocatedImpl(ctx context.Context, appUID typesv2.ApplicationUID) error {
+	state, err := d.ApplicationStateGetByApplication(ctx, appUID)
 	if err != nil {
 		return err
 	} else if state.Status != typesv2.ApplicationState_ALLOCATED {
 		return fmt.Errorf("Fish: The Application is not allocated")
 	}
+
 	return nil
 }
 
-// ApplicationDeallocate helps with creating deallocate/recalled state for the Application
-func (d *Database) ApplicationDeallocate(appUID typesv2.ApplicationUID, requestor string) (*typesv2.ApplicationState, error) {
-	out, err := d.ApplicationStateGetByApplication(appUID)
+// applicationDeallocateImpl helps with creating deallocate state for the Application
+func (d *Database) applicationDeallocateImpl(ctx context.Context, appUID typesv2.ApplicationUID, requestor string) (*typesv2.ApplicationState, error) {
+	out, err := d.ApplicationStateGetByApplication(ctx, appUID)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to find status for the Application: %s, %w", appUID, err)
 	}
+
 	if !d.ApplicationStateIsActive(out.Status) {
 		// Since app can't be deallocated - it's not really an error, treating as precaution
-		log.Warnf("DB: Unable to deallocate the Application %q with status: %s", appUID, out.Status)
+		log.WithFunc("database", "applicationDeallocateImpl").Warn("Can't deallocate the Application with status", "app_uid", appUID, "status", out.Status)
 		return out, nil
 	}
 
@@ -107,11 +113,12 @@ func (d *Database) ApplicationDeallocate(appUID typesv2.ApplicationUID, requesto
 		// The Application is still NEW so just mark it as DEALLOCATED
 		newStatus = typesv2.ApplicationState_DEALLOCATED
 	}
+
 	as := &typesv2.ApplicationState{ApplicationUid: appUID, Status: newStatus,
 		Description: fmt.Sprintf("Requested by %s", requestor),
 	}
 
-	if err = d.ApplicationStateCreate(as); err != nil {
+	if err = d.ApplicationStateCreate(ctx, as); err != nil {
 		return nil, fmt.Errorf("Unable to deallocate the Application: %s, %w", appUID, err)
 	}
 

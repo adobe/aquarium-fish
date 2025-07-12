@@ -17,6 +17,7 @@ package tests
 import (
 	"context"
 	"fmt"
+	"net/netip"
 	"os"
 	"strings"
 	"testing"
@@ -35,7 +36,7 @@ import (
 // WARN: This test requires `sh` binary to be available in PATH
 func Test_proxyssh_ssh_password2password_tty_access(t *testing.T) {
 	t.Parallel()
-	afi := h.NewAquariumFish(t, "node-1", `---
+	afi := h.NewStoppedAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0
@@ -46,6 +47,22 @@ drivers:
       bind_address: 127.0.0.1:0
   providers:
     test:`)
+
+	var proxysshEndpoint string
+	afi.WaitForLog(" proxyssh.addr=", func(substring, line string) bool {
+		data := strings.SplitN(strings.TrimSpace(line), substring, 2)
+		addrport, err := netip.ParseAddrPort(data[1])
+		if err != nil {
+			t.Fatalf("ERROR: Unable to parse address:port from data %q: %v", data[1], err)
+			return false
+		}
+		proxysshEndpoint = addrport.String()
+		t.Logf("Located proxyssh endpoint: %q", proxysshEndpoint)
+
+		return true
+	})
+
+	afi.Start(t)
 
 	t.Cleanup(func() {
 		afi.Cleanup(t)
@@ -216,7 +233,7 @@ drivers:
 
 	// Now running the same but through proxy - and we should get the identical answer
 	t.Run("Executing SSH shell through PROXYSSH", func(t *testing.T) {
-		response, err := h.RunCmdPtySSH(afi.ProxySSHEndpoint(), accUsername, accPassword, "echo 'Its ALIVE!'")
+		response, err := h.RunCmdPtySSH(proxysshEndpoint, accUsername, accPassword, "echo 'Its ALIVE!'")
 		if err != nil {
 			t.Fatalf("Failed to execute command via PROXYSSH: %v", err)
 		}
@@ -228,7 +245,7 @@ drivers:
 	})
 
 	t.Run("Checking the PROXYSSH token could be used only once", func(t *testing.T) {
-		_, err := h.RunCmdPtySSH(afi.ProxySSHEndpoint(), accUsername, accPassword, "echo 'Its ALIVE!'")
+		_, err := h.RunCmdPtySSH(proxysshEndpoint, accUsername, accPassword, "echo 'Its ALIVE!'")
 		if err == nil {
 			t.Fatalf("Apparently PROXYSSH token could be used once more - no deal: %v", err)
 		}
@@ -268,7 +285,7 @@ drivers:
 // Test ProxySSH SCP functionality
 func Test_proxyssh_scp_password2password_copy(t *testing.T) {
 	t.Parallel()
-	afi := h.NewAquariumFish(t, "node-1", `---
+	afi := h.NewStoppedAquariumFish(t, "node-1", `---
 node_location: test_loc
 
 api_address: 127.0.0.1:0
@@ -279,6 +296,22 @@ drivers:
       bind_address: 127.0.0.1:0
   providers:
     test:`)
+
+	var proxysshEndpoint string
+	afi.WaitForLog(" proxyssh.addr=", func(substring, line string) bool {
+		data := strings.SplitN(strings.TrimSpace(line), substring, 2)
+		addrport, err := netip.ParseAddrPort(data[1])
+		if err != nil {
+			t.Fatalf("ERROR: Unable to parse address:port from data %q: %v", data[1], err)
+			return false
+		}
+		proxysshEndpoint = addrport.String()
+		t.Logf("Located proxyssh endpoint: %q", proxysshEndpoint)
+
+		return true
+	})
+
+	afi.Start(t)
 
 	t.Cleanup(func() {
 		afi.Cleanup(t)
@@ -450,7 +483,7 @@ drivers:
 			t.Fatalf("Unable to generate random files: %v", err)
 		}
 
-		err = h.RunSftp(afi.ProxySSHEndpoint(), accUsername, accPassword, srcFiles, dstdir, false)
+		err = h.RunSftp(proxysshEndpoint, accUsername, accPassword, srcFiles, dstdir, false)
 		if err != nil {
 			t.Fatalf("Failed to copy files via PROXYSSH: %v", err)
 		}
@@ -499,7 +532,7 @@ drivers:
 			t.Fatalf("Unable to generate random files: %v", err)
 		}
 
-		err = h.RunSftp(afi.ProxySSHEndpoint(), accUsername, accPassword, srcFiles, dstdir, true)
+		err = h.RunSftp(proxysshEndpoint, accUsername, accPassword, srcFiles, dstdir, true)
 		if err != nil {
 			t.Fatalf("Failed to copy files via PROXYSSH: %v", err)
 		}

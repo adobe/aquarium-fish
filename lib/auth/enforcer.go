@@ -97,21 +97,22 @@ func NewEnforcer() (*Enforcer, error) {
 
 // CheckPermission checks if the roles has permission to perform the action on the object
 func (e *Enforcer) CheckPermission(roles []string, obj, act string) bool {
+	logger := log.WithFunc("auth", "CheckPermission").With("roles", roles, "obj", obj, "act", act)
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
 	for _, role := range roles {
 		allowed, err := e.enforcer.Enforce(role, obj, act)
 		if err != nil {
-			log.Errorf("Auth: Enforcer: BLOCKED: %s %s %s: Failed to check permission: %v", roles, obj, act, err)
+			logger.Error("Enforcer: BLOCKED: Failed to check permission", "err", err)
 			return false
 		}
 		if allowed {
-			log.Debug("Auth: Enforcer: PASSED:", roles, obj, act)
+			logger.Debug("Enforcer: PASSED")
 			return true
 		}
 	}
-	log.Debug("Auth: Enforcer: BLOCKED:", roles, obj, act)
+	logger.Debug("Enforcer: BLOCKED")
 	return false
 }
 
