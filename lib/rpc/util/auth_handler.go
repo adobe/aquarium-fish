@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/adobe/aquarium-fish/lib/auth"
 	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/log"
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
@@ -45,6 +46,7 @@ type JWTClaims struct {
 // getJWTSecret returns the JWT secret, generating it if necessary
 func getJWTSecret() []byte {
 	jwtSecretOnce.Do(func() {
+		// TODO: Store jwt secret somewhere or use priv/pub key
 		jwtSecret = make([]byte, 32)
 		if _, err := rand.Read(jwtSecret); err != nil {
 			panic(fmt.Sprintf("failed to generate JWT secret: %v", err))
@@ -89,7 +91,17 @@ func NewAuthHandler(db *database.Database) *AuthHandler {
 // Handler implements HTTP middleware for authentication
 func (h *AuthHandler) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logger := log.WithFunc("rpc", "auth")
+		logger := log.WithFunc("rpc", "auth").With("url_path", r.URL.Path)
+
+		service, method := getServiceMethodFromPath(r.URL.Path)
+
+		// Ignore the service/method when it's in auth authExclude list
+		if auth.IsEcludedFromAuth(service, method) {
+			logger.Debug("Skipping auth for excluded method")
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		auth := r.Header.Get("Authorization")
 
 		var user *typesv2.User
@@ -97,7 +109,7 @@ func (h *AuthHandler) Handler(next http.Handler) http.Handler {
 		// Check for JWT Bearer token first
 		if strings.HasPrefix(auth, "Bearer ") {
 			tokenString := auth[7:]
-			logger.Debug("JWT Bearer token found", "url_path", r.URL.Path)
+			logger.Debug("JWT Bearer token found")
 
 			// Parse JWT token
 			claims, err := ParseJWTToken(tokenString)
@@ -115,7 +127,7 @@ func (h *AuthHandler) Handler(next http.Handler) http.Handler {
 				return
 			}
 
-			logger.Debug("JWT authentication successful", "user", user.Name, "url_path", r.URL.Path)
+			logger.Debug("JWT authentication successful", "user", user.Name)
 		} else if strings.HasPrefix(auth, "Basic ") {
 			// Fall back to Basic auth for compatibility
 			payload, err := base64.StdEncoding.DecodeString(auth[6:])
@@ -133,7 +145,7 @@ func (h *AuthHandler) Handler(next http.Handler) http.Handler {
 			}
 
 			username, password := parts[0], parts[1]
-			logger.Debug("Basic auth request received", "user", username, "url_path", r.URL.Path)
+			logger.Debug("Basic auth request received", "user", username)
 
 			user = h.db.UserAuth(r.Context(), username, password)
 			if user == nil {
@@ -142,7 +154,7 @@ func (h *AuthHandler) Handler(next http.Handler) http.Handler {
 				return
 			}
 
-			logger.Debug("Basic authentication successful", "user", user.Name, "url_path", r.URL.Path)
+			logger.Debug("Basic authentication successful", "user", user.Name)
 		} else {
 			logger.Debug("No valid auth header found")
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)

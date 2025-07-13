@@ -43,6 +43,36 @@ func Handler() http.Handler {
 		})
 	}
 
+	// Check if index.html exists (indicating web assets are built)
+	if _, err := distFS.Open("index.html"); err != nil {
+		logger.Warn("Web dashboard assets not built - index.html not found", "err", err)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/html")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte(`<!DOCTYPE html>
+<html>
+<head>
+    <title>Aquarium Fish - Web Dashboard Unavailable</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; text-align: center; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .error { color: #e74c3c; }
+        .info { color: #3498db; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Aquarium Fish</h1>
+        <p class="error">Web Dashboard Unavailable</p>
+        <p>The web dashboard assets have not been built yet.</p>
+        <p class="info">To build the web dashboard, run: <code>cd web && ./build.sh</code></p>
+        <p class="info">API endpoints are still available at <code>/grpc/*</code></p>
+    </div>
+</body>
+</html>`))
+		})
+	}
+
 	// Create file server for static assets
 	fileServer := http.FileServer(http.FS(distFS))
 
@@ -68,9 +98,6 @@ func Handler() http.Handler {
 				logger.Debug("Serving SPA route with index.html")
 				urlPath = "index.html"
 
-				// Set the URL path back to index.html for the file server
-				r.URL.Path = "/index.html"
-
 				// Set appropriate headers for SPA
 				w.Header().Set("Cache-Control", "no-cache")
 			} else {
@@ -78,9 +105,6 @@ func Handler() http.Handler {
 				http.NotFound(w, r)
 				return
 			}
-		} else {
-			// Set the URL path for the file server
-			r.URL.Path = "/" + urlPath
 		}
 
 		// Set security headers
@@ -94,6 +118,10 @@ func Handler() http.Handler {
 			// Cache static assets for 1 year
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		}
+
+		// Create new request with correct path for file server
+		/*fileReq := r.Clone(r.Context())
+		fileReq.URL.Path = "/" + urlPath*/
 
 		// Serve the file
 		fileServer.ServeHTTP(w, r)

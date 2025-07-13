@@ -78,11 +78,35 @@ const (
 	{{- end }}
 {{ end }}
 )
-{{- if gt (len .Excluded) 0 }}
 
-// RBAC-excluded services and methods
+{{- if gt (len .AuthExcluded) 0 }}
+// Auth-excluded service-methods
+var authExcluded = map[string][]string{
+	{{- range $serviceName, $methods := .AuthExcluded }}
+	"{{ $serviceName }}": {
+		{{- range $methods }}
+		"{{ . }}",
+		{{- end }}
+	},
+	{{ end }}
+}
+
+// IsEcludedFromAuth helps connectrpc to exclude methods from Auth validation
+func IsEcludedFromAuth(service, method string) bool {
+	if methods, ok := authExcluded[service]; ok {
+		for _, m := range methods {
+			if m == method {
+				return true
+			}
+		}
+	}
+	return false
+}{{ end }}
+{{- if gt (len .RbacExcluded) 0 }}
+
+// RBAC-excluded service-methods
 var rbacExcluded = map[string][]string{
-	{{- range $serviceName, $methods := .Excluded }}
+	{{- range $serviceName, $methods := .RbacExcluded }}
 	"{{ $serviceName }}": {
 		{{- range $methods }}
 		"{{ . }}",
@@ -166,6 +190,7 @@ func processGrpcPermissions(plugin *protogen.Plugin) (map[string][]string, map[s
 				opts, ok := method.Desc.Options().(*descriptorpb.MethodOptions)
 				var roles []string
 				var additionalActions []string
+				svcMethod := method.GoName
 				if ok {
 					ext := proto.GetExtension(opts, aquariumv2.E_AccessControl)
 					ac, ok := ext.(*aquariumv2.RoleBasedAccessControl)
@@ -175,8 +200,13 @@ func processGrpcPermissions(plugin *protogen.Plugin) (map[string][]string, map[s
 						roles = []string{auth.AdminRoleName} // Default role
 					}
 					if ac != nil {
-						// If no_permission_needed is set - skipping roles processing for method
-						if !ac.GetNoPermissionNeeded() {
+						if ac.GetAllowUnauthenticated() {
+							// If allow_unauthenticated is set - skip both auth & rbac entirely
+							svcMethod = "--" + svcMethod
+						} else if ac.GetNoPermissionNeeded() {
+							// If no_permission_needed is set - skipping roles processing for method
+							svcMethod = "-" + svcMethod
+						} else {
 							// Administrator as default
 							roles = []string{auth.AdminRoleName} // Default role
 							for _, role := range ac.GetAllowedRoles() {
@@ -201,14 +231,7 @@ func processGrpcPermissions(plugin *protogen.Plugin) (map[string][]string, map[s
 					roles = []string{auth.AdminRoleName} // Default role
 				}
 
-				// The AccessControl is defined, but AllowedRoles are
-				// unset - so allowing any logged-in user to call this method
-				if len(roles) == 0 {
-					// Prefixing method name with minus to mark it later in template
-					svcMethods = append(svcMethods, "-"+method.GoName)
-				} else {
-					svcMethods = append(svcMethods, method.GoName)
-				}
+				svcMethods = append(svcMethods, svcMethod)
 
 				// Add permissions for each role
 				for _, role := range roles {
@@ -255,15 +278,27 @@ func generatePermissionFiles(grpcServices map[string][]string, grpcRoles map[str
 func generateServiceMethodConstants(services map[string][]string, suffix string) error {
 	// Add services methods with "-" prefix to RBAC exclusion
 	// It's used on ConnectRPC side
-	excluded := make(map[string][]string)
+	authExcluded := make(map[string][]string)
+	rbacExcluded := make(map[string][]string)
 	for service, methods := range services {
 		for i, method := range methods {
-			if strings.HasPrefix(method, "-") {
-				if _, ok := excluded[service]; !ok {
-					excluded[service] = []string{}
+			if strings.HasPrefix(method, "--") {
+				// Two minuses before the method means it's excluded from both Auth & RBAC
+				if _, ok := authExcluded[service]; !ok {
+					authExcluded[service] = []string{}
+				}
+				noPrefixMethod := method[2:]
+				authExcluded[service] = append(authExcluded[service], noPrefixMethod)
+				rbacExcluded[service] = append(rbacExcluded[service], noPrefixMethod)
+				methods[i] = noPrefixMethod
+				services[service] = methods
+			} else if strings.HasPrefix(method, "-") {
+				// One minus - means method excluded from RBAC
+				if _, ok := rbacExcluded[service]; !ok {
+					rbacExcluded[service] = []string{}
 				}
 				noPrefixMethod := method[1:]
-				excluded[service] = append(excluded[service], noPrefixMethod)
+				rbacExcluded[service] = append(rbacExcluded[service], noPrefixMethod)
 				methods[i] = noPrefixMethod
 				services[service] = methods
 			}
@@ -273,8 +308,9 @@ func generateServiceMethodConstants(services map[string][]string, suffix string)
 	// Execute template
 	g := &bytes.Buffer{}
 	err := serviceMethodConstantsTmpl.Execute(g, map[string]any{
-		"Services": services,
-		"Excluded": excluded,
+		"Services":     services,
+		"AuthExcluded": authExcluded,
+		"RbacExcluded": rbacExcluded,
 	})
 	if err != nil {
 		return fmt.Errorf("Error executing gRPC template: %v", err)

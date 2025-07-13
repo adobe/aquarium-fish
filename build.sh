@@ -49,7 +49,7 @@ go generate -v .
 echo
 echo "--- BUILD WEB DASHBOARD ---"
 # Build the web dashboard
-if [ -d "web" ]; then
+if [ "x${NO_WEB}" = x ]; then
     echo "Building web dashboard..."
     cd web
     ./build.sh
@@ -59,7 +59,7 @@ if [ -d "web" ]; then
     cp -a web/build/client lib/web/dist
     echo "Web dashboard build completed"
 else
-    echo "Web directory not found, skipping web build"
+    echo "Skipping. Reusing existing web dashboard build"
 fi
 
 # If ONLYGEN is specified - skip the build

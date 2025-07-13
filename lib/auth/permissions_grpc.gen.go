@@ -38,8 +38,8 @@ const (
 
 	// AuthService service constants
 	AuthService               = "AuthService"
-	AuthServiceGetPermissions = "GetPermissions"
 	AuthServiceLogin          = "Login"
+	AuthServiceGetPermissions = "GetPermissions"
 	AuthServiceRefreshToken   = "RefreshToken"
 	AuthServiceValidateToken  = "ValidateToken"
 
@@ -87,11 +87,30 @@ const (
 	UserServiceUpdateRoles    = "UpdateRoles"
 )
 
-// RBAC-excluded services and methods
+// Auth-excluded service-methods
+var authExcluded = map[string][]string{
+	"AuthService": {
+		"Login",
+	},
+}
+
+// IsEcludedFromAuth helps connectrpc to exclude methods from Auth validation
+func IsEcludedFromAuth(service, method string) bool {
+	if methods, ok := authExcluded[service]; ok {
+		for _, m := range methods {
+			if m == method {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// RBAC-excluded service-methods
 var rbacExcluded = map[string][]string{
 	"AuthService": {
-		"GetPermissions",
 		"Login",
+		"GetPermissions",
 		"RefreshToken",
 		"ValidateToken",
 	},

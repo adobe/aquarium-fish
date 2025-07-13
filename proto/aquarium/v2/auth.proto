@@ -24,7 +24,7 @@ service AuthService {
   // Login authenticates a user and returns a JWT token
   rpc Login(AuthServiceLoginRequest) returns (AuthServiceLoginResponse) {
     option (access_control) = {
-      no_permission_needed: true,
+      allow_unauthenticated: true,
     };
   }
 

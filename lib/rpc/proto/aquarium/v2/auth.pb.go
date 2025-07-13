@@ -741,7 +741,7 @@ const file_aquarium_v2_auth_proto_rawDesc = "" +
 	"\n" +
 	"\b_session2\xcd\x03\n" +
 	"\vAuthService\x12\\\n" +
-	"\x05Login\x12$.aquarium.v2.AuthServiceLoginRequest\x1a%.aquarium.v2.AuthServiceLoginResponse\"\x06\x82\xb5\x18\x02\x10\x01\x12q\n" +
+	"\x05Login\x12$.aquarium.v2.AuthServiceLoginRequest\x1a%.aquarium.v2.AuthServiceLoginResponse\"\x06\x82\xb5\x18\x02\b\x01\x12q\n" +
 	"\fRefreshToken\x12+.aquarium.v2.AuthServiceRefreshTokenRequest\x1a,.aquarium.v2.AuthServiceRefreshTokenResponse\"\x06\x82\xb5\x18\x02\x10\x01\x12w\n" +
 	"\x0eGetPermissions\x12-.aquarium.v2.AuthServiceGetPermissionsRequest\x1a..aquarium.v2.AuthServiceGetPermissionsResponse\"\x06\x82\xb5\x18\x02\x10\x01\x12t\n" +
 	"\rValidateToken\x12,.aquarium.v2.AuthServiceValidateTokenRequest\x1a-.aquarium.v2.AuthServiceValidateTokenResponse\"\x06\x82\xb5\x18\x02\x10\x01BEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"

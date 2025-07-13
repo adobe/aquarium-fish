@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/adobe/aquarium-fish/lib/auth"
 	"github.com/adobe/aquarium-fish/lib/log"
@@ -61,7 +60,7 @@ func (h *RBACHandler) Handler(next http.Handler) http.Handler {
 
 // checkPermission checks if the current user has permission to access the procedure
 func (h *RBACHandler) checkPermission(ctx context.Context, service, method string) error {
-	// Ignore the service/method when it's in auth.SkipRBAC list
+	// Ignore the service/method when it's in auth rbacExclude list
 	if auth.IsEcludedFromRBAC(service, method) {
 		return nil
 	}
@@ -78,25 +77,4 @@ func (h *RBACHandler) checkPermission(ctx context.Context, service, method strin
 	}
 
 	return nil
-}
-
-// getServiceMethodFromPath extracts service and method from HTTP path
-// Expected format: /aquarium.v2.ServiceName/Method
-func getServiceMethodFromPath(path string) (string, string) {
-	// Remove leading slash and split
-	path = strings.TrimPrefix(path, "/")
-	parts := strings.Split(path, "/")
-	if len(parts) != 2 {
-		return "", ""
-	}
-
-	service := parts[0]
-	// Extract service name from package.service format
-	sub := strings.Split(service, ".")
-	if len(sub) > 1 {
-		service = sub[len(sub)-1]
-	}
-
-	method := parts[1]
-	return service, method
 }

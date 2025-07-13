@@ -11,35 +11,11 @@
 
 # Author: Sergei Parshev (@sparshev)
 
-set -e
-
 # Get the directory of this script
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
 echo "=== Building Web Dashboard ==="
-
-# Check if we should only generate protobuf code
-if [ "$1" = "gen-only" ]; then
-    echo "Generating protobuf code only..."
-
-    # Generate protobuf code using Docker
-    docker run --rm \
-        -v "${SCRIPT_DIR}:/workspace:rw" \
-        -v "${SCRIPT_DIR}/../proto:/workspace/proto:ro" \
-        -w /workspace \
-        node:24-alpine \
-        sh -c "
-            # Install buf & generator plugin
-            npm install -g @bufbuild/buf @bufbuild/protoc-gen-es
-
-            # Generate protobuf code for web
-            buf generate proto/
-        "
-
-    echo "Protobuf code generation completed"
-    exit 0
-fi
 
 # Full build process
 echo "Building web application..."
@@ -53,9 +29,7 @@ docker run --rm \
     -v "${SCRIPT_DIR}/../proto:/workspace/proto:ro" \
     -w /workspace \
     node:24-alpine \
-    sh -c "
-        set -e
-
+    sh -ec "
         echo 'Installing dependencies...'
         npm install
 
@@ -66,8 +40,14 @@ docker run --rm \
         # Generate protobuf code
         buf generate proto/
 
-        echo 'Building application...'
-        npm run build
+        if [ "x$RELEASE" != 'x' ]; then
+            echo 'Building release SPA...'
+            npm run build
+        else
+            echo 'Building debug SPA...'
+            #NODE_ENV=development DEBUG='*:*' npm run build:debug
+            npm run build:debug
+        fi
 
         echo 'Build completed successfully'
     "
