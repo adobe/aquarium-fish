@@ -28,6 +28,13 @@ service AuthService {
     };
   }
 
+  // ValidateToken validates a JWT token
+  rpc ValidateToken(AuthServiceValidateTokenRequest) returns (AuthServiceValidateTokenResponse) {
+    option (access_control) = {
+      allow_unauthenticated: true,
+    };
+  }
+
   // RefreshToken refreshes an existing JWT token
   rpc RefreshToken(AuthServiceRefreshTokenRequest) returns (AuthServiceRefreshTokenResponse) {
     option (access_control) = {
@@ -37,13 +44,6 @@ service AuthService {
 
   // GetPermissions returns the current user's permissions
   rpc GetPermissions(AuthServiceGetPermissionsRequest) returns (AuthServiceGetPermissionsResponse) {
-    option (access_control) = {
-      no_permission_needed: true,
-    };
-  }
-
-  // ValidateToken validates a JWT token
-  rpc ValidateToken(AuthServiceValidateTokenRequest) returns (AuthServiceValidateTokenResponse) {
     option (access_control) = {
       no_permission_needed: true,
     };

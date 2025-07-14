@@ -97,7 +97,7 @@ func (h *AuthHandler) Handler(next http.Handler) http.Handler {
 
 		// Ignore the service/method when it's in auth authExclude list
 		if auth.IsEcludedFromAuth(service, method) {
-			logger.Debug("Skipping auth for excluded method")
+			logger.Debug("Skipping Auth for excluded method")
 			next.ServeHTTP(w, r)
 			return
 		}

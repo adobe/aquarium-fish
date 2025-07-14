@@ -60,8 +60,10 @@ func (h *RBACHandler) Handler(next http.Handler) http.Handler {
 
 // checkPermission checks if the current user has permission to access the procedure
 func (h *RBACHandler) checkPermission(ctx context.Context, service, method string) error {
+	logger := log.WithFunc("rpc", "rbac").With("rpc_service", service, "rpc_method", method)
 	// Ignore the service/method when it's in auth rbacExclude list
 	if auth.IsEcludedFromRBAC(service, method) {
+		logger.Debug("Skipping RBAC for excluded method")
 		return nil
 	}
 

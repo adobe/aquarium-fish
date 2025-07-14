@@ -46,27 +46,27 @@ const (
 const (
 	// AuthServiceLoginProcedure is the fully-qualified name of the AuthService's Login RPC.
 	AuthServiceLoginProcedure = "/aquarium.v2.AuthService/Login"
+	// AuthServiceValidateTokenProcedure is the fully-qualified name of the AuthService's ValidateToken
+	// RPC.
+	AuthServiceValidateTokenProcedure = "/aquarium.v2.AuthService/ValidateToken"
 	// AuthServiceRefreshTokenProcedure is the fully-qualified name of the AuthService's RefreshToken
 	// RPC.
 	AuthServiceRefreshTokenProcedure = "/aquarium.v2.AuthService/RefreshToken"
 	// AuthServiceGetPermissionsProcedure is the fully-qualified name of the AuthService's
 	// GetPermissions RPC.
 	AuthServiceGetPermissionsProcedure = "/aquarium.v2.AuthService/GetPermissions"
-	// AuthServiceValidateTokenProcedure is the fully-qualified name of the AuthService's ValidateToken
-	// RPC.
-	AuthServiceValidateTokenProcedure = "/aquarium.v2.AuthService/ValidateToken"
 )
 
 // AuthServiceClient is a client for the aquarium.v2.AuthService service.
 type AuthServiceClient interface {
 	// Login authenticates a user and returns a JWT token
 	Login(context.Context, *connect.Request[v2.AuthServiceLoginRequest]) (*connect.Response[v2.AuthServiceLoginResponse], error)
+	// ValidateToken validates a JWT token
+	ValidateToken(context.Context, *connect.Request[v2.AuthServiceValidateTokenRequest]) (*connect.Response[v2.AuthServiceValidateTokenResponse], error)
 	// RefreshToken refreshes an existing JWT token
 	RefreshToken(context.Context, *connect.Request[v2.AuthServiceRefreshTokenRequest]) (*connect.Response[v2.AuthServiceRefreshTokenResponse], error)
 	// GetPermissions returns the current user's permissions
 	GetPermissions(context.Context, *connect.Request[v2.AuthServiceGetPermissionsRequest]) (*connect.Response[v2.AuthServiceGetPermissionsResponse], error)
-	// ValidateToken validates a JWT token
-	ValidateToken(context.Context, *connect.Request[v2.AuthServiceValidateTokenRequest]) (*connect.Response[v2.AuthServiceValidateTokenResponse], error)
 }
 
 // NewAuthServiceClient constructs a client for the aquarium.v2.AuthService service. By default, it
@@ -86,6 +86,12 @@ func NewAuthServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(authServiceMethods.ByName("Login")),
 			connect.WithClientOptions(opts...),
 		),
+		validateToken: connect.NewClient[v2.AuthServiceValidateTokenRequest, v2.AuthServiceValidateTokenResponse](
+			httpClient,
+			baseURL+AuthServiceValidateTokenProcedure,
+			connect.WithSchema(authServiceMethods.ByName("ValidateToken")),
+			connect.WithClientOptions(opts...),
+		),
 		refreshToken: connect.NewClient[v2.AuthServiceRefreshTokenRequest, v2.AuthServiceRefreshTokenResponse](
 			httpClient,
 			baseURL+AuthServiceRefreshTokenProcedure,
@@ -98,26 +104,25 @@ func NewAuthServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(authServiceMethods.ByName("GetPermissions")),
 			connect.WithClientOptions(opts...),
 		),
-		validateToken: connect.NewClient[v2.AuthServiceValidateTokenRequest, v2.AuthServiceValidateTokenResponse](
-			httpClient,
-			baseURL+AuthServiceValidateTokenProcedure,
-			connect.WithSchema(authServiceMethods.ByName("ValidateToken")),
-			connect.WithClientOptions(opts...),
-		),
 	}
 }
 
 // authServiceClient implements AuthServiceClient.
 type authServiceClient struct {
 	login          *connect.Client[v2.AuthServiceLoginRequest, v2.AuthServiceLoginResponse]
+	validateToken  *connect.Client[v2.AuthServiceValidateTokenRequest, v2.AuthServiceValidateTokenResponse]
 	refreshToken   *connect.Client[v2.AuthServiceRefreshTokenRequest, v2.AuthServiceRefreshTokenResponse]
 	getPermissions *connect.Client[v2.AuthServiceGetPermissionsRequest, v2.AuthServiceGetPermissionsResponse]
-	validateToken  *connect.Client[v2.AuthServiceValidateTokenRequest, v2.AuthServiceValidateTokenResponse]
 }
 
 // Login calls aquarium.v2.AuthService.Login.
 func (c *authServiceClient) Login(ctx context.Context, req *connect.Request[v2.AuthServiceLoginRequest]) (*connect.Response[v2.AuthServiceLoginResponse], error) {
 	return c.login.CallUnary(ctx, req)
+}
+
+// ValidateToken calls aquarium.v2.AuthService.ValidateToken.
+func (c *authServiceClient) ValidateToken(ctx context.Context, req *connect.Request[v2.AuthServiceValidateTokenRequest]) (*connect.Response[v2.AuthServiceValidateTokenResponse], error) {
+	return c.validateToken.CallUnary(ctx, req)
 }
 
 // RefreshToken calls aquarium.v2.AuthService.RefreshToken.
@@ -130,21 +135,16 @@ func (c *authServiceClient) GetPermissions(ctx context.Context, req *connect.Req
 	return c.getPermissions.CallUnary(ctx, req)
 }
 
-// ValidateToken calls aquarium.v2.AuthService.ValidateToken.
-func (c *authServiceClient) ValidateToken(ctx context.Context, req *connect.Request[v2.AuthServiceValidateTokenRequest]) (*connect.Response[v2.AuthServiceValidateTokenResponse], error) {
-	return c.validateToken.CallUnary(ctx, req)
-}
-
 // AuthServiceHandler is an implementation of the aquarium.v2.AuthService service.
 type AuthServiceHandler interface {
 	// Login authenticates a user and returns a JWT token
 	Login(context.Context, *connect.Request[v2.AuthServiceLoginRequest]) (*connect.Response[v2.AuthServiceLoginResponse], error)
+	// ValidateToken validates a JWT token
+	ValidateToken(context.Context, *connect.Request[v2.AuthServiceValidateTokenRequest]) (*connect.Response[v2.AuthServiceValidateTokenResponse], error)
 	// RefreshToken refreshes an existing JWT token
 	RefreshToken(context.Context, *connect.Request[v2.AuthServiceRefreshTokenRequest]) (*connect.Response[v2.AuthServiceRefreshTokenResponse], error)
 	// GetPermissions returns the current user's permissions
 	GetPermissions(context.Context, *connect.Request[v2.AuthServiceGetPermissionsRequest]) (*connect.Response[v2.AuthServiceGetPermissionsResponse], error)
-	// ValidateToken validates a JWT token
-	ValidateToken(context.Context, *connect.Request[v2.AuthServiceValidateTokenRequest]) (*connect.Response[v2.AuthServiceValidateTokenResponse], error)
 }
 
 // NewAuthServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -160,6 +160,12 @@ func NewAuthServiceHandler(svc AuthServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(authServiceMethods.ByName("Login")),
 		connect.WithHandlerOptions(opts...),
 	)
+	authServiceValidateTokenHandler := connect.NewUnaryHandler(
+		AuthServiceValidateTokenProcedure,
+		svc.ValidateToken,
+		connect.WithSchema(authServiceMethods.ByName("ValidateToken")),
+		connect.WithHandlerOptions(opts...),
+	)
 	authServiceRefreshTokenHandler := connect.NewUnaryHandler(
 		AuthServiceRefreshTokenProcedure,
 		svc.RefreshToken,
@@ -172,22 +178,16 @@ func NewAuthServiceHandler(svc AuthServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(authServiceMethods.ByName("GetPermissions")),
 		connect.WithHandlerOptions(opts...),
 	)
-	authServiceValidateTokenHandler := connect.NewUnaryHandler(
-		AuthServiceValidateTokenProcedure,
-		svc.ValidateToken,
-		connect.WithSchema(authServiceMethods.ByName("ValidateToken")),
-		connect.WithHandlerOptions(opts...),
-	)
 	return "/aquarium.v2.AuthService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AuthServiceLoginProcedure:
 			authServiceLoginHandler.ServeHTTP(w, r)
+		case AuthServiceValidateTokenProcedure:
+			authServiceValidateTokenHandler.ServeHTTP(w, r)
 		case AuthServiceRefreshTokenProcedure:
 			authServiceRefreshTokenHandler.ServeHTTP(w, r)
 		case AuthServiceGetPermissionsProcedure:
 			authServiceGetPermissionsHandler.ServeHTTP(w, r)
-		case AuthServiceValidateTokenProcedure:
-			authServiceValidateTokenHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -201,14 +201,14 @@ func (UnimplementedAuthServiceHandler) Login(context.Context, *connect.Request[v
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.AuthService.Login is not implemented"))
 }
 
+func (UnimplementedAuthServiceHandler) ValidateToken(context.Context, *connect.Request[v2.AuthServiceValidateTokenRequest]) (*connect.Response[v2.AuthServiceValidateTokenResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.AuthService.ValidateToken is not implemented"))
+}
+
 func (UnimplementedAuthServiceHandler) RefreshToken(context.Context, *connect.Request[v2.AuthServiceRefreshTokenRequest]) (*connect.Response[v2.AuthServiceRefreshTokenResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.AuthService.RefreshToken is not implemented"))
 }
 
 func (UnimplementedAuthServiceHandler) GetPermissions(context.Context, *connect.Request[v2.AuthServiceGetPermissionsRequest]) (*connect.Response[v2.AuthServiceGetPermissionsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.AuthService.GetPermissions is not implemented"))
-}
-
-func (UnimplementedAuthServiceHandler) ValidateToken(context.Context, *connect.Request[v2.AuthServiceValidateTokenRequest]) (*connect.Response[v2.AuthServiceValidateTokenResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.AuthService.ValidateToken is not implemented"))
 }

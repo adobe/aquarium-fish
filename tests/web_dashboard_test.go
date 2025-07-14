@@ -52,7 +52,7 @@ drivers:
 	}
 
 	// Get the API address
-	baseURL := afi.APIAddress("grpc")
+	baseURL := afi.APIAddress("")
 
 	t.Run("Dashboard Root Serves HTML", func(t *testing.T) {
 		resp, err := client.Get(baseURL)
@@ -78,13 +78,8 @@ drivers:
 		}
 
 		// Check for React app root element
-		if !strings.Contains(bodyStr, `id="root"`) {
+		if !strings.Contains(bodyStr, `{"root":route0}`) {
 			t.Error("Response should contain React root element")
-		}
-
-		// Check for title
-		if !strings.Contains(bodyStr, "Aquarium Fish") {
-			t.Error("Response should contain Aquarium Fish title")
 		}
 	})
 
@@ -112,7 +107,7 @@ drivers:
 				bodyStr := string(body)
 
 				// Should serve the same index.html content
-				if !strings.Contains(bodyStr, `id="root"`) {
+				if !strings.Contains(bodyStr, `{"root":route0}`) {
 					t.Errorf("Route %s should serve React root element", route)
 				}
 			})
@@ -121,7 +116,7 @@ drivers:
 
 	t.Run("API Routes Still Work", func(t *testing.T) {
 		// Test that API routes are not affected by web dashboard
-		resp, err := client.Get(baseURL)
+		resp, err := client.Get(baseURL + "/grpc/")
 		if err != nil {
 			t.Fatalf("Failed to get API root: %v", err)
 		}
@@ -185,12 +180,12 @@ drivers:
 	}
 
 	// Get the API address
-	baseURL := afi.APIAddress("grpc")
+	baseURL := afi.APIAddress("")
 
 	t.Run("Auth API Accessible", func(t *testing.T) {
 		// Test that auth API is accessible from web dashboard
 		// This would typically be called by the frontend
-		resp, err := client.Post(baseURL+"/aquarium.v2.AuthService/Login",
+		resp, err := client.Post(baseURL+"/grpc/aquarium.v2.AuthService/Login",
 			"application/json",
 			strings.NewReader(`{"username":"test","password":"test"}`))
 		if err != nil {

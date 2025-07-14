@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../components/DashboardLayout';
+import { ProtectedRoute } from '../components/ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
 
 export function meta() {
@@ -29,45 +30,56 @@ export default function Applications() {
 
   // Mock data for now - will be replaced with real ConnectRPC streaming
   useEffect(() => {
-    const mockApplications: Application[] = [
+    const mockApps: Application[] = [
       {
         id: '1',
-        name: 'web-app-prod',
+        name: 'web-frontend',
         status: 'running',
-        createdAt: '2025-01-12T10:00:00Z',
+        createdAt: '2024-01-15T10:30:00Z',
         resources: {
-          cpu: '0.5 cores',
-          memory: '512 MB',
-          storage: '1 GB',
+          cpu: '0.5 vCPU',
+          memory: '1 GB',
+          storage: '10 GB',
         },
       },
       {
         id: '2',
-        name: 'api-service',
+        name: 'api-backend',
         status: 'running',
-        createdAt: '2025-01-12T09:30:00Z',
+        createdAt: '2024-01-15T10:25:00Z',
         resources: {
-          cpu: '1 core',
-          memory: '1 GB',
-          storage: '2 GB',
+          cpu: '1 vCPU',
+          memory: '2 GB',
+          storage: '20 GB',
         },
       },
       {
         id: '3',
-        name: 'batch-processor',
-        status: 'stopped',
-        createdAt: '2025-01-12T08:00:00Z',
+        name: 'database',
+        status: 'running',
+        createdAt: '2024-01-15T10:20:00Z',
         resources: {
-          cpu: '2 cores',
-          memory: '2 GB',
-          storage: '10 GB',
+          cpu: '2 vCPU',
+          memory: '4 GB',
+          storage: '100 GB',
+        },
+      },
+      {
+        id: '4',
+        name: 'cache-service',
+        status: 'pending',
+        createdAt: '2024-01-15T11:00:00Z',
+        resources: {
+          cpu: '0.25 vCPU',
+          memory: '512 MB',
+          storage: '5 GB',
         },
       },
     ];
 
-    // Simulate API call
+    // Simulate loading
     setTimeout(() => {
-      setApplications(mockApplications);
+      setApplications(mockApps);
       setLoading(false);
     }, 1000);
   }, []);
@@ -96,125 +108,190 @@ export default function Applications() {
       case 'pending':
         return '🟡';
       case 'error':
-        return '❌';
+        return '🔴';
       default:
         return '⚪';
     }
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString() + ' ' + new Date(dateString).toLocaleTimeString();
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
-  if (loading) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600 dark:text-gray-300">Loading applications...</p>
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  if (error) {
-    return (
-      <DashboardLayout>
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4">
-          <div className="flex">
-            <div className="text-sm text-red-700 dark:text-red-300">
-              Error loading applications: {error}
-            </div>
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Applications</h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Manage and monitor your applications
-            </p>
-          </div>
-          {hasPermission('application', 'create') && (
-            <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium">
-              Create Application
-            </button>
-          )}
-        </div>
-
-        {/* Real-time status indicator */}
-        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md p-4">
-          <div className="flex items-center">
-            <div className="animate-pulse w-3 h-3 bg-green-500 rounded-full mr-3"></div>
-            <div className="text-sm text-green-700 dark:text-green-300">
-              Real-time updates active (ConnectRPC streaming)
+    <ProtectedRoute>
+      <DashboardLayout>
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Applications</h1>
+              <p className="text-gray-600 dark:text-gray-300">
+                Manage and monitor your applications
+              </p>
             </div>
+            {hasPermission('applications', 'create') && (
+              <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium">
+                Create Application
+              </button>
+            )}
           </div>
-        </div>
 
-        {/* Applications grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {applications.map((app) => (
-            <div key={app.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">{app.name}</h3>
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(app.status)}`}>
-                  <span className="mr-1">{getStatusIcon(app.status)}</span>
-                  {app.status}
-                </span>
-              </div>
-
-              <div className="space-y-3">
-                <div className="text-sm text-gray-600 dark:text-gray-400">
-                  <div className="font-medium">Created:</div>
-                  <div>{formatDate(app.createdAt)}</div>
-                </div>
-
-                <div className="text-sm text-gray-600 dark:text-gray-400">
-                  <div className="font-medium mb-1">Resources:</div>
-                  <div className="space-y-1">
-                    <div>CPU: {app.resources.cpu}</div>
-                    <div>Memory: {app.resources.memory}</div>
-                    <div>Storage: {app.resources.storage}</div>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                    <span className="text-white font-bold">R</span>
                   </div>
                 </div>
-              </div>
-
-              <div className="mt-4 flex space-x-2">
-                {hasPermission('application', 'read') && (
-                  <button className="flex-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 px-3 py-2 rounded-md text-sm font-medium">
-                    View Details
-                  </button>
-                )}
-                {hasPermission('application', 'update') && (
-                  <button className="flex-1 bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 px-3 py-2 rounded-md text-sm font-medium">
-                    {app.status === 'running' ? 'Stop' : 'Start'}
-                  </button>
-                )}
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                      Running
+                    </dt>
+                    <dd className="text-lg font-medium text-gray-900 dark:text-white">
+                      {applications.filter(app => app.status === 'running').length}
+                    </dd>
+                  </dl>
+                </div>
               </div>
             </div>
-          ))}
-        </div>
 
-        {applications.length === 0 && (
-          <div className="text-center py-12">
-            <div className="text-gray-500 dark:text-gray-400">
-              <div className="text-6xl mb-4">📱</div>
-              <h3 className="text-lg font-medium mb-2">No applications found</h3>
-              <p className="text-sm">Create your first application to get started.</p>
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center">
+                    <span className="text-white font-bold">P</span>
+                  </div>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                      Pending
+                    </dt>
+                    <dd className="text-lg font-medium text-gray-900 dark:text-white">
+                      {applications.filter(app => app.status === 'pending').length}
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
+                    <span className="text-white font-bold">S</span>
+                  </div>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                      Stopped
+                    </dt>
+                    <dd className="text-lg font-medium text-gray-900 dark:text-white">
+                      {applications.filter(app => app.status === 'stopped').length}
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-white font-bold">T</span>
+                  </div>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                      Total
+                    </dt>
+                    <dd className="text-lg font-medium text-gray-900 dark:text-white">
+                      {applications.length}
+                    </dd>
+                  </dl>
+                </div>
+              </div>
             </div>
           </div>
-        )}
-      </div>
-    </DashboardLayout>
+
+          {/* Applications List */}
+          <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
+            <div className="px-4 py-5 sm:p-6">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                Application List
+              </h3>
+
+              {loading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600 dark:text-gray-300">Loading applications...</p>
+                </div>
+              ) : error ? (
+                <div className="text-center py-8">
+                  <p className="text-red-600 dark:text-red-400">{error}</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {applications.map((app) => (
+                    <div key={app.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <span className="text-lg">{getStatusIcon(app.status)}</span>
+                          <div>
+                            <h4 className="text-lg font-medium text-gray-900 dark:text-white">
+                              {app.name}
+                            </h4>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                              Created: {formatDate(app.createdAt)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(app.status)}`}>
+                            {app.status}
+                          </span>
+                          {hasPermission('applications', 'update') && (
+                            <button className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+                              Configure
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <span className="font-medium text-gray-900 dark:text-white">CPU:</span>
+                          <span className="ml-2 text-gray-600 dark:text-gray-300">{app.resources.cpu}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-900 dark:text-white">Memory:</span>
+                          <span className="ml-2 text-gray-600 dark:text-gray-300">{app.resources.memory}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-900 dark:text-white">Storage:</span>
+                          <span className="ml-2 text-gray-600 dark:text-gray-300">{app.resources.storage}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </DashboardLayout>
+    </ProtectedRoute>
   );
 }

@@ -89,8 +89,6 @@ func Handler() http.Handler {
 			urlPath = strings.TrimPrefix(urlPath, "/")
 		}
 
-		logger.Debug("Serving web request", "clean_path", urlPath)
-
 		// Check if file exists
 		if _, err := distFS.Open(urlPath); err != nil {
 			// For SPA routes, serve index.html
@@ -120,8 +118,12 @@ func Handler() http.Handler {
 		}
 
 		// Create new request with correct path for file server
-		/*fileReq := r.Clone(r.Context())
-		fileReq.URL.Path = "/" + urlPath*/
+		if urlPath == "index.html" {
+			urlPath = ""
+		}
+		r.URL.Path = "/" + urlPath
+
+		logger.Debug("Serving web request", "clean_path", urlPath)
 
 		// Serve the file
 		fileServer.ServeHTTP(w, r)

@@ -39,9 +39,9 @@ const (
 	// AuthService service constants
 	AuthService               = "AuthService"
 	AuthServiceLogin          = "Login"
+	AuthServiceValidateToken  = "ValidateToken"
 	AuthServiceGetPermissions = "GetPermissions"
 	AuthServiceRefreshToken   = "RefreshToken"
-	AuthServiceValidateToken  = "ValidateToken"
 
 	// GateProxySSHService service constants
 	GateProxySSHService                     = "GateProxySSHService"
@@ -91,6 +91,7 @@ const (
 var authExcluded = map[string][]string{
 	"AuthService": {
 		"Login",
+		"ValidateToken",
 	},
 }
 
@@ -110,9 +111,9 @@ func IsEcludedFromAuth(service, method string) bool {
 var rbacExcluded = map[string][]string{
 	"AuthService": {
 		"Login",
+		"ValidateToken",
 		"GetPermissions",
 		"RefreshToken",
-		"ValidateToken",
 	},
 
 	"UserService": {

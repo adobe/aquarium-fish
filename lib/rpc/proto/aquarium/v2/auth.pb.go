@@ -741,10 +741,10 @@ const file_aquarium_v2_auth_proto_rawDesc = "" +
 	"\n" +
 	"\b_session2\xcd\x03\n" +
 	"\vAuthService\x12\\\n" +
-	"\x05Login\x12$.aquarium.v2.AuthServiceLoginRequest\x1a%.aquarium.v2.AuthServiceLoginResponse\"\x06\x82\xb5\x18\x02\b\x01\x12q\n" +
+	"\x05Login\x12$.aquarium.v2.AuthServiceLoginRequest\x1a%.aquarium.v2.AuthServiceLoginResponse\"\x06\x82\xb5\x18\x02\b\x01\x12t\n" +
+	"\rValidateToken\x12,.aquarium.v2.AuthServiceValidateTokenRequest\x1a-.aquarium.v2.AuthServiceValidateTokenResponse\"\x06\x82\xb5\x18\x02\b\x01\x12q\n" +
 	"\fRefreshToken\x12+.aquarium.v2.AuthServiceRefreshTokenRequest\x1a,.aquarium.v2.AuthServiceRefreshTokenResponse\"\x06\x82\xb5\x18\x02\x10\x01\x12w\n" +
-	"\x0eGetPermissions\x12-.aquarium.v2.AuthServiceGetPermissionsRequest\x1a..aquarium.v2.AuthServiceGetPermissionsResponse\"\x06\x82\xb5\x18\x02\x10\x01\x12t\n" +
-	"\rValidateToken\x12,.aquarium.v2.AuthServiceValidateTokenRequest\x1a-.aquarium.v2.AuthServiceValidateTokenResponse\"\x06\x82\xb5\x18\x02\x10\x01BEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"
+	"\x0eGetPermissions\x12-.aquarium.v2.AuthServiceGetPermissionsRequest\x1a..aquarium.v2.AuthServiceGetPermissionsResponse\"\x06\x82\xb5\x18\x02\x10\x01BEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"
 
 var (
 	file_aquarium_v2_auth_proto_rawDescOnce sync.Once
@@ -785,13 +785,13 @@ var file_aquarium_v2_auth_proto_depIdxs = []int32{
 	2,  // 8: aquarium.v2.AuthServiceGetPermissionsResponse.session:type_name -> aquarium.v2.UserSession
 	2,  // 9: aquarium.v2.AuthServiceValidateTokenResponse.session:type_name -> aquarium.v2.UserSession
 	3,  // 10: aquarium.v2.AuthService.Login:input_type -> aquarium.v2.AuthServiceLoginRequest
-	5,  // 11: aquarium.v2.AuthService.RefreshToken:input_type -> aquarium.v2.AuthServiceRefreshTokenRequest
-	7,  // 12: aquarium.v2.AuthService.GetPermissions:input_type -> aquarium.v2.AuthServiceGetPermissionsRequest
-	9,  // 13: aquarium.v2.AuthService.ValidateToken:input_type -> aquarium.v2.AuthServiceValidateTokenRequest
+	9,  // 11: aquarium.v2.AuthService.ValidateToken:input_type -> aquarium.v2.AuthServiceValidateTokenRequest
+	5,  // 12: aquarium.v2.AuthService.RefreshToken:input_type -> aquarium.v2.AuthServiceRefreshTokenRequest
+	7,  // 13: aquarium.v2.AuthService.GetPermissions:input_type -> aquarium.v2.AuthServiceGetPermissionsRequest
 	4,  // 14: aquarium.v2.AuthService.Login:output_type -> aquarium.v2.AuthServiceLoginResponse
-	6,  // 15: aquarium.v2.AuthService.RefreshToken:output_type -> aquarium.v2.AuthServiceRefreshTokenResponse
-	8,  // 16: aquarium.v2.AuthService.GetPermissions:output_type -> aquarium.v2.AuthServiceGetPermissionsResponse
-	10, // 17: aquarium.v2.AuthService.ValidateToken:output_type -> aquarium.v2.AuthServiceValidateTokenResponse
+	10, // 15: aquarium.v2.AuthService.ValidateToken:output_type -> aquarium.v2.AuthServiceValidateTokenResponse
+	6,  // 16: aquarium.v2.AuthService.RefreshToken:output_type -> aquarium.v2.AuthServiceRefreshTokenResponse
+	8,  // 17: aquarium.v2.AuthService.GetPermissions:output_type -> aquarium.v2.AuthServiceGetPermissionsResponse
 	14, // [14:18] is the sub-list for method output_type
 	10, // [10:14] is the sub-list for method input_type
 	10, // [10:10] is the sub-list for extension type_name

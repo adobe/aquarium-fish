@@ -46,6 +46,7 @@ fi
 # Run code generation
 go generate -v .
 
+# Web build is placed here because it also generates client from protobuf
 echo
 echo "--- BUILD WEB DASHBOARD ---"
 # Build the web dashboard
