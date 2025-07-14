@@ -42,6 +42,6 @@ func (d *Database) NodeSave(ctx context.Context, node *typesv2.Node) error {
 	return d.nodeSaveImpl(ctx, node)
 }
 
-func (d *Database) NodePing(ctx context.Context, node *typesv2.Node) error {
-	return d.nodePingImpl(ctx, node)
+func (d *Database) NodePing(ctx context.Context) error {
+	return d.nodePingImpl(ctx)
 }

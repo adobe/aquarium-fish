@@ -54,7 +54,7 @@ func (s *NodeService) List(ctx context.Context, _ /*req*/ *connect.Request[aquar
 // GetThis returns information about this node
 func (s *NodeService) GetThis(_ /*ctx*/ context.Context, _ /*req*/ *connect.Request[aquariumv2.NodeServiceGetThisRequest]) (*connect.Response[aquariumv2.NodeServiceGetThisResponse], error) {
 	node := s.fish.DB().GetNode()
-	if node == nil {
+	if node.Name == "" {
 		return connect.NewResponse(&aquariumv2.NodeServiceGetThisResponse{
 			Status: false, Message: "Node not found",
 		}), connect.NewError(connect.CodeNotFound, nil)

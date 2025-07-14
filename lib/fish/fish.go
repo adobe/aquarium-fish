@@ -185,14 +185,14 @@ func (f *Fish) Init() error {
 		return fmt.Errorf("Fish: Unable to init node: %v", err)
 	}
 
-	f.db.SetNode(*node)
+	f.db.SetNode(node)
 
 	if createNode {
-		if err = f.db.NodeCreate(ctx, f.db.GetNode()); err != nil {
+		if err = f.db.NodeCreate(ctx, node); err != nil {
 			return fmt.Errorf("Fish: Unable to create node: %v", err)
 		}
 	} else {
-		if err = f.db.NodeSave(ctx, f.db.GetNode()); err != nil {
+		if err = f.db.NodeSave(ctx, node); err != nil {
 			return fmt.Errorf("Fish: Unable to save node: %v", err)
 		}
 	}
@@ -373,7 +373,7 @@ func (f *Fish) pingProcess(ctx context.Context) {
 			return
 		case <-pingTicker.C:
 			logger.Debug("Fish Node: ping")
-			f.db.NodePing(ctx, f.db.GetNode())
+			f.db.NodePing(ctx)
 		}
 	}
 }

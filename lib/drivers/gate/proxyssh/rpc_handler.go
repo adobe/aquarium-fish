@@ -125,7 +125,7 @@ func (d *driverRPCHandler) GetResourceAccess(ctx context.Context, req *connect.R
 	// because this particular one could not be able to serve the connection. Probably need to
 	// get node from the ApplicationResource and put it's address in place, but also need to
 	// find it's ProxySSH gate config and port, so becomes quite a bit complicated...
-	addressHost, _, err := net.SplitHostPort(d.drv.db.GetNode().Address)
+	addressHost, _, err := net.SplitHostPort(d.drv.db.GetNodeAddress())
 	if err != nil {
 		logger.Warn("Unable to parse BindAddress host:port : using default host 999.999.999.999", "err", err)
 		addressHost = "999.999.999.999"

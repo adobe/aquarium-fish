@@ -46,8 +46,9 @@ type Database struct {
 	// uses RLock to not interfere with the merge operation.
 	beMu sync.RWMutex
 
-	// Memory storage for current node - we using it to generate new UIDs
-	node typesv2.Node
+	// Memory storage for current node - we having it in db to generate new UIDs
+	nodeMu sync.RWMutex
+	node   *typesv2.Node
 
 	// Subscriptions to notify subscribers about changes in DB, contains key prefix and channel
 	// Protected by subsMu to prevent data races during subscribe/unsubscribe operations
@@ -203,31 +204,6 @@ func (d *Database) shutdownImpl(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-// SetNode puts current node in the memory storage
-func (d *Database) SetNode(node typesv2.Node) {
-	d.node = node
-}
-
-// GetNode returns current Fish node spec
-func (d *Database) GetNode() *typesv2.Node {
-	return &d.node
-}
-
-// GetNodeUID returns node UID
-func (d *Database) GetNodeUID() typesv2.NodeUID {
-	return d.node.Uid
-}
-
-// GetNodeName returns current node name
-func (d *Database) GetNodeName() string {
-	return d.node.Name
-}
-
-// GetNodeLocation returns current node location
-func (d *Database) GetNodeLocation() string {
-	return d.node.Location
 }
 
 // NewUID Creates new UID with 6 starting bytes of Node UID as prefix

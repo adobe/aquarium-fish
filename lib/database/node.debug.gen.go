@@ -101,11 +101,11 @@ func (d *Database) NodeSave(ctx context.Context, node *typesv2.Node) error {
 
 }
 
-func (d *Database) NodePing(ctx context.Context, node *typesv2.Node) error {
+func (d *Database) NodePing(ctx context.Context) error {
 	ctx, span := debugTracerDatabaseNode.Start(ctx, "database.Database.nodePingImpl")
 	defer span.End()
 
-	err0 := d.nodePingImpl(ctx, node)
+	err0 := d.nodePingImpl(ctx)
 
 	if err0 != nil {
 		span.RecordError(err0)
