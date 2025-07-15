@@ -14,7 +14,7 @@
 
 import { create } from "@bufbuild/protobuf";
 import { createClient } from "@connectrpc/connect";
-import { createConnectTransport } from "@connectrpc/connect-web";
+import { createGrpcWebTransport } from "@connectrpc/connect-web";
 import {
   AuthService as AuthServiceDef,
   AuthServiceLoginRequestSchema,
@@ -31,7 +31,7 @@ import {
 import { type Permission } from "../../gen/aquarium/v2/role_pb"
 
 // Create the ConnectRPC transport
-const transport = createConnectTransport({
+const transport = createGrpcWebTransport({
   baseUrl: typeof window !== "undefined" ? `${window.location.origin}/grpc` : "http://localhost:8001/grpc",
 });
 

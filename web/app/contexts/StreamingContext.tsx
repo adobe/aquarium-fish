@@ -15,7 +15,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { createClient } from '@connectrpc/connect';
-import { createConnectTransport } from '@connectrpc/connect-web';
+import { createGrpcWebTransport } from '@connectrpc/connect-web';
 import { create } from '@bufbuild/protobuf';
 import { useAuth } from './AuthContext';
 import {
@@ -64,7 +64,7 @@ import {
 } from '../../gen/aquarium/v2/role_pb';
 
 // Transport configuration
-const transport = createConnectTransport({
+const transport = createGrpcWebTransport({
   baseUrl: typeof window !== 'undefined' ? `${window.location.origin}/grpc` : 'http://localhost:8001/grpc',
   interceptors: [
     (next) => async (req) => {

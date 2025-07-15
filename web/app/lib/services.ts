@@ -13,7 +13,7 @@
 // Author: Sergei Parshev (@sparshev)
 
 import { createClient } from '@connectrpc/connect';
-import { createConnectTransport } from '@connectrpc/connect-web';
+import { createGrpcWebTransport } from '@connectrpc/connect-web';
 import { create } from '@bufbuild/protobuf';
 import { tokenStorage } from './auth';
 
@@ -103,7 +103,7 @@ import {
 } from '../../gen/aquarium/v2/gate_proxyssh_access_pb';
 
 // Create transport with auth header
-const transport = createConnectTransport({
+const transport = createGrpcWebTransport({
   baseUrl: typeof window !== 'undefined' ? `${window.location.origin}/grpc` : 'http://localhost:8001/grpc',
   interceptors: [
     (next) => async (req) => {

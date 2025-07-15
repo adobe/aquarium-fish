@@ -155,16 +155,15 @@ export default function Applications() {
         metadata: appData.metadata || {},
       });
 
-      // TODO: Send request through streaming context when protobuf issues are resolved
-      // const application = create(ApplicationServiceCreateRequestSchema, {
-      //   application: {
-      //     uid: crypto.randomUUID(),
-      //     ownerName: user?.userName || '',
-      //     labelUid: appData.labelUid,
-      //     metadata: appData.metadata || {},
-      //   },
-      // });
-      // await sendRequest(application, 'ApplicationServiceCreateRequest');
+      const application = create(ApplicationServiceCreateRequestSchema, {
+        application: {
+          uid: crypto.randomUUID(),
+          ownerName: user?.userName || '',
+          labelUid: appData.labelUid,
+          metadata: appData.metadata || {},
+        },
+      });
+      await sendRequest(application, 'ApplicationServiceCreateRequest');
 
       setShowCreateModal(false);
       setCreateYaml('');
