@@ -1,3 +1,17 @@
+/**
+ * Copyright 2025 Adobe. All rights reserved.
+ * This file is licensed to you under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License. You may obtain a copy
+ * of the License at http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under
+ * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR REPRESENTATIONS
+ * OF ANY KIND, either express or implied. See the License for the specific language
+ * governing permissions and limitations under the License.
+ */
+
+// Author: Sergei Parshev (@sparshev)
+
 import { create } from "@bufbuild/protobuf";
 import { createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
@@ -13,8 +27,8 @@ import {
   type AuthServiceValidateTokenResponse,
   type JWTToken,
   type UserSession,
-  type UserPermission,
 } from "../../gen/aquarium/v2/auth_pb";
+import { type Permission } from "../../gen/aquarium/v2/role_pb"
 
 // Create the ConnectRPC transport
 const transport = createConnectTransport({
@@ -89,7 +103,7 @@ function convertUserSession(session: UserSession): AuthUser {
   return {
     userName: session.userName,
     roles: session.roles,
-    permissions: session.permissions.map((p: UserPermission) => ({
+    permissions: session.permissions.map((p: Permission) => ({
       resource: p.resource,
       action: p.action,
       description: p.description,

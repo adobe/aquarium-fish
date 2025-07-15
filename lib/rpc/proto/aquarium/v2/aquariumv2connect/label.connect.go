@@ -50,8 +50,8 @@ const (
 	LabelServiceGetProcedure = "/aquarium.v2.LabelService/Get"
 	// LabelServiceCreateProcedure is the fully-qualified name of the LabelService's Create RPC.
 	LabelServiceCreateProcedure = "/aquarium.v2.LabelService/Create"
-	// LabelServiceDeleteProcedure is the fully-qualified name of the LabelService's Delete RPC.
-	LabelServiceDeleteProcedure = "/aquarium.v2.LabelService/Delete"
+	// LabelServiceRemoveProcedure is the fully-qualified name of the LabelService's Remove RPC.
+	LabelServiceRemoveProcedure = "/aquarium.v2.LabelService/Remove"
 )
 
 // LabelServiceClient is a client for the aquarium.v2.LabelService service.
@@ -62,8 +62,8 @@ type LabelServiceClient interface {
 	Get(context.Context, *connect.Request[v2.LabelServiceGetRequest]) (*connect.Response[v2.LabelServiceGetResponse], error)
 	// Create new label
 	Create(context.Context, *connect.Request[v2.LabelServiceCreateRequest]) (*connect.Response[v2.LabelServiceCreateResponse], error)
-	// Delete label by UID
-	Delete(context.Context, *connect.Request[v2.LabelServiceDeleteRequest]) (*connect.Response[v2.LabelServiceDeleteResponse], error)
+	// Remove label by UID
+	Remove(context.Context, *connect.Request[v2.LabelServiceRemoveRequest]) (*connect.Response[v2.LabelServiceRemoveResponse], error)
 }
 
 // NewLabelServiceClient constructs a client for the aquarium.v2.LabelService service. By default,
@@ -95,10 +95,10 @@ func NewLabelServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(labelServiceMethods.ByName("Create")),
 			connect.WithClientOptions(opts...),
 		),
-		delete: connect.NewClient[v2.LabelServiceDeleteRequest, v2.LabelServiceDeleteResponse](
+		remove: connect.NewClient[v2.LabelServiceRemoveRequest, v2.LabelServiceRemoveResponse](
 			httpClient,
-			baseURL+LabelServiceDeleteProcedure,
-			connect.WithSchema(labelServiceMethods.ByName("Delete")),
+			baseURL+LabelServiceRemoveProcedure,
+			connect.WithSchema(labelServiceMethods.ByName("Remove")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -109,7 +109,7 @@ type labelServiceClient struct {
 	list   *connect.Client[v2.LabelServiceListRequest, v2.LabelServiceListResponse]
 	get    *connect.Client[v2.LabelServiceGetRequest, v2.LabelServiceGetResponse]
 	create *connect.Client[v2.LabelServiceCreateRequest, v2.LabelServiceCreateResponse]
-	delete *connect.Client[v2.LabelServiceDeleteRequest, v2.LabelServiceDeleteResponse]
+	remove *connect.Client[v2.LabelServiceRemoveRequest, v2.LabelServiceRemoveResponse]
 }
 
 // List calls aquarium.v2.LabelService.List.
@@ -127,9 +127,9 @@ func (c *labelServiceClient) Create(ctx context.Context, req *connect.Request[v2
 	return c.create.CallUnary(ctx, req)
 }
 
-// Delete calls aquarium.v2.LabelService.Delete.
-func (c *labelServiceClient) Delete(ctx context.Context, req *connect.Request[v2.LabelServiceDeleteRequest]) (*connect.Response[v2.LabelServiceDeleteResponse], error) {
-	return c.delete.CallUnary(ctx, req)
+// Remove calls aquarium.v2.LabelService.Remove.
+func (c *labelServiceClient) Remove(ctx context.Context, req *connect.Request[v2.LabelServiceRemoveRequest]) (*connect.Response[v2.LabelServiceRemoveResponse], error) {
+	return c.remove.CallUnary(ctx, req)
 }
 
 // LabelServiceHandler is an implementation of the aquarium.v2.LabelService service.
@@ -140,8 +140,8 @@ type LabelServiceHandler interface {
 	Get(context.Context, *connect.Request[v2.LabelServiceGetRequest]) (*connect.Response[v2.LabelServiceGetResponse], error)
 	// Create new label
 	Create(context.Context, *connect.Request[v2.LabelServiceCreateRequest]) (*connect.Response[v2.LabelServiceCreateResponse], error)
-	// Delete label by UID
-	Delete(context.Context, *connect.Request[v2.LabelServiceDeleteRequest]) (*connect.Response[v2.LabelServiceDeleteResponse], error)
+	// Remove label by UID
+	Remove(context.Context, *connect.Request[v2.LabelServiceRemoveRequest]) (*connect.Response[v2.LabelServiceRemoveResponse], error)
 }
 
 // NewLabelServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -169,10 +169,10 @@ func NewLabelServiceHandler(svc LabelServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(labelServiceMethods.ByName("Create")),
 		connect.WithHandlerOptions(opts...),
 	)
-	labelServiceDeleteHandler := connect.NewUnaryHandler(
-		LabelServiceDeleteProcedure,
-		svc.Delete,
-		connect.WithSchema(labelServiceMethods.ByName("Delete")),
+	labelServiceRemoveHandler := connect.NewUnaryHandler(
+		LabelServiceRemoveProcedure,
+		svc.Remove,
+		connect.WithSchema(labelServiceMethods.ByName("Remove")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/aquarium.v2.LabelService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -183,8 +183,8 @@ func NewLabelServiceHandler(svc LabelServiceHandler, opts ...connect.HandlerOpti
 			labelServiceGetHandler.ServeHTTP(w, r)
 		case LabelServiceCreateProcedure:
 			labelServiceCreateHandler.ServeHTTP(w, r)
-		case LabelServiceDeleteProcedure:
-			labelServiceDeleteHandler.ServeHTTP(w, r)
+		case LabelServiceRemoveProcedure:
+			labelServiceRemoveHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -206,6 +206,6 @@ func (UnimplementedLabelServiceHandler) Create(context.Context, *connect.Request
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.LabelService.Create is not implemented"))
 }
 
-func (UnimplementedLabelServiceHandler) Delete(context.Context, *connect.Request[v2.LabelServiceDeleteRequest]) (*connect.Response[v2.LabelServiceDeleteResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.LabelService.Delete is not implemented"))
+func (UnimplementedLabelServiceHandler) Remove(context.Context, *connect.Request[v2.LabelServiceRemoveRequest]) (*connect.Response[v2.LabelServiceRemoveResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.LabelService.Remove is not implemented"))
 }

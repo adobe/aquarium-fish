@@ -196,15 +196,15 @@ func (s *UserService) Update(ctx context.Context, req *connect.Request[aquariumv
 	}), nil
 }
 
-// Delete implements the Delete RPC
-func (s *UserService) Delete(ctx context.Context, req *connect.Request[aquariumv2.UserServiceDeleteRequest]) (*connect.Response[aquariumv2.UserServiceDeleteResponse], error) {
+// Remove implements the Remove RPC
+func (s *UserService) Remove(ctx context.Context, req *connect.Request[aquariumv2.UserServiceRemoveRequest]) (*connect.Response[aquariumv2.UserServiceRemoveResponse], error) {
 	if err := s.fish.DB().UserDelete(ctx, req.Msg.GetUserName()); err != nil {
-		return connect.NewResponse(&aquariumv2.UserServiceDeleteResponse{
-			Status: false, Message: "Failed to delete user: " + err.Error(),
+		return connect.NewResponse(&aquariumv2.UserServiceRemoveResponse{
+			Status: false, Message: "Failed to remove user: " + err.Error(),
 		}), connect.NewError(connect.CodeNotFound, err)
 	}
 
-	return connect.NewResponse(&aquariumv2.UserServiceDeleteResponse{
-		Status: true, Message: "User deleted successfully",
+	return connect.NewResponse(&aquariumv2.UserServiceRemoveResponse{
+		Status: true, Message: "User removed successfully",
 	}), nil
 }

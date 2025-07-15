@@ -36,8 +36,8 @@ service LabelService {
   // Create new label
   rpc Create(LabelServiceCreateRequest) returns (LabelServiceCreateResponse) {}
 
-  // Delete label by UID
-  rpc Delete(LabelServiceDeleteRequest) returns (LabelServiceDeleteResponse) {}
+  // Remove label by UID
+  rpc Remove(LabelServiceRemoveRequest) returns (LabelServiceRemoveResponse) {}
 }
 
 // Label represents a reproducible environment configuration
@@ -212,11 +212,11 @@ message LabelServiceCreateResponse {
   Label data = 3;
 }
 
-message LabelServiceDeleteRequest {
+message LabelServiceRemoveRequest {
   string label_uid = 1;
 }
 
-message LabelServiceDeleteResponse {
+message LabelServiceRemoveResponse {
   bool status = 1;
   string message = 2;
 }

@@ -45,8 +45,8 @@ service UserService {
    };
   }
 
-  // Delete user
-  rpc Delete(UserServiceDeleteRequest) returns (UserServiceDeleteResponse) {}
+  // Remove user
+  rpc Remove(UserServiceRemoveRequest) returns (UserServiceRemoveResponse) {}
 }
 
 // User represents a user in the system
@@ -113,11 +113,11 @@ message UserServiceUpdateResponse {
   User data = 3;
 }
 
-message UserServiceDeleteRequest {
+message UserServiceRemoveRequest {
   string user_name = 1;
 }
 
-message UserServiceDeleteResponse {
+message UserServiceRemoveResponse {
   bool status = 1;
   string message = 2;
 }

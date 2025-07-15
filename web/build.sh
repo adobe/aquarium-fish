@@ -15,13 +15,31 @@
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
+if [ "x$ONLYBUILD" = 'x' ]; then
+    echo "=== Generating protobuf code ==="
+
+    # Use Docker to build the web application
+    docker run --rm \
+        -v "${SCRIPT_DIR}:/workspace:rw" \
+        -v "${SCRIPT_DIR}/../proto:/workspace/proto:ro" \
+        -w /workspace \
+        node:24-alpine \
+        sh -ec "
+            echo 'Installing dependencies...'
+            npm install
+
+            echo 'Generating protobuf code...'
+            # Install protobuf tools
+            npm install -g @bufbuild/buf @bufbuild/protoc-gen-es
+
+            # Generate protobuf code
+            buf generate proto/
+        "
+fi
+
+[ -z "$ONLYGEN" ] || exit 0
+
 echo "=== Building Web Dashboard ==="
-
-# Full build process
-echo "Building web application..."
-
-# Create necessary directories
-mkdir -p dist
 
 # Use Docker to build the web application
 docker run --rm \
@@ -33,13 +51,6 @@ docker run --rm \
         echo 'Installing dependencies...'
         npm install
 
-        echo 'Generating protobuf code...'
-        # Install protobuf tools
-        npm install -g @bufbuild/buf @bufbuild/protoc-gen-es
-
-        # Generate protobuf code
-        buf generate proto/
-
         if [ "x$RELEASE" != 'x' ]; then
             echo 'Building release SPA...'
             npm run build
@@ -48,8 +59,4 @@ docker run --rm \
             #NODE_ENV=development DEBUG='*:*' npm run build:debug
             npm run build:debug
         fi
-
-        echo 'Build completed successfully'
     "
-
-echo "=== Web Dashboard Build Completed ==="

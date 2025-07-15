@@ -141,15 +141,15 @@ func (s *RoleService) Update(ctx context.Context, req *connect.Request[aquariumv
 	}), nil
 }
 
-// Delete implements the Delete RPC
-func (s *RoleService) Delete(ctx context.Context, req *connect.Request[aquariumv2.RoleServiceDeleteRequest]) (*connect.Response[aquariumv2.RoleServiceDeleteResponse], error) {
+// Remove implements the Remove RPC
+func (s *RoleService) Remove(ctx context.Context, req *connect.Request[aquariumv2.RoleServiceRemoveRequest]) (*connect.Response[aquariumv2.RoleServiceRemoveResponse], error) {
 	if err := s.fish.DB().RoleDelete(ctx, req.Msg.GetRoleName()); err != nil {
-		return connect.NewResponse(&aquariumv2.RoleServiceDeleteResponse{
-			Status: false, Message: "Failed to delete role: " + err.Error(),
+		return connect.NewResponse(&aquariumv2.RoleServiceRemoveResponse{
+			Status: false, Message: "Failed to remove role: " + err.Error(),
 		}), connect.NewError(connect.CodeNotFound, err)
 	}
 
-	return connect.NewResponse(&aquariumv2.RoleServiceDeleteResponse{
-		Status: true, Message: "Role deleted successfully",
+	return connect.NewResponse(&aquariumv2.RoleServiceRemoveResponse{
+		Status: true, Message: "Role removed successfully",
 	}), nil
 }

@@ -588,7 +588,7 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 					fmt.Errorf("client disconnected due to buffer overflow - unable to keep up with notification rate"))
 			} else {
 				// Normal shutdown notification
-				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED, aquariumv2.ChangeType_CHANGE_TYPE_DELETED, nil); err != nil {
+				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED, aquariumv2.ChangeType_CHANGE_TYPE_REMOVED, nil); err != nil {
 					logger.Debug("Failed to send subscription shutdown notification", "err", err)
 				}
 			}

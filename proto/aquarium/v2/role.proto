@@ -32,8 +32,8 @@ service RoleService {
   // Update existing role
   rpc Update(RoleServiceUpdateRequest) returns (RoleServiceUpdateResponse) {}
 
-  // Delete role
-  rpc Delete(RoleServiceDeleteRequest) returns (RoleServiceDeleteResponse) {}
+  // Remove role
+  rpc Remove(RoleServiceRemoveRequest) returns (RoleServiceRemoveResponse) {}
 }
 
 // Role represents a role in the RBAC system
@@ -54,7 +54,7 @@ message Role {
 message Permission {
   // Resource type or specific resource ID this permission applies to
   string resource = 1;
-  // Action allowed on the resource (e.g., read, write, delete)
+  // Action allowed on the resource (e.g., read, write, remove)
   string action = 2;
 }
 
@@ -96,11 +96,11 @@ message RoleServiceUpdateResponse {
   Role data = 3;
 }
 
-message RoleServiceDeleteRequest {
+message RoleServiceRemoveRequest {
   string role_name = 1;
 }
 
-message RoleServiceDeleteResponse {
+message RoleServiceRemoveResponse {
   bool status = 1;
   string message = 2;
 }

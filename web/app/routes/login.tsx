@@ -40,12 +40,6 @@ export default function Login() {
     }
   };
 
-  const themeOptions = [
-    { value: 'system', label: 'System', icon: '🖥️' },
-    { value: 'light', label: 'Light', icon: '☀️' },
-    { value: 'dark', label: 'Dark', icon: '🌙' },
-  ];
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
@@ -67,26 +61,6 @@ export default function Login() {
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Sign in to your account
           </p>
-        </div>
-
-        {/* Theme Selector */}
-        <div className="flex justify-center">
-          <div className="flex bg-gray-200 dark:bg-gray-700 rounded-lg p-1">
-            {themeOptions.map((option) => (
-              <button
-                key={option.value}
-                onClick={() => setTheme(option.value as any)}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                  theme === option.value
-                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                }`}
-              >
-                <span className="mr-1">{option.icon}</span>
-                {option.label}
-              </button>
-            ))}
-          </div>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>

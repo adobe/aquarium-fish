@@ -114,7 +114,7 @@ type Permission struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Resource type or specific resource ID this permission applies to
 	Resource string `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
-	// Action allowed on the resource (e.g., read, write, delete)
+	// Action allowed on the resource (e.g., read, write, remove)
 	Action        string `protobuf:"bytes,2,opt,name=action,proto3" json:"action,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -572,27 +572,27 @@ func (x *RoleServiceUpdateResponse) GetData() *Role {
 	return nil
 }
 
-type RoleServiceDeleteRequest struct {
+type RoleServiceRemoveRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RoleName      string                 `protobuf:"bytes,1,opt,name=role_name,json=roleName,proto3" json:"role_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *RoleServiceDeleteRequest) Reset() {
-	*x = RoleServiceDeleteRequest{}
+func (x *RoleServiceRemoveRequest) Reset() {
+	*x = RoleServiceRemoveRequest{}
 	mi := &file_aquarium_v2_role_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *RoleServiceDeleteRequest) String() string {
+func (x *RoleServiceRemoveRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*RoleServiceDeleteRequest) ProtoMessage() {}
+func (*RoleServiceRemoveRequest) ProtoMessage() {}
 
-func (x *RoleServiceDeleteRequest) ProtoReflect() protoreflect.Message {
+func (x *RoleServiceRemoveRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_aquarium_v2_role_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -604,19 +604,19 @@ func (x *RoleServiceDeleteRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RoleServiceDeleteRequest.ProtoReflect.Descriptor instead.
-func (*RoleServiceDeleteRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use RoleServiceRemoveRequest.ProtoReflect.Descriptor instead.
+func (*RoleServiceRemoveRequest) Descriptor() ([]byte, []int) {
 	return file_aquarium_v2_role_proto_rawDescGZIP(), []int{10}
 }
 
-func (x *RoleServiceDeleteRequest) GetRoleName() string {
+func (x *RoleServiceRemoveRequest) GetRoleName() string {
 	if x != nil {
 		return x.RoleName
 	}
 	return ""
 }
 
-type RoleServiceDeleteResponse struct {
+type RoleServiceRemoveResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Status        bool                   `protobuf:"varint,1,opt,name=status,proto3" json:"status,omitempty"`
 	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
@@ -624,20 +624,20 @@ type RoleServiceDeleteResponse struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *RoleServiceDeleteResponse) Reset() {
-	*x = RoleServiceDeleteResponse{}
+func (x *RoleServiceRemoveResponse) Reset() {
+	*x = RoleServiceRemoveResponse{}
 	mi := &file_aquarium_v2_role_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *RoleServiceDeleteResponse) String() string {
+func (x *RoleServiceRemoveResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*RoleServiceDeleteResponse) ProtoMessage() {}
+func (*RoleServiceRemoveResponse) ProtoMessage() {}
 
-func (x *RoleServiceDeleteResponse) ProtoReflect() protoreflect.Message {
+func (x *RoleServiceRemoveResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_aquarium_v2_role_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -649,19 +649,19 @@ func (x *RoleServiceDeleteResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RoleServiceDeleteResponse.ProtoReflect.Descriptor instead.
-func (*RoleServiceDeleteResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use RoleServiceRemoveResponse.ProtoReflect.Descriptor instead.
+func (*RoleServiceRemoveResponse) Descriptor() ([]byte, []int) {
 	return file_aquarium_v2_role_proto_rawDescGZIP(), []int{11}
 }
 
-func (x *RoleServiceDeleteResponse) GetStatus() bool {
+func (x *RoleServiceRemoveResponse) GetStatus() bool {
 	if x != nil {
 		return x.Status
 	}
 	return false
 }
 
-func (x *RoleServiceDeleteResponse) GetMessage() string {
+func (x *RoleServiceRemoveResponse) GetMessage() string {
 	if x != nil {
 		return x.Message
 	}
@@ -707,9 +707,9 @@ const file_aquarium_v2_role_proto_rawDesc = "" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12%\n" +
 	"\x04data\x18\x03 \x01(\v2\x11.aquarium.v2.RoleR\x04data\"7\n" +
-	"\x18RoleServiceDeleteRequest\x12\x1b\n" +
+	"\x18RoleServiceRemoveRequest\x12\x1b\n" +
 	"\trole_name\x18\x01 \x01(\tR\broleName\"M\n" +
-	"\x19RoleServiceDeleteResponse\x12\x16\n" +
+	"\x19RoleServiceRemoveResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage2\xc5\x03\n" +
 	"\vRoleService\x12S\n" +
@@ -717,7 +717,7 @@ const file_aquarium_v2_role_proto_rawDesc = "" +
 	"\x03Get\x12\".aquarium.v2.RoleServiceGetRequest\x1a#.aquarium.v2.RoleServiceGetResponse\"\x00\x12Y\n" +
 	"\x06Create\x12%.aquarium.v2.RoleServiceCreateRequest\x1a&.aquarium.v2.RoleServiceCreateResponse\"\x00\x12Y\n" +
 	"\x06Update\x12%.aquarium.v2.RoleServiceUpdateRequest\x1a&.aquarium.v2.RoleServiceUpdateResponse\"\x00\x12Y\n" +
-	"\x06Delete\x12%.aquarium.v2.RoleServiceDeleteRequest\x1a&.aquarium.v2.RoleServiceDeleteResponse\"\x00BEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"
+	"\x06Remove\x12%.aquarium.v2.RoleServiceRemoveRequest\x1a&.aquarium.v2.RoleServiceRemoveResponse\"\x00BEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"
 
 var (
 	file_aquarium_v2_role_proto_rawDescOnce sync.Once
@@ -743,8 +743,8 @@ var file_aquarium_v2_role_proto_goTypes = []any{
 	(*RoleServiceCreateResponse)(nil), // 7: aquarium.v2.RoleServiceCreateResponse
 	(*RoleServiceUpdateRequest)(nil),  // 8: aquarium.v2.RoleServiceUpdateRequest
 	(*RoleServiceUpdateResponse)(nil), // 9: aquarium.v2.RoleServiceUpdateResponse
-	(*RoleServiceDeleteRequest)(nil),  // 10: aquarium.v2.RoleServiceDeleteRequest
-	(*RoleServiceDeleteResponse)(nil), // 11: aquarium.v2.RoleServiceDeleteResponse
+	(*RoleServiceRemoveRequest)(nil),  // 10: aquarium.v2.RoleServiceRemoveRequest
+	(*RoleServiceRemoveResponse)(nil), // 11: aquarium.v2.RoleServiceRemoveResponse
 	(*timestamppb.Timestamp)(nil),     // 12: google.protobuf.Timestamp
 }
 var file_aquarium_v2_role_proto_depIdxs = []int32{
@@ -761,12 +761,12 @@ var file_aquarium_v2_role_proto_depIdxs = []int32{
 	4,  // 10: aquarium.v2.RoleService.Get:input_type -> aquarium.v2.RoleServiceGetRequest
 	6,  // 11: aquarium.v2.RoleService.Create:input_type -> aquarium.v2.RoleServiceCreateRequest
 	8,  // 12: aquarium.v2.RoleService.Update:input_type -> aquarium.v2.RoleServiceUpdateRequest
-	10, // 13: aquarium.v2.RoleService.Delete:input_type -> aquarium.v2.RoleServiceDeleteRequest
+	10, // 13: aquarium.v2.RoleService.Remove:input_type -> aquarium.v2.RoleServiceRemoveRequest
 	3,  // 14: aquarium.v2.RoleService.List:output_type -> aquarium.v2.RoleServiceListResponse
 	5,  // 15: aquarium.v2.RoleService.Get:output_type -> aquarium.v2.RoleServiceGetResponse
 	7,  // 16: aquarium.v2.RoleService.Create:output_type -> aquarium.v2.RoleServiceCreateResponse
 	9,  // 17: aquarium.v2.RoleService.Update:output_type -> aquarium.v2.RoleServiceUpdateResponse
-	11, // 18: aquarium.v2.RoleService.Delete:output_type -> aquarium.v2.RoleServiceDeleteResponse
+	11, // 18: aquarium.v2.RoleService.Remove:output_type -> aquarium.v2.RoleServiceRemoveResponse
 	14, // [14:19] is the sub-list for method output_type
 	9,  // [9:14] is the sub-list for method input_type
 	9,  // [9:9] is the sub-list for extension type_name

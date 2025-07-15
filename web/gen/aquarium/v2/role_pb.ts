@@ -24,7 +24,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file aquarium/v2/role.proto.
  */
 export const file_aquarium_v2_role: GenFile = /*@__PURE__*/
-  fileDesc("ChZhcXVhcml1bS92Mi9yb2xlLnByb3RvEgthcXVhcml1bS52MiKiAQoEUm9sZRIMCgRuYW1lGAEgASgJEi4KCmNyZWF0ZWRfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiwKC3Blcm1pc3Npb25zGAQgAygLMhcuYXF1YXJpdW0udjIuUGVybWlzc2lvbiIuCgpQZXJtaXNzaW9uEhAKCHJlc291cmNlGAEgASgJEg4KBmFjdGlvbhgCIAEoCSIYChZSb2xlU2VydmljZUxpc3RSZXF1ZXN0IlsKF1JvbGVTZXJ2aWNlTGlzdFJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEh8KBGRhdGEYAyADKAsyES5hcXVhcml1bS52Mi5Sb2xlIioKFVJvbGVTZXJ2aWNlR2V0UmVxdWVzdBIRCglyb2xlX25hbWUYASABKAkiWgoWUm9sZVNlcnZpY2VHZXRSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIfCgRkYXRhGAMgASgLMhEuYXF1YXJpdW0udjIuUm9sZSI7ChhSb2xlU2VydmljZUNyZWF0ZVJlcXVlc3QSHwoEcm9sZRgBIAEoCzIRLmFxdWFyaXVtLnYyLlJvbGUiXQoZUm9sZVNlcnZpY2VDcmVhdGVSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIfCgRkYXRhGAMgASgLMhEuYXF1YXJpdW0udjIuUm9sZSI7ChhSb2xlU2VydmljZVVwZGF0ZVJlcXVlc3QSHwoEcm9sZRgBIAEoCzIRLmFxdWFyaXVtLnYyLlJvbGUiXQoZUm9sZVNlcnZpY2VVcGRhdGVSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIfCgRkYXRhGAMgASgLMhEuYXF1YXJpdW0udjIuUm9sZSItChhSb2xlU2VydmljZURlbGV0ZVJlcXVlc3QSEQoJcm9sZV9uYW1lGAEgASgJIjwKGVJvbGVTZXJ2aWNlRGVsZXRlUmVzcG9uc2USDgoGc3RhdHVzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkyxQMKC1JvbGVTZXJ2aWNlElMKBExpc3QSIy5hcXVhcml1bS52Mi5Sb2xlU2VydmljZUxpc3RSZXF1ZXN0GiQuYXF1YXJpdW0udjIuUm9sZVNlcnZpY2VMaXN0UmVzcG9uc2UiABJQCgNHZXQSIi5hcXVhcml1bS52Mi5Sb2xlU2VydmljZUdldFJlcXVlc3QaIy5hcXVhcml1bS52Mi5Sb2xlU2VydmljZUdldFJlc3BvbnNlIgASWQoGQ3JlYXRlEiUuYXF1YXJpdW0udjIuUm9sZVNlcnZpY2VDcmVhdGVSZXF1ZXN0GiYuYXF1YXJpdW0udjIuUm9sZVNlcnZpY2VDcmVhdGVSZXNwb25zZSIAElkKBlVwZGF0ZRIlLmFxdWFyaXVtLnYyLlJvbGVTZXJ2aWNlVXBkYXRlUmVxdWVzdBomLmFxdWFyaXVtLnYyLlJvbGVTZXJ2aWNlVXBkYXRlUmVzcG9uc2UiABJZCgZEZWxldGUSJS5hcXVhcml1bS52Mi5Sb2xlU2VydmljZURlbGV0ZVJlcXVlc3QaJi5hcXVhcml1bS52Mi5Sb2xlU2VydmljZURlbGV0ZVJlc3BvbnNlIgBCRVpDZ2l0aHViLmNvbS9hZG9iZS9hcXVhcml1bS1maXNoL2xpYi9ycGMvcHJvdG8vYXF1YXJpdW0vdjI7YXF1YXJpdW12MmIGcHJvdG8z", [file_google_protobuf_timestamp]);
+  fileDesc("ChZhcXVhcml1bS92Mi9yb2xlLnByb3RvEgthcXVhcml1bS52MiKiAQoEUm9sZRIMCgRuYW1lGAEgASgJEi4KCmNyZWF0ZWRfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiwKC3Blcm1pc3Npb25zGAQgAygLMhcuYXF1YXJpdW0udjIuUGVybWlzc2lvbiIuCgpQZXJtaXNzaW9uEhAKCHJlc291cmNlGAEgASgJEg4KBmFjdGlvbhgCIAEoCSIYChZSb2xlU2VydmljZUxpc3RSZXF1ZXN0IlsKF1JvbGVTZXJ2aWNlTGlzdFJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEh8KBGRhdGEYAyADKAsyES5hcXVhcml1bS52Mi5Sb2xlIioKFVJvbGVTZXJ2aWNlR2V0UmVxdWVzdBIRCglyb2xlX25hbWUYASABKAkiWgoWUm9sZVNlcnZpY2VHZXRSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIfCgRkYXRhGAMgASgLMhEuYXF1YXJpdW0udjIuUm9sZSI7ChhSb2xlU2VydmljZUNyZWF0ZVJlcXVlc3QSHwoEcm9sZRgBIAEoCzIRLmFxdWFyaXVtLnYyLlJvbGUiXQoZUm9sZVNlcnZpY2VDcmVhdGVSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIfCgRkYXRhGAMgASgLMhEuYXF1YXJpdW0udjIuUm9sZSI7ChhSb2xlU2VydmljZVVwZGF0ZVJlcXVlc3QSHwoEcm9sZRgBIAEoCzIRLmFxdWFyaXVtLnYyLlJvbGUiXQoZUm9sZVNlcnZpY2VVcGRhdGVSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIfCgRkYXRhGAMgASgLMhEuYXF1YXJpdW0udjIuUm9sZSItChhSb2xlU2VydmljZVJlbW92ZVJlcXVlc3QSEQoJcm9sZV9uYW1lGAEgASgJIjwKGVJvbGVTZXJ2aWNlUmVtb3ZlUmVzcG9uc2USDgoGc3RhdHVzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkyxQMKC1JvbGVTZXJ2aWNlElMKBExpc3QSIy5hcXVhcml1bS52Mi5Sb2xlU2VydmljZUxpc3RSZXF1ZXN0GiQuYXF1YXJpdW0udjIuUm9sZVNlcnZpY2VMaXN0UmVzcG9uc2UiABJQCgNHZXQSIi5hcXVhcml1bS52Mi5Sb2xlU2VydmljZUdldFJlcXVlc3QaIy5hcXVhcml1bS52Mi5Sb2xlU2VydmljZUdldFJlc3BvbnNlIgASWQoGQ3JlYXRlEiUuYXF1YXJpdW0udjIuUm9sZVNlcnZpY2VDcmVhdGVSZXF1ZXN0GiYuYXF1YXJpdW0udjIuUm9sZVNlcnZpY2VDcmVhdGVSZXNwb25zZSIAElkKBlVwZGF0ZRIlLmFxdWFyaXVtLnYyLlJvbGVTZXJ2aWNlVXBkYXRlUmVxdWVzdBomLmFxdWFyaXVtLnYyLlJvbGVTZXJ2aWNlVXBkYXRlUmVzcG9uc2UiABJZCgZSZW1vdmUSJS5hcXVhcml1bS52Mi5Sb2xlU2VydmljZVJlbW92ZVJlcXVlc3QaJi5hcXVhcml1bS52Mi5Sb2xlU2VydmljZVJlbW92ZVJlc3BvbnNlIgBCRVpDZ2l0aHViLmNvbS9hZG9iZS9hcXVhcml1bS1maXNoL2xpYi9ycGMvcHJvdG8vYXF1YXJpdW0vdjI7YXF1YXJpdW12MmIGcHJvdG8z", [file_google_protobuf_timestamp]);
 
 /**
  * Role represents a role in the RBAC system
@@ -82,7 +82,7 @@ export type Permission = Message<"aquarium.v2.Permission"> & {
   resource: string;
 
   /**
-   * Action allowed on the resource (e.g., read, write, delete)
+   * Action allowed on the resource (e.g., read, write, remove)
    *
    * @generated from field: string action = 2;
    */
@@ -269,9 +269,9 @@ export const RoleServiceUpdateResponseSchema: GenMessage<RoleServiceUpdateRespon
   messageDesc(file_aquarium_v2_role, 9);
 
 /**
- * @generated from message aquarium.v2.RoleServiceDeleteRequest
+ * @generated from message aquarium.v2.RoleServiceRemoveRequest
  */
-export type RoleServiceDeleteRequest = Message<"aquarium.v2.RoleServiceDeleteRequest"> & {
+export type RoleServiceRemoveRequest = Message<"aquarium.v2.RoleServiceRemoveRequest"> & {
   /**
    * @generated from field: string role_name = 1;
    */
@@ -279,16 +279,16 @@ export type RoleServiceDeleteRequest = Message<"aquarium.v2.RoleServiceDeleteReq
 };
 
 /**
- * Describes the message aquarium.v2.RoleServiceDeleteRequest.
- * Use `create(RoleServiceDeleteRequestSchema)` to create a new message.
+ * Describes the message aquarium.v2.RoleServiceRemoveRequest.
+ * Use `create(RoleServiceRemoveRequestSchema)` to create a new message.
  */
-export const RoleServiceDeleteRequestSchema: GenMessage<RoleServiceDeleteRequest> = /*@__PURE__*/
+export const RoleServiceRemoveRequestSchema: GenMessage<RoleServiceRemoveRequest> = /*@__PURE__*/
   messageDesc(file_aquarium_v2_role, 10);
 
 /**
- * @generated from message aquarium.v2.RoleServiceDeleteResponse
+ * @generated from message aquarium.v2.RoleServiceRemoveResponse
  */
-export type RoleServiceDeleteResponse = Message<"aquarium.v2.RoleServiceDeleteResponse"> & {
+export type RoleServiceRemoveResponse = Message<"aquarium.v2.RoleServiceRemoveResponse"> & {
   /**
    * @generated from field: bool status = 1;
    */
@@ -301,10 +301,10 @@ export type RoleServiceDeleteResponse = Message<"aquarium.v2.RoleServiceDeleteRe
 };
 
 /**
- * Describes the message aquarium.v2.RoleServiceDeleteResponse.
- * Use `create(RoleServiceDeleteResponseSchema)` to create a new message.
+ * Describes the message aquarium.v2.RoleServiceRemoveResponse.
+ * Use `create(RoleServiceRemoveResponseSchema)` to create a new message.
  */
-export const RoleServiceDeleteResponseSchema: GenMessage<RoleServiceDeleteResponse> = /*@__PURE__*/
+export const RoleServiceRemoveResponseSchema: GenMessage<RoleServiceRemoveResponse> = /*@__PURE__*/
   messageDesc(file_aquarium_v2_role, 11);
 
 /**
@@ -354,14 +354,14 @@ export const RoleService: GenService<{
     output: typeof RoleServiceUpdateResponseSchema;
   },
   /**
-   * Delete role
+   * Remove role
    *
-   * @generated from rpc aquarium.v2.RoleService.Delete
+   * @generated from rpc aquarium.v2.RoleService.Remove
    */
-  delete: {
+  remove: {
     methodKind: "unary";
-    input: typeof RoleServiceDeleteRequestSchema;
-    output: typeof RoleServiceDeleteResponseSchema;
+    input: typeof RoleServiceRemoveRequestSchema;
+    output: typeof RoleServiceRemoveResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_aquarium_v2_role, 0);

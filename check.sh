@@ -31,31 +31,33 @@ for f in `git diff --name-only main`; do
         fi
 
         # Logic files: go, proto, sh
-        if echo "$f" | grep -q '\.\(go\|proto\|sh\)$'; then
-            if ! echo "$f" | fgrep -q '.gen.'; then
-                # Should contain copyright
-                if !(head -20 "$f" | grep -q 'Copyright 20.\+ Adobe. All rights reserved'); then
-                    echo "ERROR: Should contain Adobe copyright header: $f"
-                    errors=$((${errors}+1))
-                fi
+        if echo "$f" | grep -q '\.\(go\|proto\|sh\|ts\|tsx\|css\|js\)$'; then
+            if echo "$f" | fgrep -q '.gen.'; then
+                continue
+            fi
 
-                # Should contain license
-                if !(head -20 "$f" | fgrep -q 'Apache License, Version 2.0'); then
-                    echo "ERROR: Should contain license name and version: $f"
-                    errors=$((${errors}+1))
-                fi
+            # Should contain copyright
+            if !(head -20 "$f" | grep -q 'Copyright 20.\+ Adobe. All rights reserved'); then
+                echo "ERROR: Should contain Adobe copyright header: $f"
+                errors=$((${errors}+1))
+            fi
 
-                #  Should contain Author
-                if !(head -20 "$f" | grep -q 'Author: .\+'); then
-                    echo "ERROR: Should contain Author: $f"
-                    errors=$((${errors}+1))
-                fi
+            # Should contain license
+            if !(head -20 "$f" | fgrep -q 'Apache License, Version 2.0'); then
+                echo "ERROR: Should contain license name and version: $f"
+                errors=$((${errors}+1))
+            fi
 
-                # Copyright year in files should be the current year
-                if !(head -20 "$f" | grep 'Copyright 20.\+ Adobe. All rights reserved' | fgrep -q "$(date '+%Y')"); then
-                    echo "ERROR: Copyright header need to be adjusted to contain current year like: 20??-$(date '+%Y') $f"
-                    errors=$((${errors}+1))
-                fi
+            #  Should contain Author
+            if !(head -20 "$f" | grep -q 'Author: .\+'); then
+                echo "ERROR: Should contain Author: $f"
+                errors=$((${errors}+1))
+            fi
+
+            # Copyright year in files should be the current year
+            if !(head -20 "$f" | grep 'Copyright 20.\+ Adobe. All rights reserved' | fgrep -q "$(date '+%Y')"); then
+                echo "ERROR: Copyright header need to be adjusted to contain current year like: 20??-$(date '+%Y') $f"
+                errors=$((${errors}+1))
             fi
         fi
     fi

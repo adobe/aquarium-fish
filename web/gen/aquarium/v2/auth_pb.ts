@@ -18,6 +18,8 @@ import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegen
 import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { Permission } from "./role_pb";
+import { file_aquarium_v2_role } from "./role_pb";
 import { file_aquarium_v2_rbac } from "./rbac_pb";
 import type { Message } from "@bufbuild/protobuf";
 
@@ -25,7 +27,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file aquarium/v2/auth.proto.
  */
 export const file_aquarium_v2_auth: GenFile = /*@__PURE__*/
-  fileDesc("ChZhcXVhcml1bS92Mi9hdXRoLnByb3RvEgthcXVhcml1bS52MiKYAQoISldUVG9rZW4SDQoFdG9rZW4YASABKAkSLgoKZXhwaXJlc19hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASFQoNcmVmcmVzaF90b2tlbhgDIAEoCRI2ChJyZWZyZXNoX2V4cGlyZXNfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIkcKDlVzZXJQZXJtaXNzaW9uEhAKCHJlc291cmNlGAEgASgJEg4KBmFjdGlvbhgCIAEoCRITCgtkZXNjcmlwdGlvbhgDIAEoCSLAAQoLVXNlclNlc3Npb24SEQoJdXNlcl9uYW1lGAEgASgJEg0KBXJvbGVzGAIgAygJEjAKC3Blcm1pc3Npb25zGAMgAygLMhsuYXF1YXJpdW0udjIuVXNlclBlcm1pc3Npb24SLgoKY3JlYXRlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLQoJbGFzdF91c2VkGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCI9ChdBdXRoU2VydmljZUxvZ2luUmVxdWVzdBIQCgh1c2VybmFtZRgBIAEoCRIQCghwYXNzd29yZBgCIAEoCSKsAQoYQXV0aFNlcnZpY2VMb2dpblJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEikKBXRva2VuGAMgASgLMhUuYXF1YXJpdW0udjIuSldUVG9rZW5IAIgBARIuCgdzZXNzaW9uGAQgASgLMhguYXF1YXJpdW0udjIuVXNlclNlc3Npb25IAYgBAUIICgZfdG9rZW5CCgoIX3Nlc3Npb24iNwoeQXV0aFNlcnZpY2VSZWZyZXNoVG9rZW5SZXF1ZXN0EhUKDXJlZnJlc2hfdG9rZW4YASABKAkidwofQXV0aFNlcnZpY2VSZWZyZXNoVG9rZW5SZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIpCgV0b2tlbhgDIAEoCzIVLmFxdWFyaXVtLnYyLkpXVFRva2VuSACIAQFCCAoGX3Rva2VuIiIKIEF1dGhTZXJ2aWNlR2V0UGVybWlzc2lvbnNSZXF1ZXN0IoABCiFBdXRoU2VydmljZUdldFBlcm1pc3Npb25zUmVzcG9uc2USDgoGc3RhdHVzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkSLgoHc2Vzc2lvbhgDIAEoCzIYLmFxdWFyaXVtLnYyLlVzZXJTZXNzaW9uSACIAQFCCgoIX3Nlc3Npb24iMAofQXV0aFNlcnZpY2VWYWxpZGF0ZVRva2VuUmVxdWVzdBINCgV0b2tlbhgBIAEoCSJ/CiBBdXRoU2VydmljZVZhbGlkYXRlVG9rZW5SZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIuCgdzZXNzaW9uGAMgASgLMhguYXF1YXJpdW0udjIuVXNlclNlc3Npb25IAIgBAUIKCghfc2Vzc2lvbjLNAwoLQXV0aFNlcnZpY2USXAoFTG9naW4SJC5hcXVhcml1bS52Mi5BdXRoU2VydmljZUxvZ2luUmVxdWVzdBolLmFxdWFyaXVtLnYyLkF1dGhTZXJ2aWNlTG9naW5SZXNwb25zZSIGgrUYAggBEnQKDVZhbGlkYXRlVG9rZW4SLC5hcXVhcml1bS52Mi5BdXRoU2VydmljZVZhbGlkYXRlVG9rZW5SZXF1ZXN0Gi0uYXF1YXJpdW0udjIuQXV0aFNlcnZpY2VWYWxpZGF0ZVRva2VuUmVzcG9uc2UiBoK1GAIIARJxCgxSZWZyZXNoVG9rZW4SKy5hcXVhcml1bS52Mi5BdXRoU2VydmljZVJlZnJlc2hUb2tlblJlcXVlc3QaLC5hcXVhcml1bS52Mi5BdXRoU2VydmljZVJlZnJlc2hUb2tlblJlc3BvbnNlIgaCtRgCEAESdwoOR2V0UGVybWlzc2lvbnMSLS5hcXVhcml1bS52Mi5BdXRoU2VydmljZUdldFBlcm1pc3Npb25zUmVxdWVzdBouLmFxdWFyaXVtLnYyLkF1dGhTZXJ2aWNlR2V0UGVybWlzc2lvbnNSZXNwb25zZSIGgrUYAhABQkVaQ2dpdGh1Yi5jb20vYWRvYmUvYXF1YXJpdW0tZmlzaC9saWIvcnBjL3Byb3RvL2FxdWFyaXVtL3YyO2FxdWFyaXVtdjJiBnByb3RvMw", [file_google_protobuf_timestamp, file_aquarium_v2_rbac]);
+  fileDesc("ChZhcXVhcml1bS92Mi9hdXRoLnByb3RvEgthcXVhcml1bS52MiKYAQoISldUVG9rZW4SDQoFdG9rZW4YASABKAkSLgoKZXhwaXJlc19hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASFQoNcmVmcmVzaF90b2tlbhgDIAEoCRI2ChJyZWZyZXNoX2V4cGlyZXNfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIrwBCgtVc2VyU2Vzc2lvbhIRCgl1c2VyX25hbWUYASABKAkSDQoFcm9sZXMYAiADKAkSLAoLcGVybWlzc2lvbnMYAyADKAsyFy5hcXVhcml1bS52Mi5QZXJtaXNzaW9uEi4KCmNyZWF0ZWRfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi0KCWxhc3RfdXNlZBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiPQoXQXV0aFNlcnZpY2VMb2dpblJlcXVlc3QSEAoIdXNlcm5hbWUYASABKAkSEAoIcGFzc3dvcmQYAiABKAkirAEKGEF1dGhTZXJ2aWNlTG9naW5SZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIpCgV0b2tlbhgDIAEoCzIVLmFxdWFyaXVtLnYyLkpXVFRva2VuSACIAQESLgoHc2Vzc2lvbhgEIAEoCzIYLmFxdWFyaXVtLnYyLlVzZXJTZXNzaW9uSAGIAQFCCAoGX3Rva2VuQgoKCF9zZXNzaW9uIjcKHkF1dGhTZXJ2aWNlUmVmcmVzaFRva2VuUmVxdWVzdBIVCg1yZWZyZXNoX3Rva2VuGAEgASgJIncKH0F1dGhTZXJ2aWNlUmVmcmVzaFRva2VuUmVzcG9uc2USDgoGc3RhdHVzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkSKQoFdG9rZW4YAyABKAsyFS5hcXVhcml1bS52Mi5KV1RUb2tlbkgAiAEBQggKBl90b2tlbiIiCiBBdXRoU2VydmljZUdldFBlcm1pc3Npb25zUmVxdWVzdCKAAQohQXV0aFNlcnZpY2VHZXRQZXJtaXNzaW9uc1Jlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEi4KB3Nlc3Npb24YAyABKAsyGC5hcXVhcml1bS52Mi5Vc2VyU2Vzc2lvbkgAiAEBQgoKCF9zZXNzaW9uIjAKH0F1dGhTZXJ2aWNlVmFsaWRhdGVUb2tlblJlcXVlc3QSDQoFdG9rZW4YASABKAkifwogQXV0aFNlcnZpY2VWYWxpZGF0ZVRva2VuUmVzcG9uc2USDgoGc3RhdHVzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkSLgoHc2Vzc2lvbhgDIAEoCzIYLmFxdWFyaXVtLnYyLlVzZXJTZXNzaW9uSACIAQFCCgoIX3Nlc3Npb24yzQMKC0F1dGhTZXJ2aWNlElwKBUxvZ2luEiQuYXF1YXJpdW0udjIuQXV0aFNlcnZpY2VMb2dpblJlcXVlc3QaJS5hcXVhcml1bS52Mi5BdXRoU2VydmljZUxvZ2luUmVzcG9uc2UiBoK1GAIIARJ0Cg1WYWxpZGF0ZVRva2VuEiwuYXF1YXJpdW0udjIuQXV0aFNlcnZpY2VWYWxpZGF0ZVRva2VuUmVxdWVzdBotLmFxdWFyaXVtLnYyLkF1dGhTZXJ2aWNlVmFsaWRhdGVUb2tlblJlc3BvbnNlIgaCtRgCCAEScQoMUmVmcmVzaFRva2VuEisuYXF1YXJpdW0udjIuQXV0aFNlcnZpY2VSZWZyZXNoVG9rZW5SZXF1ZXN0GiwuYXF1YXJpdW0udjIuQXV0aFNlcnZpY2VSZWZyZXNoVG9rZW5SZXNwb25zZSIGgrUYAhABEncKDkdldFBlcm1pc3Npb25zEi0uYXF1YXJpdW0udjIuQXV0aFNlcnZpY2VHZXRQZXJtaXNzaW9uc1JlcXVlc3QaLi5hcXVhcml1bS52Mi5BdXRoU2VydmljZUdldFBlcm1pc3Npb25zUmVzcG9uc2UiBoK1GAIQAUJFWkNnaXRodWIuY29tL2Fkb2JlL2FxdWFyaXVtLWZpc2gvbGliL3JwYy9wcm90by9hcXVhcml1bS92MjthcXVhcml1bXYyYgZwcm90bzM", [file_google_protobuf_timestamp, file_aquarium_v2_role, file_aquarium_v2_rbac]);
 
 /**
  * JWT token response containing the token and metadata
@@ -70,41 +72,6 @@ export const JWTTokenSchema: GenMessage<JWTToken> = /*@__PURE__*/
   messageDesc(file_aquarium_v2_auth, 0);
 
 /**
- * User permission information
- *
- * @generated from message aquarium.v2.UserPermission
- */
-export type UserPermission = Message<"aquarium.v2.UserPermission"> & {
-  /**
-   * Resource or service name
-   *
-   * @generated from field: string resource = 1;
-   */
-  resource: string;
-
-  /**
-   * Action allowed on the resource
-   *
-   * @generated from field: string action = 2;
-   */
-  action: string;
-
-  /**
-   * Human-readable description of the permission
-   *
-   * @generated from field: string description = 3;
-   */
-  description: string;
-};
-
-/**
- * Describes the message aquarium.v2.UserPermission.
- * Use `create(UserPermissionSchema)` to create a new message.
- */
-export const UserPermissionSchema: GenMessage<UserPermission> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_auth, 1);
-
-/**
  * Complete user session information
  *
  * @generated from message aquarium.v2.UserSession
@@ -125,11 +92,11 @@ export type UserSession = Message<"aquarium.v2.UserSession"> & {
   roles: string[];
 
   /**
-   * User permissions derived from roles
+   * User permissions from roles
    *
-   * @generated from field: repeated aquarium.v2.UserPermission permissions = 3;
+   * @generated from field: repeated aquarium.v2.Permission permissions = 3;
    */
-  permissions: UserPermission[];
+  permissions: Permission[];
 
   /**
    * Session metadata
@@ -149,7 +116,7 @@ export type UserSession = Message<"aquarium.v2.UserSession"> & {
  * Use `create(UserSessionSchema)` to create a new message.
  */
 export const UserSessionSchema: GenMessage<UserSession> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_auth, 2);
+  messageDesc(file_aquarium_v2_auth, 1);
 
 /**
  * @generated from message aquarium.v2.AuthServiceLoginRequest
@@ -175,7 +142,7 @@ export type AuthServiceLoginRequest = Message<"aquarium.v2.AuthServiceLoginReque
  * Use `create(AuthServiceLoginRequestSchema)` to create a new message.
  */
 export const AuthServiceLoginRequestSchema: GenMessage<AuthServiceLoginRequest> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_auth, 3);
+  messageDesc(file_aquarium_v2_auth, 2);
 
 /**
  * @generated from message aquarium.v2.AuthServiceLoginResponse
@@ -211,7 +178,7 @@ export type AuthServiceLoginResponse = Message<"aquarium.v2.AuthServiceLoginResp
  * Use `create(AuthServiceLoginResponseSchema)` to create a new message.
  */
 export const AuthServiceLoginResponseSchema: GenMessage<AuthServiceLoginResponse> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_auth, 4);
+  messageDesc(file_aquarium_v2_auth, 3);
 
 /**
  * @generated from message aquarium.v2.AuthServiceRefreshTokenRequest
@@ -230,7 +197,7 @@ export type AuthServiceRefreshTokenRequest = Message<"aquarium.v2.AuthServiceRef
  * Use `create(AuthServiceRefreshTokenRequestSchema)` to create a new message.
  */
 export const AuthServiceRefreshTokenRequestSchema: GenMessage<AuthServiceRefreshTokenRequest> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_auth, 5);
+  messageDesc(file_aquarium_v2_auth, 4);
 
 /**
  * @generated from message aquarium.v2.AuthServiceRefreshTokenResponse
@@ -259,7 +226,7 @@ export type AuthServiceRefreshTokenResponse = Message<"aquarium.v2.AuthServiceRe
  * Use `create(AuthServiceRefreshTokenResponseSchema)` to create a new message.
  */
 export const AuthServiceRefreshTokenResponseSchema: GenMessage<AuthServiceRefreshTokenResponse> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_auth, 6);
+  messageDesc(file_aquarium_v2_auth, 5);
 
 /**
  * @generated from message aquarium.v2.AuthServiceGetPermissionsRequest
@@ -272,7 +239,7 @@ export type AuthServiceGetPermissionsRequest = Message<"aquarium.v2.AuthServiceG
  * Use `create(AuthServiceGetPermissionsRequestSchema)` to create a new message.
  */
 export const AuthServiceGetPermissionsRequestSchema: GenMessage<AuthServiceGetPermissionsRequest> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_auth, 7);
+  messageDesc(file_aquarium_v2_auth, 6);
 
 /**
  * @generated from message aquarium.v2.AuthServiceGetPermissionsResponse
@@ -301,7 +268,7 @@ export type AuthServiceGetPermissionsResponse = Message<"aquarium.v2.AuthService
  * Use `create(AuthServiceGetPermissionsResponseSchema)` to create a new message.
  */
 export const AuthServiceGetPermissionsResponseSchema: GenMessage<AuthServiceGetPermissionsResponse> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_auth, 8);
+  messageDesc(file_aquarium_v2_auth, 7);
 
 /**
  * @generated from message aquarium.v2.AuthServiceValidateTokenRequest
@@ -320,7 +287,7 @@ export type AuthServiceValidateTokenRequest = Message<"aquarium.v2.AuthServiceVa
  * Use `create(AuthServiceValidateTokenRequestSchema)` to create a new message.
  */
 export const AuthServiceValidateTokenRequestSchema: GenMessage<AuthServiceValidateTokenRequest> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_auth, 9);
+  messageDesc(file_aquarium_v2_auth, 8);
 
 /**
  * @generated from message aquarium.v2.AuthServiceValidateTokenResponse
@@ -349,7 +316,7 @@ export type AuthServiceValidateTokenResponse = Message<"aquarium.v2.AuthServiceV
  * Use `create(AuthServiceValidateTokenResponseSchema)` to create a new message.
  */
 export const AuthServiceValidateTokenResponseSchema: GenMessage<AuthServiceValidateTokenResponse> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_auth, 10);
+  messageDesc(file_aquarium_v2_auth, 9);
 
 /**
  * AuthService handles authentication and authorization operations

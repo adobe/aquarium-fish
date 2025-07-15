@@ -632,27 +632,27 @@ func (x *UserServiceUpdateResponse) GetData() *User {
 	return nil
 }
 
-type UserServiceDeleteRequest struct {
+type UserServiceRemoveRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserName      string                 `protobuf:"bytes,1,opt,name=user_name,json=userName,proto3" json:"user_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *UserServiceDeleteRequest) Reset() {
-	*x = UserServiceDeleteRequest{}
+func (x *UserServiceRemoveRequest) Reset() {
+	*x = UserServiceRemoveRequest{}
 	mi := &file_aquarium_v2_user_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *UserServiceDeleteRequest) String() string {
+func (x *UserServiceRemoveRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*UserServiceDeleteRequest) ProtoMessage() {}
+func (*UserServiceRemoveRequest) ProtoMessage() {}
 
-func (x *UserServiceDeleteRequest) ProtoReflect() protoreflect.Message {
+func (x *UserServiceRemoveRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_aquarium_v2_user_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -664,19 +664,19 @@ func (x *UserServiceDeleteRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use UserServiceDeleteRequest.ProtoReflect.Descriptor instead.
-func (*UserServiceDeleteRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use UserServiceRemoveRequest.ProtoReflect.Descriptor instead.
+func (*UserServiceRemoveRequest) Descriptor() ([]byte, []int) {
 	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{11}
 }
 
-func (x *UserServiceDeleteRequest) GetUserName() string {
+func (x *UserServiceRemoveRequest) GetUserName() string {
 	if x != nil {
 		return x.UserName
 	}
 	return ""
 }
 
-type UserServiceDeleteResponse struct {
+type UserServiceRemoveResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Status        bool                   `protobuf:"varint,1,opt,name=status,proto3" json:"status,omitempty"`
 	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
@@ -684,20 +684,20 @@ type UserServiceDeleteResponse struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *UserServiceDeleteResponse) Reset() {
-	*x = UserServiceDeleteResponse{}
+func (x *UserServiceRemoveResponse) Reset() {
+	*x = UserServiceRemoveResponse{}
 	mi := &file_aquarium_v2_user_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *UserServiceDeleteResponse) String() string {
+func (x *UserServiceRemoveResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*UserServiceDeleteResponse) ProtoMessage() {}
+func (*UserServiceRemoveResponse) ProtoMessage() {}
 
-func (x *UserServiceDeleteResponse) ProtoReflect() protoreflect.Message {
+func (x *UserServiceRemoveResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_aquarium_v2_user_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -709,19 +709,19 @@ func (x *UserServiceDeleteResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use UserServiceDeleteResponse.ProtoReflect.Descriptor instead.
-func (*UserServiceDeleteResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use UserServiceRemoveResponse.ProtoReflect.Descriptor instead.
+func (*UserServiceRemoveResponse) Descriptor() ([]byte, []int) {
 	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{12}
 }
 
-func (x *UserServiceDeleteResponse) GetStatus() bool {
+func (x *UserServiceRemoveResponse) GetStatus() bool {
 	if x != nil {
 		return x.Status
 	}
 	return false
 }
 
-func (x *UserServiceDeleteResponse) GetMessage() string {
+func (x *UserServiceRemoveResponse) GetMessage() string {
 	if x != nil {
 		return x.Message
 	}
@@ -772,9 +772,9 @@ const file_aquarium_v2_user_proto_rawDesc = "" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12%\n" +
 	"\x04data\x18\x03 \x01(\v2\x11.aquarium.v2.UserR\x04data\"7\n" +
-	"\x18UserServiceDeleteRequest\x12\x1b\n" +
+	"\x18UserServiceRemoveRequest\x12\x1b\n" +
 	"\tuser_name\x18\x01 \x01(\tR\buserName\"M\n" +
-	"\x19UserServiceDeleteResponse\x12\x16\n" +
+	"\x19UserServiceRemoveResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage2\xd0\x04\n" +
 	"\vUserService\x12\\\n" +
@@ -783,7 +783,7 @@ const file_aquarium_v2_user_proto_rawDesc = "" +
 	"\x03Get\x12\".aquarium.v2.UserServiceGetRequest\x1a#.aquarium.v2.UserServiceGetResponse\"\x00\x12Y\n" +
 	"\x06Create\x12%.aquarium.v2.UserServiceCreateRequest\x1a&.aquarium.v2.UserServiceCreateResponse\"\x00\x12\x85\x01\n" +
 	"\x06Update\x12%.aquarium.v2.UserServiceUpdateRequest\x1a&.aquarium.v2.UserServiceUpdateResponse\",\x82\xb5\x18(\"\tUpdateAll\"\x0eUpdatePassword\"\vUpdateRoles\x12Y\n" +
-	"\x06Delete\x12%.aquarium.v2.UserServiceDeleteRequest\x1a&.aquarium.v2.UserServiceDeleteResponse\"\x00BEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"
+	"\x06Remove\x12%.aquarium.v2.UserServiceRemoveRequest\x1a&.aquarium.v2.UserServiceRemoveResponse\"\x00BEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"
 
 var (
 	file_aquarium_v2_user_proto_rawDescOnce sync.Once
@@ -810,8 +810,8 @@ var file_aquarium_v2_user_proto_goTypes = []any{
 	(*UserServiceCreateResponse)(nil), // 8: aquarium.v2.UserServiceCreateResponse
 	(*UserServiceUpdateRequest)(nil),  // 9: aquarium.v2.UserServiceUpdateRequest
 	(*UserServiceUpdateResponse)(nil), // 10: aquarium.v2.UserServiceUpdateResponse
-	(*UserServiceDeleteRequest)(nil),  // 11: aquarium.v2.UserServiceDeleteRequest
-	(*UserServiceDeleteResponse)(nil), // 12: aquarium.v2.UserServiceDeleteResponse
+	(*UserServiceRemoveRequest)(nil),  // 11: aquarium.v2.UserServiceRemoveRequest
+	(*UserServiceRemoveResponse)(nil), // 12: aquarium.v2.UserServiceRemoveResponse
 	(*timestamppb.Timestamp)(nil),     // 13: google.protobuf.Timestamp
 	(*structpb.Struct)(nil),           // 14: google.protobuf.Struct
 }
@@ -831,13 +831,13 @@ var file_aquarium_v2_user_proto_depIdxs = []int32{
 	5,  // 12: aquarium.v2.UserService.Get:input_type -> aquarium.v2.UserServiceGetRequest
 	7,  // 13: aquarium.v2.UserService.Create:input_type -> aquarium.v2.UserServiceCreateRequest
 	9,  // 14: aquarium.v2.UserService.Update:input_type -> aquarium.v2.UserServiceUpdateRequest
-	11, // 15: aquarium.v2.UserService.Delete:input_type -> aquarium.v2.UserServiceDeleteRequest
+	11, // 15: aquarium.v2.UserService.Remove:input_type -> aquarium.v2.UserServiceRemoveRequest
 	2,  // 16: aquarium.v2.UserService.GetMe:output_type -> aquarium.v2.UserServiceGetMeResponse
 	4,  // 17: aquarium.v2.UserService.List:output_type -> aquarium.v2.UserServiceListResponse
 	6,  // 18: aquarium.v2.UserService.Get:output_type -> aquarium.v2.UserServiceGetResponse
 	8,  // 19: aquarium.v2.UserService.Create:output_type -> aquarium.v2.UserServiceCreateResponse
 	10, // 20: aquarium.v2.UserService.Update:output_type -> aquarium.v2.UserServiceUpdateResponse
-	12, // 21: aquarium.v2.UserService.Delete:output_type -> aquarium.v2.UserServiceDeleteResponse
+	12, // 21: aquarium.v2.UserService.Remove:output_type -> aquarium.v2.UserServiceRemoveResponse
 	16, // [16:22] is the sub-list for method output_type
 	10, // [10:16] is the sub-list for method input_type
 	10, // [10:10] is the sub-list for extension type_name

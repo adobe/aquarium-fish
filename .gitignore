@@ -1,2 +1,5 @@
 /aquarium-fish*
 /lib/web/dist
+
+# Empty file to keep go:embed happy until web dashboard will be built
+/lib/web/dist/empty

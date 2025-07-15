@@ -41,7 +41,6 @@ const (
 	ObjectStreamError            = "StreamError"
 	ObjectSubscribeConfig        = "SubscribeConfig"
 	ObjectUser                   = "User"
-	ObjectUserPermission         = "UserPermission"
 	ObjectUserSession            = "UserSession"
 	ObjectVote                   = "Vote"
 )

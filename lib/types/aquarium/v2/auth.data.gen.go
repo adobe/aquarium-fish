@@ -59,43 +59,13 @@ func (j JWTToken) ToJWTToken() *pbTypes.JWTToken {
 	return result
 }
 
-// UserPermission is a data for UserPermission without internal locks
-type UserPermission struct {
-	Action      string `json:"action,omitempty"`
-	Description string `json:"description,omitempty"`
-	Resource    string `json:"resource,omitempty"`
-}
-
-// FromUserPermission creates a UserPermission from UserPermission
-func FromUserPermission(src *pbTypes.UserPermission) UserPermission {
-	if src == nil {
-		return UserPermission{}
-	}
-
-	result := UserPermission{}
-	result.Action = src.GetAction()
-	result.Description = src.GetDescription()
-	result.Resource = src.GetResource()
-	return result
-}
-
-// ToUserPermission converts UserPermission to UserPermission
-func (u UserPermission) ToUserPermission() *pbTypes.UserPermission {
-	result := &pbTypes.UserPermission{}
-
-	result.Action = u.Action
-	result.Description = u.Description
-	result.Resource = u.Resource
-	return result
-}
-
 // UserSession is a data for UserSession without internal locks
 type UserSession struct {
-	CreatedAt   time.Time        `json:"created_at,omitempty"`
-	LastUsed    time.Time        `json:"last_used,omitempty"`
-	Permissions []UserPermission `json:"permissions,omitempty"`
-	Roles       []string         `json:"roles,omitempty"`
-	UserName    string           `json:"user_name,omitempty"`
+	CreatedAt   time.Time    `json:"created_at,omitempty"`
+	LastUsed    time.Time    `json:"last_used,omitempty"`
+	Permissions []Permission `json:"permissions,omitempty"`
+	Roles       []string     `json:"roles,omitempty"`
+	UserName    string       `json:"user_name,omitempty"`
 }
 
 // FromUserSession creates a UserSession from UserSession
@@ -113,7 +83,7 @@ func FromUserSession(src *pbTypes.UserSession) UserSession {
 	}
 	for _, item := range src.GetPermissions() {
 		if item != nil {
-			result.Permissions = append(result.Permissions, FromUserPermission(item))
+			result.Permissions = append(result.Permissions, FromPermission(item))
 		}
 	}
 	result.Roles = src.GetRoles()
@@ -128,7 +98,7 @@ func (u UserSession) ToUserSession() *pbTypes.UserSession {
 	result.CreatedAt = timestamppb.New(u.CreatedAt)
 	result.LastUsed = timestamppb.New(u.LastUsed)
 	for _, item := range u.Permissions {
-		result.Permissions = append(result.Permissions, item.ToUserPermission())
+		result.Permissions = append(result.Permissions, item.ToPermission())
 	}
 	result.Roles = u.Roles
 	result.UserName = u.UserName

@@ -1,3 +1,17 @@
+/**
+ * Copyright 2025 Adobe. All rights reserved.
+ * This file is licensed to you under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License. You may obtain a copy
+ * of the License at http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under
+ * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR REPRESENTATIONS
+ * OF ANY KIND, either express or implied. See the License for the specific language
+ * governing permissions and limitations under the License.
+ */
+
+// Author: Sergei Parshev (@sparshev)
+
 import React from "react";
 import {
   Links,
@@ -11,6 +25,7 @@ import type { LinksFunction } from "react-router";
 import "./app.css";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { StreamingProvider } from "./contexts/StreamingContext";
 
 export const links: LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -58,7 +73,9 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <Outlet />
+        <StreamingProvider>
+          <Outlet />
+        </StreamingProvider>
       </AuthProvider>
     </ThemeProvider>
   );
@@ -69,7 +86,7 @@ export function ErrorBoundary({ error }: { error: unknown }) {
   let details = "An unexpected error occurred.";
   let stack: string | undefined;
 
-  if (import.meta.env.DEV && error && error instanceof Error) {
+  if (error && error instanceof Error) {
     details = error.message;
     stack = error.stack;
   }

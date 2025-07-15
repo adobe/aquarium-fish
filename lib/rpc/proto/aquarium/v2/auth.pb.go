@@ -107,70 +107,6 @@ func (x *JWTToken) GetRefreshExpiresAt() *timestamppb.Timestamp {
 	return nil
 }
 
-// User permission information
-type UserPermission struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Resource or service name
-	Resource string `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
-	// Action allowed on the resource
-	Action string `protobuf:"bytes,2,opt,name=action,proto3" json:"action,omitempty"`
-	// Human-readable description of the permission
-	Description   string `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *UserPermission) Reset() {
-	*x = UserPermission{}
-	mi := &file_aquarium_v2_auth_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UserPermission) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UserPermission) ProtoMessage() {}
-
-func (x *UserPermission) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_auth_proto_msgTypes[1]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UserPermission.ProtoReflect.Descriptor instead.
-func (*UserPermission) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_auth_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *UserPermission) GetResource() string {
-	if x != nil {
-		return x.Resource
-	}
-	return ""
-}
-
-func (x *UserPermission) GetAction() string {
-	if x != nil {
-		return x.Action
-	}
-	return ""
-}
-
-func (x *UserPermission) GetDescription() string {
-	if x != nil {
-		return x.Description
-	}
-	return ""
-}
-
 // Complete user session information
 type UserSession struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -178,8 +114,8 @@ type UserSession struct {
 	UserName string `protobuf:"bytes,1,opt,name=user_name,json=userName,proto3" json:"user_name,omitempty"`
 	// User roles
 	Roles []string `protobuf:"bytes,2,rep,name=roles,proto3" json:"roles,omitempty"`
-	// User permissions derived from roles
-	Permissions []*UserPermission `protobuf:"bytes,3,rep,name=permissions,proto3" json:"permissions,omitempty"`
+	// User permissions from roles
+	Permissions []*Permission `protobuf:"bytes,3,rep,name=permissions,proto3" json:"permissions,omitempty"`
 	// Session metadata
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	LastUsed      *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=last_used,json=lastUsed,proto3" json:"last_used,omitempty"`
@@ -189,7 +125,7 @@ type UserSession struct {
 
 func (x *UserSession) Reset() {
 	*x = UserSession{}
-	mi := &file_aquarium_v2_auth_proto_msgTypes[2]
+	mi := &file_aquarium_v2_auth_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -201,7 +137,7 @@ func (x *UserSession) String() string {
 func (*UserSession) ProtoMessage() {}
 
 func (x *UserSession) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_auth_proto_msgTypes[2]
+	mi := &file_aquarium_v2_auth_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -214,7 +150,7 @@ func (x *UserSession) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserSession.ProtoReflect.Descriptor instead.
 func (*UserSession) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_auth_proto_rawDescGZIP(), []int{2}
+	return file_aquarium_v2_auth_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *UserSession) GetUserName() string {
@@ -231,7 +167,7 @@ func (x *UserSession) GetRoles() []string {
 	return nil
 }
 
-func (x *UserSession) GetPermissions() []*UserPermission {
+func (x *UserSession) GetPermissions() []*Permission {
 	if x != nil {
 		return x.Permissions
 	}
@@ -264,7 +200,7 @@ type AuthServiceLoginRequest struct {
 
 func (x *AuthServiceLoginRequest) Reset() {
 	*x = AuthServiceLoginRequest{}
-	mi := &file_aquarium_v2_auth_proto_msgTypes[3]
+	mi := &file_aquarium_v2_auth_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -276,7 +212,7 @@ func (x *AuthServiceLoginRequest) String() string {
 func (*AuthServiceLoginRequest) ProtoMessage() {}
 
 func (x *AuthServiceLoginRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_auth_proto_msgTypes[3]
+	mi := &file_aquarium_v2_auth_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -289,7 +225,7 @@ func (x *AuthServiceLoginRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthServiceLoginRequest.ProtoReflect.Descriptor instead.
 func (*AuthServiceLoginRequest) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_auth_proto_rawDescGZIP(), []int{3}
+	return file_aquarium_v2_auth_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *AuthServiceLoginRequest) GetUsername() string {
@@ -320,7 +256,7 @@ type AuthServiceLoginResponse struct {
 
 func (x *AuthServiceLoginResponse) Reset() {
 	*x = AuthServiceLoginResponse{}
-	mi := &file_aquarium_v2_auth_proto_msgTypes[4]
+	mi := &file_aquarium_v2_auth_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -332,7 +268,7 @@ func (x *AuthServiceLoginResponse) String() string {
 func (*AuthServiceLoginResponse) ProtoMessage() {}
 
 func (x *AuthServiceLoginResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_auth_proto_msgTypes[4]
+	mi := &file_aquarium_v2_auth_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -345,7 +281,7 @@ func (x *AuthServiceLoginResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthServiceLoginResponse.ProtoReflect.Descriptor instead.
 func (*AuthServiceLoginResponse) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_auth_proto_rawDescGZIP(), []int{4}
+	return file_aquarium_v2_auth_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *AuthServiceLoginResponse) GetStatus() bool {
@@ -386,7 +322,7 @@ type AuthServiceRefreshTokenRequest struct {
 
 func (x *AuthServiceRefreshTokenRequest) Reset() {
 	*x = AuthServiceRefreshTokenRequest{}
-	mi := &file_aquarium_v2_auth_proto_msgTypes[5]
+	mi := &file_aquarium_v2_auth_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -398,7 +334,7 @@ func (x *AuthServiceRefreshTokenRequest) String() string {
 func (*AuthServiceRefreshTokenRequest) ProtoMessage() {}
 
 func (x *AuthServiceRefreshTokenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_auth_proto_msgTypes[5]
+	mi := &file_aquarium_v2_auth_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -411,7 +347,7 @@ func (x *AuthServiceRefreshTokenRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthServiceRefreshTokenRequest.ProtoReflect.Descriptor instead.
 func (*AuthServiceRefreshTokenRequest) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_auth_proto_rawDescGZIP(), []int{5}
+	return file_aquarium_v2_auth_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *AuthServiceRefreshTokenRequest) GetRefreshToken() string {
@@ -433,7 +369,7 @@ type AuthServiceRefreshTokenResponse struct {
 
 func (x *AuthServiceRefreshTokenResponse) Reset() {
 	*x = AuthServiceRefreshTokenResponse{}
-	mi := &file_aquarium_v2_auth_proto_msgTypes[6]
+	mi := &file_aquarium_v2_auth_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -445,7 +381,7 @@ func (x *AuthServiceRefreshTokenResponse) String() string {
 func (*AuthServiceRefreshTokenResponse) ProtoMessage() {}
 
 func (x *AuthServiceRefreshTokenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_auth_proto_msgTypes[6]
+	mi := &file_aquarium_v2_auth_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -458,7 +394,7 @@ func (x *AuthServiceRefreshTokenResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthServiceRefreshTokenResponse.ProtoReflect.Descriptor instead.
 func (*AuthServiceRefreshTokenResponse) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_auth_proto_rawDescGZIP(), []int{6}
+	return file_aquarium_v2_auth_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *AuthServiceRefreshTokenResponse) GetStatus() bool {
@@ -490,7 +426,7 @@ type AuthServiceGetPermissionsRequest struct {
 
 func (x *AuthServiceGetPermissionsRequest) Reset() {
 	*x = AuthServiceGetPermissionsRequest{}
-	mi := &file_aquarium_v2_auth_proto_msgTypes[7]
+	mi := &file_aquarium_v2_auth_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -502,7 +438,7 @@ func (x *AuthServiceGetPermissionsRequest) String() string {
 func (*AuthServiceGetPermissionsRequest) ProtoMessage() {}
 
 func (x *AuthServiceGetPermissionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_auth_proto_msgTypes[7]
+	mi := &file_aquarium_v2_auth_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -515,7 +451,7 @@ func (x *AuthServiceGetPermissionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthServiceGetPermissionsRequest.ProtoReflect.Descriptor instead.
 func (*AuthServiceGetPermissionsRequest) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_auth_proto_rawDescGZIP(), []int{7}
+	return file_aquarium_v2_auth_proto_rawDescGZIP(), []int{6}
 }
 
 type AuthServiceGetPermissionsResponse struct {
@@ -530,7 +466,7 @@ type AuthServiceGetPermissionsResponse struct {
 
 func (x *AuthServiceGetPermissionsResponse) Reset() {
 	*x = AuthServiceGetPermissionsResponse{}
-	mi := &file_aquarium_v2_auth_proto_msgTypes[8]
+	mi := &file_aquarium_v2_auth_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -542,7 +478,7 @@ func (x *AuthServiceGetPermissionsResponse) String() string {
 func (*AuthServiceGetPermissionsResponse) ProtoMessage() {}
 
 func (x *AuthServiceGetPermissionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_auth_proto_msgTypes[8]
+	mi := &file_aquarium_v2_auth_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -555,7 +491,7 @@ func (x *AuthServiceGetPermissionsResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use AuthServiceGetPermissionsResponse.ProtoReflect.Descriptor instead.
 func (*AuthServiceGetPermissionsResponse) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_auth_proto_rawDescGZIP(), []int{8}
+	return file_aquarium_v2_auth_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *AuthServiceGetPermissionsResponse) GetStatus() bool {
@@ -589,7 +525,7 @@ type AuthServiceValidateTokenRequest struct {
 
 func (x *AuthServiceValidateTokenRequest) Reset() {
 	*x = AuthServiceValidateTokenRequest{}
-	mi := &file_aquarium_v2_auth_proto_msgTypes[9]
+	mi := &file_aquarium_v2_auth_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -601,7 +537,7 @@ func (x *AuthServiceValidateTokenRequest) String() string {
 func (*AuthServiceValidateTokenRequest) ProtoMessage() {}
 
 func (x *AuthServiceValidateTokenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_auth_proto_msgTypes[9]
+	mi := &file_aquarium_v2_auth_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -614,7 +550,7 @@ func (x *AuthServiceValidateTokenRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthServiceValidateTokenRequest.ProtoReflect.Descriptor instead.
 func (*AuthServiceValidateTokenRequest) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_auth_proto_rawDescGZIP(), []int{9}
+	return file_aquarium_v2_auth_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *AuthServiceValidateTokenRequest) GetToken() string {
@@ -636,7 +572,7 @@ type AuthServiceValidateTokenResponse struct {
 
 func (x *AuthServiceValidateTokenResponse) Reset() {
 	*x = AuthServiceValidateTokenResponse{}
-	mi := &file_aquarium_v2_auth_proto_msgTypes[10]
+	mi := &file_aquarium_v2_auth_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -648,7 +584,7 @@ func (x *AuthServiceValidateTokenResponse) String() string {
 func (*AuthServiceValidateTokenResponse) ProtoMessage() {}
 
 func (x *AuthServiceValidateTokenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_auth_proto_msgTypes[10]
+	mi := &file_aquarium_v2_auth_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -661,7 +597,7 @@ func (x *AuthServiceValidateTokenResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthServiceValidateTokenResponse.ProtoReflect.Descriptor instead.
 func (*AuthServiceValidateTokenResponse) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_auth_proto_rawDescGZIP(), []int{10}
+	return file_aquarium_v2_auth_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *AuthServiceValidateTokenResponse) GetStatus() bool {
@@ -689,21 +625,17 @@ var File_aquarium_v2_auth_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_auth_proto_rawDesc = "" +
 	"\n" +
-	"\x16aquarium/v2/auth.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16aquarium/v2/rbac.proto\"\xca\x01\n" +
+	"\x16aquarium/v2/auth.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16aquarium/v2/role.proto\x1a\x16aquarium/v2/rbac.proto\"\xca\x01\n" +
 	"\bJWTToken\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\x129\n" +
 	"\n" +
 	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12#\n" +
 	"\rrefresh_token\x18\x03 \x01(\tR\frefreshToken\x12H\n" +
-	"\x12refresh_expires_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\x10refreshExpiresAt\"f\n" +
-	"\x0eUserPermission\x12\x1a\n" +
-	"\bresource\x18\x01 \x01(\tR\bresource\x12\x16\n" +
-	"\x06action\x18\x02 \x01(\tR\x06action\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\"\xf3\x01\n" +
+	"\x12refresh_expires_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\x10refreshExpiresAt\"\xef\x01\n" +
 	"\vUserSession\x12\x1b\n" +
 	"\tuser_name\x18\x01 \x01(\tR\buserName\x12\x14\n" +
-	"\x05roles\x18\x02 \x03(\tR\x05roles\x12=\n" +
-	"\vpermissions\x18\x03 \x03(\v2\x1b.aquarium.v2.UserPermissionR\vpermissions\x129\n" +
+	"\x05roles\x18\x02 \x03(\tR\x05roles\x129\n" +
+	"\vpermissions\x18\x03 \x03(\v2\x17.aquarium.v2.PermissionR\vpermissions\x129\n" +
 	"\n" +
 	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x127\n" +
 	"\tlast_used\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\blastUsed\"Q\n" +
@@ -758,40 +690,40 @@ func file_aquarium_v2_auth_proto_rawDescGZIP() []byte {
 	return file_aquarium_v2_auth_proto_rawDescData
 }
 
-var file_aquarium_v2_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_aquarium_v2_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_aquarium_v2_auth_proto_goTypes = []any{
 	(*JWTToken)(nil),                          // 0: aquarium.v2.JWTToken
-	(*UserPermission)(nil),                    // 1: aquarium.v2.UserPermission
-	(*UserSession)(nil),                       // 2: aquarium.v2.UserSession
-	(*AuthServiceLoginRequest)(nil),           // 3: aquarium.v2.AuthServiceLoginRequest
-	(*AuthServiceLoginResponse)(nil),          // 4: aquarium.v2.AuthServiceLoginResponse
-	(*AuthServiceRefreshTokenRequest)(nil),    // 5: aquarium.v2.AuthServiceRefreshTokenRequest
-	(*AuthServiceRefreshTokenResponse)(nil),   // 6: aquarium.v2.AuthServiceRefreshTokenResponse
-	(*AuthServiceGetPermissionsRequest)(nil),  // 7: aquarium.v2.AuthServiceGetPermissionsRequest
-	(*AuthServiceGetPermissionsResponse)(nil), // 8: aquarium.v2.AuthServiceGetPermissionsResponse
-	(*AuthServiceValidateTokenRequest)(nil),   // 9: aquarium.v2.AuthServiceValidateTokenRequest
-	(*AuthServiceValidateTokenResponse)(nil),  // 10: aquarium.v2.AuthServiceValidateTokenResponse
-	(*timestamppb.Timestamp)(nil),             // 11: google.protobuf.Timestamp
+	(*UserSession)(nil),                       // 1: aquarium.v2.UserSession
+	(*AuthServiceLoginRequest)(nil),           // 2: aquarium.v2.AuthServiceLoginRequest
+	(*AuthServiceLoginResponse)(nil),          // 3: aquarium.v2.AuthServiceLoginResponse
+	(*AuthServiceRefreshTokenRequest)(nil),    // 4: aquarium.v2.AuthServiceRefreshTokenRequest
+	(*AuthServiceRefreshTokenResponse)(nil),   // 5: aquarium.v2.AuthServiceRefreshTokenResponse
+	(*AuthServiceGetPermissionsRequest)(nil),  // 6: aquarium.v2.AuthServiceGetPermissionsRequest
+	(*AuthServiceGetPermissionsResponse)(nil), // 7: aquarium.v2.AuthServiceGetPermissionsResponse
+	(*AuthServiceValidateTokenRequest)(nil),   // 8: aquarium.v2.AuthServiceValidateTokenRequest
+	(*AuthServiceValidateTokenResponse)(nil),  // 9: aquarium.v2.AuthServiceValidateTokenResponse
+	(*timestamppb.Timestamp)(nil),             // 10: google.protobuf.Timestamp
+	(*Permission)(nil),                        // 11: aquarium.v2.Permission
 }
 var file_aquarium_v2_auth_proto_depIdxs = []int32{
-	11, // 0: aquarium.v2.JWTToken.expires_at:type_name -> google.protobuf.Timestamp
-	11, // 1: aquarium.v2.JWTToken.refresh_expires_at:type_name -> google.protobuf.Timestamp
-	1,  // 2: aquarium.v2.UserSession.permissions:type_name -> aquarium.v2.UserPermission
-	11, // 3: aquarium.v2.UserSession.created_at:type_name -> google.protobuf.Timestamp
-	11, // 4: aquarium.v2.UserSession.last_used:type_name -> google.protobuf.Timestamp
+	10, // 0: aquarium.v2.JWTToken.expires_at:type_name -> google.protobuf.Timestamp
+	10, // 1: aquarium.v2.JWTToken.refresh_expires_at:type_name -> google.protobuf.Timestamp
+	11, // 2: aquarium.v2.UserSession.permissions:type_name -> aquarium.v2.Permission
+	10, // 3: aquarium.v2.UserSession.created_at:type_name -> google.protobuf.Timestamp
+	10, // 4: aquarium.v2.UserSession.last_used:type_name -> google.protobuf.Timestamp
 	0,  // 5: aquarium.v2.AuthServiceLoginResponse.token:type_name -> aquarium.v2.JWTToken
-	2,  // 6: aquarium.v2.AuthServiceLoginResponse.session:type_name -> aquarium.v2.UserSession
+	1,  // 6: aquarium.v2.AuthServiceLoginResponse.session:type_name -> aquarium.v2.UserSession
 	0,  // 7: aquarium.v2.AuthServiceRefreshTokenResponse.token:type_name -> aquarium.v2.JWTToken
-	2,  // 8: aquarium.v2.AuthServiceGetPermissionsResponse.session:type_name -> aquarium.v2.UserSession
-	2,  // 9: aquarium.v2.AuthServiceValidateTokenResponse.session:type_name -> aquarium.v2.UserSession
-	3,  // 10: aquarium.v2.AuthService.Login:input_type -> aquarium.v2.AuthServiceLoginRequest
-	9,  // 11: aquarium.v2.AuthService.ValidateToken:input_type -> aquarium.v2.AuthServiceValidateTokenRequest
-	5,  // 12: aquarium.v2.AuthService.RefreshToken:input_type -> aquarium.v2.AuthServiceRefreshTokenRequest
-	7,  // 13: aquarium.v2.AuthService.GetPermissions:input_type -> aquarium.v2.AuthServiceGetPermissionsRequest
-	4,  // 14: aquarium.v2.AuthService.Login:output_type -> aquarium.v2.AuthServiceLoginResponse
-	10, // 15: aquarium.v2.AuthService.ValidateToken:output_type -> aquarium.v2.AuthServiceValidateTokenResponse
-	6,  // 16: aquarium.v2.AuthService.RefreshToken:output_type -> aquarium.v2.AuthServiceRefreshTokenResponse
-	8,  // 17: aquarium.v2.AuthService.GetPermissions:output_type -> aquarium.v2.AuthServiceGetPermissionsResponse
+	1,  // 8: aquarium.v2.AuthServiceGetPermissionsResponse.session:type_name -> aquarium.v2.UserSession
+	1,  // 9: aquarium.v2.AuthServiceValidateTokenResponse.session:type_name -> aquarium.v2.UserSession
+	2,  // 10: aquarium.v2.AuthService.Login:input_type -> aquarium.v2.AuthServiceLoginRequest
+	8,  // 11: aquarium.v2.AuthService.ValidateToken:input_type -> aquarium.v2.AuthServiceValidateTokenRequest
+	4,  // 12: aquarium.v2.AuthService.RefreshToken:input_type -> aquarium.v2.AuthServiceRefreshTokenRequest
+	6,  // 13: aquarium.v2.AuthService.GetPermissions:input_type -> aquarium.v2.AuthServiceGetPermissionsRequest
+	3,  // 14: aquarium.v2.AuthService.Login:output_type -> aquarium.v2.AuthServiceLoginResponse
+	9,  // 15: aquarium.v2.AuthService.ValidateToken:output_type -> aquarium.v2.AuthServiceValidateTokenResponse
+	5,  // 16: aquarium.v2.AuthService.RefreshToken:output_type -> aquarium.v2.AuthServiceRefreshTokenResponse
+	7,  // 17: aquarium.v2.AuthService.GetPermissions:output_type -> aquarium.v2.AuthServiceGetPermissionsResponse
 	14, // [14:18] is the sub-list for method output_type
 	10, // [10:14] is the sub-list for method input_type
 	10, // [10:10] is the sub-list for extension type_name
@@ -804,18 +736,19 @@ func file_aquarium_v2_auth_proto_init() {
 	if File_aquarium_v2_auth_proto != nil {
 		return
 	}
+	file_aquarium_v2_role_proto_init()
 	file_aquarium_v2_rbac_proto_init()
-	file_aquarium_v2_auth_proto_msgTypes[4].OneofWrappers = []any{}
-	file_aquarium_v2_auth_proto_msgTypes[6].OneofWrappers = []any{}
-	file_aquarium_v2_auth_proto_msgTypes[8].OneofWrappers = []any{}
-	file_aquarium_v2_auth_proto_msgTypes[10].OneofWrappers = []any{}
+	file_aquarium_v2_auth_proto_msgTypes[3].OneofWrappers = []any{}
+	file_aquarium_v2_auth_proto_msgTypes[5].OneofWrappers = []any{}
+	file_aquarium_v2_auth_proto_msgTypes[7].OneofWrappers = []any{}
+	file_aquarium_v2_auth_proto_msgTypes[9].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aquarium_v2_auth_proto_rawDesc), len(file_aquarium_v2_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

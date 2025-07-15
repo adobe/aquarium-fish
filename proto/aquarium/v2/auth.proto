@@ -15,6 +15,7 @@ syntax = "proto3";
 package aquarium.v2;
 
 import "google/protobuf/timestamp.proto";
+import "aquarium/v2/role.proto";
 import "aquarium/v2/rbac.proto";
 
 option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2";
@@ -62,24 +63,14 @@ message JWTToken {
   google.protobuf.Timestamp refresh_expires_at = 4;
 }
 
-// User permission information
-message UserPermission {
-  // Resource or service name
-  string resource = 1;
-  // Action allowed on the resource
-  string action = 2;
-  // Human-readable description of the permission
-  string description = 3;
-}
-
 // Complete user session information
 message UserSession {
   // User name
   string user_name = 1;
   // User roles
   repeated string roles = 2;
-  // User permissions derived from roles
-  repeated UserPermission permissions = 3;
+  // User permissions from roles
+  repeated Permission permissions = 3;
   // Session metadata
   google.protobuf.Timestamp created_at = 4;
   google.protobuf.Timestamp last_used = 5;

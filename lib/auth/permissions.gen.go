@@ -46,9 +46,9 @@ var rolePermissions = map[string][]typesv2.Permission{
 
 		// LabelService
 		{Resource: LabelService, Action: LabelServiceCreate}, // gRPC
-		{Resource: LabelService, Action: LabelServiceDelete}, // gRPC
 		{Resource: LabelService, Action: LabelServiceGet},    // gRPC
 		{Resource: LabelService, Action: LabelServiceList},   // gRPC
+		{Resource: LabelService, Action: LabelServiceRemove}, // gRPC
 
 		// NodeService
 		{Resource: NodeService, Action: NodeServiceGetThis},        // gRPC
@@ -57,9 +57,9 @@ var rolePermissions = map[string][]typesv2.Permission{
 
 		// RoleService
 		{Resource: RoleService, Action: RoleServiceCreate}, // gRPC
-		{Resource: RoleService, Action: RoleServiceDelete}, // gRPC
 		{Resource: RoleService, Action: RoleServiceGet},    // gRPC
 		{Resource: RoleService, Action: RoleServiceList},   // gRPC
+		{Resource: RoleService, Action: RoleServiceRemove}, // gRPC
 		{Resource: RoleService, Action: RoleServiceUpdate}, // gRPC
 
 		// StreamingService
@@ -68,9 +68,9 @@ var rolePermissions = map[string][]typesv2.Permission{
 
 		// UserService
 		{Resource: UserService, Action: UserServiceCreate},         // gRPC
-		{Resource: UserService, Action: UserServiceDelete},         // gRPC
 		{Resource: UserService, Action: UserServiceGet},            // gRPC
 		{Resource: UserService, Action: UserServiceList},           // gRPC
+		{Resource: UserService, Action: UserServiceRemove},         // gRPC
 		{Resource: UserService, Action: UserServiceUpdate},         // gRPC
 		{Resource: UserService, Action: UserServiceUpdateAll},      // gRPC additional
 		{Resource: UserService, Action: UserServiceUpdatePassword}, // gRPC additional

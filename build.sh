@@ -39,26 +39,19 @@ if ! command -v protoc-gen-go >/dev/null 2>&1; then
 fi
 
 if ! command -v protoc-gen-connect-go >/dev/null 2>&1; then
-    # Version is from go.mod
     go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.18.1
 fi
 
 # Run code generation
 go generate -v .
 
-# Web build is placed here because it also generates client from protobuf
 echo
-echo "--- BUILD WEB DASHBOARD ---"
+echo "--- GENERATE PROTOBUF WEB ---"
 # Build the web dashboard
 if [ "x${NO_WEB}" = x ]; then
-    echo "Building web dashboard..."
     cd web
-    ./build.sh
+    ONLYGEN=1 ./build.sh
     cd ..
-
-    rm -rf lib/web/dist
-    cp -a web/build/client lib/web/dist
-    echo "Web dashboard build completed"
 else
     echo "Skipping. Reusing existing web dashboard build"
 fi
@@ -73,6 +66,20 @@ echo
 echo "--- RUN UNIT TESTS ---"
 # Unit tests should not consume more then 5 sec per run - for that we have integration tests
 go test -v -failfast -count=1 -timeout=5s -v ./lib/...
+
+echo
+echo "--- BUILD WEB DASHBOARD ---"
+# Build the web dashboard
+if [ "x${NO_WEB}" = x ]; then
+    cd web
+    ONLYBUILD=1 ./build.sh
+    cd ..
+
+    rm -rf lib/web/dist
+    cp -a web/build/client lib/web/dist
+else
+    echo "Skipping. Reusing existing web dashboard build"
+fi
 
 echo
 echo "--- BUILD ${BINARY_NAME} ($MAXJOBS in parallel) ---"

@@ -51,9 +51,9 @@ const (
 	// LabelService service constants
 	LabelService       = "LabelService"
 	LabelServiceCreate = "Create"
-	LabelServiceDelete = "Delete"
 	LabelServiceGet    = "Get"
 	LabelServiceList   = "List"
+	LabelServiceRemove = "Remove"
 
 	// NodeService service constants
 	NodeService               = "NodeService"
@@ -64,9 +64,9 @@ const (
 	// RoleService service constants
 	RoleService       = "RoleService"
 	RoleServiceCreate = "Create"
-	RoleServiceDelete = "Delete"
 	RoleServiceGet    = "Get"
 	RoleServiceList   = "List"
+	RoleServiceRemove = "Remove"
 	RoleServiceUpdate = "Update"
 
 	// StreamingService service constants
@@ -78,9 +78,9 @@ const (
 	UserService               = "UserService"
 	UserServiceGetMe          = "GetMe"
 	UserServiceCreate         = "Create"
-	UserServiceDelete         = "Delete"
 	UserServiceGet            = "Get"
 	UserServiceList           = "List"
+	UserServiceRemove         = "Remove"
 	UserServiceUpdate         = "Update"
 	UserServiceUpdateAll      = "UpdateAll"
 	UserServiceUpdatePassword = "UpdatePassword"

@@ -57,22 +57,22 @@ var requestTypeMapping = map[string]serviceMethodInfo{
 	"ApplicationServiceListRequest":        {auth.ApplicationService, auth.ApplicationServiceList},
 	"ApplicationServiceListTaskRequest":    {auth.ApplicationService, auth.ApplicationServiceListTask},
 	"LabelServiceCreateRequest":            {auth.LabelService, auth.LabelServiceCreate},
-	"LabelServiceDeleteRequest":            {auth.LabelService, auth.LabelServiceDelete},
 	"LabelServiceGetRequest":               {auth.LabelService, auth.LabelServiceGet},
 	"LabelServiceListRequest":              {auth.LabelService, auth.LabelServiceList},
+	"LabelServiceRemoveRequest":            {auth.LabelService, auth.LabelServiceRemove},
 	"NodeServiceGetThisRequest":            {auth.NodeService, auth.NodeServiceGetThis},
 	"NodeServiceListRequest":               {auth.NodeService, auth.NodeServiceList},
 	"NodeServiceSetMaintenanceRequest":     {auth.NodeService, auth.NodeServiceSetMaintenance},
 	"RoleServiceCreateRequest":             {auth.RoleService, auth.RoleServiceCreate},
-	"RoleServiceDeleteRequest":             {auth.RoleService, auth.RoleServiceDelete},
 	"RoleServiceGetRequest":                {auth.RoleService, auth.RoleServiceGet},
 	"RoleServiceListRequest":               {auth.RoleService, auth.RoleServiceList},
+	"RoleServiceRemoveRequest":             {auth.RoleService, auth.RoleServiceRemove},
 	"RoleServiceUpdateRequest":             {auth.RoleService, auth.RoleServiceUpdate},
 	"UserServiceCreateRequest":             {auth.UserService, auth.UserServiceCreate},
-	"UserServiceDeleteRequest":             {auth.UserService, auth.UserServiceDelete},
 	"UserServiceGetRequest":                {auth.UserService, auth.UserServiceGet},
 	"UserServiceGetMeRequest":              {auth.UserService, auth.UserServiceGetMe},
 	"UserServiceListRequest":               {auth.UserService, auth.UserServiceList},
+	"UserServiceRemoveRequest":             {auth.UserService, auth.UserServiceRemove},
 	"UserServiceUpdateRequest":             {auth.UserService, auth.UserServiceUpdate},
 }
 
@@ -205,17 +205,6 @@ func (s *StreamingService) routeLabelServiceRequest(ctx context.Context, request
 		}
 
 		return anypb.New(resp.Msg)
-	case "LabelServiceDeleteRequest":
-		var req aquariumv2.LabelServiceDeleteRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.labelService.Delete(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-
-		return anypb.New(resp.Msg)
 	case "LabelServiceGetRequest":
 		var req aquariumv2.LabelServiceGetRequest
 		if err := requestData.UnmarshalTo(&req); err != nil {
@@ -233,6 +222,17 @@ func (s *StreamingService) routeLabelServiceRequest(ctx context.Context, request
 			return nil, connect.NewError(connect.CodeInvalidArgument, err)
 		}
 		resp, err := s.labelService.List(ctx, connect.NewRequest(&req))
+		if err != nil {
+			return nil, err
+		}
+
+		return anypb.New(resp.Msg)
+	case "LabelServiceRemoveRequest":
+		var req aquariumv2.LabelServiceRemoveRequest
+		if err := requestData.UnmarshalTo(&req); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		resp, err := s.labelService.Remove(ctx, connect.NewRequest(&req))
 		if err != nil {
 			return nil, err
 		}
@@ -298,17 +298,6 @@ func (s *StreamingService) routeRoleServiceRequest(ctx context.Context, requestT
 		}
 
 		return anypb.New(resp.Msg)
-	case "RoleServiceDeleteRequest":
-		var req aquariumv2.RoleServiceDeleteRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.roleService.Delete(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-
-		return anypb.New(resp.Msg)
 	case "RoleServiceGetRequest":
 		var req aquariumv2.RoleServiceGetRequest
 		if err := requestData.UnmarshalTo(&req); err != nil {
@@ -326,6 +315,17 @@ func (s *StreamingService) routeRoleServiceRequest(ctx context.Context, requestT
 			return nil, connect.NewError(connect.CodeInvalidArgument, err)
 		}
 		resp, err := s.roleService.List(ctx, connect.NewRequest(&req))
+		if err != nil {
+			return nil, err
+		}
+
+		return anypb.New(resp.Msg)
+	case "RoleServiceRemoveRequest":
+		var req aquariumv2.RoleServiceRemoveRequest
+		if err := requestData.UnmarshalTo(&req); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		resp, err := s.roleService.Remove(ctx, connect.NewRequest(&req))
 		if err != nil {
 			return nil, err
 		}
@@ -361,17 +361,6 @@ func (s *StreamingService) routeUserServiceRequest(ctx context.Context, requestT
 		}
 
 		return anypb.New(resp.Msg)
-	case "UserServiceDeleteRequest":
-		var req aquariumv2.UserServiceDeleteRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.userService.Delete(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-
-		return anypb.New(resp.Msg)
 	case "UserServiceGetRequest":
 		var req aquariumv2.UserServiceGetRequest
 		if err := requestData.UnmarshalTo(&req); err != nil {
@@ -400,6 +389,17 @@ func (s *StreamingService) routeUserServiceRequest(ctx context.Context, requestT
 			return nil, connect.NewError(connect.CodeInvalidArgument, err)
 		}
 		resp, err := s.userService.List(ctx, connect.NewRequest(&req))
+		if err != nil {
+			return nil, err
+		}
+
+		return anypb.New(resp.Msg)
+	case "UserServiceRemoveRequest":
+		var req aquariumv2.UserServiceRemoveRequest
+		if err := requestData.UnmarshalTo(&req); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		resp, err := s.userService.Remove(ctx, connect.NewRequest(&req))
 		if err != nil {
 			return nil, err
 		}

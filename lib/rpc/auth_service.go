@@ -97,7 +97,7 @@ func (s *AuthService) Login(ctx context.Context, req *connect.Request[aquariumv2
 	}
 
 	// Get user permissions
-	session, err := s.buildUserSession(user)
+	session, err := s.buildUserSession(ctx, user)
 	if err != nil {
 		logger.Error("Failed to build user session", "err", err)
 		return connect.NewResponse(&aquariumv2.AuthServiceLoginResponse{
@@ -184,7 +184,7 @@ func (s *AuthService) GetPermissions(ctx context.Context, req *connect.Request[a
 	}
 
 	// Build user session with permissions
-	session, err := s.buildUserSession(user)
+	session, err := s.buildUserSession(ctx, user)
 	if err != nil {
 		logger.Error("Failed to build user session", "err", err)
 		return connect.NewResponse(&aquariumv2.AuthServiceGetPermissionsResponse{
@@ -238,7 +238,7 @@ func (s *AuthService) ValidateToken(ctx context.Context, req *connect.Request[aq
 	}
 
 	// Build user session
-	session, err := s.buildUserSession(user)
+	session, err := s.buildUserSession(ctx, user)
 	if err != nil {
 		logger.Error("Failed to build user session", "err", err)
 		return connect.NewResponse(&aquariumv2.AuthServiceValidateTokenResponse{
@@ -305,7 +305,8 @@ func (s *AuthService) generateToken(user *typesv2.User) (*aquariumv2.JWTToken, e
 }
 
 // buildUserSession creates a complete user session with permissions
-func (s *AuthService) buildUserSession(user *typesv2.User) (*aquariumv2.UserSession, error) {
+func (s *AuthService) buildUserSession(ctx context.Context, user *typesv2.User) (*aquariumv2.UserSession, error) {
+	logger := log.WithFunc("rpc", "AuthService.buildUserSession").With("user", user.Name)
 	now := time.Now()
 
 	// Get all available permissions for the user's roles
@@ -314,30 +315,30 @@ func (s *AuthService) buildUserSession(user *typesv2.User) (*aquariumv2.UserSess
 		return nil, fmt.Errorf("RBAC enforcer not available")
 	}
 
-	// Build permissions list
-	var permissions []*aquariumv2.UserPermission
+	// Build permissions list using actual role permissions from database
+	var permissions []*aquariumv2.Permission
 
-	// Get all defined services and methods
-	services := []string{
-		auth.ApplicationService,
-		auth.LabelService,
-		auth.NodeService,
-		auth.RoleService,
-		auth.UserService,
-	}
+	// Create a map to avoid duplicates
+	permissionMap := make(map[string]*aquariumv2.Permission)
 
-	for _, service := range services {
-		// Get all methods for this service
-		methods := s.getServiceMethods(service)
-		for _, method := range methods {
-			if enforcer.CheckPermission(user.Roles, service, method) {
-				permissions = append(permissions, &aquariumv2.UserPermission{
-					Resource:    service,
-					Action:      method,
-					Description: s.getPermissionDescription(service, method),
-				})
+	// Collect all permissions from user's roles
+	for _, roleName := range user.Roles {
+		role, err := s.fish.DB().RoleGet(ctx, roleName)
+		if err != nil {
+			logger.Warn("Unable to get role, skipping", "role", roleName)
+			continue
+		}
+		for _, perm := range role.Permissions {
+			key := fmt.Sprintf("%s.%s", perm.Resource, perm.Action)
+			if _, exists := permissionMap[key]; !exists {
+				permissionMap[key] = perm.ToPermission()
 			}
 		}
+	}
+
+	// Convert map to slice
+	for _, perm := range permissionMap {
+		permissions = append(permissions, perm)
 	}
 
 	return &aquariumv2.UserSession{
@@ -347,126 +348,6 @@ func (s *AuthService) buildUserSession(user *typesv2.User) (*aquariumv2.UserSess
 		CreatedAt:   timestamppb.New(now),
 		LastUsed:    timestamppb.New(now),
 	}, nil
-}
-
-// getServiceMethods returns all methods for a given service
-func (s *AuthService) getServiceMethods(service string) []string {
-	switch service {
-	case auth.ApplicationService:
-		return []string{
-			auth.ApplicationServiceCreate,
-			auth.ApplicationServiceDeallocate,
-			auth.ApplicationServiceGet,
-			auth.ApplicationServiceGetAll,
-			auth.ApplicationServiceGetResource,
-			auth.ApplicationServiceGetResourceAll,
-			auth.ApplicationServiceGetState,
-			auth.ApplicationServiceGetStateAll,
-			auth.ApplicationServiceGetTask,
-			auth.ApplicationServiceGetTaskAll,
-			auth.ApplicationServiceList,
-			auth.ApplicationServiceListAll,
-			auth.ApplicationServiceListTask,
-			auth.ApplicationServiceListTaskAll,
-			auth.ApplicationServiceCreateTask,
-			auth.ApplicationServiceCreateTaskAll,
-		}
-	case auth.LabelService:
-		return []string{
-			auth.LabelServiceCreate,
-			auth.LabelServiceDelete,
-			auth.LabelServiceGet,
-			auth.LabelServiceList,
-		}
-	case auth.NodeService:
-		return []string{
-			auth.NodeServiceGetThis,
-			auth.NodeServiceList,
-			auth.NodeServiceSetMaintenance,
-		}
-	case auth.RoleService:
-		return []string{
-			auth.RoleServiceCreate,
-			auth.RoleServiceDelete,
-			auth.RoleServiceGet,
-			auth.RoleServiceList,
-			auth.RoleServiceUpdate,
-		}
-	case auth.UserService:
-		return []string{
-			auth.UserServiceCreate,
-			auth.UserServiceDelete,
-			auth.UserServiceGet,
-			auth.UserServiceGetMe,
-			auth.UserServiceList,
-			auth.UserServiceUpdate,
-			auth.UserServiceUpdateAll,
-			auth.UserServiceUpdatePassword,
-			auth.UserServiceUpdateRoles,
-		}
-	}
-	return []string{}
-}
-
-// getPermissionDescription returns a human-readable description for a permission
-func (s *AuthService) getPermissionDescription(service, method string) string {
-	descriptions := map[string]map[string]string{
-		auth.ApplicationService: {
-			auth.ApplicationServiceCreate:         "Create new applications",
-			auth.ApplicationServiceDeallocate:     "Deallocate applications",
-			auth.ApplicationServiceGet:            "View own applications",
-			auth.ApplicationServiceGetAll:         "View all applications",
-			auth.ApplicationServiceGetResource:    "View own application resources",
-			auth.ApplicationServiceGetResourceAll: "View all application resources",
-			auth.ApplicationServiceGetState:       "View own application states",
-			auth.ApplicationServiceGetStateAll:    "View all application states",
-			auth.ApplicationServiceGetTask:        "View own application tasks",
-			auth.ApplicationServiceGetTaskAll:     "View all application tasks",
-			auth.ApplicationServiceList:           "List own applications",
-			auth.ApplicationServiceListAll:        "List all applications",
-			auth.ApplicationServiceListTask:       "List own application tasks",
-			auth.ApplicationServiceListTaskAll:    "List all application tasks",
-			auth.ApplicationServiceCreateTask:     "Create tasks on own applications",
-			auth.ApplicationServiceCreateTaskAll:  "Create tasks on all applications",
-		},
-		auth.LabelService: {
-			auth.LabelServiceCreate: "Create labels",
-			auth.LabelServiceDelete: "Delete labels",
-			auth.LabelServiceGet:    "View labels",
-			auth.LabelServiceList:   "List labels",
-		},
-		auth.NodeService: {
-			auth.NodeServiceGetThis:        "View current node information",
-			auth.NodeServiceList:           "List all nodes",
-			auth.NodeServiceSetMaintenance: "Set node maintenance mode",
-		},
-		auth.RoleService: {
-			auth.RoleServiceCreate: "Create roles",
-			auth.RoleServiceDelete: "Delete roles",
-			auth.RoleServiceGet:    "View roles",
-			auth.RoleServiceList:   "List roles",
-			auth.RoleServiceUpdate: "Update roles",
-		},
-		auth.UserService: {
-			auth.UserServiceCreate:         "Create users",
-			auth.UserServiceDelete:         "Delete users",
-			auth.UserServiceGet:            "View users",
-			auth.UserServiceGetMe:          "View own user information",
-			auth.UserServiceList:           "List users",
-			auth.UserServiceUpdate:         "Update users",
-			auth.UserServiceUpdateAll:      "Update all user properties",
-			auth.UserServiceUpdatePassword: "Update user passwords",
-			auth.UserServiceUpdateRoles:    "Update user roles",
-		},
-	}
-
-	if serviceDescs, exists := descriptions[service]; exists {
-		if desc, exists := serviceDescs[method]; exists {
-			return desc
-		}
-	}
-
-	return fmt.Sprintf("Access %s.%s", service, method)
 }
 
 // ParseJWTToken parses a JWT token and returns the claims
