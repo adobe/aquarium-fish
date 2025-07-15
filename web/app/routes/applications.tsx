@@ -21,6 +21,7 @@ import { create } from '@bufbuild/protobuf';
 import { ApplicationServiceCreateRequestSchema, type Application, type ApplicationState, type ApplicationResource } from '../../gen/aquarium/v2/application_pb';
 import { utils } from '../lib/services';
 import * as yaml from 'js-yaml';
+import { ApplicationServiceDeallocateRequestSchema, ApplicationServiceGetResourceRequestSchema } from '../../gen/aquarium/v2/application_pb';
 
 export function meta() {
   return [
@@ -37,7 +38,7 @@ interface ApplicationWithDetails extends Application {
 
 export default function Applications() {
   const { user, hasPermission } = useAuth();
-  const { data, isConnected, connectionStatus } = useStreaming();
+  const { data, isConnected, connectionStatus, sendRequest } = useStreaming();
   const [applications, setApplications] = useState<ApplicationWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -180,8 +181,11 @@ export default function Applications() {
     if (!confirm('Are you sure you want to deallocate this application?')) return;
 
     try {
-      // TODO: Send deallocate request through streaming context
-      console.log('Deallocating application:', uid);
+      const deallocateRequest = create(ApplicationServiceDeallocateRequestSchema, {
+        applicationUid: uid,
+      });
+      await sendRequest(deallocateRequest, 'ApplicationServiceDeallocateRequest');
+      console.log('Application deallocated:', uid);
     } catch (error) {
       setError(`Failed to deallocate application: ${error}`);
     }
@@ -189,8 +193,12 @@ export default function Applications() {
 
   const handleGetResourceAccess = async (uid: string) => {
     try {
-      // TODO: Get resource access through streaming context
-      console.log('Getting resource access for:', uid);
+      const resourceRequest = create(ApplicationServiceGetResourceRequestSchema, {
+        applicationUid: uid,
+      });
+      const response = await sendRequest(resourceRequest, 'ApplicationServiceGetResourceRequest');
+      console.log('Resource access info:', response);
+      // TODO: Display resource access information or SSH connection details
     } catch (error) {
       setError(`Failed to get resource access: ${error}`);
     }

@@ -31,7 +31,7 @@ import {
 } from '../../gen/aquarium/v2/streaming_pb';
 import {
   ApplicationService,
-  type ApplicationServiceListRequest,
+  ApplicationServiceListRequestSchema,
   type ApplicationServiceListResponse,
   type Application,
   type ApplicationState,
@@ -40,25 +40,25 @@ import {
 } from '../../gen/aquarium/v2/application_pb';
 import {
   LabelService,
-  type LabelServiceListRequest,
+  LabelServiceListRequestSchema,
   type LabelServiceListResponse,
   type Label,
 } from '../../gen/aquarium/v2/label_pb';
 import {
   NodeService,
-  type NodeServiceListRequest,
+  NodeServiceListRequestSchema,
   type NodeServiceListResponse,
   type Node,
 } from '../../gen/aquarium/v2/node_pb';
 import {
   UserService,
-  type UserServiceListRequest,
+  UserServiceListRequestSchema,
   type UserServiceListResponse,
   type User,
 } from '../../gen/aquarium/v2/user_pb';
 import {
   RoleService,
-  type RoleServiceListRequest,
+  RoleServiceListRequestSchema,
   type RoleServiceListResponse,
   type Role,
 } from '../../gen/aquarium/v2/role_pb';
@@ -146,8 +146,11 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
   const connectStreamRef = useRef<AsyncIterable<StreamingServiceConnectResponse> | null>(null);
   const subscribeStreamRef = useRef<AsyncIterable<StreamingServiceSubscribeResponse> | null>(null);
   const callbacksRef = useRef<Set<DataUpdateCallback>>(new Set());
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeoutRef = useRef<number | null>(null);
   const isReconnectingRef = useRef(false);
+  const pendingRequestsRef = useRef<Map<string, { resolve: (value: any) => void; reject: (reason?: any) => void }>>(new Map());
+  const requestQueueRef = useRef<StreamingServiceConnectRequest[]>([]);
+  const connectWriterRef = useRef<WritableStream<StreamingServiceConnectRequest> | null>(null);
 
   // Subscribe to data updates
   const subscribe = useCallback((callback: DataUpdateCallback) => {
@@ -171,11 +174,11 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
 
     try {
       const [appsRes, labelsRes, nodesRes, usersRes, rolesRes] = await Promise.all([
-        applicationClient.list(create(ApplicationServiceListRequest.schema)),
-        labelClient.list(create(LabelServiceListRequest.schema)),
-        nodeClient.list(create(NodeServiceListRequest.schema)),
-        userClient.list(create(UserServiceListRequest.schema)),
-        roleClient.list(create(RoleServiceListRequest.schema)),
+        applicationClient.list(create(ApplicationServiceListRequestSchema)),
+        labelClient.list(create(LabelServiceListRequestSchema)),
+        nodeClient.list(create(NodeServiceListRequestSchema)),
+        userClient.list(create(UserServiceListRequestSchema)),
+        roleClient.list(create(RoleServiceListRequestSchema)),
       ]);
 
       const newData = {
@@ -204,16 +207,16 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
 
       try {
         switch (response.objectType) {
-          case SubscriptionType.SUBSCRIPTION_TYPE_APPLICATION: {
-            const app = response.objectData?.value as Application;
+          case SubscriptionType.APPLICATION: {
+            const app = response.objectData?.value as unknown as Application;
             if (app) {
               switch (response.changeType) {
-                case ChangeType.CHANGE_TYPE_CREATED:
-                case ChangeType.CHANGE_TYPE_UPDATED:
+                case ChangeType.CREATED:
+                case ChangeType.UPDATED:
                   newData.applications = newData.applications.filter(a => a.uid !== app.uid);
                   newData.applications.push(app);
                   break;
-                case ChangeType.CHANGE_TYPE_DELETED:
+                case ChangeType.REMOVED:
                   newData.applications = newData.applications.filter(a => a.uid !== app.uid);
                   break;
               }
@@ -221,15 +224,15 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
             break;
           }
 
-          case SubscriptionType.SUBSCRIPTION_TYPE_APPLICATION_STATE: {
-            const state = response.objectData?.value as ApplicationState;
+          case SubscriptionType.APPLICATION_STATE: {
+            const state = response.objectData?.value as unknown as ApplicationState;
             if (state) {
               switch (response.changeType) {
-                case ChangeType.CHANGE_TYPE_CREATED:
-                case ChangeType.CHANGE_TYPE_UPDATED:
+                case ChangeType.CREATED:
+                case ChangeType.UPDATED:
                   newData.applicationStates.set(state.applicationUid, state);
                   break;
-                case ChangeType.CHANGE_TYPE_DELETED:
+                case ChangeType.REMOVED:
                   newData.applicationStates.delete(state.applicationUid);
                   break;
               }
@@ -237,15 +240,15 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
             break;
           }
 
-          case SubscriptionType.SUBSCRIPTION_TYPE_APPLICATION_RESOURCE: {
-            const resource = response.objectData?.value as ApplicationResource;
+          case SubscriptionType.APPLICATION_RESOURCE: {
+            const resource = response.objectData?.value as unknown as ApplicationResource;
             if (resource) {
               switch (response.changeType) {
-                case ChangeType.CHANGE_TYPE_CREATED:
-                case ChangeType.CHANGE_TYPE_UPDATED:
+                case ChangeType.CREATED:
+                case ChangeType.UPDATED:
                   newData.applicationResources.set(resource.applicationUid, resource);
                   break;
-                case ChangeType.CHANGE_TYPE_DELETED:
+                case ChangeType.REMOVED:
                   newData.applicationResources.delete(resource.applicationUid);
                   break;
               }
@@ -253,16 +256,16 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
             break;
           }
 
-          case SubscriptionType.SUBSCRIPTION_TYPE_LABEL: {
-            const label = response.objectData?.value as Label;
+          case SubscriptionType.LABEL: {
+            const label = response.objectData?.value as unknown as Label;
             if (label) {
               switch (response.changeType) {
-                case ChangeType.CHANGE_TYPE_CREATED:
-                case ChangeType.CHANGE_TYPE_UPDATED:
+                case ChangeType.CREATED:
+                case ChangeType.UPDATED:
                   newData.labels = newData.labels.filter(l => l.uid !== label.uid);
                   newData.labels.push(label);
                   break;
-                case ChangeType.CHANGE_TYPE_DELETED:
+                case ChangeType.REMOVED:
                   newData.labels = newData.labels.filter(l => l.uid !== label.uid);
                   break;
               }
@@ -270,16 +273,16 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
             break;
           }
 
-          case SubscriptionType.SUBSCRIPTION_TYPE_NODE: {
-            const node = response.objectData?.value as Node;
+          case SubscriptionType.NODE: {
+            const node = response.objectData?.value as unknown as Node;
             if (node) {
               switch (response.changeType) {
-                case ChangeType.CHANGE_TYPE_CREATED:
-                case ChangeType.CHANGE_TYPE_UPDATED:
+                case ChangeType.CREATED:
+                case ChangeType.UPDATED:
                   newData.nodes = newData.nodes.filter(n => n.uid !== node.uid);
                   newData.nodes.push(node);
                   break;
-                case ChangeType.CHANGE_TYPE_DELETED:
+                case ChangeType.REMOVED:
                   newData.nodes = newData.nodes.filter(n => n.uid !== node.uid);
                   break;
               }
@@ -287,16 +290,16 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
             break;
           }
 
-          case SubscriptionType.SUBSCRIPTION_TYPE_USER: {
-            const user = response.objectData?.value as User;
+          case SubscriptionType.USER: {
+            const user = response.objectData?.value as unknown as User;
             if (user) {
               switch (response.changeType) {
-                case ChangeType.CHANGE_TYPE_CREATED:
-                case ChangeType.CHANGE_TYPE_UPDATED:
+                case ChangeType.CREATED:
+                case ChangeType.UPDATED:
                   newData.users = newData.users.filter(u => u.name !== user.name);
                   newData.users.push(user);
                   break;
-                case ChangeType.CHANGE_TYPE_DELETED:
+                case ChangeType.REMOVED:
                   newData.users = newData.users.filter(u => u.name !== user.name);
                   break;
               }
@@ -304,16 +307,16 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
             break;
           }
 
-          case SubscriptionType.SUBSCRIPTION_TYPE_ROLE: {
-            const role = response.objectData?.value as Role;
+          case SubscriptionType.ROLE: {
+            const role = response.objectData?.value as unknown as Role;
             if (role) {
               switch (response.changeType) {
-                case ChangeType.CHANGE_TYPE_CREATED:
-                case ChangeType.CHANGE_TYPE_UPDATED:
+                case ChangeType.CREATED:
+                case ChangeType.UPDATED:
                   newData.roles = newData.roles.filter(r => r.name !== role.name);
                   newData.roles.push(role);
                   break;
-                case ChangeType.CHANGE_TYPE_DELETED:
+                case ChangeType.REMOVED:
                   newData.roles = newData.roles.filter(r => r.name !== role.name);
                   break;
               }
@@ -330,22 +333,49 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
     });
   }, [notifySubscribers]);
 
+  // Handle Connect stream responses
+  const handleConnectResponse = useCallback((response: StreamingServiceConnectResponse) => {
+    const { requestId, error: streamError, responseData } = response;
+
+    const pendingRequest = pendingRequestsRef.current.get(requestId);
+    if (pendingRequest) {
+      pendingRequestsRef.current.delete(requestId);
+
+      if (streamError) {
+        pendingRequest.reject(new Error(`Stream error: ${streamError.message}`));
+      } else {
+        pendingRequest.resolve(responseData);
+      }
+    }
+  }, []);
+
   // Send request through Connect stream
   const sendRequest = useCallback(async (request: any, requestType: string): Promise<any> => {
-    if (!connectStreamRef.current) {
-      throw new Error('Connect stream not available');
+    // For now, fall back to direct service calls until bidirectional streaming is fully implemented
+    // This is a temporary solution to make the UI functional
+    console.log('Sending request through direct service call:', requestType);
+
+    try {
+      switch (requestType) {
+        case 'ApplicationServiceCreateRequest':
+          return await applicationClient.create(request);
+        case 'ApplicationServiceDeallocateRequest':
+          return await applicationClient.deallocate(request);
+        case 'LabelServiceCreateRequest':
+          return await labelClient.create(request);
+        case 'LabelServiceRemoveRequest':
+          return await labelClient.remove(request);
+        case 'UserServiceCreateRequest':
+          return await userClient.create(request);
+        case 'UserServiceUpdateRequest':
+          return await userClient.update(request);
+        default:
+          throw new Error(`Unsupported request type: ${requestType}`);
+      }
+    } catch (err) {
+      console.error('Request failed:', err);
+      throw err;
     }
-
-    const requestId = crypto.randomUUID();
-    const connectRequest = create(StreamingServiceConnectRequestSchema, {
-      requestId,
-      requestType,
-      requestData: { value: request },
-    });
-
-    // TODO: Implement bidirectional streaming request/response handling
-    // For now, return a placeholder
-    return Promise.resolve({});
   }, []);
 
   // Connect to streaming
@@ -356,17 +386,17 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
       setConnectionStatus('connecting');
       setError(null);
 
-      // Create subscription request
+      // Create subscription reques
       const subscribeRequest = create(StreamingServiceSubscribeRequestSchema, {
         subscriptionTypes: [
-          SubscriptionType.SUBSCRIPTION_TYPE_APPLICATION,
-          SubscriptionType.SUBSCRIPTION_TYPE_APPLICATION_STATE,
-          SubscriptionType.SUBSCRIPTION_TYPE_APPLICATION_RESOURCE,
-          SubscriptionType.SUBSCRIPTION_TYPE_APPLICATION_TASK,
-          SubscriptionType.SUBSCRIPTION_TYPE_LABEL,
-          SubscriptionType.SUBSCRIPTION_TYPE_NODE,
-          SubscriptionType.SUBSCRIPTION_TYPE_USER,
-          SubscriptionType.SUBSCRIPTION_TYPE_ROLE,
+          SubscriptionType.APPLICATION,
+          SubscriptionType.APPLICATION_STATE,
+          SubscriptionType.APPLICATION_RESOURCE,
+          SubscriptionType.APPLICATION_TASK,
+          SubscriptionType.LABEL,
+          SubscriptionType.NODE,
+          SubscriptionType.USER,
+          SubscriptionType.ROLE,
         ],
       });
 
@@ -390,7 +420,7 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
       // Schedule reconnection
       if (!isReconnectingRef.current) {
         isReconnectingRef.current = true;
-        reconnectTimeoutRef.current = setTimeout(() => {
+        reconnectTimeoutRef.current = window.setTimeout(() => {
           isReconnectingRef.current = false;
           connect();
         }, 5000);
@@ -407,7 +437,15 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
 
     connectStreamRef.current = null;
     subscribeStreamRef.current = null;
+    connectWriterRef.current = null;
     isReconnectingRef.current = false;
+
+    // Reject all pending requests
+    pendingRequestsRef.current.forEach(({ reject }) => {
+      reject(new Error('Connection closed'));
+    });
+    pendingRequestsRef.current.clear();
+    requestQueueRef.current = [];
 
     setIsConnected(false);
     setConnectionStatus('disconnected');

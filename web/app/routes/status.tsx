@@ -35,6 +35,10 @@ export default function Status() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
+  const [showShutdownModal, setShowShutdownModal] = useState(false);
+  const [shutdownDelay, setShutdownDelay] = useState('1m');
+  const [maintenanceLoading, setMaintenanceLoading] = useState(false);
 
   const fetchNodes = async () => {
     try {
@@ -81,6 +85,32 @@ export default function Status() {
     return date.toLocaleString();
   };
 
+  const handleMaintenanceToggle = async (enable: boolean) => {
+    try {
+      setMaintenanceLoading(true);
+      await nodeServiceHelpers.setMaintenance(enable);
+      setShowMaintenanceModal(false);
+      await fetchNodes(); // Refresh data
+    } catch (err) {
+      setError(`Failed to ${enable ? 'enable' : 'disable'} maintenance mode: ${err}`);
+    } finally {
+      setMaintenanceLoading(false);
+    }
+  };
+
+  const handleShutdown = async () => {
+    try {
+      setMaintenanceLoading(true);
+      await nodeServiceHelpers.setMaintenance(undefined, true, shutdownDelay);
+      setShowShutdownModal(false);
+      await fetchNodes(); // Refresh data
+    } catch (err) {
+      setError(`Failed to initiate shutdown: ${err}`);
+    } finally {
+      setMaintenanceLoading(false);
+    }
+  };
+
   const canListNodes = hasPermission('NodeService', 'List');
   const canGetThisNode = hasPermission('NodeService', 'GetThis');
   const canSetMaintenance = hasPermission('NodeService', 'SetMaintenance');
@@ -107,13 +137,35 @@ export default function Status() {
       <DashboardLayout>
         <div className="space-y-6">
           {/* Header */}
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-              Node Status
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Monitor node health and system information
-            </p>
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+                Node Status
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400">
+                View system information and node status
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              {canSetMaintenance && (
+                <>
+                  <button
+                    onClick={() => setShowMaintenanceModal(true)}
+                    disabled={maintenanceLoading}
+                    className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 disabled:opacity-50"
+                  >
+                    {maintenanceLoading ? 'Loading...' : 'Maintenance Mode'}
+                  </button>
+                  <button
+                    onClick={() => setShowShutdownModal(true)}
+                    disabled={maintenanceLoading}
+                    className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {maintenanceLoading ? 'Loading...' : 'Shutdown Node'}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Error */}
@@ -490,6 +542,86 @@ export default function Status() {
                     )}
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Maintenance Mode Modal */}
+        {showMaintenanceModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+              <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+                Maintenance Mode
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                Choose whether to enable or disable maintenance mode for this node.
+              </p>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowMaintenanceModal(false)}
+                  className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleMaintenanceToggle(false)}
+                  disabled={maintenanceLoading}
+                  className="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                >
+                  Disable
+                </button>
+                <button
+                  onClick={() => handleMaintenanceToggle(true)}
+                  disabled={maintenanceLoading}
+                  className="px-4 py-2 text-sm bg-yellow-600 text-white rounded-md hover:bg-yellow-700 disabled:opacity-50"
+                >
+                  Enable
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Shutdown Modal */}
+        {showShutdownModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+              <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+                Shutdown Node
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                This will put the node in maintenance mode and then shut it down after the specified delay.
+              </p>
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Shutdown Delay
+                </label>
+                <input
+                  type="text"
+                  value={shutdownDelay}
+                  onChange={(e) => setShutdownDelay(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  placeholder="1m"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Format: 1h30m (hours, minutes, seconds)
+                </p>
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowShutdownModal(false)}
+                  className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleShutdown}
+                  disabled={maintenanceLoading}
+                  className="px-4 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+                >
+                  Shutdown
+                </button>
               </div>
             </div>
           </div>

@@ -16,7 +16,10 @@ import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../components/DashboardLayout';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
+import { useStreaming } from '../contexts/StreamingContext';
 import { labelServiceHelpers, userServiceHelpers, roleServiceHelpers } from '../lib/services';
+import { create } from '@bufbuild/protobuf';
+import { LabelServiceCreateRequestSchema } from '../../gen/aquarium/v2/label_pb';
 import type { Label } from '../../gen/aquarium/v2/label_pb';
 import type { User } from '../../gen/aquarium/v2/user_pb';
 import type { Role } from '../../gen/aquarium/v2/role_pb';
@@ -31,6 +34,7 @@ export function meta() {
 
 export default function Manage() {
   const { user, hasPermission } = useAuth();
+  const { sendRequest } = useStreaming();
   const [activeTab, setActiveTab] = useState<'labels' | 'users'>('labels');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +68,7 @@ export default function Manage() {
       setError(null);
       setLoading(true);
 
-      const promises = [];
+      const promises: Promise<any>[] = [];
 
       if (hasPermission('LabelService', 'List')) {
         promises.push(labelServiceHelpers.list());
@@ -111,7 +115,7 @@ export default function Manage() {
     return date.toLocaleString();
   };
 
-    // Label operations
+  // Label operations
   const handleCreateLabel = async () => {
     try {
       setLabelYamlError(null);
@@ -130,23 +134,28 @@ export default function Manage() {
         throw new Error('Label definitions are required');
       }
 
-      // Create label object (simplified to avoid protobuf issues)
-      const labelObj = {
-        uid: crypto.randomUUID(),
-        name: labelData.name,
-        version: labelData.version,
-        definitions: labelData.definitions,
-        metadata: labelData.metadata || {},
-      };
+      // Create label request using streaming
+      const labelRequest = create(LabelServiceCreateRequestSchema, {
+        label: {
+          uid: crypto.randomUUID(),
+          name: labelData.name,
+          version: labelData.version,
+          definitions: labelData.definitions,
+          metadata: labelData.metadata || {},
+        },
+      });
 
-      console.log('Creating label:', labelObj);
-      // TODO: Fix service call when protobuf issues are resolved
-      // await labelServiceHelpers.create(labelObj);
+      console.log('Creating label:', labelRequest);
+      await sendRequest(labelRequest, 'LabelServiceCreateRequest');
       await fetchData(); // Refresh data
       setShowCreateLabelModal(false);
       setLabelYaml('');
     } catch (error) {
-      setLabelYamlError(`Failed to create label: ${error}`);
+      if (error instanceof yaml.YAMLException) {
+        setLabelYamlError(`YAML parsing error: ${error.message}`);
+      } else {
+        setLabelYamlError(`Failed to create label: ${error}`);
+      }
     }
   };
 
@@ -180,7 +189,7 @@ export default function Manage() {
         roles: userForm.roles,
       };
 
-      await userServiceHelpers.create(userObj);
+      await userServiceHelpers.create(userObj as any);
       await fetchData(); // Refresh data
       setShowCreateUserModal(false);
       setUserForm({ name: '', password: '', roles: [] });
