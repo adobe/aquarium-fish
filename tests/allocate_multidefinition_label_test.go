@@ -53,7 +53,7 @@ drivers:
 	}()
 
 	// Create admin client
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA())
 
 	// Create service clients
 	labelClient := aquariumv2connect.NewLabelServiceClient(

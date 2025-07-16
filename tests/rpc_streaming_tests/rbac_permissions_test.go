@@ -62,9 +62,9 @@ drivers:
 	}
 
 	// Create clients for different users
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientGRPC)
-	regularCli, regularOpts := h.NewRPCClient(regularUser.Name, regularUserPass, h.RPCClientGRPC)
-	powerCli, powerOpts := h.NewRPCClient(powerUser.Name, powerUserPass, h.RPCClientGRPC)
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientGRPC, afi.GetCA())
+	regularCli, regularOpts := h.NewRPCClient(regularUser.Name, regularUserPass, h.RPCClientGRPC, afi.GetCA())
+	powerCli, powerOpts := h.NewRPCClient(powerUser.Name, powerUserPass, h.RPCClientGRPC, afi.GetCA())
 
 	// Create streaming service clients
 	adminStreamingClient := aquariumv2connect.NewStreamingServiceClient(

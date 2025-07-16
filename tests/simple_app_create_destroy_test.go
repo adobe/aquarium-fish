@@ -56,12 +56,12 @@ drivers:
 	cli := &http.Client{
 		Timeout: time.Second * 5,
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			TLSClientConfig: &tls.Config{RootCAs: afi.GetCA(t)},
 		},
 	}
 
 	// Create admin client
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA())
 
 	// Create service clients
 	labelClient := aquariumv2connect.NewLabelServiceClient(

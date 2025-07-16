@@ -17,6 +17,7 @@ package helper
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"net/http"
 	"time"
@@ -45,23 +46,22 @@ func basicAuth(username, password string) string {
 
 // NewRPCClient creates a new HTTP client and returns it along with the appropriate connect options
 // for the specified client type and authentication credentials.
-func NewRPCClient(username, password string, clientType RPCClientType) (*http.Client, []connect.ClientOption) {
+func NewRPCClient(username, password string, clientType RPCClientType, caPool *x509.CertPool) (*http.Client, []connect.ClientOption, afi.GetCA()) {
 	var cli *http.Client
 
 	// For gRPC client type, we need HTTP/2 support for bidirectional streaming
 	if clientType == RPCClientGRPC {
-		// Create TLS config for HTTP/2 support
-		tlsConfig := &tls.Config{
-			InsecureSkipVerify: true,                       //nolint:gosec // G402 - used in tests, so not big deal
-			NextProtos:         []string{"h2", "http/1.1"}, // Prefer HTTP/2
-		}
-
 		// Create HTTP/2 transport over TLS with streaming-friendly settings
 		tr := &http2.Transport{
-			TLSClientConfig: tlsConfig,
+			TLSClientConfig: &tls.Config{
+				NextProtos: []string{"h2", "http/1.1"}, // Prefer HTTP/2
+			},
 			// Streaming-friendly HTTP/2 settings
 			ReadIdleTimeout: 300 * time.Second, // 5 minutes for streaming read idle
 			PingTimeout:     30 * time.Second,  // Keep connection alive with pings
+		}
+		if caPool != nil {
+			tr.TLSClientConfig.RootCAs = caPool,
 		}
 
 		cli = &http.Client{

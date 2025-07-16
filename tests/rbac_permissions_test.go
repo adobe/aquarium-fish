@@ -62,9 +62,9 @@ drivers:
 	}
 
 	// Create clients for different users
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
-	regularCli, regularOpts := h.NewRPCClient(regularUser.Name, regularUserPass, h.RPCClientREST)
-	powerCli, powerOpts := h.NewRPCClient(powerUser.Name, powerUserPass, h.RPCClientREST)
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA())
+	regularCli, regularOpts := h.NewRPCClient(regularUser.Name, regularUserPass, h.RPCClientREST, afi.GetCA())
+	powerCli, powerOpts := h.NewRPCClient(powerUser.Name, powerUserPass, h.RPCClientREST, afi.GetCA())
 
 	// Create service clients for admin
 	adminUserClient := aquariumv2connect.NewUserServiceClient(

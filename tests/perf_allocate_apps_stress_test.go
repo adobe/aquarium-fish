@@ -58,7 +58,7 @@ drivers:
 	}()
 
 	// Create admin client
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA())
 
 	// Create service clients
 	labelClient := aquariumv2connect.NewLabelServiceClient(
@@ -103,7 +103,7 @@ drivers:
 			defer wg.Done()
 
 			// Create individual client for each goroutine
-			cli, opts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+			cli, opts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA())
 			appClient := aquariumv2connect.NewApplicationServiceClient(
 				cli,
 				afi.APIAddress("grpc"),
@@ -162,7 +162,7 @@ drivers:
 	}()
 
 	// Create admin client (no auth)
-	adminCli, adminOpts := h.NewRPCClient("admin", "notoken", h.RPCClientREST)
+	adminCli, adminOpts := h.NewRPCClient("admin", "notoken", h.RPCClientREST, afi.GetCA())
 
 	// Create service clients
 	labelClient := aquariumv2connect.NewLabelServiceClient(
@@ -210,7 +210,7 @@ drivers:
 				defer wg.Done()
 
 				// Create individual client for each goroutine (no auth)
-				cli, opts := h.NewRPCClient("admin", "notoken", h.RPCClientREST)
+				cli, opts := h.NewRPCClient("admin", "notoken", h.RPCClientREST, afi.GetCA())
 				appClient := aquariumv2connect.NewApplicationServiceClient(
 					cli,
 					afi.APIAddress("grpc"),

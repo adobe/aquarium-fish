@@ -43,12 +43,11 @@ drivers:
 	})
 
 	// Create HTTP client with custom transport to skip TLS verification
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // Test environment
-	}
 	client := &http.Client{
-		Transport: tr,
 		Timeout:   10 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{RootCAs: afi.GetCA(t)},
+		},
 	}
 
 	// Get the API address

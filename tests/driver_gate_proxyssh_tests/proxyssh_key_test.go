@@ -84,7 +84,7 @@ drivers:
 	}()
 
 	// Create admin client
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA())
 
 	// Create service clients
 	labelClient := aquariumv2connect.NewLabelServiceClient(
@@ -328,7 +328,7 @@ drivers:
 	}()
 
 	// Create admin client
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA())
 
 	// Create service clients
 	labelClient := aquariumv2connect.NewLabelServiceClient(
@@ -675,7 +675,7 @@ drivers:
 	}()
 
 	// Create admin client
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA())
 
 	// Create service clients
 	labelClient := aquariumv2connect.NewLabelServiceClient(
@@ -1013,16 +1013,15 @@ drivers:
 	}()
 
 	// Still need HTTPS client to test the port proxy working correctly
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
 	cli := &http.Client{
 		Timeout:   time.Second * 5,
-		Transport: tr,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{RootCAs: afi.GetCA(t)},
+		},
 	}
 
 	// Create admin client
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA())
 
 	// Create service clients
 	labelClient := aquariumv2connect.NewLabelServiceClient(

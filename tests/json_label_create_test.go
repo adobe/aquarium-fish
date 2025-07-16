@@ -53,12 +53,11 @@ drivers:
 		}
 	}()
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
 	cli := &http.Client{
 		Timeout:   time.Second * 5,
-		Transport: tr,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{RootCAs: afi.GetCA(t)},
+		},
 	}
 
 	var labelResp aquariumv2.LabelServiceCreateResponse
