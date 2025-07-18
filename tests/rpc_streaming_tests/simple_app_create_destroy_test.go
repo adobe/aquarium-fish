@@ -52,7 +52,7 @@ drivers:
 	})
 
 	// Create admin client
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientGRPC, afi.GetCA())
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientGRPC, afi.GetCA(t))
 
 	// Create streaming service client
 	streamingClient := aquariumv2connect.NewStreamingServiceClient(

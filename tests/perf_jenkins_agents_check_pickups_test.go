@@ -61,7 +61,7 @@ drivers:
 	}()
 
 	// Create admin client
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA())
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
 
 	// Create service clients
 	labelClient := aquariumv2connect.NewLabelServiceClient(
@@ -165,7 +165,7 @@ drivers:
 	// Running periodic requests to test what's the delay will be
 	workerFunc := func(t *testing.T, afi *h.AFInstance) {
 		// Create individual client for each goroutine
-		cli, opts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA())
+		cli, opts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
 		appClient := aquariumv2connect.NewApplicationServiceClient(
 			cli,
 			afi.APIAddress("grpc"),

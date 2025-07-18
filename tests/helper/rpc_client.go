@@ -46,7 +46,7 @@ func basicAuth(username, password string) string {
 
 // NewRPCClient creates a new HTTP client and returns it along with the appropriate connect options
 // for the specified client type and authentication credentials.
-func NewRPCClient(username, password string, clientType RPCClientType, caPool *x509.CertPool) (*http.Client, []connect.ClientOption, afi.GetCA()) {
+func NewRPCClient(username, password string, clientType RPCClientType, caPool *x509.CertPool) (*http.Client, []connect.ClientOption) {
 	var cli *http.Client
 
 	// For gRPC client type, we need HTTP/2 support for bidirectional streaming
@@ -61,7 +61,7 @@ func NewRPCClient(username, password string, clientType RPCClientType, caPool *x
 			PingTimeout:     30 * time.Second,  // Keep connection alive with pings
 		}
 		if caPool != nil {
-			tr.TLSClientConfig.RootCAs = caPool,
+			tr.TLSClientConfig.RootCAs = caPool
 		}
 
 		cli = &http.Client{

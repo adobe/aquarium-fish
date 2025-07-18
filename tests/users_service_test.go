@@ -47,7 +47,7 @@ drivers:
 	})
 
 	// Create admin client
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA())
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
 	adminUserClient := aquariumv2connect.NewUserServiceClient(
 		adminCli,
 		afi.APIAddress("grpc"),

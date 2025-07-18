@@ -64,7 +64,7 @@ drivers:
 	})
 
 	// Create admin client
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA())
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
 
 	// Create service clients
 	labelClient := aquariumv2connect.NewLabelServiceClient(
@@ -97,7 +97,7 @@ drivers:
 		labelUID = resp.Msg.Data.Uid
 	})
 
-	workerCli, workerOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA())
+	workerCli, workerOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
 
 	var completed int32 // Use atomic int32: 0=false, 1=true
 	workerFunc := func(t *testing.T, wg *sync.WaitGroup, id int) {

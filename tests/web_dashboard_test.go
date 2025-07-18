@@ -44,7 +44,7 @@ drivers:
 
 	// Create HTTP client with custom transport to skip TLS verification
 	client := &http.Client{
-		Timeout:   10 * time.Second,
+		Timeout: 10 * time.Second,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{RootCAs: afi.GetCA(t)},
 		},

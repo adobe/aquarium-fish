@@ -54,7 +54,7 @@ drivers:
 	}()
 
 	cli := &http.Client{
-		Timeout:   time.Second * 5,
+		Timeout: time.Second * 5,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{RootCAs: afi.GetCA(t)},
 		},
