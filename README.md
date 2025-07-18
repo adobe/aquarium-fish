@@ -320,6 +320,17 @@ The integration tests needs aquarium-fish* binary, so prior to execution please 
    ```sh
    $ FISH_MONITORING=localhost go test -json -v -parallel 1 -count=1 -skip '_stress$' -race ./tests/...
    ```
+   ```
+
+#### Docker & WEB UI testing
+
+There are a couple of helpers to run specific tests:
+* Mac->Lin build & integration tests runner: `./scripts/test-docker.sh`
+* Web UI integration tests runner: `./scripts/webtest-docker.sh`
+
+Both of them will build the linux binary for testing and you can disable that by `NOBUILD=1` env var,
+also any argument given to those scripts will be passed to go test. By default the scripts will use
+`./tests/...` and `./webtests/...` respectively.
 
 ### Benchmarks
 

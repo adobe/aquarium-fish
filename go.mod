@@ -26,6 +26,7 @@ require (
 	github.com/hpcloud/tail v1.0.0
 	github.com/mostlygeek/arp v0.0.0-20170424181311-541a2129847a
 	github.com/pkg/sftp v1.13.7
+	github.com/playwright-community/playwright-go v0.5200.0
 	github.com/shirou/gopsutil/v4 v4.25.1
 	github.com/spf13/cobra v1.8.0
 	github.com/steinfletcher/apitest v1.5.15
@@ -65,11 +66,14 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.2 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+	github.com/deckarep/golang-set/v2 v2.8.0 // indirect
 	github.com/ebitengine/purego v0.8.2 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
+	github.com/go-jose/go-jose/v3 v3.0.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
+	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/gofrs/flock v0.8.1 // indirect
 	github.com/google/go-github/v69 v69.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect

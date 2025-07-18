@@ -18,6 +18,7 @@ import { createClient } from '@connectrpc/connect';
 import { createGrpcWebTransport } from '@connectrpc/connect-web';
 import { create } from '@bufbuild/protobuf';
 import { useAuth } from './AuthContext';
+import { tokenStorage } from '../lib/auth';
 import {
   StreamingService,
   StreamingServiceConnectRequestSchema,
@@ -69,8 +70,8 @@ const transport = createGrpcWebTransport({
   interceptors: [
     (next) => async (req) => {
       // Add auth header if available
-      const tokens = JSON.parse(localStorage.getItem('auth_tokens') || '{}');
-      if (tokens.accessToken) {
+      const tokens = tokenStorage.getTokens();
+      if (tokens && tokens.accessToken) {
         req.header.set('authorization', `Bearer ${tokens.accessToken}`);
       }
       return next(req);

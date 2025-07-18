@@ -31,6 +31,8 @@ type Config struct {
 
 	IsRemote bool `json:"is_remote"` // In case the docker client does not use the local node resources
 
+	IgnoreNonControlled bool `json:"ignore_non_controlled"` // If you want to allow non-controlled docker containers to be running
+
 	ImagesPath    string `json:"images_path"`    // Where to look/store docker file images
 	WorkspacePath string `json:"workspace_path"` // Where to place the disks
 

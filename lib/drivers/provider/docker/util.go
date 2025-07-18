@@ -31,6 +31,7 @@ import (
 )
 
 func (d *Driver) getContainersResources(containerIDs []string) (*typesv2.Resources, error) {
+	logger := log.WithFunc("docker", "Driver.getContainersResources").With("provider.name", d.name)
 	out := &typesv2.Resources{}
 
 	// Getting current running containers info - will return "<ncpu>,<mem_bytes>\n..." for each one
@@ -56,11 +57,15 @@ func (d *Driver) getContainersResources(containerIDs []string) (*typesv2.Resourc
 			return out, fmt.Errorf("DOCKER: %s: Unable to parse RAM uint: %v (%q)", d.name, err, cpuMem[1])
 		}
 		if resCPU == 0 || resRAM == 0 {
-			return out, fmt.Errorf("DOCKER: %s: The container is non-Fish controlled zero-cpu/ram ones: %q", d.name, containerIDs)
+			if !d.cfg.IgnoreNonControlled {
+				return out, fmt.Errorf("DOCKER: %s: The container is non-Fish controlled zero-cpu/ram ones: %q", d.name, containerIDs)
+			}
+			logger.Warn("Found non-Fish controlled container", "containers", containerIDs)
+		} else {
+			out.Cpu += uint32(resCPU / 1000000000) // Converting from NanoCPU
+			out.Ram += uint32(resRAM / 1073741824) // Get in GB
+			// TODO: Add disks too here
 		}
-		out.Cpu += uint32(resCPU / 1000000000) // Converting from NanoCPU
-		out.Ram += uint32(resRAM / 1073741824) // Get in GB
-		// TODO: Add disks too here
 	}
 
 	return out, nil
