@@ -51,6 +51,27 @@ func (s *NodeService) List(ctx context.Context, _ /*req*/ *connect.Request[aquar
 	}), nil
 }
 
+// Get returns information about any node
+func (s *NodeService) Get(ctx context.Context, req *connect.Request[aquariumv2.NodeServiceGetRequest]) (*connect.Response[aquariumv2.NodeServiceGetResponse], error) {
+	if req.Msg.GetNodeName() == "" {
+		return connect.NewResponse(&aquariumv2.NodeServiceGetResponse{
+			Status: false, Message: "Node not found",
+		}), connect.NewError(connect.CodeNotFound, nil)
+	}
+
+	node, err := s.fish.DB().NodeGet(ctx, req.Msg.GetNodeName())
+	if err != nil {
+		return connect.NewResponse(&aquariumv2.NodeServiceGetResponse{
+			Status: false, Message: "Node not found",
+		}), connect.NewError(connect.CodeNotFound, err)
+	}
+
+	return connect.NewResponse(&aquariumv2.NodeServiceGetResponse{
+		Status: true, Message: "Node retrieved successfully",
+		Data: node.ToNode(),
+	}), nil
+}
+
 // GetThis returns information about this node
 func (s *NodeService) GetThis(_ /*ctx*/ context.Context, _ /*req*/ *connect.Request[aquariumv2.NodeServiceGetThisRequest]) (*connect.Response[aquariumv2.NodeServiceGetThisResponse], error) {
 	node := s.fish.DB().GetNode()

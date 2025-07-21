@@ -23,7 +23,16 @@ import (
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
-// Reflection of RPC LabelServiceListRequest to pass to database function LabelList
+func (d *Database) subscribeLabelImpl(_ context.Context, ch chan LabelSubscriptionEvent) {
+	subscribeHelper(d, &d.subsLabel, ch)
+}
+
+// unsubscribeLabelImpl removes a channel from the subscription list
+func (d *Database) unsubscribeLabelImpl(_ context.Context, ch chan LabelSubscriptionEvent) {
+	unsubscribeHelper(d, &d.subsLabel, ch)
+}
+
+// LabelListParams reflection of RPC LabelServiceListRequest to pass to database function LabelList
 type LabelListParams struct {
 	Name    *string
 	Version *string
@@ -107,7 +116,14 @@ func (d *Database) labelCreateImpl(ctx context.Context, l *typesv2.Label) error 
 
 	l.Uid = d.NewUID()
 	l.CreatedAt = time.Now()
-	return d.be.Collection(ObjectLabel).Add(l.Uid.String(), l)
+	err = d.be.Collection(ObjectLabel).Add(l.Uid.String(), l)
+
+	if err == nil {
+		// Notify subscribers about the new Label
+		notifySubscribersHelper(d, &d.subsLabel, NewCreateEvent(l), ObjectLabel)
+	}
+
+	return err
 }
 
 // Intentionally disabled - labels can be created once and can't be updated
@@ -129,9 +145,21 @@ func (d *Database) labelGetImpl(_ context.Context, uid typesv2.LabelUID) (label 
 }
 
 // labelDeleteImpl deletes the Label by UID
-func (d *Database) labelDeleteImpl(_ context.Context, uid typesv2.LabelUID) error {
-	d.beMu.RLock()
-	defer d.beMu.RUnlock()
+func (d *Database) labelDeleteImpl(ctx context.Context, uid typesv2.LabelUID) error {
+	// Get the object before deleting it for notification
+	l, getErr := d.LabelGet(ctx, uid)
+	if getErr != nil {
+		return getErr
+	}
 
-	return d.be.Collection(ObjectLabel).Delete(uid.String())
+	d.beMu.RLock()
+	err := d.be.Collection(ObjectLabel).Delete(uid.String())
+	d.beMu.RUnlock()
+
+	if err == nil && l != nil {
+		// Notify subscribers about the removed Label
+		notifySubscribersHelper(d, &d.subsLabel, NewRemoveEvent(l), ObjectLabel)
+	}
+
+	return err
 }

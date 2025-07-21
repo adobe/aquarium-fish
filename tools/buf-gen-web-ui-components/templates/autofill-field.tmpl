@@ -5,7 +5,7 @@
       type="text"
       value={formData.{{.JsonName}}}
       onChange={(e) => handleFieldChange('{{.JsonName}}', e.target.value)}
-      disabled={isReadOnly || (mode === 'edit' && {{.NoMod}})}
+      disabled={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
       className="flex-1 px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
       placeholder="Enter {{.AutofillType}} UID..."
     />
@@ -13,7 +13,7 @@
     <select
       value={formData.{{.JsonName}}}
       onChange={(e) => handleFieldChange('{{.JsonName}}', e.target.value)}
-      disabled={isReadOnly || (mode === 'edit' && {{.NoMod}})}
+      disabled={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
       className="flex-1 px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
     >
       <option value="">Select {{.AutofillType}}...</option>
@@ -28,7 +28,7 @@
       })}
     </select>
   )}
-  {!isReadOnly && !(mode === 'edit' && {{.NoMod}}) && (
+  {!isReadOnly && !(mode === 'edit' && {{.NoEdit}}) && (
     <button
       type="button"
       onClick={() => setAutofillMode(prev => ({ ...prev, {{.JsonName}}: prev.{{.JsonName}} === 'text' ? 'dropdown' : 'text' }))}

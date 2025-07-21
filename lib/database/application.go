@@ -25,6 +25,15 @@ import (
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
+func (d *Database) subscribeApplicationImpl(_ context.Context, ch chan ApplicationSubscriptionEvent) {
+	subscribeHelper(d, &d.subsApplication, ch)
+}
+
+// unsubscribeApplicationImpl removes a channel from the subscription list
+func (d *Database) unsubscribeApplicationImpl(_ context.Context, ch chan ApplicationSubscriptionEvent) {
+	unsubscribeHelper(d, &d.subsApplication, ch)
+}
+
 // applicationListImpl lists Applications by filter
 func (d *Database) applicationListImpl(_ context.Context) (as []typesv2.Application, err error) {
 	d.beMu.RLock()
@@ -51,6 +60,9 @@ func (d *Database) applicationCreateImpl(ctx context.Context, a *typesv2.Applica
 		return err
 	}
 
+	// Notify subscribers about the new Application
+	notifySubscribersHelper(d, &d.subsApplication, NewCreateEvent(a), ObjectApplication)
+
 	// Create ApplicationState NEW too
 	err = d.ApplicationStateCreate(ctx, &typesv2.ApplicationState{
 		ApplicationUid: a.Uid, Status: typesv2.ApplicationState_NEW,
@@ -75,11 +87,22 @@ func (d *Database) applicationGetImpl(_ context.Context, uid typesv2.Application
 }
 
 // applicationDeleteImpl removes the Application
-func (d *Database) applicationDeleteImpl(_ context.Context, uid typesv2.ApplicationUID) (err error) {
-	d.beMu.RLock()
-	defer d.beMu.RUnlock()
+func (d *Database) applicationDeleteImpl(ctx context.Context, uid typesv2.ApplicationUID) (err error) {
+	// Get the object before deleting it for notification
+	a, getErr := d.ApplicationGet(ctx, uid)
+	if getErr != nil {
+		return getErr
+	}
 
+	d.beMu.RLock()
 	err = d.be.Collection(ObjectApplication).Delete(uid.String())
+	d.beMu.RUnlock()
+
+	if err == nil && a != nil {
+		// Notify subscribers about the removed Application
+		notifySubscribersHelper(d, &d.subsApplication, NewRemoveEvent(a), ObjectApplication)
+	}
+
 	return err
 }
 
@@ -114,7 +137,8 @@ func (d *Database) applicationDeallocateImpl(ctx context.Context, appUID typesv2
 		newStatus = typesv2.ApplicationState_DEALLOCATED
 	}
 
-	as := &typesv2.ApplicationState{ApplicationUid: appUID, Status: newStatus,
+	as := &typesv2.ApplicationState{
+		ApplicationUid: appUID, Status: newStatus,
 		Description: fmt.Sprintf("Requested by %s", requestor),
 	}
 

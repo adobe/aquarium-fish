@@ -16,14 +16,14 @@
 
 import type { GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
-import { file_aquarium_v2_ui_options } from "./ui_options_pb";
+import { file_aquarium_v2_options_ui } from "./options_ui_pb";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file aquarium/v2/common.proto.
  */
 export const file_aquarium_v2_common: GenFile = /*@__PURE__*/
-  fileDesc("ChhhcXVhcml1bS92Mi9jb21tb24ucHJvdG8SC2FxdWFyaXVtLnYyIlcKDkF1dGhlbnRpY2F0aW9uEhAKCHVzZXJuYW1lGAEgASgJEhAKCHBhc3N3b3JkGAIgASgJEgsKA2tleRgDIAEoCRIMCgRwb3J0GAQgASgFOgaStRgCCAEiKwoIUmVzcG9uc2USDgoGc3RhdHVzGAEgASgIEg8KB21lc3NhZ2UYAiABKAlCRVpDZ2l0aHViLmNvbS9hZG9iZS9hcXVhcml1bS1maXNoL2xpYi9ycGMvcHJvdG8vYXF1YXJpdW0vdjI7YXF1YXJpdW12MmIGcHJvdG8z", [file_aquarium_v2_ui_options]);
+  fileDesc("ChhhcXVhcml1bS92Mi9jb21tb24ucHJvdG8SC2FxdWFyaXVtLnYyIlcKDkF1dGhlbnRpY2F0aW9uEhAKCHVzZXJuYW1lGAEgASgJEhAKCHBhc3N3b3JkGAIgASgJEgsKA2tleRgDIAEoCRIMCgRwb3J0GAQgASgFOgaStRgCCAEiKwoIUmVzcG9uc2USDgoGc3RhdHVzGAEgASgIEg8KB21lc3NhZ2UYAiABKAlCRVpDZ2l0aHViLmNvbS9hZG9iZS9hcXVhcml1bS1maXNoL2xpYi9ycGMvcHJvdG8vYXF1YXJpdW0vdjI7YXF1YXJpdW12MmIGcHJvdG8z", [file_aquarium_v2_options_ui]);
 
 /**
  * Authentication information to enable connecting to the machine.

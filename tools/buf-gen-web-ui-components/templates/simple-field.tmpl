@@ -23,7 +23,7 @@
       type="text"
       value={formData.{{.JsonName}}}
       onChange={(e) => handleFieldChange('{{.JsonName}}', e.target.value)}
-      disabled={isReadOnly || (mode === 'edit' && {{.NoMod}})}
+      disabled={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
       className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
     />
     {validationErrors.{{.JsonName}} && (
@@ -60,7 +60,7 @@
       type="number"
       value={formData.{{.JsonName}}}
       onChange={(e) => handleFieldChange('{{.JsonName}}', parseInt(e.target.value) || 0)}
-      disabled={isReadOnly || (mode === 'edit' && {{.NoMod}})}
+      disabled={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
       className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
     />
     {validationErrors.{{.JsonName}} && (
@@ -97,7 +97,7 @@
       type="checkbox"
       checked={formData.{{.JsonName}}}
       onChange={(e) => handleFieldChange('{{.JsonName}}', e.target.checked)}
-      disabled={isReadOnly || (mode === 'edit' && {{.NoMod}})}
+      disabled={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
     />
     {validationErrors.{{.JsonName}} && (

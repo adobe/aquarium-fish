@@ -1,8 +1,8 @@
 {{define "field-renderer" -}}
 {{range .Fields -}}
   {/* {{.DisplayName}} field */}
-  {{- if .NoMod }}
-  {!(mode === 'create' && {{.NoMod}}) && (
+  {{- if .NoCreate }}
+  {!(mode === 'create' && {{.NoCreate}}) && (
     <div>
       {{- if eq .TypeScript "string" | and (not .AutofillType) | and (not .IsRepeated) | and (not .IsMap) | and (not .IsMessage) | and (not .IsStruct) | and (not .IsTimestamp) }}
 {{template "simple-string-field" .}}

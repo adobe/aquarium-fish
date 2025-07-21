@@ -517,7 +517,7 @@ var File_aquarium_v2_streaming_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_streaming_proto_rawDesc = "" +
 	"\n" +
-	"\x1baquarium/v2/streaming.proto\x12\vaquarium.v2\x1a\x19google/protobuf/any.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16aquarium/v2/rbac.proto\"\x9b\x01\n" +
+	"\x1baquarium/v2/streaming.proto\x12\vaquarium.v2\x1a\x19google/protobuf/any.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1eaquarium/v2/options_rbac.proto\"\x9b\x01\n" +
 	"\x1eStreamingServiceConnectRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12!\n" +
@@ -619,7 +619,7 @@ func file_aquarium_v2_streaming_proto_init() {
 	if File_aquarium_v2_streaming_proto != nil {
 		return
 	}
-	file_aquarium_v2_rbac_proto_init()
+	file_aquarium_v2_options_rbac_proto_init()
 	file_aquarium_v2_streaming_proto_msgTypes[1].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

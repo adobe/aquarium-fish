@@ -732,16 +732,17 @@ var File_aquarium_v2_user_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_user_proto_rawDesc = "" +
 	"\n" +
-	"\x16aquarium/v2/user.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x16aquarium/v2/rbac.proto\x1a\x1caquarium/v2/ui_options.proto\"\xc2\x02\n" +
-	"\x04User\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12A\n" +
+	"\x16aquarium/v2/user.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1eaquarium/v2/options_rbac.proto\x1a#aquarium/v2/options_streaming.proto\x1a\x1caquarium/v2/options_ui.proto\"\xe4\x02\n" +
+	"\x04User\x12\x1a\n" +
+	"\x04name\x18\x01 \x01(\tB\x06\x9a\xb5\x18\x02\x10\x01R\x04name\x12C\n" +
 	"\n" +
-	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\x06\x9a\xb5\x18\x02\b\x01R\tcreatedAt\x12A\n" +
+	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\b\x9a\xb5\x18\x04\b\x01\x10\x01R\tcreatedAt\x12C\n" +
 	"\n" +
-	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\x06\x9a\xb5\x18\x02\b\x01R\tupdatedAt\x128\n" +
-	"\x04hash\x18\x04 \x01(\v2\x17.google.protobuf.StructB\x06\x9a\xb5\x18\x02\b\x01H\x00R\x04hash\x88\x01\x01\x12\x1f\n" +
+	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\b\x9a\xb5\x18\x04\b\x01\x10\x01R\tupdatedAt\x12:\n" +
+	"\x04hash\x18\x04 \x01(\v2\x17.google.protobuf.StructB\b\x9a\xb5\x18\x04\b\x01\x10\x01H\x00R\x04hash\x88\x01\x01\x12\x1f\n" +
 	"\bpassword\x18\x05 \x01(\tH\x01R\bpassword\x88\x01\x01\x12'\n" +
-	"\x05roles\x18\x06 \x03(\tB\x11\x9a\xb5\x18\r\x12\x05Roles\x1a\x04RoleR\x05roles:\x06\x92\xb5\x18\x02\b\x01B\a\n" +
+	"\x05roles\x18\x06 \x03(\tB\x11\x9a\xb5\x18\r\x1a\x05Roles\"\x04RoleR\x05roles:\x1a\x8a\xb5\x18\x10\n" +
+	"\x0eUserServiceGet\x92\xb5\x18\x02\b\x01B\a\n" +
 	"\x05_hashB\v\n" +
 	"\t_password\"\x19\n" +
 	"\x17UserServiceGetMeRequest\"s\n" +
@@ -850,8 +851,9 @@ func file_aquarium_v2_user_proto_init() {
 	if File_aquarium_v2_user_proto != nil {
 		return
 	}
-	file_aquarium_v2_rbac_proto_init()
-	file_aquarium_v2_ui_options_proto_init()
+	file_aquarium_v2_options_rbac_proto_init()
+	file_aquarium_v2_options_streaming_proto_init()
+	file_aquarium_v2_options_ui_proto_init()
 	file_aquarium_v2_user_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

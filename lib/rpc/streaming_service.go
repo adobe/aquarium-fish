@@ -487,9 +487,9 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 	// Generating SubscriptionID with NodeUID prefix to later figure out where the user come from
 	subscriptionUID := fmt.Sprintf("%s-%s", userName, s.fish.DB().NewUID())
 
-	logger := log.WithFunc("rpc", "Subscribe").With("subs_uid", subscriptionUID)
-	logger.Debug("New subscription from user", "user", userName)
-	defer logger.Debug("Completed subscription from user", "user", userName)
+	logger := log.WithFunc("rpc", "Subscribe").With("user", userName, "subs_uid", subscriptionUID)
+	logger.Debug("New subscription from user")
+	defer logger.Debug("Completed subscription from user")
 
 	// Check if server is shutting down
 	s.shutdownMutex.RLock()
@@ -499,6 +499,16 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 		return connect.NewError(connect.CodeUnavailable, fmt.Errorf("server is shutting down"))
 	}
 	s.shutdownMutex.RUnlock()
+
+	// Check the requested subscriptions and if user has access to those by rbac permissions
+	for _, subType := range req.Msg.GetSubscriptionTypes() {
+		rbacMethod := s.getSubscriptionPermissionMethod(subType)
+		rbacCtx := s.setServiceMethodContext(ctx, auth.ApplicationService, rbacMethod)
+		if !rpcutil.CheckUserPermission(rbacCtx, rbacMethod) {
+			logger.Warn("Rejecting new subscription due to lack of permission", "sub_type", subType)
+			return connect.NewError(connect.CodeUnavailable, fmt.Errorf("no permission to subscribe to %s", subType))
+		}
+	}
 
 	// Create subscription context
 	subCtx, cancel := context.WithCancel(ctx)
@@ -631,7 +641,7 @@ func (s *StreamingService) checkApplicationAccess(sub *subscription, appUID type
 	if rbacMethod != "" {
 		// Set proper RBAC context for permission checking
 		rbacCtx := s.setServiceMethodContext(sub.ctx, auth.ApplicationService, rbacMethod)
-		hasRBACPermission = rpcutil.CheckUserPermission(rbacCtx, rbacMethod)
+		hasRBACPermission = rpcutil.CheckUserPermission(rbacCtx, rbacMethod+"All")
 	}
 
 	hasAccess := isOwner || hasRBACPermission
@@ -646,18 +656,59 @@ func (s *StreamingService) checkApplicationAccess(sub *subscription, appUID type
 	return hasAccess
 }
 
-// shouldSendApplicationObject checks if application-related object should be sent based on ownership and RBAC permissions
-func (s *StreamingService) shouldSendApplicationObject(sub *subscription, appUID typesv2.ApplicationUID, objectType aquariumv2.SubscriptionType) bool {
-	// Get the appropriate RBAC method from the generated helper
-	rbacMethod := s.getSubscriptionPermissionMethod(objectType)
-
+// shouldSendApplicationUID helper allows to unify logic of Application related objects
+func (s *StreamingService) shouldSendApplicationUIDHelper(sub *subscription, appUID typesv2.ApplicationUID, method string) bool {
 	// Check if user has access (owner or RBAC permission)
-	hasAccess := s.checkApplicationAccess(sub, appUID, rbacMethod)
+	hasAccess := s.checkApplicationAccess(sub, appUID, method)
 
 	// Trigger cache cleanup periodically during permission checks
 	s.permissionCache.CleanupStaleEntries(s.fish)
 
 	return hasAccess
+}
+
+// shouldSendApplicationObject checks if application-related object should be sent based on ownership and RBAC permissions
+func (s *StreamingService) shouldSendApplicationObject(sub *subscription, app *typesv2.Application, method string) bool {
+	return s.shouldSendApplicationUIDHelper(sub, app.Uid, method)
+}
+
+// shouldSendApplicationStateObject checks if application-related object should be sent based on ownership and RBAC permissions
+func (s *StreamingService) shouldSendApplicationStateObject(sub *subscription, state *typesv2.ApplicationState, method string) bool {
+	return s.shouldSendApplicationUIDHelper(sub, state.ApplicationUid, method)
+}
+
+// shouldSendApplicationTaskObject checks if application-related object should be sent based on ownership and RBAC permissions
+func (s *StreamingService) shouldSendApplicationTaskObject(sub *subscription, task *typesv2.ApplicationTask, method string) bool {
+	return s.shouldSendApplicationUIDHelper(sub, task.ApplicationUid, method)
+}
+
+// shouldSendApplicationResourceObject checks if application-related object should be sent based on ownership and RBAC permissions
+func (s *StreamingService) shouldSendApplicationResourceObject(sub *subscription, res *typesv2.ApplicationResource, method string) bool {
+	return s.shouldSendApplicationUIDHelper(sub, res.ApplicationUid, method)
+}
+
+// shouldSendRoleObject returns true since subscribers already have required permission
+func (s *StreamingService) shouldSendRoleObject(_ *subscription, _ *typesv2.Role, _ /*method*/ string) bool {
+	// We checking role get access during subscription, so if user has one - no need to filter out anything
+	return true
+}
+
+// shouldSendLabelObject returns true since subscribers already have required permission
+func (s *StreamingService) shouldSendLabelObject(_ *subscription, _ *typesv2.Label, _ /*method*/ string) bool {
+	// Labels generally available for everyone, so no need in additional checks since user already has label get permission
+	return true
+}
+
+// shouldSendUserObject returns true since subscribers already have required permission
+func (s *StreamingService) shouldSendUserObject(_ *subscription, _ *typesv2.User, _ /*method*/ string) bool {
+	// We checking user get access during subscription, so if user has one - no need to filter out anything
+	return true
+}
+
+// shouldSendNodeObject returns true since subscribers already have required permission
+func (s *StreamingService) shouldSendNodeObject(_ *subscription, _ *typesv2.Node, _ /*method*/ string) bool {
+	// We checking node get access during subscription, so if user has one - no need to filter out anything
+	return true
 }
 
 // sendSubscriptionResponse sends a subscription response to the client

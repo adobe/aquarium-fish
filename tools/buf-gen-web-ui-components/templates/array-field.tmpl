@@ -8,7 +8,7 @@
         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
           {{.DisplayName}} {index + 1}
         </h4>
-        {!isReadOnly && !(mode === 'edit' && {{.NoMod}}) && (
+        {!isReadOnly && !(mode === 'edit' && {{.NoEdit}}) && (
           <button
             type="button"
             onClick={() => removeArrayItem('{{.JsonName}}', index)}
@@ -36,7 +36,7 @@
                 }}
                 onCancel={() => {}}
                 title={'{{.DisplayName}} ' + (index + 1)}
-                readonly={isReadOnly || (mode === 'edit' && {{.NoMod}})}
+                readonly={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
                 nested={true}
               />
             </div>
@@ -59,7 +59,7 @@
                   // Invalid JSON, keep the text value for user to fix
                 }
               }}
-              disabled={isReadOnly || (mode === 'edit' && {{.NoMod}})}
+              disabled={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
               className="w-full h-32 px-3 py-2 border border-gray-300 rounded-md font-mono text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white resize-none"
               placeholder="Enter JSON object for {{.MessageTypeName}}..."
             />
@@ -72,10 +72,10 @@
           type="{{if eq .TypeScript "string"}}text{{else if eq .TypeScript "number"}}number{{else}}text{{end}}"
           value={item}
           onChange={(e) => handleArrayChange('{{.JsonName}}', index, {{if eq .TypeScript "number"}}parseInt(e.target.value) || 0{{else}}e.target.value{{end}})}
-          disabled={isReadOnly || (mode === 'edit' && {{.NoMod}})}
+          disabled={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
           className="flex-1 mr-3 px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
         />
-        {!isReadOnly && !(mode === 'edit' && {{.NoMod}}) && (
+        {!isReadOnly && !(mode === 'edit' && {{.NoEdit}}) && (
           <button
             type="button"
             onClick={() => removeArrayItem('{{.JsonName}}', index)}
@@ -91,7 +91,7 @@
       {{- end }}
     </div>
   ))}
-  {!isReadOnly && !(mode === 'edit' && {{.NoMod}}) && (
+  {!isReadOnly && !(mode === 'edit' && {{.NoEdit}}) && (
     <button
       onClick={() => addArrayItem('{{.JsonName}}', {{if .IsMessage}}{}{{else if eq .TypeScript "string"}}''{{else if eq .TypeScript "number"}}0{{else}}''{{end}})}
       className="w-full px-3 py-2 text-sm border-2 border-dashed border-gray-300 text-gray-600 rounded-md hover:border-green-400 hover:text-green-600 transition-colors"

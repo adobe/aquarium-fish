@@ -25,6 +25,15 @@ import (
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
+func (d *Database) subscribeNodeImpl(_ context.Context, ch chan NodeSubscriptionEvent) {
+	subscribeHelper(d, &d.subsNode, ch)
+}
+
+// unsubscribeLabelImpl removes a channel from the subscription list
+func (d *Database) unsubscribeNodeImpl(_ context.Context, ch chan NodeSubscriptionEvent) {
+	unsubscribeHelper(d, &d.subsNode, ch)
+}
+
 // nodeListImpl returns list of Nodes that fits filter
 func (d *Database) nodeListImpl(_ context.Context) (ns []typesv2.Node, err error) {
 	d.beMu.RLock()

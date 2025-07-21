@@ -904,15 +904,16 @@ var File_aquarium_v2_label_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_label_proto_rawDesc = "" +
 	"\n" +
-	"\x17aquarium/v2/label.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x18aquarium/v2/common.proto\x1a\x16aquarium/v2/rbac.proto\x1a\x1caquarium/v2/ui_options.proto\"\x8f\x02\n" +
-	"\x05Label\x12\x18\n" +
-	"\x03uid\x18\x01 \x01(\tB\x06\x9a\xb5\x18\x02\b\x01R\x03uid\x12A\n" +
+	"\x17aquarium/v2/label.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x18aquarium/v2/common.proto\x1a\x1eaquarium/v2/options_rbac.proto\x1a#aquarium/v2/options_streaming.proto\x1a\x1caquarium/v2/options_ui.proto\"\xa8\x02\n" +
+	"\x05Label\x12\x1a\n" +
+	"\x03uid\x18\x01 \x01(\tB\b\x9a\xb5\x18\x04\b\x01\x10\x01R\x03uid\x12C\n" +
 	"\n" +
-	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\x06\x9a\xb5\x18\x02\b\x01R\tcreatedAt\x12\x12\n" +
+	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\b\x9a\xb5\x18\x04\b\x01\x10\x01R\tcreatedAt\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x18\n" +
 	"\aversion\x18\x04 \x01(\x05R\aversion\x12>\n" +
 	"\vdefinitions\x18\x05 \x03(\v2\x1c.aquarium.v2.LabelDefinitionR\vdefinitions\x123\n" +
-	"\bmetadata\x18\x06 \x01(\v2\x17.google.protobuf.StructR\bmetadata:\x06\x92\xb5\x18\x02\b\x01\"\xf7\x01\n" +
+	"\bmetadata\x18\x06 \x01(\v2\x17.google.protobuf.StructR\bmetadata:\x1b\x8a\xb5\x18\x11\n" +
+	"\x0fLabelServiceGet\x92\xb5\x18\x02\b\x01\"\xf7\x01\n" +
 	"\x0fLabelDefinition\x12\x16\n" +
 	"\x06driver\x18\x01 \x01(\tR\x06driver\x121\n" +
 	"\aoptions\x18\x02 \x01(\v2\x17.google.protobuf.StructR\aoptions\x124\n" +
@@ -1042,8 +1043,9 @@ func file_aquarium_v2_label_proto_init() {
 		return
 	}
 	file_aquarium_v2_common_proto_init()
-	file_aquarium_v2_rbac_proto_init()
-	file_aquarium_v2_ui_options_proto_init()
+	file_aquarium_v2_options_rbac_proto_init()
+	file_aquarium_v2_options_streaming_proto_init()
+	file_aquarium_v2_options_ui_proto_init()
 	file_aquarium_v2_label_proto_msgTypes[1].OneofWrappers = []any{}
 	file_aquarium_v2_label_proto_msgTypes[2].OneofWrappers = []any{}
 	file_aquarium_v2_label_proto_msgTypes[4].OneofWrappers = []any{}

@@ -11,7 +11,7 @@
         <div className="text-sm text-gray-500 dark:text-gray-400 mb-3">
           {{.DisplayName}} is not set
         </div>
-        {!isReadOnly && !(mode === 'edit' && {{.NoMod}}) && (
+        {!isReadOnly && !(mode === 'edit' && {{.NoEdit}}) && (
           <button
             type="button"
             onClick={() => handleFieldChange('{{.JsonName}}', {})}
@@ -33,7 +33,7 @@
           <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
             {{.DisplayName}}
           </h4>
-          {!isReadOnly && !(mode === 'edit' && {{.NoMod}}) && (
+          {!isReadOnly && !(mode === 'edit' && {{.NoEdit}}) && (
             <button
               type="button"
               onClick={() => handleFieldChange('{{.JsonName}}', null)}
@@ -54,7 +54,7 @@
             onSubmit={(data: any) => handleFieldChange('{{.JsonName}}', data)}
             onCancel={() => {}}
             title={'{{.DisplayName}}'}
-            readonly={isReadOnly || (mode === 'edit' && {{.NoMod}})}
+            readonly={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
             nested={true}
           />
         </div>
@@ -70,7 +70,7 @@
         <div className="text-sm text-gray-500">
           {{.MessageTypeName}} (Component not available - using JSON editor)
         </div>
-        {!isReadOnly && !(mode === 'edit' && {{.NoMod}}) && (
+        {!isReadOnly && !(mode === 'edit' && {{.NoEdit}}) && (
           <button
             type="button"
             onClick={() => handleFieldChange('{{.JsonName}}', null)}
@@ -98,7 +98,7 @@
             // Invalid JSON, keep the text value for user to fix
           }
         }}
-        disabled={isReadOnly || (mode === 'edit' && {{.NoMod}})}
+        disabled={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
         className="w-full h-32 px-3 py-2 border-0 font-mono text-sm dark:bg-gray-700 dark:text-white resize-none"
         placeholder="Enter JSON object for {{.MessageTypeName}}..."
       />

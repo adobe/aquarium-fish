@@ -609,8 +609,8 @@ func resolveReturnType(fieldName, messageName string) string {
 func processProtoFile(plugin *protogen.Plugin, file *protogen.File) {
 	var messages []DataMessage
 	var hasUUIDs, hasTime, hasJSON bool
-	var enumsUsed = make(map[string]*protogen.Enum) // Track used enums
-	var typeAliases = make(map[string]bool)         // Aliases for fields
+	enumsUsed := make(map[string]*protogen.Enum) // Track used enums
+	typeAliases := make(map[string]bool)         // Aliases for fields
 
 	// Process each message in the file
 	for _, message := range file.Messages {

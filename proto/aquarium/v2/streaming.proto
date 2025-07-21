@@ -16,7 +16,7 @@ package aquarium.v2;
 
 import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
-import "aquarium/v2/rbac.proto";
+import "aquarium/v2/options_rbac.proto";
 
 option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2";
 

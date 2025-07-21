@@ -43,7 +43,7 @@ const validateForm = (): boolean => {
 
 {{- range .Fields }}
 {{- if not .IsOptional }}
-  {{- if .NoMod }}
+  {{- if .NoEdit }}
   if (mode !== 'create' && (!formData.{{.JsonName}}{{if .IsRepeated}} || formData.{{.JsonName}}.length === 0{{end}})) {
     errors.{{.JsonName}} = '{{.DisplayName}} is required';
   }

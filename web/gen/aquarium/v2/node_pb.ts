@@ -18,13 +18,14 @@ import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegen
 import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import { file_aquarium_v2_options_streaming } from "./options_streaming_pb";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file aquarium/v2/node.proto.
  */
 export const file_aquarium_v2_node: GenFile = /*@__PURE__*/
-  fileDesc("ChZhcXVhcml1bS92Mi9ub2RlLnByb3RvEgthcXVhcml1bS52MiLlAQoETm9kZRILCgN1aWQYASABKAkSLgoKY3JlYXRlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDAoEbmFtZRgEIAEoCRIvCgpkZWZpbml0aW9uGAUgASgLMhsuYXF1YXJpdW0udjIuTm9kZURlZmluaXRpb24SEAoIbG9jYXRpb24YBiABKAkSDwoHYWRkcmVzcxgHIAEoCRIOCgZwdWJrZXkYCCABKAwiqwIKDk5vZGVEZWZpbml0aW9uEiMKBGhvc3QYASABKAsyFS5hcXVhcml1bS52Mi5Ib3N0SW5mbxInCgZtZW1vcnkYAiABKAsyFy5hcXVhcml1bS52Mi5NZW1vcnlJbmZvEiEKA2NwdRgDIAMoCzIULmFxdWFyaXVtLnYyLkNwdUluZm8SNQoFZGlza3MYBCADKAsyJi5hcXVhcml1bS52Mi5Ob2RlRGVmaW5pdGlvbi5EaXNrc0VudHJ5EisKBG5ldHMYBSADKAsyHS5hcXVhcml1bS52Mi5OZXR3b3JrSW50ZXJmYWNlGkQKCkRpc2tzRW50cnkSCwoDa2V5GAEgASgJEiUKBXZhbHVlGAIgASgLMhYuYXF1YXJpdW0udjIuRGlza1VzYWdlOgI4ASKaAQoISG9zdEluZm8SEAoIaG9zdG5hbWUYASABKAkSCgoCb3MYAiABKAkSEAoIcGxhdGZvcm0YAyABKAkSFwoPcGxhdGZvcm1fZmFtaWx5GAQgASgJEhgKEHBsYXRmb3JtX3ZlcnNpb24YBSABKAkSFgoOa2VybmVsX3ZlcnNpb24YBiABKAkSEwoLa2VybmVsX2FyY2gYByABKAkiUgoKTWVtb3J5SW5mbxINCgV0b3RhbBgBIAEoBBIRCglhdmFpbGFibGUYAiABKAQSDAoEdXNlZBgDIAEoBBIUCgx1c2VkX3BlcmNlbnQYBCABKAIi1wEKB0NwdUluZm8SCwoDY3B1GAEgASgJEhEKCXZlbmRvcl9pZBgCIAEoCRIOCgZmYW1pbHkYAyABKAkSDQoFbW9kZWwYBCABKAkSEAoIc3RlcHBpbmcYBSABKAkSEwoLcGh5c2ljYWxfaWQYBiABKAkSDwoHY29yZV9pZBgHIAEoCRINCgVjb3JlcxgIIAEoBRISCgptb2RlbF9uYW1lGAkgASgJEgsKA21oehgKIAEoAhISCgpjYWNoZV9zaXplGAsgASgJEhEKCW1pY3JvY29kZRgMIAEoCSJqCglEaXNrVXNhZ2USDAoEcGF0aBgBIAEoCRIOCgZmc3R5cGUYAiABKAkSDQoFdG90YWwYAyABKAQSDAoEZnJlZRgEIAEoBBIMCgR1c2VkGAUgASgEEhQKDHVzZWRfcGVyY2VudBgGIAEoAiI+ChBOZXR3b3JrSW50ZXJmYWNlEgwKBG5hbWUYASABKAkSDQoFYWRkcnMYAiADKAkSDQoFZmxhZ3MYAyADKAkiGAoWTm9kZVNlcnZpY2VMaXN0UmVxdWVzdCJbChdOb2RlU2VydmljZUxpc3RSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIfCgRkYXRhGAMgAygLMhEuYXF1YXJpdW0udjIuTm9kZSIbChlOb2RlU2VydmljZUdldFRoaXNSZXF1ZXN0Il4KGk5vZGVTZXJ2aWNlR2V0VGhpc1Jlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEh8KBGRhdGEYAyABKAsyES5hcXVhcml1bS52Mi5Ob2RlIqABCiBOb2RlU2VydmljZVNldE1haW50ZW5hbmNlUmVxdWVzdBIYCgttYWludGVuYW5jZRgBIAEoCEgAiAEBEhUKCHNodXRkb3duGAIgASgISAGIAQESGwoOc2h1dGRvd25fZGVsYXkYAyABKAlIAogBAUIOCgxfbWFpbnRlbmFuY2VCCwoJX3NodXRkb3duQhEKD19zaHV0ZG93bl9kZWxheSJECiFOb2RlU2VydmljZVNldE1haW50ZW5hbmNlUmVzcG9uc2USDgoGc3RhdHVzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkyswIKC05vZGVTZXJ2aWNlElMKBExpc3QSIy5hcXVhcml1bS52Mi5Ob2RlU2VydmljZUxpc3RSZXF1ZXN0GiQuYXF1YXJpdW0udjIuTm9kZVNlcnZpY2VMaXN0UmVzcG9uc2UiABJcCgdHZXRUaGlzEiYuYXF1YXJpdW0udjIuTm9kZVNlcnZpY2VHZXRUaGlzUmVxdWVzdBonLmFxdWFyaXVtLnYyLk5vZGVTZXJ2aWNlR2V0VGhpc1Jlc3BvbnNlIgAScQoOU2V0TWFpbnRlbmFuY2USLS5hcXVhcml1bS52Mi5Ob2RlU2VydmljZVNldE1haW50ZW5hbmNlUmVxdWVzdBouLmFxdWFyaXVtLnYyLk5vZGVTZXJ2aWNlU2V0TWFpbnRlbmFuY2VSZXNwb25zZSIAQkVaQ2dpdGh1Yi5jb20vYWRvYmUvYXF1YXJpdW0tZmlzaC9saWIvcnBjL3Byb3RvL2FxdWFyaXVtL3YyO2FxdWFyaXVtdjJiBnByb3RvMw", [file_google_protobuf_timestamp]);
+  fileDesc("ChZhcXVhcml1bS92Mi9ub2RlLnByb3RvEgthcXVhcml1bS52MiL7AQoETm9kZRILCgN1aWQYASABKAkSLgoKY3JlYXRlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDAoEbmFtZRgEIAEoCRIvCgpkZWZpbml0aW9uGAUgASgLMhsuYXF1YXJpdW0udjIuTm9kZURlZmluaXRpb24SEAoIbG9jYXRpb24YBiABKAkSDwoHYWRkcmVzcxgHIAEoCRIOCgZwdWJrZXkYCCABKAw6FIq1GBAKDk5vZGVTZXJ2aWNlR2V0IqsCCg5Ob2RlRGVmaW5pdGlvbhIjCgRob3N0GAEgASgLMhUuYXF1YXJpdW0udjIuSG9zdEluZm8SJwoGbWVtb3J5GAIgASgLMhcuYXF1YXJpdW0udjIuTWVtb3J5SW5mbxIhCgNjcHUYAyADKAsyFC5hcXVhcml1bS52Mi5DcHVJbmZvEjUKBWRpc2tzGAQgAygLMiYuYXF1YXJpdW0udjIuTm9kZURlZmluaXRpb24uRGlza3NFbnRyeRIrCgRuZXRzGAUgAygLMh0uYXF1YXJpdW0udjIuTmV0d29ya0ludGVyZmFjZRpECgpEaXNrc0VudHJ5EgsKA2tleRgBIAEoCRIlCgV2YWx1ZRgCIAEoCzIWLmFxdWFyaXVtLnYyLkRpc2tVc2FnZToCOAEimgEKCEhvc3RJbmZvEhAKCGhvc3RuYW1lGAEgASgJEgoKAm9zGAIgASgJEhAKCHBsYXRmb3JtGAMgASgJEhcKD3BsYXRmb3JtX2ZhbWlseRgEIAEoCRIYChBwbGF0Zm9ybV92ZXJzaW9uGAUgASgJEhYKDmtlcm5lbF92ZXJzaW9uGAYgASgJEhMKC2tlcm5lbF9hcmNoGAcgASgJIlIKCk1lbW9yeUluZm8SDQoFdG90YWwYASABKAQSEQoJYXZhaWxhYmxlGAIgASgEEgwKBHVzZWQYAyABKAQSFAoMdXNlZF9wZXJjZW50GAQgASgCItcBCgdDcHVJbmZvEgsKA2NwdRgBIAEoCRIRCgl2ZW5kb3JfaWQYAiABKAkSDgoGZmFtaWx5GAMgASgJEg0KBW1vZGVsGAQgASgJEhAKCHN0ZXBwaW5nGAUgASgJEhMKC3BoeXNpY2FsX2lkGAYgASgJEg8KB2NvcmVfaWQYByABKAkSDQoFY29yZXMYCCABKAUSEgoKbW9kZWxfbmFtZRgJIAEoCRILCgNtaHoYCiABKAISEgoKY2FjaGVfc2l6ZRgLIAEoCRIRCgltaWNyb2NvZGUYDCABKAkiagoJRGlza1VzYWdlEgwKBHBhdGgYASABKAkSDgoGZnN0eXBlGAIgASgJEg0KBXRvdGFsGAMgASgEEgwKBGZyZWUYBCABKAQSDAoEdXNlZBgFIAEoBBIUCgx1c2VkX3BlcmNlbnQYBiABKAIiPgoQTmV0d29ya0ludGVyZmFjZRIMCgRuYW1lGAEgASgJEg0KBWFkZHJzGAIgAygJEg0KBWZsYWdzGAMgAygJIhgKFk5vZGVTZXJ2aWNlTGlzdFJlcXVlc3QiWwoXTm9kZVNlcnZpY2VMaXN0UmVzcG9uc2USDgoGc3RhdHVzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkSHwoEZGF0YRgDIAMoCzIRLmFxdWFyaXVtLnYyLk5vZGUiKgoVTm9kZVNlcnZpY2VHZXRSZXF1ZXN0EhEKCW5vZGVfbmFtZRgBIAEoCSJaChZOb2RlU2VydmljZUdldFJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEh8KBGRhdGEYAyABKAsyES5hcXVhcml1bS52Mi5Ob2RlIhsKGU5vZGVTZXJ2aWNlR2V0VGhpc1JlcXVlc3QiXgoaTm9kZVNlcnZpY2VHZXRUaGlzUmVzcG9uc2USDgoGc3RhdHVzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkSHwoEZGF0YRgDIAEoCzIRLmFxdWFyaXVtLnYyLk5vZGUioAEKIE5vZGVTZXJ2aWNlU2V0TWFpbnRlbmFuY2VSZXF1ZXN0EhgKC21haW50ZW5hbmNlGAEgASgISACIAQESFQoIc2h1dGRvd24YAiABKAhIAYgBARIbCg5zaHV0ZG93bl9kZWxheRgDIAEoCUgCiAEBQg4KDF9tYWludGVuYW5jZUILCglfc2h1dGRvd25CEQoPX3NodXRkb3duX2RlbGF5IkQKIU5vZGVTZXJ2aWNlU2V0TWFpbnRlbmFuY2VSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCTKFAwoLTm9kZVNlcnZpY2USUwoETGlzdBIjLmFxdWFyaXVtLnYyLk5vZGVTZXJ2aWNlTGlzdFJlcXVlc3QaJC5hcXVhcml1bS52Mi5Ob2RlU2VydmljZUxpc3RSZXNwb25zZSIAElAKA0dldBIiLmFxdWFyaXVtLnYyLk5vZGVTZXJ2aWNlR2V0UmVxdWVzdBojLmFxdWFyaXVtLnYyLk5vZGVTZXJ2aWNlR2V0UmVzcG9uc2UiABJcCgdHZXRUaGlzEiYuYXF1YXJpdW0udjIuTm9kZVNlcnZpY2VHZXRUaGlzUmVxdWVzdBonLmFxdWFyaXVtLnYyLk5vZGVTZXJ2aWNlR2V0VGhpc1Jlc3BvbnNlIgAScQoOU2V0TWFpbnRlbmFuY2USLS5hcXVhcml1bS52Mi5Ob2RlU2VydmljZVNldE1haW50ZW5hbmNlUmVxdWVzdBouLmFxdWFyaXVtLnYyLk5vZGVTZXJ2aWNlU2V0TWFpbnRlbmFuY2VSZXNwb25zZSIAQkVaQ2dpdGh1Yi5jb20vYWRvYmUvYXF1YXJpdW0tZmlzaC9saWIvcnBjL3Byb3RvL2FxdWFyaXVtL3YyO2FxdWFyaXVtdjJiBnByb3RvMw", [file_google_protobuf_timestamp, file_aquarium_v2_options_streaming]);
 
 /**
  * Node represents a node in the system
@@ -403,6 +404,50 @@ export const NodeServiceListResponseSchema: GenMessage<NodeServiceListResponse> 
   messageDesc(file_aquarium_v2_node, 8);
 
 /**
+ * @generated from message aquarium.v2.NodeServiceGetRequest
+ */
+export type NodeServiceGetRequest = Message<"aquarium.v2.NodeServiceGetRequest"> & {
+  /**
+   * @generated from field: string node_name = 1;
+   */
+  nodeName: string;
+};
+
+/**
+ * Describes the message aquarium.v2.NodeServiceGetRequest.
+ * Use `create(NodeServiceGetRequestSchema)` to create a new message.
+ */
+export const NodeServiceGetRequestSchema: GenMessage<NodeServiceGetRequest> = /*@__PURE__*/
+  messageDesc(file_aquarium_v2_node, 9);
+
+/**
+ * @generated from message aquarium.v2.NodeServiceGetResponse
+ */
+export type NodeServiceGetResponse = Message<"aquarium.v2.NodeServiceGetResponse"> & {
+  /**
+   * @generated from field: bool status = 1;
+   */
+  status: boolean;
+
+  /**
+   * @generated from field: string message = 2;
+   */
+  message: string;
+
+  /**
+   * @generated from field: aquarium.v2.Node data = 3;
+   */
+  data?: Node;
+};
+
+/**
+ * Describes the message aquarium.v2.NodeServiceGetResponse.
+ * Use `create(NodeServiceGetResponseSchema)` to create a new message.
+ */
+export const NodeServiceGetResponseSchema: GenMessage<NodeServiceGetResponse> = /*@__PURE__*/
+  messageDesc(file_aquarium_v2_node, 10);
+
+/**
  * @generated from message aquarium.v2.NodeServiceGetThisRequest
  */
 export type NodeServiceGetThisRequest = Message<"aquarium.v2.NodeServiceGetThisRequest"> & {
@@ -413,7 +458,7 @@ export type NodeServiceGetThisRequest = Message<"aquarium.v2.NodeServiceGetThisR
  * Use `create(NodeServiceGetThisRequestSchema)` to create a new message.
  */
 export const NodeServiceGetThisRequestSchema: GenMessage<NodeServiceGetThisRequest> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_node, 9);
+  messageDesc(file_aquarium_v2_node, 11);
 
 /**
  * @generated from message aquarium.v2.NodeServiceGetThisResponse
@@ -440,7 +485,7 @@ export type NodeServiceGetThisResponse = Message<"aquarium.v2.NodeServiceGetThis
  * Use `create(NodeServiceGetThisResponseSchema)` to create a new message.
  */
 export const NodeServiceGetThisResponseSchema: GenMessage<NodeServiceGetThisResponse> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_node, 10);
+  messageDesc(file_aquarium_v2_node, 12);
 
 /**
  * @generated from message aquarium.v2.NodeServiceSetMaintenanceRequest
@@ -475,7 +520,7 @@ export type NodeServiceSetMaintenanceRequest = Message<"aquarium.v2.NodeServiceS
  * Use `create(NodeServiceSetMaintenanceRequestSchema)` to create a new message.
  */
 export const NodeServiceSetMaintenanceRequestSchema: GenMessage<NodeServiceSetMaintenanceRequest> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_node, 11);
+  messageDesc(file_aquarium_v2_node, 13);
 
 /**
  * @generated from message aquarium.v2.NodeServiceSetMaintenanceResponse
@@ -497,7 +542,7 @@ export type NodeServiceSetMaintenanceResponse = Message<"aquarium.v2.NodeService
  * Use `create(NodeServiceSetMaintenanceResponseSchema)` to create a new message.
  */
 export const NodeServiceSetMaintenanceResponseSchema: GenMessage<NodeServiceSetMaintenanceResponse> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_node, 12);
+  messageDesc(file_aquarium_v2_node, 14);
 
 /**
  * NodeService handles node management operations
@@ -514,6 +559,16 @@ export const NodeService: GenService<{
     methodKind: "unary";
     input: typeof NodeServiceListRequestSchema;
     output: typeof NodeServiceListResponseSchema;
+  },
+  /**
+   * Get node by unique name
+   *
+   * @generated from rpc aquarium.v2.NodeService.Get
+   */
+  get: {
+    methodKind: "unary";
+    input: typeof NodeServiceGetRequestSchema;
+    output: typeof NodeServiceGetResponseSchema;
   },
   /**
    * Get this node information

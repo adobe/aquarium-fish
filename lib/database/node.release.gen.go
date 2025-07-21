@@ -22,6 +22,14 @@ import (
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
+func (d *Database) SubscribeNode(ctx context.Context, ch chan NodeSubscriptionEvent) {
+	d.subscribeNodeImpl(ctx, ch)
+}
+
+func (d *Database) UnsubscribeNode(ctx context.Context, ch chan NodeSubscriptionEvent) {
+	d.unsubscribeNodeImpl(ctx, ch)
+}
+
 func (d *Database) NodeList(ctx context.Context) ([]typesv2.Node, error) {
 	return d.nodeListImpl(ctx)
 }

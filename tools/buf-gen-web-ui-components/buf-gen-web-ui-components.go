@@ -71,7 +71,8 @@ type FieldInfo struct {
 	MapKeyType   string
 	MapValueType string
 	// UI options
-	NoMod        bool
+	NoCreate     bool
+	NoEdit       bool
 	DisplayName  string
 	AutofillType string
 	// Message type name for nested components
@@ -252,8 +253,11 @@ func processMessage(msg *protogen.Message) *TypeInfo {
 		if fieldOptions != nil {
 			if fieldUiConfig := proto.GetExtension(fieldOptions, aquariumv2.E_FieldUiConfig); fieldUiConfig != nil {
 				if config, ok := fieldUiConfig.(*aquariumv2.FieldUiConfig); ok && config != nil {
-					if config.Nomod != nil && *config.Nomod {
-						fieldInfo.NoMod = true
+					if config.Nocreate != nil && *config.Nocreate {
+						fieldInfo.NoCreate = true
+					}
+					if config.Noedit != nil && *config.Noedit {
+						fieldInfo.NoEdit = true
 					}
 					if config.Name != nil && *config.Name != "" {
 						fieldInfo.DisplayName = *config.Name

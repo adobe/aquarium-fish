@@ -14,7 +14,7 @@
 // Example:
 // message Application {
 //   option (ui_config) = {};
-//   string uid = 1 [(field_ui_config) = { nomod: true }];
+//   string uid = 1 [(field_ui_config) = { nocreate: true, noedit: true }];
 //   string label_uid = 2 [(field_ui_config) = { name: "Label", autofill: "Label" }];
 //   // ... other fields
 // }
@@ -23,7 +23,7 @@
 // versions:
 // 	protoc-gen-go v1.36.6
 // 	protoc        (unknown)
-// source: aquarium/v2/ui_options.proto
+// source: aquarium/v2/options_ui.proto
 
 package aquariumv2
 
@@ -54,7 +54,7 @@ type UiConfig struct {
 
 func (x *UiConfig) Reset() {
 	*x = UiConfig{}
-	mi := &file_aquarium_v2_ui_options_proto_msgTypes[0]
+	mi := &file_aquarium_v2_options_ui_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -66,7 +66,7 @@ func (x *UiConfig) String() string {
 func (*UiConfig) ProtoMessage() {}
 
 func (x *UiConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_ui_options_proto_msgTypes[0]
+	mi := &file_aquarium_v2_options_ui_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -79,7 +79,7 @@ func (x *UiConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UiConfig.ProtoReflect.Descriptor instead.
 func (*UiConfig) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_ui_options_proto_rawDescGZIP(), []int{0}
+	return file_aquarium_v2_options_ui_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *UiConfig) GetGenerateUi() bool {
@@ -92,19 +92,21 @@ func (x *UiConfig) GetGenerateUi() bool {
 // FieldUiConfig defines UI configuration for a field
 type FieldUiConfig struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Field should be hidden during Create and read-only during Edit
-	Nomod *bool `protobuf:"varint,1,opt,name=nomod,proto3,oneof" json:"nomod,omitempty"`
+	// Field should be hidden during Create
+	Nocreate *bool `protobuf:"varint,1,opt,name=nocreate,proto3,oneof" json:"nocreate,omitempty"`
+	// Field should be read-only during Edit
+	Noedit *bool `protobuf:"varint,2,opt,name=noedit,proto3,oneof" json:"noedit,omitempty"`
 	// Custom name to display in UI instead of field name
-	Name *string `protobuf:"bytes,2,opt,name=name,proto3,oneof" json:"name,omitempty"`
+	Name *string `protobuf:"bytes,3,opt,name=name,proto3,oneof" json:"name,omitempty"`
 	// Name of the message type to use for autofill dropdown
-	Autofill      *string `protobuf:"bytes,3,opt,name=autofill,proto3,oneof" json:"autofill,omitempty"`
+	Autofill      *string `protobuf:"bytes,4,opt,name=autofill,proto3,oneof" json:"autofill,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *FieldUiConfig) Reset() {
 	*x = FieldUiConfig{}
-	mi := &file_aquarium_v2_ui_options_proto_msgTypes[1]
+	mi := &file_aquarium_v2_options_ui_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -116,7 +118,7 @@ func (x *FieldUiConfig) String() string {
 func (*FieldUiConfig) ProtoMessage() {}
 
 func (x *FieldUiConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_ui_options_proto_msgTypes[1]
+	mi := &file_aquarium_v2_options_ui_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -129,12 +131,19 @@ func (x *FieldUiConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FieldUiConfig.ProtoReflect.Descriptor instead.
 func (*FieldUiConfig) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_ui_options_proto_rawDescGZIP(), []int{1}
+	return file_aquarium_v2_options_ui_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *FieldUiConfig) GetNomod() bool {
-	if x != nil && x.Nomod != nil {
-		return *x.Nomod
+func (x *FieldUiConfig) GetNocreate() bool {
+	if x != nil && x.Nocreate != nil {
+		return *x.Nocreate
+	}
+	return false
+}
+
+func (x *FieldUiConfig) GetNoedit() bool {
+	if x != nil && x.Noedit != nil {
+		return *x.Noedit
 	}
 	return false
 }
@@ -153,14 +162,14 @@ func (x *FieldUiConfig) GetAutofill() string {
 	return ""
 }
 
-var file_aquarium_v2_ui_options_proto_extTypes = []protoimpl.ExtensionInfo{
+var file_aquarium_v2_options_ui_proto_extTypes = []protoimpl.ExtensionInfo{
 	{
 		ExtendedType:  (*descriptorpb.MessageOptions)(nil),
 		ExtensionType: (*UiConfig)(nil),
 		Field:         50002,
 		Name:          "aquarium.v2.ui_config",
 		Tag:           "bytes,50002,opt,name=ui_config",
-		Filename:      "aquarium/v2/ui_options.proto",
+		Filename:      "aquarium/v2/options_ui.proto",
 	},
 	{
 		ExtendedType:  (*descriptorpb.FieldOptions)(nil),
@@ -168,7 +177,7 @@ var file_aquarium_v2_ui_options_proto_extTypes = []protoimpl.ExtensionInfo{
 		Field:         50003,
 		Name:          "aquarium.v2.field_ui_config",
 		Tag:           "bytes,50003,opt,name=field_ui_config",
-		Filename:      "aquarium/v2/ui_options.proto",
+		Filename:      "aquarium/v2/options_ui.proto",
 	},
 }
 
@@ -177,7 +186,7 @@ var (
 	// UI configuration for the message
 	//
 	// optional aquarium.v2.UiConfig ui_config = 50002;
-	E_UiConfig = &file_aquarium_v2_ui_options_proto_extTypes[0]
+	E_UiConfig = &file_aquarium_v2_options_ui_proto_extTypes[0]
 )
 
 // Extension fields to descriptorpb.FieldOptions.
@@ -185,48 +194,50 @@ var (
 	// UI configuration for the field
 	//
 	// optional aquarium.v2.FieldUiConfig field_ui_config = 50003;
-	E_FieldUiConfig = &file_aquarium_v2_ui_options_proto_extTypes[1]
+	E_FieldUiConfig = &file_aquarium_v2_options_ui_proto_extTypes[1]
 )
 
-var File_aquarium_v2_ui_options_proto protoreflect.FileDescriptor
+var File_aquarium_v2_options_ui_proto protoreflect.FileDescriptor
 
-const file_aquarium_v2_ui_options_proto_rawDesc = "" +
+const file_aquarium_v2_options_ui_proto_rawDesc = "" +
 	"\n" +
-	"\x1caquarium/v2/ui_options.proto\x12\vaquarium.v2\x1a google/protobuf/descriptor.proto\"@\n" +
+	"\x1caquarium/v2/options_ui.proto\x12\vaquarium.v2\x1a google/protobuf/descriptor.proto\"@\n" +
 	"\bUiConfig\x12$\n" +
 	"\vgenerate_ui\x18\x01 \x01(\bH\x00R\n" +
 	"generateUi\x88\x01\x01B\x0e\n" +
-	"\f_generate_ui\"\x84\x01\n" +
-	"\rFieldUiConfig\x12\x19\n" +
-	"\x05nomod\x18\x01 \x01(\bH\x00R\x05nomod\x88\x01\x01\x12\x17\n" +
-	"\x04name\x18\x02 \x01(\tH\x01R\x04name\x88\x01\x01\x12\x1f\n" +
-	"\bautofill\x18\x03 \x01(\tH\x02R\bautofill\x88\x01\x01B\b\n" +
-	"\x06_nomodB\a\n" +
+	"\f_generate_ui\"\xb5\x01\n" +
+	"\rFieldUiConfig\x12\x1f\n" +
+	"\bnocreate\x18\x01 \x01(\bH\x00R\bnocreate\x88\x01\x01\x12\x1b\n" +
+	"\x06noedit\x18\x02 \x01(\bH\x01R\x06noedit\x88\x01\x01\x12\x17\n" +
+	"\x04name\x18\x03 \x01(\tH\x02R\x04name\x88\x01\x01\x12\x1f\n" +
+	"\bautofill\x18\x04 \x01(\tH\x03R\bautofill\x88\x01\x01B\v\n" +
+	"\t_nocreateB\t\n" +
+	"\a_noeditB\a\n" +
 	"\x05_nameB\v\n" +
 	"\t_autofill:X\n" +
 	"\tui_config\x12\x1f.google.protobuf.MessageOptions\x18҆\x03 \x01(\v2\x15.aquarium.v2.UiConfigR\buiConfig\x88\x01\x01:f\n" +
 	"\x0ffield_ui_config\x12\x1d.google.protobuf.FieldOptions\x18ӆ\x03 \x01(\v2\x1a.aquarium.v2.FieldUiConfigR\rfieldUiConfig\x88\x01\x01BEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"
 
 var (
-	file_aquarium_v2_ui_options_proto_rawDescOnce sync.Once
-	file_aquarium_v2_ui_options_proto_rawDescData []byte
+	file_aquarium_v2_options_ui_proto_rawDescOnce sync.Once
+	file_aquarium_v2_options_ui_proto_rawDescData []byte
 )
 
-func file_aquarium_v2_ui_options_proto_rawDescGZIP() []byte {
-	file_aquarium_v2_ui_options_proto_rawDescOnce.Do(func() {
-		file_aquarium_v2_ui_options_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_aquarium_v2_ui_options_proto_rawDesc), len(file_aquarium_v2_ui_options_proto_rawDesc)))
+func file_aquarium_v2_options_ui_proto_rawDescGZIP() []byte {
+	file_aquarium_v2_options_ui_proto_rawDescOnce.Do(func() {
+		file_aquarium_v2_options_ui_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_aquarium_v2_options_ui_proto_rawDesc), len(file_aquarium_v2_options_ui_proto_rawDesc)))
 	})
-	return file_aquarium_v2_ui_options_proto_rawDescData
+	return file_aquarium_v2_options_ui_proto_rawDescData
 }
 
-var file_aquarium_v2_ui_options_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
-var file_aquarium_v2_ui_options_proto_goTypes = []any{
+var file_aquarium_v2_options_ui_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_aquarium_v2_options_ui_proto_goTypes = []any{
 	(*UiConfig)(nil),                    // 0: aquarium.v2.UiConfig
 	(*FieldUiConfig)(nil),               // 1: aquarium.v2.FieldUiConfig
 	(*descriptorpb.MessageOptions)(nil), // 2: google.protobuf.MessageOptions
 	(*descriptorpb.FieldOptions)(nil),   // 3: google.protobuf.FieldOptions
 }
-var file_aquarium_v2_ui_options_proto_depIdxs = []int32{
+var file_aquarium_v2_options_ui_proto_depIdxs = []int32{
 	2, // 0: aquarium.v2.ui_config:extendee -> google.protobuf.MessageOptions
 	3, // 1: aquarium.v2.field_ui_config:extendee -> google.protobuf.FieldOptions
 	0, // 2: aquarium.v2.ui_config:type_name -> aquarium.v2.UiConfig
@@ -238,29 +249,29 @@ var file_aquarium_v2_ui_options_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_aquarium_v2_ui_options_proto_init() }
-func file_aquarium_v2_ui_options_proto_init() {
-	if File_aquarium_v2_ui_options_proto != nil {
+func init() { file_aquarium_v2_options_ui_proto_init() }
+func file_aquarium_v2_options_ui_proto_init() {
+	if File_aquarium_v2_options_ui_proto != nil {
 		return
 	}
-	file_aquarium_v2_ui_options_proto_msgTypes[0].OneofWrappers = []any{}
-	file_aquarium_v2_ui_options_proto_msgTypes[1].OneofWrappers = []any{}
+	file_aquarium_v2_options_ui_proto_msgTypes[0].OneofWrappers = []any{}
+	file_aquarium_v2_options_ui_proto_msgTypes[1].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aquarium_v2_ui_options_proto_rawDesc), len(file_aquarium_v2_ui_options_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aquarium_v2_options_ui_proto_rawDesc), len(file_aquarium_v2_options_ui_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   2,
 			NumExtensions: 2,
 			NumServices:   0,
 		},
-		GoTypes:           file_aquarium_v2_ui_options_proto_goTypes,
-		DependencyIndexes: file_aquarium_v2_ui_options_proto_depIdxs,
-		MessageInfos:      file_aquarium_v2_ui_options_proto_msgTypes,
-		ExtensionInfos:    file_aquarium_v2_ui_options_proto_extTypes,
+		GoTypes:           file_aquarium_v2_options_ui_proto_goTypes,
+		DependencyIndexes: file_aquarium_v2_options_ui_proto_depIdxs,
+		MessageInfos:      file_aquarium_v2_options_ui_proto_msgTypes,
+		ExtensionInfos:    file_aquarium_v2_options_ui_proto_extTypes,
 	}.Build()
-	File_aquarium_v2_ui_options_proto = out.File
-	file_aquarium_v2_ui_options_proto_goTypes = nil
-	file_aquarium_v2_ui_options_proto_depIdxs = nil
+	File_aquarium_v2_options_ui_proto = out.File
+	file_aquarium_v2_options_ui_proto_goTypes = nil
+	file_aquarium_v2_options_ui_proto_depIdxs = nil
 }

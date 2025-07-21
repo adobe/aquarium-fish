@@ -17,9 +17,9 @@ package aquarium.v2;
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 import "aquarium/v2/common.proto";
-import "aquarium/v2/rbac.proto";
-import "aquarium/v2/streaming_options.proto";
-import "aquarium/v2/ui_options.proto";
+import "aquarium/v2/options_rbac.proto";
+import "aquarium/v2/options_streaming.proto";
+import "aquarium/v2/options_ui.proto";
 
 option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2";
 
@@ -27,73 +27,73 @@ option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aq
 service ApplicationService {
   // Get list of applications
   rpc List(ApplicationServiceListRequest) returns (ApplicationServiceListResponse) {
-   option (access_control) = {
-     allowed_roles: ["User"],
-     additional_actions: ["ListAll"],
-   };
+    option (access_control) = {
+      allowed_roles: ["User"],
+      additional_actions: ["ListAll"],
+    };
   }
 
   // Get application by UID
   rpc Get(ApplicationServiceGetRequest) returns (ApplicationServiceGetResponse) {
-   option (access_control) = {
-     allowed_roles: ["User"],
-     additional_actions: ["GetAll"],
-   };
+    option (access_control) = {
+      allowed_roles: ["User"],
+      additional_actions: ["GetAll"],
+    };
   }
 
   // Create new application
   rpc Create(ApplicationServiceCreateRequest) returns (ApplicationServiceCreateResponse) {
-   option (access_control) = {
-     allowed_roles: ["User"],
-   };
+    option (access_control) = {
+      allowed_roles: ["User"],
+    };
   }
 
   // Get application state
   rpc GetState(ApplicationServiceGetStateRequest) returns (ApplicationServiceGetStateResponse) {
-   option (access_control) = {
-     allowed_roles: ["User"],
-     additional_actions: ["GetStateAll"],
-   };
+    option (access_control) = {
+      allowed_roles: ["User"],
+      additional_actions: ["GetStateAll"],
+    };
   }
 
   // Get application resource
   rpc GetResource(ApplicationServiceGetResourceRequest) returns (ApplicationServiceGetResourceResponse) {
-   option (access_control) = {
-     allowed_roles: ["User"],
-     additional_actions: ["GetResourceAll"],
-   };
+    option (access_control) = {
+      allowed_roles: ["User"],
+      additional_actions: ["GetResourceAll"],
+    };
   }
 
   // List application tasks
   rpc ListTask(ApplicationServiceListTaskRequest) returns (ApplicationServiceListTaskResponse) {
-   option (access_control) = {
-     allowed_roles: ["Power"],
-     additional_actions: ["ListTaskAll"],
-   };
+    option (access_control) = {
+      allowed_roles: ["Power"],
+      additional_actions: ["ListTaskAll"],
+    };
   }
 
   // Create application task
   rpc CreateTask(ApplicationServiceCreateTaskRequest) returns (ApplicationServiceCreateTaskResponse) {
-   option (access_control) = {
-     allowed_roles: ["Power"],
-     additional_actions: ["CreateTaskAll"],
-   };
+    option (access_control) = {
+      allowed_roles: ["Power"],
+      additional_actions: ["CreateTaskAll"],
+    };
   }
 
   // Get application task
   rpc GetTask(ApplicationServiceGetTaskRequest) returns (ApplicationServiceGetTaskResponse) {
-   option (access_control) = {
-     allowed_roles: ["Power"],
-     additional_actions: ["GetTaskAll"],
-   };
+    option (access_control) = {
+      allowed_roles: ["Power"],
+      additional_actions: ["GetTaskAll"],
+    };
   }
 
   // Deallocate application
   rpc Deallocate(ApplicationServiceDeallocateRequest) returns (ApplicationServiceDeallocateResponse) {
-   option (access_control) = {
-     allowed_roles: ["User"],
-     additional_actions: ["DeallocateAll"],
-   };
+    option (access_control) = {
+      allowed_roles: ["User"],
+      additional_actions: ["DeallocateAll"],
+    };
   }
 }
 
@@ -103,10 +103,11 @@ service ApplicationService {
 // the ApplicationResource and the cluster choose which one node will actually do the work.
 message Application {
   option (ui_config) = { generate_ui: true };
+  option (subscribe_config) = { permission_check: "ApplicationServiceGet" };
 
-  string uid = 1                           [(field_ui_config) = { nomod: true }];
-  google.protobuf.Timestamp created_at = 2 [(field_ui_config) = { nomod: true }];
-  string owner_name = 3                    [(field_ui_config) = { nomod: true }];
+  string uid = 1                           [(field_ui_config) = { nocreate: true, noedit: true }];
+  google.protobuf.Timestamp created_at = 2 [(field_ui_config) = { nocreate: true, noedit: true }];
+  string owner_name = 3                    [(field_ui_config) = { nocreate: true, noedit: true }];
   string label_uid = 4                     [(field_ui_config) = { name: "Label", autofill: "Label" }];
   // Additional metadata in JSON format (can't override Label metadata)
   // example:
@@ -122,9 +123,7 @@ message Application {
 // info when the Application comes to this state and the last one describes the current state
 // of the Application.
 message ApplicationState {
-  option (aquarium.v2.subscribe_config) = {
-    permission_check: "ApplicationServiceGetStateAll"
-  };
+  option (subscribe_config) = { permission_check: "ApplicationServiceGetState" };
 
   // Enum for ApplicationState status field
   enum Status {
@@ -154,9 +153,7 @@ message ApplicationState {
 //
 // Could be created and updated only by the node which won the Application execution.
 message ApplicationResource {
-  option (aquarium.v2.subscribe_config) = {
-    permission_check: "ApplicationServiceGetResourceAll"
-  };
+  option (subscribe_config) = { permission_check: "ApplicationServiceGetResource" };
 
   string uid = 1;
   google.protobuf.Timestamp created_at = 2;
@@ -198,9 +195,7 @@ message ApplicationResource {
 //
 // It could be created by any Node but updated by the one which won the Application execution.
 message ApplicationTask {
-  option (aquarium.v2.subscribe_config) = {
-    permission_check: "ApplicationServiceListTaskAll"
-  };
+  option (subscribe_config) = { permission_check: "ApplicationServiceGetTask" };
 
   string uid = 1;
   google.protobuf.Timestamp created_at = 2;

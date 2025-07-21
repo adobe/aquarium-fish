@@ -672,14 +672,15 @@ var File_aquarium_v2_role_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_role_proto_rawDesc = "" +
 	"\n" +
-	"\x16aquarium/v2/role.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\"\xcb\x01\n" +
+	"\x16aquarium/v2/role.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a#aquarium/v2/options_streaming.proto\x1a\x1caquarium/v2/options_ui.proto\"\xe7\x01\n" +
 	"\x04Role\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x129\n" +
 	"\n" +
 	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x129\n" +
-	"\vpermissions\x18\x04 \x03(\v2\x17.aquarium.v2.PermissionR\vpermissions\"@\n" +
+	"\vpermissions\x18\x04 \x03(\v2\x17.aquarium.v2.PermissionR\vpermissions:\x1a\x8a\xb5\x18\x10\n" +
+	"\x0eRoleServiceGet\x92\xb5\x18\x02\b\x01\"@\n" +
 	"\n" +
 	"Permission\x12\x1a\n" +
 	"\bresource\x18\x01 \x01(\tR\bresource\x12\x16\n" +
@@ -779,6 +780,8 @@ func file_aquarium_v2_role_proto_init() {
 	if File_aquarium_v2_role_proto != nil {
 		return
 	}
+	file_aquarium_v2_options_streaming_proto_init()
+	file_aquarium_v2_options_ui_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

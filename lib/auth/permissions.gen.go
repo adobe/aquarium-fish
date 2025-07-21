@@ -51,6 +51,7 @@ var rolePermissions = map[string][]typesv2.Permission{
 		{Resource: LabelService, Action: LabelServiceRemove}, // gRPC
 
 		// NodeService
+		{Resource: NodeService, Action: NodeServiceGet},            // gRPC
 		{Resource: NodeService, Action: NodeServiceGetThis},        // gRPC
 		{Resource: NodeService, Action: NodeServiceList},           // gRPC
 		{Resource: NodeService, Action: NodeServiceSetMaintenance}, // gRPC

@@ -2,7 +2,7 @@
 <select
   value={formData.{{.JsonName}}}
   onChange={(e) => handleFieldChange('{{.JsonName}}', parseInt(e.target.value))}
-  disabled={isReadOnly || (mode === 'edit' && {{.NoMod}})}
+  disabled={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
   className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
 >
   <option value="">Select...</option>
@@ -15,7 +15,7 @@
   type="datetime-local"
   value={formData.{{.JsonName}}}
   onChange={(e) => handleFieldChange('{{.JsonName}}', e.target.value)}
-  disabled={isReadOnly || (mode === 'edit' && {{.NoMod}})}
+  disabled={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
   className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
 />
 {{end}}

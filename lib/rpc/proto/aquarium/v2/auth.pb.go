@@ -625,7 +625,7 @@ var File_aquarium_v2_auth_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_auth_proto_rawDesc = "" +
 	"\n" +
-	"\x16aquarium/v2/auth.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16aquarium/v2/role.proto\x1a\x16aquarium/v2/rbac.proto\"\xca\x01\n" +
+	"\x16aquarium/v2/auth.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16aquarium/v2/role.proto\x1a\x1eaquarium/v2/options_rbac.proto\"\xca\x01\n" +
 	"\bJWTToken\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\x129\n" +
 	"\n" +
@@ -737,7 +737,7 @@ func file_aquarium_v2_auth_proto_init() {
 		return
 	}
 	file_aquarium_v2_role_proto_init()
-	file_aquarium_v2_rbac_proto_init()
+	file_aquarium_v2_options_rbac_proto_init()
 	file_aquarium_v2_auth_proto_msgTypes[3].OneofWrappers = []any{}
 	file_aquarium_v2_auth_proto_msgTypes[5].OneofWrappers = []any{}
 	file_aquarium_v2_auth_proto_msgTypes[7].OneofWrappers = []any{}

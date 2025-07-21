@@ -17,4 +17,5 @@ export { LabelForm } from './LabelForm';
 export { LabelDefinitionForm } from './LabelDefinitionForm';
 export { ResourcesForm } from './ResourcesForm';
 export { ResourcesDiskForm } from './ResourcesDiskForm';
+export { RoleForm } from './RoleForm';
 export { UserForm } from './UserForm';

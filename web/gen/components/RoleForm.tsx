@@ -14,40 +14,36 @@
 
 import React, { useState, useEffect } from 'react';
 import { create } from '@bufbuild/protobuf';
-import { UserSchema, type User } from '../../gen/aquarium/v2/user_pb';
+import { RoleSchema, type Role } from '../../gen/aquarium/v2/role_pb';
 import * as yaml from 'js-yaml';
 import * as Components from './index';
 import { useStreaming } from '../../app/contexts/StreamingContext';
 
-interface UserFormProps {
+interface RoleFormProps {
   mode: 'create' | 'edit' | 'view';
-  initialData?: User;
-  onSubmit: (data: User) => void;
+  initialData?: Role;
+  onSubmit: (data: Role) => void;
   onCancel: () => void;
   title?: string;
   readonly?: boolean;
   nested?: boolean;
 }
 
-interface UserFormState {
+interface RoleFormState {
   name: string;
   createdAt: string;
   updatedAt: string;
-  hash: Record<string, any>;
-  password: string;
-  roles: string;
+  permissions: any;
 }
-const defaultUserState: UserFormState = {
+const defaultRoleState: RoleFormState = {
   name: '',
   createdAt: '',
   updatedAt: '',
-  hash: undefined,
-  password: undefined,
-  roles: [],
+  permissions: [],
 };
 
 
-export const UserForm: React.FC<UserFormProps> = ({
+export const RoleForm: React.FC<RoleFormProps> = ({
   initialData,
   onSubmit,
   onCancel,
@@ -56,7 +52,7 @@ export const UserForm: React.FC<UserFormProps> = ({
   readonly,
   nested = false
 }) => {
-  const [formData, setFormData] = useState<UserFormState>(defaultUserState);
+  const [formData, setFormData] = useState<RoleFormState>(defaultRoleState);
   const [yamlText, setYamlText] = useState('');
   const [showYamlInput, setShowYamlInput] = useState(false);
   const [yamlError, setYamlError] = useState<string | null>(null);
@@ -69,19 +65,16 @@ export const UserForm: React.FC<UserFormProps> = ({
   // Initialize form data from initialData
   useEffect(() => {
     if (initialData) {
-      const newFormData: UserFormState = {
+      const newFormData: RoleFormState = {
         name: initialData.name || '',
         createdAt: initialData.createdAt ? new Date(Number(initialData.createdAt.seconds) * 1000).toISOString().slice(0, 16) : '',
         updatedAt: initialData.updatedAt ? new Date(Number(initialData.updatedAt.seconds) * 1000).toISOString().slice(0, 16) : '',
-        hash: initialData.hash || {},
-        password: initialData.password ?? undefined,
-        roles: initialData.roles || [],
+        permissions: initialData.permissions || [],
       };
       setFormData(newFormData);
 
       // Initialize struct field text
       const newStructText: Record<string, string> = {};
-      newStructText['hash'] = initialData.hash ? yaml.dump(initialData.hash) : '';
       setStructFieldText(newStructText);
     }
   }, [initialData]);
@@ -97,7 +90,7 @@ const handleYamlLoad = () => {
       throw new Error('Invalid YAML format');
     }
 
-    const newFormData: UserFormState = { ...defaultUserState };
+    const newFormData: RoleFormState = { ...defaultRoleState };
     if (parsedData.name !== undefined) {
       newFormData.name = parsedData.name;
     }
@@ -111,17 +104,9 @@ const handleYamlLoad = () => {
         newFormData.updatedAt = new Date(parsedData.updatedAt).toISOString().slice(0, 16);
       }
     }
-    if (parsedData.hash !== undefined) {
-      if (typeof parsedData.hash === 'object') {
-        newFormData.hash = parsedData.hash;
-      }
-    }
-    if (parsedData.password !== undefined) {
-      newFormData.password = parsedData.password;
-    }
-    if (parsedData.roles !== undefined) {
-      if (Array.isArray(parsedData.roles)) {
-        newFormData.roles = parsedData.roles;
+    if (parsedData.permissions !== undefined) {
+      if (Array.isArray(parsedData.permissions)) {
+        newFormData.permissions = parsedData.permissions;
       }
     }
 
@@ -135,17 +120,17 @@ const handleYamlLoad = () => {
 // Validate form data
 const validateForm = (): boolean => {
   const errors: Record<string, string> = {};
-  if (mode !== 'create' && (!formData.name)) {
+  if (!formData.name) {
     errors.name = 'Name is required';
   }
-  if (mode !== 'create' && (!formData.createdAt)) {
+  if (!formData.createdAt) {
     errors.createdAt = 'Created At is required';
   }
-  if (mode !== 'create' && (!formData.updatedAt)) {
+  if (!formData.updatedAt) {
     errors.updatedAt = 'Updated At is required';
   }
-  if (!formData.roles || formData.roles.length === 0) {
-    errors.roles = 'Roles is required';
+  if (!formData.permissions || formData.permissions.length === 0) {
+    errors.permissions = 'Permissions is required';
   }
 
   setValidationErrors(errors);
@@ -160,18 +145,16 @@ const handleSubmit = () => {
 
   try {
     // Convert form data to protobuf message
-    const data = create(UserSchema, {
+    const data = create(RoleSchema, {
       name: formData.name,
       createdAt: formData.createdAt ? { seconds: BigInt(Math.floor(new Date(formData.createdAt).getTime() / 1000)) } : undefined,
       updatedAt: formData.updatedAt ? { seconds: BigInt(Math.floor(new Date(formData.updatedAt).getTime() / 1000)) } : undefined,
-      hash: formData.hash,
-      password: formData.password || undefined,
-      roles: formData.roles,
+      permissions: formData.permissions,
     });
 
     onSubmit(data);
   } catch (error) {
-    setYamlError('Failed to create User: ' + error);
+    setYamlError('Failed to create Role: ' + error);
   }
 };
 
@@ -195,7 +178,7 @@ const handleFieldChange = (field: string, value: any) => {
 const handleArrayChange = (field: string, index: number, value: any) => {
   setFormData(prev => ({
     ...prev,
-    [field]: prev[field as keyof UserFormState].map((item: any, i: number) =>
+    [field]: prev[field as keyof RoleFormState].map((item: any, i: number) =>
       i === index ? value : item
     )
   }));
@@ -205,7 +188,7 @@ const handleArrayChange = (field: string, index: number, value: any) => {
 const addArrayItem = (field: string, defaultValue: any) => {
   setFormData(prev => ({
     ...prev,
-    [field]: [...(prev[field as keyof UserFormState] as any[]), defaultValue]
+    [field]: [...(prev[field as keyof RoleFormState] as any[]), defaultValue]
   }));
 };
 
@@ -213,12 +196,12 @@ const addArrayItem = (field: string, defaultValue: any) => {
 const removeArrayItem = (field: string, index: number) => {
   setFormData(prev => ({
     ...prev,
-    [field]: (prev[field as keyof UserFormState] as any[]).filter((_, i) => i !== index)
+    [field]: (prev[field as keyof RoleFormState] as any[]).filter((_, i) => i !== index)
   }));
 };
 
 const isReadOnly = readonly || mode === 'view';
-const formTitle = title || (mode === 'create' ? 'Create User' : mode === 'edit' ? 'Edit User' : 'View User');
+const formTitle = title || (mode === 'create' ? 'Create Role' : mode === 'edit' ? 'Edit Role' : 'View Role');
 
 // Helper function to get autofill options
 const getAutofillOptions = (type: string) => {
@@ -322,13 +305,23 @@ const isSimpleField = (field: any) => {
     <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
       Name *
     </label>
+    <div className="relative group">
+      <span className="cursor-help text-gray-400 hover:text-gray-600">
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </span>
+      <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
+        <pre className="whitespace-pre-wrap text-xs leading-relaxed">Unique name of the role</pre>
+      </div>
+    </div>
   </div>
   <div className="flex-1 max-w-xs ml-4">
     <input
       type="text"
       value={formData.name}
       onChange={(e) => handleFieldChange('name', e.target.value)}
-      disabled={isReadOnly || (mode === 'edit' && true)}
+      disabled={isReadOnly || (mode === 'edit' && false)}
       className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
     />
     {validationErrors.name && (
@@ -340,10 +333,9 @@ const isSimpleField = (field: any) => {
 </div>
 
   </div>{/* Created At field */}
-  {!(mode === 'create' && true) && (
-    <div>
-      {/* Complex field - traditional layout */}
-      <div className="space-y-2">
+  <div>
+    {/* Complex field - traditional layout */}
+    <div className="space-y-2">
 <div className="flex items-center space-x-2">
   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
     Created At *
@@ -354,7 +346,7 @@ const isSimpleField = (field: any) => {
   type="datetime-local"
   value={formData.createdAt}
   onChange={(e) => handleFieldChange('createdAt', e.target.value)}
-  disabled={isReadOnly || (mode === 'edit' && true)}
+  disabled={isReadOnly || (mode === 'edit' && false)}
   className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
 />
 
@@ -364,13 +356,11 @@ const isSimpleField = (field: any) => {
   </div>
 )}
 
-      </div>
     </div>
-  )}{/* Updated At field */}
-  {!(mode === 'create' && true) && (
-    <div>
-      {/* Complex field - traditional layout */}
-      <div className="space-y-2">
+  </div>{/* Updated At field */}
+  <div>
+    {/* Complex field - traditional layout */}
+    <div className="space-y-2">
 <div className="flex items-center space-x-2">
   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
     Updated At *
@@ -381,7 +371,7 @@ const isSimpleField = (field: any) => {
   type="datetime-local"
   value={formData.updatedAt}
   onChange={(e) => handleFieldChange('updatedAt', e.target.value)}
-  disabled={isReadOnly || (mode === 'edit' && true)}
+  disabled={isReadOnly || (mode === 'edit' && false)}
   className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
 />
 
@@ -391,104 +381,14 @@ const isSimpleField = (field: any) => {
   </div>
 )}
 
-      </div>
     </div>
-  )}{/* Hash field */}
-  {!(mode === 'create' && true) && (
-    <div>
-      {/* Complex field - traditional layout */}
-      <div className="space-y-2">
-<div className="flex items-center space-x-2">
-  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-    Hash
-  </label>
-  <div className="relative group">
-    <span className="cursor-help text-gray-400 hover:text-gray-600">
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    </span>
-    <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
-      <pre className="whitespace-pre-wrap text-xs leading-relaxed">Where the hashed password stored</pre>
-    </div>
-  </div>
-</div>
-
-<div className="border border-gray-300 rounded-md p-3 dark:border-gray-600 space-y-2">
-  <textarea
-    value={structFieldText.hash || ''}
-    onChange={(e) => setStructFieldText(prev => ({ ...prev, hash: e.target.value }))}
-    onBlur={() => parseStructField('hash', structFieldText.hash || '')}
-    disabled={isReadOnly || (mode === 'edit' && true)}
-    className="w-full h-32 px-3 py-2 border-0 font-mono text-sm dark:bg-gray-700 dark:text-white resize-none"
-    placeholder="Enter YAML or JSON object..."
-  />
-  {structFieldErrors.hash && (
-    <div className="text-sm text-red-600 dark:text-red-400">
-      {structFieldErrors.hash}
-    </div>
-  )}
-  {!isReadOnly && !(mode === 'edit' && true) && (
-    <button
-      type="button"
-      onClick={() => parseStructField('hash', structFieldText.hash || '')}
-      className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded-md hover:bg-blue-200"
-    >
-      Parse & Update
-    </button>
-  )}
-</div>
-
-{validationErrors.hash && (
-  <div className="text-sm text-red-600 dark:text-red-400 mt-1">
-    {validationErrors.hash}
-  </div>
-)}
-
-      </div>
-    </div>
-  )}{/* Password field */}
-  <div>
-{/* Simple string field - inline layout */}
-<div className="flex items-center justify-between">
-  <div className="flex items-center space-x-2 min-w-0 flex-1">
-    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-      Password
-    </label>
-    <div className="relative group">
-      <span className="cursor-help text-gray-400 hover:text-gray-600">
-        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      </span>
-      <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
-        <pre className="whitespace-pre-wrap text-xs leading-relaxed">Set when the user was generated with no password</pre>
-      </div>
-    </div>
-  </div>
-  <div className="flex-1 max-w-xs ml-4">
-    <input
-      type="text"
-      value={formData.password}
-      onChange={(e) => handleFieldChange('password', e.target.value)}
-      disabled={isReadOnly || (mode === 'edit' && false)}
-      className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-    />
-    {validationErrors.password && (
-      <div className="text-xs text-red-600 dark:text-red-400 mt-1">
-        {validationErrors.password}
-      </div>
-    )}
-  </div>
-</div>
-
-  </div>{/* Roles field */}
+  </div>{/* Permissions field */}
   <div>
     {/* Complex field - traditional layout */}
     <div className="space-y-2">
 <div className="flex items-center space-x-2">
   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-    Roles *
+    Permissions *
   </label>
   <div className="relative group">
     <span className="cursor-help text-gray-400 hover:text-gray-600">
@@ -497,28 +397,25 @@ const isSimpleField = (field: any) => {
       </svg>
     </span>
     <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
-      <pre className="whitespace-pre-wrap text-xs leading-relaxed">List of role names assigned to the user</pre>
+      <pre className="whitespace-pre-wrap text-xs leading-relaxed">List of permissions granted to this role</pre>
     </div>
   </div>
 </div>
 
 <div className="space-y-3">
-  {formData.roles.map((item, index) => (
+  {formData.permissions.map((item, index) => (
     <div key={index} className="relative border-2 border-gray-200 rounded-lg p-3 dark:border-gray-600 bg-gray-50 dark:bg-gray-800">
-      <div className="flex items-center justify-between">
-        <input
-          type="text"
-          value={item}
-          onChange={(e) => handleArrayChange('roles', index, e.target.value)}
-          disabled={isReadOnly || (mode === 'edit' && false)}
-          className="flex-1 mr-3 px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-        />
+      {/* Nested component header */}
+      <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200 dark:border-gray-600">
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          Permissions {index + 1}
+        </h4>
         {!isReadOnly && !(mode === 'edit' && false) && (
           <button
             type="button"
-            onClick={() => removeArrayItem('roles', index)}
+            onClick={() => removeArrayItem('permissions', index)}
             className="flex items-center justify-center w-6 h-6 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors"
-            title="Remove item"
+            title="Remove Permissions"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -526,21 +423,66 @@ const isSimpleField = (field: any) => {
           </button>
         )}
       </div>
+      {(() => {
+        const ComponentName = 'PermissionForm';
+        const NestedComponent = (Components as any)[ComponentName];
+
+        if (NestedComponent) {
+          return (
+            <div className="pl-2">
+              <NestedComponent
+                mode={mode}
+                initialData={item}
+                onSubmit={(data: any) => {
+                  handleArrayChange('permissions', index, data);
+                }}
+                onCancel={() => {}}
+                title={'Permissions ' + (index + 1)}
+                readonly={isReadOnly || (mode === 'edit' && false)}
+                nested={true}
+              />
+            </div>
+          );
+        }
+
+        // Fallback to textarea for JSON editing
+        return (
+          <div className="pl-2">
+            <div className="text-sm text-gray-500 mb-2">
+              Permission (Component not available - using JSON editor)
+            </div>
+            <textarea
+              value={JSON.stringify(item, null, 2)}
+              onChange={(e) => {
+                try {
+                  const parsed = JSON.parse(e.target.value);
+                  handleArrayChange('permissions', index, parsed);
+                } catch (error) {
+                  // Invalid JSON, keep the text value for user to fix
+                }
+              }}
+              disabled={isReadOnly || (mode === 'edit' && false)}
+              className="w-full h-32 px-3 py-2 border border-gray-300 rounded-md font-mono text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white resize-none"
+              placeholder="Enter JSON object for Permission..."
+            />
+          </div>
+        );
+      })()}
     </div>
   ))}
   {!isReadOnly && !(mode === 'edit' && false) && (
     <button
-      onClick={() => addArrayItem('roles', '')}
+      onClick={() => addArrayItem('permissions', {})}
       className="w-full px-3 py-2 text-sm border-2 border-dashed border-gray-300 text-gray-600 rounded-md hover:border-green-400 hover:text-green-600 transition-colors"
     >
-      + Add Roles
+      + Add Permissions
     </button>
   )}
 </div>
 
-{validationErrors.roles && (
+{validationErrors.permissions && (
   <div className="text-sm text-red-600 dark:text-red-400 mt-1">
-    {validationErrors.roles}
+    {validationErrors.permissions}
   </div>
 )}
 

@@ -165,7 +165,7 @@ var File_aquarium_v2_common_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_common_proto_rawDesc = "" +
 	"\n" +
-	"\x18aquarium/v2/common.proto\x12\vaquarium.v2\x1a\x1caquarium/v2/ui_options.proto\"v\n" +
+	"\x18aquarium/v2/common.proto\x12\vaquarium.v2\x1a\x1caquarium/v2/options_ui.proto\"v\n" +
 	"\x0eAuthentication\x12\x1a\n" +
 	"\busername\x18\x01 \x01(\tR\busername\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x10\n" +
@@ -205,7 +205,7 @@ func file_aquarium_v2_common_proto_init() {
 	if File_aquarium_v2_common_proto != nil {
 		return
 	}
-	file_aquarium_v2_ui_options_proto_init()
+	file_aquarium_v2_options_ui_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

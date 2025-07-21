@@ -53,9 +53,14 @@ type Database struct {
 	// Subscriptions to notify subscribers about changes in DB, contains key prefix and channel
 	// Protected by subsMu to prevent data races during subscribe/unsubscribe operations
 	subsMu                  sync.RWMutex
-	subsApplicationState    []chan *typesv2.ApplicationState
-	subsApplicationTask     []chan *typesv2.ApplicationTask
-	subsApplicationResource []chan *typesv2.ApplicationResource
+	subsApplication         []chan ApplicationSubscriptionEvent
+	subsApplicationState    []chan ApplicationStateSubscriptionEvent
+	subsApplicationTask     []chan ApplicationTaskSubscriptionEvent
+	subsApplicationResource []chan ApplicationResourceSubscriptionEvent
+	subsLabel               []chan LabelSubscriptionEvent
+	subsUser                []chan UserSubscriptionEvent
+	subsRole                []chan RoleSubscriptionEvent
+	subsNode                []chan NodeSubscriptionEvent
 
 	// OpenTelemetry instrumentation
 	tracer trace.Tracer

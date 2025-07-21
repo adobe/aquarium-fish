@@ -22,7 +22,8 @@ import (
 type FieldUiConfig struct {
 	Autofill *string `json:"autofill,omitempty"`
 	Name     *string `json:"name,omitempty"`
-	Nomod    *bool   `json:"nomod,omitempty"`
+	Nocreate *bool   `json:"nocreate,omitempty"`
+	Noedit   *bool   `json:"noedit,omitempty"`
 }
 
 // FromFieldUiConfig creates a FieldUiConfig from FieldUiConfig
@@ -40,9 +41,13 @@ func FromFieldUiConfig(src *pbTypes.FieldUiConfig) FieldUiConfig {
 		val := src.GetName()
 		result.Name = &val
 	}
-	if src.GetNomod() != false {
-		val := src.GetNomod()
-		result.Nomod = &val
+	if src.GetNocreate() != false {
+		val := src.GetNocreate()
+		result.Nocreate = &val
+	}
+	if src.GetNoedit() != false {
+		val := src.GetNoedit()
+		result.Noedit = &val
 	}
 	return result
 }
@@ -57,8 +62,11 @@ func (f FieldUiConfig) ToFieldUiConfig() *pbTypes.FieldUiConfig {
 	if f.Name != nil {
 		result.Name = f.Name
 	}
-	if f.Nomod != nil {
-		result.Nomod = f.Nomod
+	if f.Nocreate != nil {
+		result.Nocreate = f.Nocreate
+	}
+	if f.Noedit != nil {
+		result.Noedit = f.Noedit
 	}
 	return result
 }

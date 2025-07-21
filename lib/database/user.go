@@ -24,6 +24,15 @@ import (
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
+func (d *Database) subscribeUserImpl(_ context.Context, ch chan UserSubscriptionEvent) {
+	subscribeHelper(d, &d.subsUser, ch)
+}
+
+// unsubscribeUserImpl removes a channel from the subscription list
+func (d *Database) unsubscribeUserImpl(_ context.Context, ch chan UserSubscriptionEvent) {
+	unsubscribeHelper(d, &d.subsUser, ch)
+}
+
 // userListImpl returns list of users
 func (d *Database) userListImpl(_ context.Context) (us []typesv2.User, err error) {
 	d.beMu.RLock()
@@ -47,16 +56,30 @@ func (d *Database) userCreateImpl(_ context.Context, u *typesv2.User) error {
 
 	u.CreatedAt = time.Now()
 	u.UpdatedAt = u.CreatedAt
-	return d.be.Collection(ObjectUser).Add(u.Name, u)
+	err := d.be.Collection(ObjectUser).Add(u.Name, u)
+
+	if err == nil {
+		// Notify subscribers about the new User
+		notifySubscribersHelper(d, &d.subsUser, NewCreateEvent(u), ObjectUser)
+	}
+
+	return err
 }
 
 // userSaveImpl stores User
 func (d *Database) userSaveImpl(_ context.Context, u *typesv2.User) error {
-	d.beMu.RLock()
-	defer d.beMu.RUnlock()
-
 	u.UpdatedAt = time.Now()
-	return d.be.Collection(ObjectUser).Add(u.Name, &u)
+
+	d.beMu.RLock()
+	err := d.be.Collection(ObjectUser).Add(u.Name, u)
+	d.beMu.RUnlock()
+
+	if err == nil {
+		// Notify subscribers about the updated User
+		notifySubscribersHelper(d, &d.subsUser, NewUpdateEvent(u), ObjectUser)
+	}
+
+	return err
 }
 
 // userGetImpl returns User by unique name
@@ -69,11 +92,23 @@ func (d *Database) userGetImpl(_ context.Context, name string) (u *typesv2.User,
 }
 
 // userDeleteImpl removes User
-func (d *Database) userDeleteImpl(_ context.Context, name string) error {
-	d.beMu.RLock()
-	defer d.beMu.RUnlock()
+func (d *Database) userDeleteImpl(ctx context.Context, name string) error {
+	// Get the object before deleting it for notification
+	u, getErr := d.UserGet(ctx, name)
+	if getErr != nil {
+		return getErr
+	}
 
-	return d.be.Collection(ObjectUser).Delete(name)
+	d.beMu.RLock()
+	err := d.be.Collection(ObjectUser).Delete(name)
+	d.beMu.RUnlock()
+
+	if err == nil && u != nil {
+		// Notify subscribers about the removed User
+		notifySubscribersHelper(d, &d.subsUser, NewRemoveEvent(u), ObjectUser)
+	}
+
+	return err
 }
 
 // userAuthImpl returns User if name and password are correct

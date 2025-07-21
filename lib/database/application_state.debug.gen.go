@@ -26,7 +26,7 @@ import (
 
 var debugTracerDatabaseApplication_state = otel.Tracer("aquarium-fish/database")
 
-func (d *Database) SubscribeApplicationState(ctx context.Context, ch chan *typesv2.ApplicationState) {
+func (d *Database) SubscribeApplicationState(ctx context.Context, ch chan ApplicationStateSubscriptionEvent) {
 	ctx, span := debugTracerDatabaseApplication_state.Start(ctx, "database.Database.subscribeApplicationStateImpl")
 	defer span.End()
 
@@ -34,7 +34,7 @@ func (d *Database) SubscribeApplicationState(ctx context.Context, ch chan *types
 
 }
 
-func (d *Database) UnsubscribeApplicationState(ctx context.Context, ch chan *typesv2.ApplicationState) {
+func (d *Database) UnsubscribeApplicationState(ctx context.Context, ch chan ApplicationStateSubscriptionEvent) {
 	ctx, span := debugTracerDatabaseApplication_state.Start(ctx, "database.Database.unsubscribeApplicationStateImpl")
 	defer span.End()
 

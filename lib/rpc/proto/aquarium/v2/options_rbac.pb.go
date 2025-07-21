@@ -23,7 +23,7 @@
 // versions:
 // 	protoc-gen-go v1.36.6
 // 	protoc        (unknown)
-// source: aquarium/v2/rbac.proto
+// source: aquarium/v2/options_rbac.proto
 
 package aquariumv2
 
@@ -60,7 +60,7 @@ type RoleBasedAccessControl struct {
 
 func (x *RoleBasedAccessControl) Reset() {
 	*x = RoleBasedAccessControl{}
-	mi := &file_aquarium_v2_rbac_proto_msgTypes[0]
+	mi := &file_aquarium_v2_options_rbac_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -72,7 +72,7 @@ func (x *RoleBasedAccessControl) String() string {
 func (*RoleBasedAccessControl) ProtoMessage() {}
 
 func (x *RoleBasedAccessControl) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_rbac_proto_msgTypes[0]
+	mi := &file_aquarium_v2_options_rbac_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -85,7 +85,7 @@ func (x *RoleBasedAccessControl) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoleBasedAccessControl.ProtoReflect.Descriptor instead.
 func (*RoleBasedAccessControl) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_rbac_proto_rawDescGZIP(), []int{0}
+	return file_aquarium_v2_options_rbac_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *RoleBasedAccessControl) GetAllowUnauthenticated() bool {
@@ -116,14 +116,14 @@ func (x *RoleBasedAccessControl) GetAdditionalActions() []string {
 	return nil
 }
 
-var file_aquarium_v2_rbac_proto_extTypes = []protoimpl.ExtensionInfo{
+var file_aquarium_v2_options_rbac_proto_extTypes = []protoimpl.ExtensionInfo{
 	{
 		ExtendedType:  (*descriptorpb.MethodOptions)(nil),
 		ExtensionType: (*RoleBasedAccessControl)(nil),
 		Field:         50000,
 		Name:          "aquarium.v2.access_control",
 		Tag:           "bytes,50000,opt,name=access_control",
-		Filename:      "aquarium/v2/rbac.proto",
+		Filename:      "aquarium/v2/options_rbac.proto",
 	},
 }
 
@@ -132,14 +132,14 @@ var (
 	// Access control options for the method
 	//
 	// optional aquarium.v2.RoleBasedAccessControl access_control = 50000;
-	E_AccessControl = &file_aquarium_v2_rbac_proto_extTypes[0]
+	E_AccessControl = &file_aquarium_v2_options_rbac_proto_extTypes[0]
 )
 
-var File_aquarium_v2_rbac_proto protoreflect.FileDescriptor
+var File_aquarium_v2_options_rbac_proto protoreflect.FileDescriptor
 
-const file_aquarium_v2_rbac_proto_rawDesc = "" +
+const file_aquarium_v2_options_rbac_proto_rawDesc = "" +
 	"\n" +
-	"\x16aquarium/v2/rbac.proto\x12\vaquarium.v2\x1a google/protobuf/descriptor.proto\"\x90\x02\n" +
+	"\x1eaquarium/v2/options_rbac.proto\x12\vaquarium.v2\x1a google/protobuf/descriptor.proto\"\x90\x02\n" +
 	"\x16RoleBasedAccessControl\x128\n" +
 	"\x15allow_unauthenticated\x18\x01 \x01(\bH\x00R\x14allowUnauthenticated\x88\x01\x01\x125\n" +
 	"\x14no_permission_needed\x18\x02 \x01(\bH\x01R\x12noPermissionNeeded\x88\x01\x01\x12#\n" +
@@ -150,23 +150,23 @@ const file_aquarium_v2_rbac_proto_rawDesc = "" +
 	"\x0eaccess_control\x12\x1e.google.protobuf.MethodOptions\x18І\x03 \x01(\v2#.aquarium.v2.RoleBasedAccessControlR\raccessControl\x88\x01\x01BEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"
 
 var (
-	file_aquarium_v2_rbac_proto_rawDescOnce sync.Once
-	file_aquarium_v2_rbac_proto_rawDescData []byte
+	file_aquarium_v2_options_rbac_proto_rawDescOnce sync.Once
+	file_aquarium_v2_options_rbac_proto_rawDescData []byte
 )
 
-func file_aquarium_v2_rbac_proto_rawDescGZIP() []byte {
-	file_aquarium_v2_rbac_proto_rawDescOnce.Do(func() {
-		file_aquarium_v2_rbac_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_aquarium_v2_rbac_proto_rawDesc), len(file_aquarium_v2_rbac_proto_rawDesc)))
+func file_aquarium_v2_options_rbac_proto_rawDescGZIP() []byte {
+	file_aquarium_v2_options_rbac_proto_rawDescOnce.Do(func() {
+		file_aquarium_v2_options_rbac_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_aquarium_v2_options_rbac_proto_rawDesc), len(file_aquarium_v2_options_rbac_proto_rawDesc)))
 	})
-	return file_aquarium_v2_rbac_proto_rawDescData
+	return file_aquarium_v2_options_rbac_proto_rawDescData
 }
 
-var file_aquarium_v2_rbac_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
-var file_aquarium_v2_rbac_proto_goTypes = []any{
+var file_aquarium_v2_options_rbac_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+var file_aquarium_v2_options_rbac_proto_goTypes = []any{
 	(*RoleBasedAccessControl)(nil),     // 0: aquarium.v2.RoleBasedAccessControl
 	(*descriptorpb.MethodOptions)(nil), // 1: google.protobuf.MethodOptions
 }
-var file_aquarium_v2_rbac_proto_depIdxs = []int32{
+var file_aquarium_v2_options_rbac_proto_depIdxs = []int32{
 	1, // 0: aquarium.v2.access_control:extendee -> google.protobuf.MethodOptions
 	0, // 1: aquarium.v2.access_control:type_name -> aquarium.v2.RoleBasedAccessControl
 	2, // [2:2] is the sub-list for method output_type
@@ -176,28 +176,28 @@ var file_aquarium_v2_rbac_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_aquarium_v2_rbac_proto_init() }
-func file_aquarium_v2_rbac_proto_init() {
-	if File_aquarium_v2_rbac_proto != nil {
+func init() { file_aquarium_v2_options_rbac_proto_init() }
+func file_aquarium_v2_options_rbac_proto_init() {
+	if File_aquarium_v2_options_rbac_proto != nil {
 		return
 	}
-	file_aquarium_v2_rbac_proto_msgTypes[0].OneofWrappers = []any{}
+	file_aquarium_v2_options_rbac_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aquarium_v2_rbac_proto_rawDesc), len(file_aquarium_v2_rbac_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aquarium_v2_options_rbac_proto_rawDesc), len(file_aquarium_v2_options_rbac_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   1,
 			NumExtensions: 1,
 			NumServices:   0,
 		},
-		GoTypes:           file_aquarium_v2_rbac_proto_goTypes,
-		DependencyIndexes: file_aquarium_v2_rbac_proto_depIdxs,
-		MessageInfos:      file_aquarium_v2_rbac_proto_msgTypes,
-		ExtensionInfos:    file_aquarium_v2_rbac_proto_extTypes,
+		GoTypes:           file_aquarium_v2_options_rbac_proto_goTypes,
+		DependencyIndexes: file_aquarium_v2_options_rbac_proto_depIdxs,
+		MessageInfos:      file_aquarium_v2_options_rbac_proto_msgTypes,
+		ExtensionInfos:    file_aquarium_v2_options_rbac_proto_extTypes,
 	}.Build()
-	File_aquarium_v2_rbac_proto = out.File
-	file_aquarium_v2_rbac_proto_goTypes = nil
-	file_aquarium_v2_rbac_proto_depIdxs = nil
+	File_aquarium_v2_options_rbac_proto = out.File
+	file_aquarium_v2_options_rbac_proto_goTypes = nil
+	file_aquarium_v2_options_rbac_proto_depIdxs = nil
 }

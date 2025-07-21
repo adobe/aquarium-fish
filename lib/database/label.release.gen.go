@@ -22,6 +22,14 @@ import (
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
+func (d *Database) SubscribeLabel(ctx context.Context, ch chan LabelSubscriptionEvent) {
+	d.subscribeLabelImpl(ctx, ch)
+}
+
+func (d *Database) UnsubscribeLabel(ctx context.Context, ch chan LabelSubscriptionEvent) {
+	d.unsubscribeLabelImpl(ctx, ch)
+}
+
 func (d *Database) LabelList(ctx context.Context, filters LabelListParams) ([]typesv2.Label, error) {
 	return d.labelListImpl(ctx, filters)
 }

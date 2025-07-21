@@ -57,6 +57,7 @@ const (
 
 	// NodeService service constants
 	NodeService               = "NodeService"
+	NodeServiceGet            = "Get"
 	NodeServiceGetThis        = "GetThis"
 	NodeServiceList           = "List"
 	NodeServiceSetMaintenance = "SetMaintenance"
