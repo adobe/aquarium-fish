@@ -18,6 +18,7 @@ import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 import "aquarium/v2/common.proto";
 import "aquarium/v2/rbac.proto";
+import "aquarium/v2/ui_options.proto";
 
 option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2";
 
@@ -60,8 +61,10 @@ service LabelService {
 //
 // Combination of Name and Version should be unique.
 message Label {
-  string uid = 1;
-  google.protobuf.Timestamp created_at = 2;
+  option (ui_config) = { generate_ui: true };
+
+  string uid = 1 [(field_ui_config) = { nomod: true }];
+  google.protobuf.Timestamp created_at = 2 [(field_ui_config) = { nomod: true }];
   // Simple name to identify the Label
   // example: macos1405-xcode161-ci_aws
   string name = 3;
@@ -112,6 +115,8 @@ message Label {
 // Describes Label's ways to provide aa ApplicationResource - it contains name of the driver,
 // it's resource and additional options.
 message LabelDefinition {
+  option (ui_config) = { generate_ui: true };
+
   // Name of the driver to execute
   string driver = 1;
   // Driver-specific options to execute the environment
@@ -135,6 +140,8 @@ message LabelDefinition {
 // Different drivers uses it in different ways to provide quite similar functionality, so it's
 // a good idea to check the driver's wiki page to get some clue on how to create Label def.
 message Resources {
+  option (ui_config) = { generate_ui: true };
+
   // Global amount of slots to be filled with ApplicationResources
   optional uint32 slots = 1;
   // Amount of vCPUs (logical CPU with HT enabled will have 2 per core)
@@ -167,6 +174,8 @@ message Resources {
 
 // ResourcesDisk defines disk configuration
 message ResourcesDisk {
+  option (ui_config) = { generate_ui: true };
+
   // Type of the filesystem to create by Fish - usually handled by the formatter of the image
   string type = 1;
   // Volume name will be given to the disk, empty will use the disk key

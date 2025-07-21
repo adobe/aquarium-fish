@@ -24,6 +24,7 @@ import type { Label } from '../../gen/aquarium/v2/label_pb';
 import type { User } from '../../gen/aquarium/v2/user_pb';
 import type { Role } from '../../gen/aquarium/v2/role_pb';
 import * as yaml from 'js-yaml';
+import { LabelForm, UserForm } from '../../gen/components';
 
 export function meta() {
   return [
@@ -44,8 +45,6 @@ export default function Manage() {
   const [showCreateLabelModal, setShowCreateLabelModal] = useState(false);
   const [showLabelDetailsModal, setShowLabelDetailsModal] = useState(false);
   const [selectedLabel, setSelectedLabel] = useState<Label | null>(null);
-  const [labelYaml, setLabelYaml] = useState('');
-  const [labelYamlError, setLabelYamlError] = useState<string | null>(null);
   const [labelNameFilter, setLabelNameFilter] = useState('');
   const [labelVersionFilter, setLabelVersionFilter] = useState('');
 
@@ -55,11 +54,6 @@ export default function Manage() {
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
   const [showUserDetailsModal, setShowUserDetailsModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [userForm, setUserForm] = useState({
-    name: '',
-    password: '',
-    roles: [] as string[],
-  });
   const [userFormError, setUserFormError] = useState<string | null>(null);
 
   // Fetch data
@@ -116,32 +110,13 @@ export default function Manage() {
   };
 
   // Label operations
-  const handleCreateLabel = async () => {
+  const handleCreateLabel = async (labelData: Label) => {
     try {
-      setLabelYamlError(null);
-
-      const labelData = yaml.load(labelYaml) as any;
-
-      if (!labelData.name) {
-        throw new Error('Label name is required');
-      }
-
-      if (!labelData.version) {
-        labelData.version = 1;
-      }
-
-      if (!labelData.definitions || !Array.isArray(labelData.definitions)) {
-        throw new Error('Label definitions are required');
-      }
-
       // Create label request using streaming
       const labelRequest = create(LabelServiceCreateRequestSchema, {
         label: {
+          ...labelData,
           uid: crypto.randomUUID(),
-          name: labelData.name,
-          version: labelData.version,
-          definitions: labelData.definitions,
-          metadata: labelData.metadata || {},
         },
       });
 
@@ -149,13 +124,8 @@ export default function Manage() {
       await sendRequest(labelRequest, 'LabelServiceCreateRequest');
       await fetchData(); // Refresh data
       setShowCreateLabelModal(false);
-      setLabelYaml('');
     } catch (error) {
-      if (error instanceof yaml.YAMLException) {
-        setLabelYamlError(`YAML parsing error: ${error.message}`);
-      } else {
-        setLabelYamlError(`Failed to create label: ${error}`);
-      }
+      setError(`Failed to create label: ${error}`);
     }
   };
 
@@ -171,53 +141,28 @@ export default function Manage() {
   };
 
   // User operations
-  const handleCreateUser = async () => {
+  const handleCreateUser = async (userData: User) => {
     try {
       setUserFormError(null);
 
-      if (!userForm.name) {
-        throw new Error('User name is required');
-      }
-
-      if (!userForm.password) {
-        throw new Error('Password is required');
-      }
-
-      const userObj = {
-        name: userForm.name,
-        password: userForm.password,
-        roles: userForm.roles,
-      };
-
-      await userServiceHelpers.create(userObj as any);
+      await userServiceHelpers.create(userData as any);
       await fetchData(); // Refresh data
       setShowCreateUserModal(false);
-      setUserForm({ name: '', password: '', roles: [] });
     } catch (error) {
       setUserFormError(`Failed to create user: ${error}`);
     }
   };
 
-  const handleUpdateUser = async () => {
+  const handleUpdateUser = async (userData: User) => {
     if (!selectedUser) return;
 
     try {
       setUserFormError(null);
 
-      const userObj = {
-        ...selectedUser,
-        roles: userForm.roles,
-      };
-
-      if (userForm.password) {
-        userObj.password = userForm.password;
-      }
-
-      await userServiceHelpers.update(userObj);
+      await userServiceHelpers.update(userData);
       await fetchData(); // Refresh data
       setShowUserDetailsModal(false);
       setSelectedUser(null);
-      setUserForm({ name: '', password: '', roles: [] });
     } catch (error) {
       setUserFormError(`Failed to update user: ${error}`);
     }
@@ -479,11 +424,6 @@ export default function Manage() {
                               <button
                                 onClick={() => {
                                   setSelectedUser(user);
-                                  setUserForm({
-                                    name: user.name,
-                                    password: '',
-                                    roles: user.roles,
-                                  });
                                   setShowUserDetailsModal(true);
                                 }}
                                 className="px-3 py-1 text-sm bg-green-100 text-green-800 rounded-md hover:bg-green-200"
@@ -513,58 +453,13 @@ export default function Manage() {
         {/* Create Label Modal */}
         {showCreateLabelModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-              <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
-                Create Label
-              </h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Label Configuration (YAML)
-                  </label>
-                  <textarea
-                    value={labelYaml}
-                    onChange={(e) => setLabelYaml(e.target.value)}
-                    className="w-full h-96 px-3 py-2 border border-gray-300 rounded-md font-mono text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    placeholder={`name: my-label
-version: 1
-definitions:
-  - driver: docker
-    options:
-      image: ubuntu:20.04
-    resources:
-      cpu: 2
-      ram: 4
-      disks: {}
-      network: bridge
-metadata:
-  description: My custom label`}
-                  />
-                </div>
-                {labelYamlError && (
-                  <div className="text-sm text-red-600 dark:text-red-400">
-                    {labelYamlError}
-                  </div>
-                )}
-                <div className="flex justify-end space-x-3">
-                  <button
-                    onClick={() => {
-                      setShowCreateLabelModal(false);
-                      setLabelYaml('');
-                      setLabelYamlError(null);
-                    }}
-                    className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleCreateLabel}
-                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                  >
-                    Create
-                  </button>
-                </div>
-              </div>
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <LabelForm
+                mode="create"
+                onSubmit={handleCreateLabel}
+                onCancel={() => setShowCreateLabelModal(false)}
+                title="Create Label"
+              />
             </div>
           </div>
         )}
@@ -673,87 +568,13 @@ metadata:
         {/* Create User Modal */}
         {showCreateUserModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-              <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
-                Create User
-              </h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Username
-                  </label>
-                  <input
-                    type="text"
-                    value={userForm.name}
-                    onChange={(e) => setUserForm({ ...userForm, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Password
-                  </label>
-                  <input
-                    type="password"
-                    value={userForm.password}
-                    onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Roles
-                  </label>
-                  <div className="space-y-2">
-                    {roles.map((role) => (
-                      <label key={role.name} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={userForm.roles.includes(role.name)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setUserForm({
-                                ...userForm,
-                                roles: [...userForm.roles, role.name],
-                              });
-                            } else {
-                              setUserForm({
-                                ...userForm,
-                                roles: userForm.roles.filter(r => r !== role.name),
-                              });
-                            }
-                          }}
-                          className="mr-2"
-                        />
-                        <span className="text-sm text-gray-900 dark:text-white">{role.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                {userFormError && (
-                  <div className="text-sm text-red-600 dark:text-red-400">
-                    {userFormError}
-                  </div>
-                )}
-                <div className="flex justify-end space-x-3">
-                  <button
-                    onClick={() => {
-                      setShowCreateUserModal(false);
-                      setUserForm({ name: '', password: '', roles: [] });
-                      setUserFormError(null);
-                    }}
-                    className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleCreateUser}
-                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                  >
-                    Create
-                  </button>
-                </div>
-              </div>
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <UserForm
+                mode="create"
+                onSubmit={handleCreateUser}
+                onCancel={() => setShowCreateUserModal(false)}
+                title="Create User"
+              />
             </div>
           </div>
         )}
@@ -761,77 +582,17 @@ metadata:
         {/* Edit User Modal */}
         {showUserDetailsModal && selectedUser && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-              <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
-                Edit User: {selectedUser.name}
-              </h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    New Password (leave empty to keep current)
-                  </label>
-                  <input
-                    type="password"
-                    value={userForm.password}
-                    onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Roles
-                  </label>
-                  <div className="space-y-2">
-                    {roles.map((role) => (
-                      <label key={role.name} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={userForm.roles.includes(role.name)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setUserForm({
-                                ...userForm,
-                                roles: [...userForm.roles, role.name],
-                              });
-                            } else {
-                              setUserForm({
-                                ...userForm,
-                                roles: userForm.roles.filter(r => r !== role.name),
-                              });
-                            }
-                          }}
-                          className="mr-2"
-                        />
-                        <span className="text-sm text-gray-900 dark:text-white">{role.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                {userFormError && (
-                  <div className="text-sm text-red-600 dark:text-red-400">
-                    {userFormError}
-                  </div>
-                )}
-                <div className="flex justify-end space-x-3">
-                  <button
-                    onClick={() => {
-                      setShowUserDetailsModal(false);
-                      setSelectedUser(null);
-                      setUserForm({ name: '', password: '', roles: [] });
-                      setUserFormError(null);
-                    }}
-                    className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleUpdateUser}
-                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                  >
-                    Update
-                  </button>
-                </div>
-              </div>
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <UserForm
+                mode="edit"
+                initialData={selectedUser}
+                onSubmit={handleUpdateUser}
+                onCancel={() => {
+                  setShowUserDetailsModal(false);
+                  setSelectedUser(null);
+                }}
+                title={`Edit User: ${selectedUser.name}`}
+              />
             </div>
           </div>
         )}

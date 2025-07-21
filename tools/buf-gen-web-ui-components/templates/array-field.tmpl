@@ -1,0 +1,103 @@
+{{define "array-field" -}}
+<div className="space-y-3">
+  {formData.{{.JsonName}}.map((item, index) => (
+    <div key={index} className="relative border-2 border-gray-200 rounded-lg p-3 dark:border-gray-600 bg-gray-50 dark:bg-gray-800">
+      {{- if .IsMessage }}
+      {/* Nested component header */}
+      <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200 dark:border-gray-600">
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          {{.DisplayName}} {index + 1}
+        </h4>
+        {!isReadOnly && !(mode === 'edit' && {{.NoMod}}) && (
+          <button
+            type="button"
+            onClick={() => removeArrayItem('{{.JsonName}}', index)}
+            className="flex items-center justify-center w-6 h-6 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors"
+            title="Remove {{.DisplayName}}"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+      {(() => {
+        const ComponentName = '{{.MessageTypeName}}Form';
+        const NestedComponent = (Components as any)[ComponentName];
+
+        if (NestedComponent) {
+          return (
+            <div className="pl-2">
+              <NestedComponent
+                mode={mode}
+                initialData={item}
+                onSubmit={(data: any) => {
+                  handleArrayChange('{{.JsonName}}', index, data);
+                }}
+                onCancel={() => {}}
+                title={'{{.DisplayName}} ' + (index + 1)}
+                readonly={isReadOnly || (mode === 'edit' && {{.NoMod}})}
+                nested={true}
+              />
+            </div>
+          );
+        }
+
+        // Fallback to textarea for JSON editing
+        return (
+          <div className="pl-2">
+            <div className="text-sm text-gray-500 mb-2">
+              {{.MessageTypeName}} (Component not available - using JSON editor)
+            </div>
+            <textarea
+              value={JSON.stringify(item, null, 2)}
+              onChange={(e) => {
+                try {
+                  const parsed = JSON.parse(e.target.value);
+                  handleArrayChange('{{.JsonName}}', index, parsed);
+                } catch (error) {
+                  // Invalid JSON, keep the text value for user to fix
+                }
+              }}
+              disabled={isReadOnly || (mode === 'edit' && {{.NoMod}})}
+              className="w-full h-32 px-3 py-2 border border-gray-300 rounded-md font-mono text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white resize-none"
+              placeholder="Enter JSON object for {{.MessageTypeName}}..."
+            />
+          </div>
+        );
+      })()}
+      {{- else }}
+      <div className="flex items-center justify-between">
+        <input
+          type="{{if eq .TypeScript "string"}}text{{else if eq .TypeScript "number"}}number{{else}}text{{end}}"
+          value={item}
+          onChange={(e) => handleArrayChange('{{.JsonName}}', index, {{if eq .TypeScript "number"}}parseInt(e.target.value) || 0{{else}}e.target.value{{end}})}
+          disabled={isReadOnly || (mode === 'edit' && {{.NoMod}})}
+          className="flex-1 mr-3 px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+        />
+        {!isReadOnly && !(mode === 'edit' && {{.NoMod}}) && (
+          <button
+            type="button"
+            onClick={() => removeArrayItem('{{.JsonName}}', index)}
+            className="flex items-center justify-center w-6 h-6 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors"
+            title="Remove item"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+      {{- end }}
+    </div>
+  ))}
+  {!isReadOnly && !(mode === 'edit' && {{.NoMod}}) && (
+    <button
+      onClick={() => addArrayItem('{{.JsonName}}', {{if .IsMessage}}{}{{else if eq .TypeScript "string"}}''{{else if eq .TypeScript "number"}}0{{else}}''{{end}})}
+      className="w-full px-3 py-2 text-sm border-2 border-dashed border-gray-300 text-gray-600 rounded-md hover:border-green-400 hover:text-green-600 transition-colors"
+    >
+      + Add {{.DisplayName}}
+    </button>
+  )}
+</div>
+{{end}}

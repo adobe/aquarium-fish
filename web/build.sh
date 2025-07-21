@@ -26,14 +26,10 @@ if [ "x$ONLYBUILD" = 'x' ]; then
         node:24-alpine \
         sh -ec "
             echo 'Installing dependencies...'
-            npm install
+            npm --prefer-offline install
 
             echo 'Generating protobuf code...'
-            # Install protobuf tools
-            npm install -g @bufbuild/buf @bufbuild/protoc-gen-es
-
-            # Generate protobuf code
-            buf generate proto/
+            npx @bufbuild/buf generate proto/
         "
 fi
 
@@ -49,7 +45,7 @@ docker run --rm \
     node:24-alpine \
     sh -ec "
         echo 'Installing dependencies...'
-        npm install
+        npm --prefer-offline install
 
         if [ "x$RELEASE" != 'x' ]; then
             echo 'Building release SPA...'

@@ -732,16 +732,16 @@ var File_aquarium_v2_user_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_user_proto_rawDesc = "" +
 	"\n" +
-	"\x16aquarium/v2/user.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x16aquarium/v2/rbac.proto\"\x8f\x02\n" +
+	"\x16aquarium/v2/user.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x16aquarium/v2/rbac.proto\x1a\x1caquarium/v2/ui_options.proto\"\xc2\x02\n" +
 	"\x04User\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x129\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12A\n" +
 	"\n" +
-	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\x06\x9a\xb5\x18\x02\b\x01R\tcreatedAt\x12A\n" +
 	"\n" +
-	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x120\n" +
-	"\x04hash\x18\x04 \x01(\v2\x17.google.protobuf.StructH\x00R\x04hash\x88\x01\x01\x12\x1f\n" +
-	"\bpassword\x18\x05 \x01(\tH\x01R\bpassword\x88\x01\x01\x12\x14\n" +
-	"\x05roles\x18\x06 \x03(\tR\x05rolesB\a\n" +
+	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\x06\x9a\xb5\x18\x02\b\x01R\tupdatedAt\x128\n" +
+	"\x04hash\x18\x04 \x01(\v2\x17.google.protobuf.StructB\x06\x9a\xb5\x18\x02\b\x01H\x00R\x04hash\x88\x01\x01\x12\x1f\n" +
+	"\bpassword\x18\x05 \x01(\tH\x01R\bpassword\x88\x01\x01\x12'\n" +
+	"\x05roles\x18\x06 \x03(\tB\x11\x9a\xb5\x18\r\x12\x05Roles\x1a\x04RoleR\x05roles:\x06\x92\xb5\x18\x02\b\x01B\a\n" +
 	"\x05_hashB\v\n" +
 	"\t_password\"\x19\n" +
 	"\x17UserServiceGetMeRequest\"s\n" +
@@ -851,6 +851,7 @@ func file_aquarium_v2_user_proto_init() {
 		return
 	}
 	file_aquarium_v2_rbac_proto_init()
+	file_aquarium_v2_ui_options_proto_init()
 	file_aquarium_v2_user_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

@@ -1,0 +1,108 @@
+{{define "message-field" -}}
+{(() => {
+  const ComponentName = '{{.MessageTypeName}}Form';
+  const NestedComponent = (Components as any)[ComponentName];
+
+  {{- if .IsOptional }}
+  // Optional message field - show Add/Remove buttons
+  if (!formData.{{.JsonName}}) {
+    return (
+      <div className="border border-dashed border-gray-300 rounded-md p-6 text-center dark:border-gray-600">
+        <div className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+          {{.DisplayName}} is not set
+        </div>
+        {!isReadOnly && !(mode === 'edit' && {{.NoMod}}) && (
+          <button
+            type="button"
+            onClick={() => handleFieldChange('{{.JsonName}}', {})}
+            className="px-4 py-2 text-sm bg-blue-100 text-blue-800 rounded-md hover:bg-blue-200"
+          >
+            Add {{.DisplayName}}
+          </button>
+        )}
+      </div>
+    );
+  }
+  {{- end }}
+
+  if (NestedComponent) {
+    return (
+      <div className="relative border-2 border-gray-200 rounded-lg p-3 dark:border-gray-600 bg-gray-50 dark:bg-gray-800">
+        {{- if .IsOptional }}
+        <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200 dark:border-gray-600">
+          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{.DisplayName}}
+          </h4>
+          {!isReadOnly && !(mode === 'edit' && {{.NoMod}}) && (
+            <button
+              type="button"
+              onClick={() => handleFieldChange('{{.JsonName}}', null)}
+              className="flex items-center justify-center w-6 h-6 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors"
+              title="Remove {{.DisplayName}}"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+        {{- end }}
+        <div className="pl-2">
+          <NestedComponent
+            mode={mode}
+            initialData={formData.{{.JsonName}}}
+            onSubmit={(data: any) => handleFieldChange('{{.JsonName}}', data)}
+            onCancel={() => {}}
+            title={'{{.DisplayName}}'}
+            readonly={isReadOnly || (mode === 'edit' && {{.NoMod}})}
+            nested={true}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback to textarea for JSON editing
+  return (
+    <div className="border border-gray-300 rounded-md p-3 dark:border-gray-600 space-y-2">
+      {{- if .IsOptional }}
+      <div className="flex justify-between items-center mb-2">
+        <div className="text-sm text-gray-500">
+          {{.MessageTypeName}} (Component not available - using JSON editor)
+        </div>
+        {!isReadOnly && !(mode === 'edit' && {{.NoMod}}) && (
+          <button
+            type="button"
+            onClick={() => handleFieldChange('{{.JsonName}}', null)}
+            className="flex items-center justify-center w-6 h-6 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors"
+            title="Remove {{.DisplayName}}"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+      {{- else }}
+      <div className="text-sm text-gray-500 mb-2">
+        {{.MessageTypeName}} (Component not available - using JSON editor)
+      </div>
+      {{- end }}
+      <textarea
+        value={JSON.stringify(formData.{{.JsonName}}, null, 2)}
+        onChange={(e) => {
+          try {
+            const parsed = JSON.parse(e.target.value);
+            handleFieldChange('{{.JsonName}}', parsed);
+          } catch (error) {
+            // Invalid JSON, keep the text value for user to fix
+          }
+        }}
+        disabled={isReadOnly || (mode === 'edit' && {{.NoMod}})}
+        className="w-full h-32 px-3 py-2 border-0 font-mono text-sm dark:bg-gray-700 dark:text-white resize-none"
+        placeholder="Enter JSON object for {{.MessageTypeName}}..."
+      />
+    </div>
+  );
+})()}
+{{end}}

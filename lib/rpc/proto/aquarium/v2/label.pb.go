@@ -904,21 +904,21 @@ var File_aquarium_v2_label_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_label_proto_rawDesc = "" +
 	"\n" +
-	"\x17aquarium/v2/label.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x18aquarium/v2/common.proto\x1a\x16aquarium/v2/rbac.proto\"\xf7\x01\n" +
-	"\x05Label\x12\x10\n" +
-	"\x03uid\x18\x01 \x01(\tR\x03uid\x129\n" +
+	"\x17aquarium/v2/label.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x18aquarium/v2/common.proto\x1a\x16aquarium/v2/rbac.proto\x1a\x1caquarium/v2/ui_options.proto\"\x8f\x02\n" +
+	"\x05Label\x12\x18\n" +
+	"\x03uid\x18\x01 \x01(\tB\x06\x9a\xb5\x18\x02\b\x01R\x03uid\x12A\n" +
 	"\n" +
-	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x12\n" +
+	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\x06\x9a\xb5\x18\x02\b\x01R\tcreatedAt\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x18\n" +
 	"\aversion\x18\x04 \x01(\x05R\aversion\x12>\n" +
 	"\vdefinitions\x18\x05 \x03(\v2\x1c.aquarium.v2.LabelDefinitionR\vdefinitions\x123\n" +
-	"\bmetadata\x18\x06 \x01(\v2\x17.google.protobuf.StructR\bmetadata\"\xef\x01\n" +
+	"\bmetadata\x18\x06 \x01(\v2\x17.google.protobuf.StructR\bmetadata:\x06\x92\xb5\x18\x02\b\x01\"\xf7\x01\n" +
 	"\x0fLabelDefinition\x12\x16\n" +
 	"\x06driver\x18\x01 \x01(\tR\x06driver\x121\n" +
 	"\aoptions\x18\x02 \x01(\v2\x17.google.protobuf.StructR\aoptions\x124\n" +
 	"\tresources\x18\x03 \x01(\v2\x16.aquarium.v2.ResourcesR\tresources\x12H\n" +
-	"\x0eauthentication\x18\x04 \x01(\v2\x1b.aquarium.v2.AuthenticationH\x00R\x0eauthentication\x88\x01\x01B\x11\n" +
-	"\x0f_authentication\"\xa4\x03\n" +
+	"\x0eauthentication\x18\x04 \x01(\v2\x1b.aquarium.v2.AuthenticationH\x00R\x0eauthentication\x88\x01\x01:\x06\x92\xb5\x18\x02\b\x01B\x11\n" +
+	"\x0f_authentication\"\xac\x03\n" +
 	"\tResources\x12\x19\n" +
 	"\x05slots\x18\x01 \x01(\rH\x00R\x05slots\x88\x01\x01\x12\x10\n" +
 	"\x03cpu\x18\x02 \x01(\rR\x03cpu\x12\x10\n" +
@@ -935,14 +935,14 @@ const file_aquarium_v2_label_proto_rawDesc = "" +
 	"\n" +
 	"DisksEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x120\n" +
-	"\x05value\x18\x02 \x01(\v2\x1a.aquarium.v2.ResourcesDiskR\x05value:\x028\x01B\b\n" +
-	"\x06_slots\"y\n" +
+	"\x05value\x18\x02 \x01(\v2\x1a.aquarium.v2.ResourcesDiskR\x05value:\x028\x01:\x06\x92\xb5\x18\x02\b\x01B\b\n" +
+	"\x06_slots\"\x81\x01\n" +
 	"\rResourcesDisk\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12\x12\n" +
 	"\x04size\x18\x03 \x01(\rR\x04size\x12\x14\n" +
 	"\x05reuse\x18\x04 \x01(\bR\x05reuse\x12\x14\n" +
-	"\x05clone\x18\x05 \x01(\tR\x05clone\"f\n" +
+	"\x05clone\x18\x05 \x01(\tR\x05clone:\x06\x92\xb5\x18\x02\b\x01\"f\n" +
 	"\x17LabelServiceListRequest\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tH\x00R\x04name\x88\x01\x01\x12\x1d\n" +
 	"\aversion\x18\x02 \x01(\tH\x01R\aversion\x88\x01\x01B\a\n" +
@@ -1043,6 +1043,7 @@ func file_aquarium_v2_label_proto_init() {
 	}
 	file_aquarium_v2_common_proto_init()
 	file_aquarium_v2_rbac_proto_init()
+	file_aquarium_v2_ui_options_proto_init()
 	file_aquarium_v2_label_proto_msgTypes[1].OneofWrappers = []any{}
 	file_aquarium_v2_label_proto_msgTypes[2].OneofWrappers = []any{}
 	file_aquarium_v2_label_proto_msgTypes[4].OneofWrappers = []any{}

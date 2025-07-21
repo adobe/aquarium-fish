@@ -17,6 +17,7 @@ package aquarium.v2;
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 import "aquarium/v2/rbac.proto";
+import "aquarium/v2/ui_options.proto";
 
 option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2";
 
@@ -56,15 +57,17 @@ service UserService {
 //
 // Can be created by any node and updated by any node with appropriate permissions.
 message User {
+  option (ui_config) = { generate_ui: true };
+
   string name = 1;
-  google.protobuf.Timestamp created_at = 2;
-  google.protobuf.Timestamp updated_at = 3;
+  google.protobuf.Timestamp created_at = 2 [(field_ui_config) = { nomod: true }];
+  google.protobuf.Timestamp updated_at = 3 [(field_ui_config) = { nomod: true }];
   // Where the hashed password stored
-  optional google.protobuf.Struct hash = 4;
+  optional google.protobuf.Struct hash = 4 [(field_ui_config) = { nomod: true }];
   // Set when the user was generated with no password
   optional string password = 5;
   // List of role names assigned to the user
-  repeated string roles = 6;
+  repeated string roles = 6 [(field_ui_config) = { name: "Roles", autofill: "Role" }];
 }
 
 message UserServiceGetMeRequest {}

@@ -1475,15 +1475,15 @@ var File_aquarium_v2_application_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_application_proto_rawDesc = "" +
 	"\n" +
-	"\x1daquarium/v2/application.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x18aquarium/v2/common.proto\x1a\x16aquarium/v2/rbac.proto\x1a#aquarium/v2/streaming_options.proto\"\xcb\x01\n" +
-	"\vApplication\x12\x10\n" +
-	"\x03uid\x18\x01 \x01(\tR\x03uid\x129\n" +
+	"\x1daquarium/v2/application.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x18aquarium/v2/common.proto\x1a\x16aquarium/v2/rbac.proto\x1a#aquarium/v2/streaming_options.proto\x1a\x1caquarium/v2/ui_options.proto\"\xff\x01\n" +
+	"\vApplication\x12\x18\n" +
+	"\x03uid\x18\x01 \x01(\tB\x06\x9a\xb5\x18\x02\b\x01R\x03uid\x12A\n" +
 	"\n" +
-	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x1d\n" +
+	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\x06\x9a\xb5\x18\x02\b\x01R\tcreatedAt\x12%\n" +
 	"\n" +
-	"owner_name\x18\x03 \x01(\tR\townerName\x12\x1b\n" +
-	"\tlabel_uid\x18\x04 \x01(\tR\blabelUid\x123\n" +
-	"\bmetadata\x18\x05 \x01(\v2\x17.google.protobuf.StructR\bmetadata\"\xf9\x02\n" +
+	"owner_name\x18\x03 \x01(\tB\x06\x9a\xb5\x18\x02\b\x01R\townerName\x12/\n" +
+	"\tlabel_uid\x18\x04 \x01(\tB\x12\x9a\xb5\x18\x0e\x12\x05Label\x1a\x05LabelR\blabelUid\x123\n" +
+	"\bmetadata\x18\x05 \x01(\v2\x17.google.protobuf.StructR\bmetadata:\x06\x92\xb5\x18\x02\b\x01\"\xf9\x02\n" +
 	"\x10ApplicationState\x12\x10\n" +
 	"\x03uid\x18\x01 \x01(\tR\x03uid\x129\n" +
 	"\n" +
@@ -1704,6 +1704,7 @@ func file_aquarium_v2_application_proto_init() {
 	file_aquarium_v2_common_proto_init()
 	file_aquarium_v2_rbac_proto_init()
 	file_aquarium_v2_streaming_options_proto_init()
+	file_aquarium_v2_ui_options_proto_init()
 	file_aquarium_v2_application_proto_msgTypes[2].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

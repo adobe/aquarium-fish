@@ -22,6 +22,7 @@ import { ApplicationServiceCreateRequestSchema, type Application, type Applicati
 import { utils } from '../lib/services';
 import * as yaml from 'js-yaml';
 import { ApplicationServiceDeallocateRequestSchema, ApplicationServiceGetResourceRequestSchema } from '../../gen/aquarium/v2/application_pb';
+import { ApplicationForm } from '../../gen/components';
 
 export function meta() {
   return [
@@ -51,8 +52,6 @@ export default function Applications() {
   const [filterOwner, setFilterOwner] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [createYaml, setCreateYaml] = useState('');
-  const [yamlError, setYamlError] = useState<string | null>(null);
 
   // Process streaming data
   useEffect(() => {
@@ -129,51 +128,22 @@ export default function Applications() {
     }
   };
 
-    const handleCreateApplication = async () => {
+  const handleCreateApplication = async (applicationData: Application) => {
     try {
-      setYamlError(null);
-
-      // Parse and validate YAML
-      const appData = yaml.load(createYaml) as any;
-
-      if (!appData) {
-        throw new Error('Invalid YAML format');
-      }
-
-      if (!appData.labelUid) {
-        throw new Error('labelUid is required');
-      }
-
-      // Validate YAML structure
-      if (appData.metadata && typeof appData.metadata !== 'object') {
-        throw new Error('metadata must be an object');
-      }
-
-      console.log('Creating application:', {
-        uid: crypto.randomUUID(),
-        ownerName: user?.userName || '',
-        labelUid: appData.labelUid,
-        metadata: appData.metadata || {},
-      });
+      console.log('Creating application:', applicationData);
 
       const application = create(ApplicationServiceCreateRequestSchema, {
         application: {
+          ...applicationData,
           uid: crypto.randomUUID(),
           ownerName: user?.userName || '',
-          labelUid: appData.labelUid,
-          metadata: appData.metadata || {},
         },
       });
       await sendRequest(application, 'ApplicationServiceCreateRequest');
 
       setShowCreateModal(false);
-      setCreateYaml('');
     } catch (error) {
-      if (error instanceof yaml.YAMLException) {
-        setYamlError(`YAML parsing error: ${error.message}`);
-      } else {
-        setYamlError(`Failed to create application: ${error}`);
-      }
+      setError(`Failed to create application: ${error}`);
     }
   };
 
@@ -427,50 +397,13 @@ export default function Applications() {
         {/* Create Application Modal */}
         {showCreateModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
-                Create Application
-              </h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Application YAML
-                  </label>
-                  <textarea
-                    value={createYaml}
-                    onChange={(e) => setCreateYaml(e.target.value)}
-                    className="w-full h-64 px-3 py-2 border border-gray-300 rounded-md font-mono text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    placeholder={`labelUid: "your-label-uid"
-metadata:
-  JENKINS_URL: "http://example.com"
-  JENKINS_AGENT_SECRET: "secret"
-  JENKINS_AGENT_NAME: "agent-name"`}
-                  />
-                </div>
-                {yamlError && (
-                  <div className="text-sm text-red-600 dark:text-red-400">
-                    {yamlError}
-                  </div>
-                )}
-                <div className="flex justify-end space-x-3">
-                  <button
-                    onClick={() => {
-                      setShowCreateModal(false);
-                      setCreateYaml('');
-                      setYamlError(null);
-                    }}
-                    className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleCreateApplication}
-                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                  >
-                    Create
-                  </button>
-                </div>
-              </div>
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <ApplicationForm
+                mode="create"
+                onSubmit={handleCreateApplication}
+                onCancel={() => setShowCreateModal(false)}
+                title="Create Application"
+              />
             </div>
           </div>
         )}
@@ -479,109 +412,13 @@ metadata:
         {showDetailsModal && selectedApp && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  Application Details
-                </h2>
-                <button
-                  onClick={() => setShowDetailsModal(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ×
-                </button>
-              </div>
-
-              <div className="space-y-6">
-                {/* Basic Info */}
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                    Basic Information
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">UID</p>
-                      <p className="text-sm text-gray-900 dark:text-white">{selectedApp.uid}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Label UID</p>
-                      <p className="text-sm text-gray-900 dark:text-white">{selectedApp.labelUid}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Owner</p>
-                      <p className="text-sm text-gray-900 dark:text-white">{selectedApp.ownerName}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Status</p>
-                      <div className="flex items-center space-x-2">
-                        <div className={`w-2 h-2 rounded-full ${getStatusColor(selectedApp.state)}`} />
-                        <span className="text-sm text-gray-900 dark:text-white">
-                          {getStatusText(selectedApp.state)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Metadata */}
-                {selectedApp.metadata && (
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                      Metadata
-                    </h3>
-                    <pre className="bg-gray-100 dark:bg-gray-700 p-4 rounded-md text-sm overflow-x-auto">
-                      {JSON.stringify(selectedApp.metadata, null, 2)}
-                    </pre>
-                  </div>
-                )}
-
-                {/* Resource Information */}
-                {selectedApp.resource && (
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                      Resource Information
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Node UID</p>
-                        <p className="text-sm text-gray-900 dark:text-white">{selectedApp.resource.nodeUid}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Identifier</p>
-                        <p className="text-sm text-gray-900 dark:text-white">{selectedApp.resource.identifier}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">IP Address</p>
-                        <p className="text-sm text-gray-900 dark:text-white">{selectedApp.resource.ipAddr}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">HW Address</p>
-                        <p className="text-sm text-gray-900 dark:text-white">{selectedApp.resource.hwAddr}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* State Details */}
-                {selectedApp.state && (
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                      State Details
-                    </h3>
-                    <div className="space-y-2">
-                      <div>
-                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Description</p>
-                        <p className="text-sm text-gray-900 dark:text-white">{selectedApp.state.description}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Created At</p>
-                                                 <p className="text-sm text-gray-900 dark:text-white">
-                           {selectedApp.state.createdAt ? new Date(Number(selectedApp.state.createdAt.seconds) * 1000).toLocaleString() : 'Unknown'}
-                         </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <ApplicationForm
+                mode="view"
+                initialData={selectedApp}
+                onSubmit={() => {}} // Not used in view mode
+                onCancel={() => setShowDetailsModal(false)}
+                title="Application Details"
+              />
             </div>
           </div>
         )}

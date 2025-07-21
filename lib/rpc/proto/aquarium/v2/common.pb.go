@@ -165,12 +165,12 @@ var File_aquarium_v2_common_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_common_proto_rawDesc = "" +
 	"\n" +
-	"\x18aquarium/v2/common.proto\x12\vaquarium.v2\"n\n" +
+	"\x18aquarium/v2/common.proto\x12\vaquarium.v2\x1a\x1caquarium/v2/ui_options.proto\"v\n" +
 	"\x0eAuthentication\x12\x1a\n" +
 	"\busername\x18\x01 \x01(\tR\busername\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x10\n" +
 	"\x03key\x18\x03 \x01(\tR\x03key\x12\x12\n" +
-	"\x04port\x18\x04 \x01(\x05R\x04port\"<\n" +
+	"\x04port\x18\x04 \x01(\x05R\x04port:\x06\x92\xb5\x18\x02\b\x01\"<\n" +
 	"\bResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessageBEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"
@@ -205,6 +205,7 @@ func file_aquarium_v2_common_proto_init() {
 	if File_aquarium_v2_common_proto != nil {
 		return
 	}
+	file_aquarium_v2_ui_options_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

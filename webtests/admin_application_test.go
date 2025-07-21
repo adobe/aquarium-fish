@@ -53,15 +53,17 @@ drivers:
 		hp.LoginUser(t, page, afp, afi, "admin", afi.AdminToken())
 	})
 
-	screenshots.WithScreenshots(t, "create_application", func(t *testing.T) {
-		// YAML configuration for the application
-		yamlConfig := `labelUid: "test-label-uid"
-metadata:
-  TEST_VAR: "test-value"
-  DESCRIPTION: "Test application created by admin"`
+	screenshots.WithScreenshots(t, "create_label", func(t *testing.T) {
+		// First create a label that applications can use
+		hp.CreateLabel(t, page, afp, "test-label", "test-label-uid")
+	})
 
-		// Create application using helper
-		hp.CreateApplication(t, page, afp, yamlConfig, "test-label-uid")
+	screenshots.WithScreenshots(t, "create_application", func(t *testing.T) {
+		// Create application using form interface
+		hp.CreateApplicationForm(t, page, afp, "test-label-uid", map[string]string{
+			"TEST_VAR":    "test-value",
+			"DESCRIPTION": "Test application created by admin",
+		})
 
 		// Verify application details in list
 		hp.VerifyApplicationInList(t, page, "test-label-uid", "admin")
@@ -73,14 +75,14 @@ metadata:
 	})
 
 	screenshots.WithScreenshots(t, "test_list_updates", func(t *testing.T) {
-		// Create another application to test list updates
-		yamlConfig := `labelUid: "test-label-uid-2"
-metadata:
-  TEST_VAR: "test-value-2"
-  DESCRIPTION: "Second test application"`
+		// Create another label first
+		hp.CreateLabel(t, page, afp, "test-label-2", "test-label-uid-2")
 
-		// Create second application
-		hp.CreateApplication(t, page, afp, yamlConfig, "test-label-uid-2")
+		// Create second application to test list updates
+		hp.CreateApplicationForm(t, page, afp, "test-label-uid-2", map[string]string{
+			"TEST_VAR":    "test-value-2",
+			"DESCRIPTION": "Second test application",
+		})
 
 		// Verify second application appears in list
 		hp.VerifyApplicationInList(t, page, "test-label-uid-2", "admin")

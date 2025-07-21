@@ -1,0 +1,74 @@
+{{define "field-renderer" -}}
+{{range .Fields -}}
+  {/* {{.DisplayName}} field */}
+  {{- if .NoMod }}
+  {!(mode === 'create' && {{.NoMod}}) && (
+    <div>
+      {{- if eq .TypeScript "string" | and (not .AutofillType) | and (not .IsRepeated) | and (not .IsMap) | and (not .IsMessage) | and (not .IsStruct) | and (not .IsTimestamp) }}
+{{template "simple-string-field" .}}
+      {{- else if eq .TypeScript "number" | and (not .IsRepeated) | and (not .IsMap) }}
+{{template "simple-number-field" .}}
+      {{- else if eq .TypeScript "boolean" }}
+{{template "simple-boolean-field" .}}
+      {{- else }}
+      {/* Complex field - traditional layout */}
+      <div className="space-y-2">
+{{template "field-label" .}}
+        {{- if .IsEnum }}
+{{template "enum-field" .}}
+        {{- else if .IsTimestamp }}
+{{template "timestamp-field" .}}
+        {{- else if .IsStruct }}
+{{template "struct-field" .}}
+        {{- else if .IsRepeated }}
+{{template "array-field" .}}
+        {{- else if .IsMap }}
+{{template "map-field" .}}
+        {{- else if .IsMessage }}
+{{template "message-field" .}}
+        {{- else if .AutofillType }}
+{{template "autofill-field" .}}
+        {{- else }}
+{{template "basic-input-field" .}}
+        {{- end }}
+{{template "validation-error" .}}
+      </div>
+      {{- end }}
+    </div>
+  )}
+  {{- else }}
+  <div>
+    {{- if eq .TypeScript "string" | and (not .AutofillType) | and (not .IsRepeated) | and (not .IsMap) | and (not .IsMessage) | and (not .IsStruct) | and (not .IsTimestamp) }}
+{{template "simple-string-field" .}}
+    {{- else if eq .TypeScript "number" | and (not .IsRepeated) | and (not .IsMap) }}
+{{template "simple-number-field" .}}
+    {{- else if eq .TypeScript "boolean" }}
+{{template "simple-boolean-field" .}}
+    {{- else }}
+    {/* Complex field - traditional layout */}
+    <div className="space-y-2">
+{{template "field-label" .}}
+      {{- if .IsEnum }}
+{{template "enum-field" .}}
+      {{- else if .IsTimestamp }}
+{{template "timestamp-field" .}}
+      {{- else if .IsStruct }}
+{{template "struct-field" .}}
+      {{- else if .IsRepeated }}
+{{template "array-field" .}}
+      {{- else if .IsMap }}
+{{template "map-field" .}}
+      {{- else if .IsMessage }}
+{{template "message-field" .}}
+      {{- else if .AutofillType }}
+{{template "autofill-field" .}}
+      {{- else }}
+{{template "basic-input-field" .}}
+      {{- end }}
+{{template "validation-error" .}}
+    </div>
+    {{- end }}
+  </div>
+  {{- end }}
+{{- end }}
+{{end}}

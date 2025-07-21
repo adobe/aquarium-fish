@@ -179,7 +179,7 @@ func NavigateToPage(t *testing.T, page playwright.Page, pageName string) {
 	t.Logf("INFO: Successfully navigated to %s", pageName)
 }
 
-// CreateApplication creates an application with the given YAML configuration
+// CreateApplication creates an application with the given YAML configuration (legacy)
 func CreateApplication(t *testing.T, page playwright.Page, afp *AFPlaywright, yamlConfig, labelUid string) {
 	t.Helper()
 
@@ -219,6 +219,137 @@ func CreateApplication(t *testing.T, page playwright.Page, afp *AFPlaywright, ya
 	}
 
 	t.Logf("INFO: Successfully created application %s", labelUid)
+}
+
+// CreateApplicationForm creates an application using the new form interface
+func CreateApplicationForm(t *testing.T, page playwright.Page, afp *AFPlaywright, labelUid string, metadata map[string]string) {
+	t.Helper()
+
+	// Click Create Application button
+	if err := page.Locator("text=Create Application").Click(); err != nil {
+		t.Fatalf("ERROR: Could not click Create Application button: %v", err)
+	}
+
+	// Wait for modal to appear
+	if err := page.Locator("text=Create Application").Last().WaitFor(); err != nil {
+		t.Fatalf("ERROR: Create Application modal did not appear: %v", err)
+	}
+
+	// Fill Label UID field
+	if err := page.Locator("input[type=text]").Filter(playwright.LocatorFilterOptions{
+		HasText: "Label Uid",
+	}).Fill(labelUid); err != nil {
+		// Try alternative selector
+		if err := page.Locator("label:has-text('Label Uid')").Locator("..").Locator("input").Fill(labelUid); err != nil {
+			t.Fatalf("ERROR: Could not fill Label UID field: %v", err)
+		}
+	}
+
+	// Fill metadata as JSON
+	if len(metadata) > 0 {
+		metadataJSON := "{"
+		first := true
+		for k, v := range metadata {
+			if !first {
+				metadataJSON += ","
+			}
+			metadataJSON += fmt.Sprintf(`"%s":"%s"`, k, v)
+			first = false
+		}
+		metadataJSON += "}"
+
+		if err := page.Locator("label:has-text('Metadata')").Locator("..").Locator("textarea").Fill(metadataJSON); err != nil {
+			t.Logf("WARNING: Could not fill metadata field: %v", err)
+		}
+	}
+
+	// Click Create button in modal
+	if err := page.Locator("button:has-text('Create')").Last().Click(); err != nil {
+		t.Fatalf("ERROR: Could not click Create button in modal: %v", err)
+	}
+
+	// Wait for modal to close
+	if err := page.Locator("text=Create Application").Last().WaitFor(playwright.LocatorWaitForOptions{
+		State:   playwright.WaitForSelectorStateHidden,
+		Timeout: playwright.Float(5000),
+	}); err != nil {
+		t.Errorf("ERROR: Modal did not close as expected: %v", err)
+	}
+
+	// Wait for application to appear in list
+	if err := page.Locator("text=" + labelUid).First().WaitFor(playwright.LocatorWaitForOptions{
+		Timeout: playwright.Float(5000),
+	}); err != nil {
+		t.Fatalf("ERROR: Application %s did not appear in list: %v", labelUid, err)
+	}
+
+	t.Logf("INFO: Successfully created application %s", labelUid)
+}
+
+// CreateLabel creates a label with the given name and UID
+func CreateLabel(t *testing.T, page playwright.Page, afp *AFPlaywright, labelName, labelUid string) {
+	t.Helper()
+
+	// Navigate to manage page
+	NavigateToPage(t, page, "Management")
+
+	// Click Create Label button
+	if err := page.Locator("text=Create Label").Click(); err != nil {
+		t.Fatalf("ERROR: Could not click Create Label button: %v", err)
+	}
+
+	// Wait for modal to appear
+	if err := page.Locator("text=Create Label").Last().WaitFor(); err != nil {
+		t.Fatalf("ERROR: Create Label modal did not appear: %v", err)
+	}
+
+	// Fill Name field
+	if err := page.Locator("label:has-text('Name')").Locator("..").Locator("input").Fill(labelName); err != nil {
+		t.Fatalf("ERROR: Could not fill Name field: %v", err)
+	}
+
+	// Fill Version field (default to 1)
+	if err := page.Locator("label:has-text('Version')").Locator("..").Locator("input").Fill("1"); err != nil {
+		t.Fatalf("ERROR: Could not fill Version field: %v", err)
+	}
+
+	// Create basic label definition
+	definitionJSON := `[{
+		"driver": "test",
+		"options": {},
+		"resources": {
+			"cpu": 1,
+			"ram": 1,
+			"disks": {},
+			"network": "default"
+		}
+	}]`
+
+	if err := page.Locator("label:has-text('Definitions')").Locator("..").Locator("textarea").Fill(definitionJSON); err != nil {
+		t.Fatalf("ERROR: Could not fill Definitions field: %v", err)
+	}
+
+	// Click Create button in modal
+	if err := page.Locator("button:has-text('Create')").Last().Click(); err != nil {
+		t.Fatalf("ERROR: Could not click Create button in modal: %v", err)
+	}
+
+	// Wait for modal to close
+	if err := page.Locator("text=Create Label").Last().WaitFor(playwright.LocatorWaitForOptions{
+		State:   playwright.WaitForSelectorStateHidden,
+		Timeout: playwright.Float(5000),
+	}); err != nil {
+		t.Errorf("ERROR: Modal did not close as expected: %v", err)
+	}
+
+	// Wait for label to appear in list
+	if err := page.Locator("text=" + labelName).First().WaitFor(playwright.LocatorWaitForOptions{
+		Timeout: playwright.Float(5000),
+	}); err != nil {
+		t.Fatalf("ERROR: Label %s did not appear in list: %v", labelName, err)
+	}
+
+	t.Logf("INFO: Successfully created label %s", labelName)
 }
 
 // DeallocateApplication deallocates an application by its label UID

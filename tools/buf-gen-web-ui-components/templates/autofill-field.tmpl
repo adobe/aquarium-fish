@@ -1,0 +1,42 @@
+{{define "autofill-field" -}}
+<div className="flex space-x-2">
+  {autofillMode.{{.JsonName}} === 'text' ? (
+    <input
+      type="text"
+      value={formData.{{.JsonName}}}
+      onChange={(e) => handleFieldChange('{{.JsonName}}', e.target.value)}
+      disabled={isReadOnly || (mode === 'edit' && {{.NoMod}})}
+      className="flex-1 px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+      placeholder="Enter {{.AutofillType}} UID..."
+    />
+  ) : (
+    <select
+      value={formData.{{.JsonName}}}
+      onChange={(e) => handleFieldChange('{{.JsonName}}', e.target.value)}
+      disabled={isReadOnly || (mode === 'edit' && {{.NoMod}})}
+      className="flex-1 px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+    >
+      <option value="">Select {{.AutofillType}}...</option>
+      {getAutofillOptions('{{.AutofillType}}').map((item: any) => {
+        const key = item.uid || item.name || item.id || JSON.stringify(item);
+        const label = item.name ? (item.name + (item.version ? (' v' + item.version) : '')) : key;
+        return (
+          <option key={key} value={key}>
+            {label}
+          </option>
+        );
+      })}
+    </select>
+  )}
+  {!isReadOnly && !(mode === 'edit' && {{.NoMod}}) && (
+    <button
+      type="button"
+      onClick={() => setAutofillMode(prev => ({ ...prev, {{.JsonName}}: prev.{{.JsonName}} === 'text' ? 'dropdown' : 'text' }))}
+      className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
+      title={autofillMode.{{.JsonName}} === 'text' ? 'Switch to dropdown' : 'Switch to text input'}
+    >
+      {autofillMode.{{.JsonName}} === 'text' ? '📋' : '✏️'}
+    </button>
+  )}
+</div>
+{{end}}
