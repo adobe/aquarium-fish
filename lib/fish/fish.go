@@ -154,9 +154,9 @@ func (f *Fish) Init() error {
 
 		// Assigning admin role
 		adminUser.Roles = []string{auth.AdminRoleName}
-		if err := f.db.UserSave(ctx, adminUser); err != nil {
-			logger.Error("Failed to assign Administrator Role to admin user", "err", err)
-			return fmt.Errorf("Fish: Failed to assign Administrator Role to admin user: %v", err)
+		if err := f.db.UserCreate(ctx, adminUser); err != nil {
+			logger.Error("Failed to create the admin user", "err", err)
+			return fmt.Errorf("Fish: Failed to create the admin user: %v", err)
 		}
 	} else if err != nil {
 		logger.Error("Unable to create admin", "err", err)
@@ -418,7 +418,7 @@ func (f *Fish) applicationProcess() {
 			case typesv2.ApplicationState_DEALLOCATED, typesv2.ApplicationState_ERROR:
 				// Not much to do here, but maybe later in the future?
 				// In this state the Application has no Resource to deal with, so no tasks for now
-				//f.maybeRunApplicationTask(appState.ApplicationUid, nil)
+				// f.maybeRunApplicationTask(appState.ApplicationUid, nil)
 				logger.Debug("Application reached end state", "app_uid", appState.ApplicationUid, "app_status", appState.Status)
 			}
 		case appTaskEvent := <-f.applicationTaskChannel:

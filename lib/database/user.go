@@ -128,7 +128,7 @@ func (d *Database) userAuthImpl(ctx context.Context, name string, password strin
 	return user
 }
 
-// userNewImpl makes new User
+// userNewImpl makes new User with defined or generated password
 func (d *Database) userNewImpl(ctx context.Context, name string, password string) (string, *typesv2.User, error) {
 	if password == "" {
 		password = crypt.RandString(64)
@@ -140,11 +140,6 @@ func (d *Database) userNewImpl(ctx context.Context, name string, password string
 	if err := user.SetHash(crypt.NewHash(password, nil)); err != nil {
 		log.WithFunc("database", "userNewImpl").ErrorContext(ctx, "Unable to set hash for new user", "name", name, "err", err)
 		return "", nil, fmt.Errorf("Fish: Unable to set hash for new user %q: %v", name, err)
-	}
-
-	if err := d.UserCreate(ctx, user); err != nil {
-		log.WithFunc("database", "userNewImpl").ErrorContext(ctx, "Unable to create new user", "name", name, "err", err)
-		return "", nil, fmt.Errorf("Fish: Unable to create new user %q: %v", name, err)
 	}
 
 	return password, user, nil

@@ -29,7 +29,7 @@ func (d *Database) subscribeNodeImpl(_ context.Context, ch chan NodeSubscription
 	subscribeHelper(d, &d.subsNode, ch)
 }
 
-// unsubscribeLabelImpl removes a channel from the subscription list
+// unsubscribeNodeImpl removes a channel from the subscription list
 func (d *Database) unsubscribeNodeImpl(_ context.Context, ch chan NodeSubscriptionEvent) {
 	unsubscribeHelper(d, &d.subsNode, ch)
 }
@@ -86,7 +86,14 @@ func (d *Database) nodeCreateImpl(_ context.Context, n *typesv2.Node) error {
 	n.Uid = uuid.NewHash(hash, uuid.UUID{}, n.Pubkey, 0)
 	n.CreatedAt = time.Now()
 	n.UpdatedAt = n.CreatedAt
-	return d.be.Collection(ObjectNode).Add(n.Name, n)
+	err := d.be.Collection(ObjectNode).Add(n.Name, n)
+
+	if err == nil {
+		// Notify subscribers about the new Node
+		notifySubscribersHelper(d, &d.subsNode, NewCreateEvent(n), ObjectNode)
+	}
+
+	return err
 }
 
 // nodeSaveImpl stores Node
@@ -95,7 +102,14 @@ func (d *Database) nodeSaveImpl(_ context.Context, node *typesv2.Node) error {
 	defer d.beMu.RUnlock()
 
 	node.UpdatedAt = time.Now()
-	return d.be.Collection(ObjectNode).Add(node.Name, node)
+	err := d.be.Collection(ObjectNode).Add(node.Name, node)
+
+	if err == nil {
+		// Notify subscribers about the removed Node
+		notifySubscribersHelper(d, &d.subsNode, NewUpdateEvent(node), ObjectNode)
+	}
+
+	return err
 }
 
 // nodePingImpl updates Node and shows that it's active

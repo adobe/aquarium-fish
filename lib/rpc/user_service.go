@@ -123,12 +123,12 @@ func (s *UserService) Create(ctx context.Context, req *connect.Request[aquariumv
 	// Assigning roles if they are defined
 	if msgUser.Roles != nil {
 		user.Roles = msgUser.GetRoles()
+	}
 
-		if err := s.fish.DB().UserSave(ctx, user); err != nil {
-			return connect.NewResponse(&aquariumv2.UserServiceCreateResponse{
-				Status: false, Message: "Failed to update user: " + err.Error(),
-			}), connect.NewError(connect.CodeInternal, err)
-		}
+	if err := s.fish.DB().UserCreate(ctx, user); err != nil {
+		return connect.NewResponse(&aquariumv2.UserServiceCreateResponse{
+			Status: false, Message: "Failed to create user: " + err.Error(),
+		}), connect.NewError(connect.CodeInternal, err)
 	}
 
 	if msgUser.GetPassword() == "" {
