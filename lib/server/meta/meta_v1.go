@@ -16,10 +16,12 @@
 package meta
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/adobe/aquarium-fish/lib/fish"
 	"github.com/adobe/aquarium-fish/lib/log"
@@ -63,10 +65,14 @@ func (*Processor) Return(w http.ResponseWriter, r *http.Request, code int, obj m
 	w.Write(data)
 }
 
-// DataGetList returns metadata assigned to the Resource
+// ServeHTTP returns metadata assigned to the Resource
 func (p *Processor) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Establish timeout for the request
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel() // Ensure the context is canceled when the handler exits
+
 	// Only the existing local resource access it's metadata
-	res, err := p.fish.DB().ApplicationResourceGetByIP(r.Context(), strings.TrimSpace(strings.Split(r.RemoteAddr, ":")[0]))
+	res, err := p.fish.DB().ApplicationResourceGetByIP(ctx, strings.TrimSpace(strings.Split(r.RemoteAddr, ":")[0]))
 	if err != nil {
 		log.WithFunc("meta", "ServeHTTP").Warn("Unauthorized access to meta", "err", err)
 		p.Return(w, r, http.StatusUnauthorized, H{"message": "Unauthorized"})

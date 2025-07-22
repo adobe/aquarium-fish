@@ -26,6 +26,7 @@ import (
 	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	"github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2/aquariumv2connect"
 	rpcutil "github.com/adobe/aquarium-fish/lib/rpc/util"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
 // UserService implements the User service
@@ -123,6 +124,12 @@ func (s *UserService) Create(ctx context.Context, req *connect.Request[aquariumv
 	// Assigning roles if they are defined
 	if msgUser.Roles != nil {
 		user.Roles = msgUser.GetRoles()
+	}
+
+	// Assigning config
+	if msgUser.Config != nil {
+		uc := typesv2.FromUserConfig(msgUser.GetConfig())
+		user.Config = &uc
 	}
 
 	if err := s.fish.DB().UserCreate(ctx, user); err != nil {

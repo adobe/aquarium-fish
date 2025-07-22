@@ -324,10 +324,7 @@ func ({{.ReceiverVar}} {{.DataName}}) To{{.OriginalName}}() *pbTypes.{{.Original
 {{- end }}{{else if eq .Type "util.UnparsedJSON" }}
 {{- if .IsOptional }}
 	if {{$receiverVar}}.{{.Name}} != nil {
-		{{- if $mapDataNotDefined }}
 		var mapData map[string]any
-		{{- $mapDataNotDefined = false }}
-		{{- end }}
 		mapData = make(map[string]any)
 		if err := json.Unmarshal([]byte(*{{$receiverVar}}.{{.Name}}), &mapData); err == nil {
 			if structData, err := structpb.NewStruct(mapData); err == nil {

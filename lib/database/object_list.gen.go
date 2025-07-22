@@ -43,6 +43,7 @@ const (
 	ObjectSubscribeConfig        = "SubscribeConfig"
 	ObjectUiConfig               = "UiConfig"
 	ObjectUser                   = "User"
+	ObjectUserConfig             = "UserConfig"
 	ObjectUserSession            = "UserSession"
 	ObjectVote                   = "Vote"
 )

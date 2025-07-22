@@ -50,8 +50,10 @@ type User struct {
 	Hash *structpb.Struct `protobuf:"bytes,4,opt,name=hash,proto3,oneof" json:"hash,omitempty"`
 	// Set when the user was generated with no password
 	Password *string `protobuf:"bytes,5,opt,name=password,proto3,oneof" json:"password,omitempty"`
+	// User configuration settings
+	Config *UserConfig `protobuf:"bytes,6,opt,name=config,proto3,oneof" json:"config,omitempty"`
 	// List of role names assigned to the user
-	Roles         []string `protobuf:"bytes,6,rep,name=roles,proto3" json:"roles,omitempty"`
+	Roles         []string `protobuf:"bytes,7,rep,name=roles,proto3" json:"roles,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -121,11 +123,63 @@ func (x *User) GetPassword() string {
 	return ""
 }
 
+func (x *User) GetConfig() *UserConfig {
+	if x != nil {
+		return x.Config
+	}
+	return nil
+}
+
 func (x *User) GetRoles() []string {
 	if x != nil {
 		return x.Roles
 	}
 	return nil
+}
+
+type UserConfig struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Request rate limit per minute
+	RateLimit     *int32 `protobuf:"varint,1,opt,name=rate_limit,json=rateLimit,proto3,oneof" json:"rate_limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserConfig) Reset() {
+	*x = UserConfig{}
+	mi := &file_aquarium_v2_user_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserConfig) ProtoMessage() {}
+
+func (x *UserConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_aquarium_v2_user_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserConfig.ProtoReflect.Descriptor instead.
+func (*UserConfig) Descriptor() ([]byte, []int) {
+	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *UserConfig) GetRateLimit() int32 {
+	if x != nil && x.RateLimit != nil {
+		return *x.RateLimit
+	}
+	return 0
 }
 
 type UserServiceGetMeRequest struct {
@@ -136,7 +190,7 @@ type UserServiceGetMeRequest struct {
 
 func (x *UserServiceGetMeRequest) Reset() {
 	*x = UserServiceGetMeRequest{}
-	mi := &file_aquarium_v2_user_proto_msgTypes[1]
+	mi := &file_aquarium_v2_user_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -148,7 +202,7 @@ func (x *UserServiceGetMeRequest) String() string {
 func (*UserServiceGetMeRequest) ProtoMessage() {}
 
 func (x *UserServiceGetMeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_user_proto_msgTypes[1]
+	mi := &file_aquarium_v2_user_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -161,7 +215,7 @@ func (x *UserServiceGetMeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserServiceGetMeRequest.ProtoReflect.Descriptor instead.
 func (*UserServiceGetMeRequest) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{1}
+	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{2}
 }
 
 type UserServiceGetMeResponse struct {
@@ -175,7 +229,7 @@ type UserServiceGetMeResponse struct {
 
 func (x *UserServiceGetMeResponse) Reset() {
 	*x = UserServiceGetMeResponse{}
-	mi := &file_aquarium_v2_user_proto_msgTypes[2]
+	mi := &file_aquarium_v2_user_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -187,7 +241,7 @@ func (x *UserServiceGetMeResponse) String() string {
 func (*UserServiceGetMeResponse) ProtoMessage() {}
 
 func (x *UserServiceGetMeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_user_proto_msgTypes[2]
+	mi := &file_aquarium_v2_user_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -200,7 +254,7 @@ func (x *UserServiceGetMeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserServiceGetMeResponse.ProtoReflect.Descriptor instead.
 func (*UserServiceGetMeResponse) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{2}
+	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *UserServiceGetMeResponse) GetStatus() bool {
@@ -232,7 +286,7 @@ type UserServiceListRequest struct {
 
 func (x *UserServiceListRequest) Reset() {
 	*x = UserServiceListRequest{}
-	mi := &file_aquarium_v2_user_proto_msgTypes[3]
+	mi := &file_aquarium_v2_user_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -244,7 +298,7 @@ func (x *UserServiceListRequest) String() string {
 func (*UserServiceListRequest) ProtoMessage() {}
 
 func (x *UserServiceListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_user_proto_msgTypes[3]
+	mi := &file_aquarium_v2_user_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -257,7 +311,7 @@ func (x *UserServiceListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserServiceListRequest.ProtoReflect.Descriptor instead.
 func (*UserServiceListRequest) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{3}
+	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{4}
 }
 
 type UserServiceListResponse struct {
@@ -271,7 +325,7 @@ type UserServiceListResponse struct {
 
 func (x *UserServiceListResponse) Reset() {
 	*x = UserServiceListResponse{}
-	mi := &file_aquarium_v2_user_proto_msgTypes[4]
+	mi := &file_aquarium_v2_user_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -283,7 +337,7 @@ func (x *UserServiceListResponse) String() string {
 func (*UserServiceListResponse) ProtoMessage() {}
 
 func (x *UserServiceListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_user_proto_msgTypes[4]
+	mi := &file_aquarium_v2_user_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -296,7 +350,7 @@ func (x *UserServiceListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserServiceListResponse.ProtoReflect.Descriptor instead.
 func (*UserServiceListResponse) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{4}
+	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *UserServiceListResponse) GetStatus() bool {
@@ -329,7 +383,7 @@ type UserServiceGetRequest struct {
 
 func (x *UserServiceGetRequest) Reset() {
 	*x = UserServiceGetRequest{}
-	mi := &file_aquarium_v2_user_proto_msgTypes[5]
+	mi := &file_aquarium_v2_user_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -341,7 +395,7 @@ func (x *UserServiceGetRequest) String() string {
 func (*UserServiceGetRequest) ProtoMessage() {}
 
 func (x *UserServiceGetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_user_proto_msgTypes[5]
+	mi := &file_aquarium_v2_user_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -354,7 +408,7 @@ func (x *UserServiceGetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserServiceGetRequest.ProtoReflect.Descriptor instead.
 func (*UserServiceGetRequest) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{5}
+	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *UserServiceGetRequest) GetUserName() string {
@@ -375,7 +429,7 @@ type UserServiceGetResponse struct {
 
 func (x *UserServiceGetResponse) Reset() {
 	*x = UserServiceGetResponse{}
-	mi := &file_aquarium_v2_user_proto_msgTypes[6]
+	mi := &file_aquarium_v2_user_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -387,7 +441,7 @@ func (x *UserServiceGetResponse) String() string {
 func (*UserServiceGetResponse) ProtoMessage() {}
 
 func (x *UserServiceGetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_user_proto_msgTypes[6]
+	mi := &file_aquarium_v2_user_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -400,7 +454,7 @@ func (x *UserServiceGetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserServiceGetResponse.ProtoReflect.Descriptor instead.
 func (*UserServiceGetResponse) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{6}
+	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *UserServiceGetResponse) GetStatus() bool {
@@ -433,7 +487,7 @@ type UserServiceCreateRequest struct {
 
 func (x *UserServiceCreateRequest) Reset() {
 	*x = UserServiceCreateRequest{}
-	mi := &file_aquarium_v2_user_proto_msgTypes[7]
+	mi := &file_aquarium_v2_user_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -445,7 +499,7 @@ func (x *UserServiceCreateRequest) String() string {
 func (*UserServiceCreateRequest) ProtoMessage() {}
 
 func (x *UserServiceCreateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_user_proto_msgTypes[7]
+	mi := &file_aquarium_v2_user_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -458,7 +512,7 @@ func (x *UserServiceCreateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserServiceCreateRequest.ProtoReflect.Descriptor instead.
 func (*UserServiceCreateRequest) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{7}
+	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *UserServiceCreateRequest) GetUser() *User {
@@ -479,7 +533,7 @@ type UserServiceCreateResponse struct {
 
 func (x *UserServiceCreateResponse) Reset() {
 	*x = UserServiceCreateResponse{}
-	mi := &file_aquarium_v2_user_proto_msgTypes[8]
+	mi := &file_aquarium_v2_user_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -491,7 +545,7 @@ func (x *UserServiceCreateResponse) String() string {
 func (*UserServiceCreateResponse) ProtoMessage() {}
 
 func (x *UserServiceCreateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_user_proto_msgTypes[8]
+	mi := &file_aquarium_v2_user_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -504,7 +558,7 @@ func (x *UserServiceCreateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserServiceCreateResponse.ProtoReflect.Descriptor instead.
 func (*UserServiceCreateResponse) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{8}
+	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *UserServiceCreateResponse) GetStatus() bool {
@@ -537,7 +591,7 @@ type UserServiceUpdateRequest struct {
 
 func (x *UserServiceUpdateRequest) Reset() {
 	*x = UserServiceUpdateRequest{}
-	mi := &file_aquarium_v2_user_proto_msgTypes[9]
+	mi := &file_aquarium_v2_user_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -549,7 +603,7 @@ func (x *UserServiceUpdateRequest) String() string {
 func (*UserServiceUpdateRequest) ProtoMessage() {}
 
 func (x *UserServiceUpdateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_user_proto_msgTypes[9]
+	mi := &file_aquarium_v2_user_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -562,7 +616,7 @@ func (x *UserServiceUpdateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserServiceUpdateRequest.ProtoReflect.Descriptor instead.
 func (*UserServiceUpdateRequest) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{9}
+	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *UserServiceUpdateRequest) GetUser() *User {
@@ -583,7 +637,7 @@ type UserServiceUpdateResponse struct {
 
 func (x *UserServiceUpdateResponse) Reset() {
 	*x = UserServiceUpdateResponse{}
-	mi := &file_aquarium_v2_user_proto_msgTypes[10]
+	mi := &file_aquarium_v2_user_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -595,7 +649,7 @@ func (x *UserServiceUpdateResponse) String() string {
 func (*UserServiceUpdateResponse) ProtoMessage() {}
 
 func (x *UserServiceUpdateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_user_proto_msgTypes[10]
+	mi := &file_aquarium_v2_user_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -608,7 +662,7 @@ func (x *UserServiceUpdateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserServiceUpdateResponse.ProtoReflect.Descriptor instead.
 func (*UserServiceUpdateResponse) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{10}
+	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *UserServiceUpdateResponse) GetStatus() bool {
@@ -641,7 +695,7 @@ type UserServiceRemoveRequest struct {
 
 func (x *UserServiceRemoveRequest) Reset() {
 	*x = UserServiceRemoveRequest{}
-	mi := &file_aquarium_v2_user_proto_msgTypes[11]
+	mi := &file_aquarium_v2_user_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -653,7 +707,7 @@ func (x *UserServiceRemoveRequest) String() string {
 func (*UserServiceRemoveRequest) ProtoMessage() {}
 
 func (x *UserServiceRemoveRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_user_proto_msgTypes[11]
+	mi := &file_aquarium_v2_user_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -666,7 +720,7 @@ func (x *UserServiceRemoveRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserServiceRemoveRequest.ProtoReflect.Descriptor instead.
 func (*UserServiceRemoveRequest) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{11}
+	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *UserServiceRemoveRequest) GetUserName() string {
@@ -686,7 +740,7 @@ type UserServiceRemoveResponse struct {
 
 func (x *UserServiceRemoveResponse) Reset() {
 	*x = UserServiceRemoveResponse{}
-	mi := &file_aquarium_v2_user_proto_msgTypes[12]
+	mi := &file_aquarium_v2_user_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -698,7 +752,7 @@ func (x *UserServiceRemoveResponse) String() string {
 func (*UserServiceRemoveResponse) ProtoMessage() {}
 
 func (x *UserServiceRemoveResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_user_proto_msgTypes[12]
+	mi := &file_aquarium_v2_user_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -711,7 +765,7 @@ func (x *UserServiceRemoveResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserServiceRemoveResponse.ProtoReflect.Descriptor instead.
 func (*UserServiceRemoveResponse) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{12}
+	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *UserServiceRemoveResponse) GetStatus() bool {
@@ -732,7 +786,7 @@ var File_aquarium_v2_user_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_user_proto_rawDesc = "" +
 	"\n" +
-	"\x16aquarium/v2/user.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1eaquarium/v2/options_rbac.proto\x1a#aquarium/v2/options_streaming.proto\x1a\x1caquarium/v2/options_ui.proto\"\xe4\x02\n" +
+	"\x16aquarium/v2/user.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1eaquarium/v2/options_rbac.proto\x1a#aquarium/v2/options_streaming.proto\x1a\x1caquarium/v2/options_ui.proto\"\xa5\x03\n" +
 	"\x04User\x12\x1a\n" +
 	"\x04name\x18\x01 \x01(\tB\x06\x9a\xb5\x18\x02\x10\x01R\x04name\x12C\n" +
 	"\n" +
@@ -740,11 +794,18 @@ const file_aquarium_v2_user_proto_rawDesc = "" +
 	"\n" +
 	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\b\x9a\xb5\x18\x04\b\x01\x10\x01R\tupdatedAt\x12:\n" +
 	"\x04hash\x18\x04 \x01(\v2\x17.google.protobuf.StructB\b\x9a\xb5\x18\x04\b\x01\x10\x01H\x00R\x04hash\x88\x01\x01\x12\x1f\n" +
-	"\bpassword\x18\x05 \x01(\tH\x01R\bpassword\x88\x01\x01\x12'\n" +
-	"\x05roles\x18\x06 \x03(\tB\x11\x9a\xb5\x18\r\x1a\x05Roles\"\x04RoleR\x05roles:\x1a\x8a\xb5\x18\x10\n" +
+	"\bpassword\x18\x05 \x01(\tH\x01R\bpassword\x88\x01\x01\x124\n" +
+	"\x06config\x18\x06 \x01(\v2\x17.aquarium.v2.UserConfigH\x02R\x06config\x88\x01\x01\x12'\n" +
+	"\x05roles\x18\a \x03(\tB\x11\x9a\xb5\x18\r\x1a\x05Roles\"\x04RoleR\x05roles:\x1a\x8a\xb5\x18\x10\n" +
 	"\x0eUserServiceGet\x92\xb5\x18\x02\b\x01B\a\n" +
 	"\x05_hashB\v\n" +
-	"\t_password\"\x19\n" +
+	"\t_passwordB\t\n" +
+	"\a_config\"G\n" +
+	"\n" +
+	"UserConfig\x12\"\n" +
+	"\n" +
+	"rate_limit\x18\x01 \x01(\x05H\x00R\trateLimit\x88\x01\x01:\x06\x92\xb5\x18\x02\b\x01B\r\n" +
+	"\v_rate_limit\"\x19\n" +
 	"\x17UserServiceGetMeRequest\"s\n" +
 	"\x18UserServiceGetMeResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
@@ -798,52 +859,54 @@ func file_aquarium_v2_user_proto_rawDescGZIP() []byte {
 	return file_aquarium_v2_user_proto_rawDescData
 }
 
-var file_aquarium_v2_user_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_aquarium_v2_user_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_aquarium_v2_user_proto_goTypes = []any{
 	(*User)(nil),                      // 0: aquarium.v2.User
-	(*UserServiceGetMeRequest)(nil),   // 1: aquarium.v2.UserServiceGetMeRequest
-	(*UserServiceGetMeResponse)(nil),  // 2: aquarium.v2.UserServiceGetMeResponse
-	(*UserServiceListRequest)(nil),    // 3: aquarium.v2.UserServiceListRequest
-	(*UserServiceListResponse)(nil),   // 4: aquarium.v2.UserServiceListResponse
-	(*UserServiceGetRequest)(nil),     // 5: aquarium.v2.UserServiceGetRequest
-	(*UserServiceGetResponse)(nil),    // 6: aquarium.v2.UserServiceGetResponse
-	(*UserServiceCreateRequest)(nil),  // 7: aquarium.v2.UserServiceCreateRequest
-	(*UserServiceCreateResponse)(nil), // 8: aquarium.v2.UserServiceCreateResponse
-	(*UserServiceUpdateRequest)(nil),  // 9: aquarium.v2.UserServiceUpdateRequest
-	(*UserServiceUpdateResponse)(nil), // 10: aquarium.v2.UserServiceUpdateResponse
-	(*UserServiceRemoveRequest)(nil),  // 11: aquarium.v2.UserServiceRemoveRequest
-	(*UserServiceRemoveResponse)(nil), // 12: aquarium.v2.UserServiceRemoveResponse
-	(*timestamppb.Timestamp)(nil),     // 13: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),           // 14: google.protobuf.Struct
+	(*UserConfig)(nil),                // 1: aquarium.v2.UserConfig
+	(*UserServiceGetMeRequest)(nil),   // 2: aquarium.v2.UserServiceGetMeRequest
+	(*UserServiceGetMeResponse)(nil),  // 3: aquarium.v2.UserServiceGetMeResponse
+	(*UserServiceListRequest)(nil),    // 4: aquarium.v2.UserServiceListRequest
+	(*UserServiceListResponse)(nil),   // 5: aquarium.v2.UserServiceListResponse
+	(*UserServiceGetRequest)(nil),     // 6: aquarium.v2.UserServiceGetRequest
+	(*UserServiceGetResponse)(nil),    // 7: aquarium.v2.UserServiceGetResponse
+	(*UserServiceCreateRequest)(nil),  // 8: aquarium.v2.UserServiceCreateRequest
+	(*UserServiceCreateResponse)(nil), // 9: aquarium.v2.UserServiceCreateResponse
+	(*UserServiceUpdateRequest)(nil),  // 10: aquarium.v2.UserServiceUpdateRequest
+	(*UserServiceUpdateResponse)(nil), // 11: aquarium.v2.UserServiceUpdateResponse
+	(*UserServiceRemoveRequest)(nil),  // 12: aquarium.v2.UserServiceRemoveRequest
+	(*UserServiceRemoveResponse)(nil), // 13: aquarium.v2.UserServiceRemoveResponse
+	(*timestamppb.Timestamp)(nil),     // 14: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),           // 15: google.protobuf.Struct
 }
 var file_aquarium_v2_user_proto_depIdxs = []int32{
-	13, // 0: aquarium.v2.User.created_at:type_name -> google.protobuf.Timestamp
-	13, // 1: aquarium.v2.User.updated_at:type_name -> google.protobuf.Timestamp
-	14, // 2: aquarium.v2.User.hash:type_name -> google.protobuf.Struct
-	0,  // 3: aquarium.v2.UserServiceGetMeResponse.data:type_name -> aquarium.v2.User
-	0,  // 4: aquarium.v2.UserServiceListResponse.data:type_name -> aquarium.v2.User
-	0,  // 5: aquarium.v2.UserServiceGetResponse.data:type_name -> aquarium.v2.User
-	0,  // 6: aquarium.v2.UserServiceCreateRequest.user:type_name -> aquarium.v2.User
-	0,  // 7: aquarium.v2.UserServiceCreateResponse.data:type_name -> aquarium.v2.User
-	0,  // 8: aquarium.v2.UserServiceUpdateRequest.user:type_name -> aquarium.v2.User
-	0,  // 9: aquarium.v2.UserServiceUpdateResponse.data:type_name -> aquarium.v2.User
-	1,  // 10: aquarium.v2.UserService.GetMe:input_type -> aquarium.v2.UserServiceGetMeRequest
-	3,  // 11: aquarium.v2.UserService.List:input_type -> aquarium.v2.UserServiceListRequest
-	5,  // 12: aquarium.v2.UserService.Get:input_type -> aquarium.v2.UserServiceGetRequest
-	7,  // 13: aquarium.v2.UserService.Create:input_type -> aquarium.v2.UserServiceCreateRequest
-	9,  // 14: aquarium.v2.UserService.Update:input_type -> aquarium.v2.UserServiceUpdateRequest
-	11, // 15: aquarium.v2.UserService.Remove:input_type -> aquarium.v2.UserServiceRemoveRequest
-	2,  // 16: aquarium.v2.UserService.GetMe:output_type -> aquarium.v2.UserServiceGetMeResponse
-	4,  // 17: aquarium.v2.UserService.List:output_type -> aquarium.v2.UserServiceListResponse
-	6,  // 18: aquarium.v2.UserService.Get:output_type -> aquarium.v2.UserServiceGetResponse
-	8,  // 19: aquarium.v2.UserService.Create:output_type -> aquarium.v2.UserServiceCreateResponse
-	10, // 20: aquarium.v2.UserService.Update:output_type -> aquarium.v2.UserServiceUpdateResponse
-	12, // 21: aquarium.v2.UserService.Remove:output_type -> aquarium.v2.UserServiceRemoveResponse
-	16, // [16:22] is the sub-list for method output_type
-	10, // [10:16] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	14, // 0: aquarium.v2.User.created_at:type_name -> google.protobuf.Timestamp
+	14, // 1: aquarium.v2.User.updated_at:type_name -> google.protobuf.Timestamp
+	15, // 2: aquarium.v2.User.hash:type_name -> google.protobuf.Struct
+	1,  // 3: aquarium.v2.User.config:type_name -> aquarium.v2.UserConfig
+	0,  // 4: aquarium.v2.UserServiceGetMeResponse.data:type_name -> aquarium.v2.User
+	0,  // 5: aquarium.v2.UserServiceListResponse.data:type_name -> aquarium.v2.User
+	0,  // 6: aquarium.v2.UserServiceGetResponse.data:type_name -> aquarium.v2.User
+	0,  // 7: aquarium.v2.UserServiceCreateRequest.user:type_name -> aquarium.v2.User
+	0,  // 8: aquarium.v2.UserServiceCreateResponse.data:type_name -> aquarium.v2.User
+	0,  // 9: aquarium.v2.UserServiceUpdateRequest.user:type_name -> aquarium.v2.User
+	0,  // 10: aquarium.v2.UserServiceUpdateResponse.data:type_name -> aquarium.v2.User
+	2,  // 11: aquarium.v2.UserService.GetMe:input_type -> aquarium.v2.UserServiceGetMeRequest
+	4,  // 12: aquarium.v2.UserService.List:input_type -> aquarium.v2.UserServiceListRequest
+	6,  // 13: aquarium.v2.UserService.Get:input_type -> aquarium.v2.UserServiceGetRequest
+	8,  // 14: aquarium.v2.UserService.Create:input_type -> aquarium.v2.UserServiceCreateRequest
+	10, // 15: aquarium.v2.UserService.Update:input_type -> aquarium.v2.UserServiceUpdateRequest
+	12, // 16: aquarium.v2.UserService.Remove:input_type -> aquarium.v2.UserServiceRemoveRequest
+	3,  // 17: aquarium.v2.UserService.GetMe:output_type -> aquarium.v2.UserServiceGetMeResponse
+	5,  // 18: aquarium.v2.UserService.List:output_type -> aquarium.v2.UserServiceListResponse
+	7,  // 19: aquarium.v2.UserService.Get:output_type -> aquarium.v2.UserServiceGetResponse
+	9,  // 20: aquarium.v2.UserService.Create:output_type -> aquarium.v2.UserServiceCreateResponse
+	11, // 21: aquarium.v2.UserService.Update:output_type -> aquarium.v2.UserServiceUpdateResponse
+	13, // 22: aquarium.v2.UserService.Remove:output_type -> aquarium.v2.UserServiceRemoveResponse
+	17, // [17:23] is the sub-list for method output_type
+	11, // [11:17] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_aquarium_v2_user_proto_init() }
@@ -855,13 +918,14 @@ func file_aquarium_v2_user_proto_init() {
 	file_aquarium_v2_options_streaming_proto_init()
 	file_aquarium_v2_options_ui_proto_init()
 	file_aquarium_v2_user_proto_msgTypes[0].OneofWrappers = []any{}
+	file_aquarium_v2_user_proto_msgTypes[1].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aquarium_v2_user_proto_rawDesc), len(file_aquarium_v2_user_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

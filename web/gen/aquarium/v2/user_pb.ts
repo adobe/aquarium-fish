@@ -27,7 +27,7 @@ import type { JsonObject, Message } from "@bufbuild/protobuf";
  * Describes the file aquarium/v2/user.proto.
  */
 export const file_aquarium_v2_user: GenFile = /*@__PURE__*/
-  fileDesc("ChZhcXVhcml1bS92Mi91c2VyLnByb3RvEgthcXVhcml1bS52MiKxAgoEVXNlchIUCgRuYW1lGAEgASgJQgaatRgCEAESOAoKY3JlYXRlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCCJq1GAQIARABEjgKCnVwZGF0ZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgiatRgECAEQARI0CgRoYXNoGAQgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdEIImrUYBAgBEAFIAIgBARIVCghwYXNzd29yZBgFIAEoCUgBiAEBEiAKBXJvbGVzGAYgAygJQhGatRgNGgVSb2xlcyIEUm9sZToairUYEAoOVXNlclNlcnZpY2VHZXSStRgCCAFCBwoFX2hhc2hCCwoJX3Bhc3N3b3JkIhkKF1VzZXJTZXJ2aWNlR2V0TWVSZXF1ZXN0IlwKGFVzZXJTZXJ2aWNlR2V0TWVSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIfCgRkYXRhGAMgASgLMhEuYXF1YXJpdW0udjIuVXNlciIYChZVc2VyU2VydmljZUxpc3RSZXF1ZXN0IlsKF1VzZXJTZXJ2aWNlTGlzdFJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEh8KBGRhdGEYAyADKAsyES5hcXVhcml1bS52Mi5Vc2VyIioKFVVzZXJTZXJ2aWNlR2V0UmVxdWVzdBIRCgl1c2VyX25hbWUYASABKAkiWgoWVXNlclNlcnZpY2VHZXRSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIfCgRkYXRhGAMgASgLMhEuYXF1YXJpdW0udjIuVXNlciI7ChhVc2VyU2VydmljZUNyZWF0ZVJlcXVlc3QSHwoEdXNlchgBIAEoCzIRLmFxdWFyaXVtLnYyLlVzZXIiXQoZVXNlclNlcnZpY2VDcmVhdGVSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIfCgRkYXRhGAMgASgLMhEuYXF1YXJpdW0udjIuVXNlciI7ChhVc2VyU2VydmljZVVwZGF0ZVJlcXVlc3QSHwoEdXNlchgBIAEoCzIRLmFxdWFyaXVtLnYyLlVzZXIiXQoZVXNlclNlcnZpY2VVcGRhdGVSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIfCgRkYXRhGAMgASgLMhEuYXF1YXJpdW0udjIuVXNlciItChhVc2VyU2VydmljZVJlbW92ZVJlcXVlc3QSEQoJdXNlcl9uYW1lGAEgASgJIjwKGVVzZXJTZXJ2aWNlUmVtb3ZlUmVzcG9uc2USDgoGc3RhdHVzGAEgASgIEg8KB21lc3NhZ2UYAiABKAky0AQKC1VzZXJTZXJ2aWNlElwKBUdldE1lEiQuYXF1YXJpdW0udjIuVXNlclNlcnZpY2VHZXRNZVJlcXVlc3QaJS5hcXVhcml1bS52Mi5Vc2VyU2VydmljZUdldE1lUmVzcG9uc2UiBoK1GAIQARJTCgRMaXN0EiMuYXF1YXJpdW0udjIuVXNlclNlcnZpY2VMaXN0UmVxdWVzdBokLmFxdWFyaXVtLnYyLlVzZXJTZXJ2aWNlTGlzdFJlc3BvbnNlIgASUAoDR2V0EiIuYXF1YXJpdW0udjIuVXNlclNlcnZpY2VHZXRSZXF1ZXN0GiMuYXF1YXJpdW0udjIuVXNlclNlcnZpY2VHZXRSZXNwb25zZSIAElkKBkNyZWF0ZRIlLmFxdWFyaXVtLnYyLlVzZXJTZXJ2aWNlQ3JlYXRlUmVxdWVzdBomLmFxdWFyaXVtLnYyLlVzZXJTZXJ2aWNlQ3JlYXRlUmVzcG9uc2UiABKFAQoGVXBkYXRlEiUuYXF1YXJpdW0udjIuVXNlclNlcnZpY2VVcGRhdGVSZXF1ZXN0GiYuYXF1YXJpdW0udjIuVXNlclNlcnZpY2VVcGRhdGVSZXNwb25zZSIsgrUYKCIJVXBkYXRlQWxsIg5VcGRhdGVQYXNzd29yZCILVXBkYXRlUm9sZXMSWQoGUmVtb3ZlEiUuYXF1YXJpdW0udjIuVXNlclNlcnZpY2VSZW1vdmVSZXF1ZXN0GiYuYXF1YXJpdW0udjIuVXNlclNlcnZpY2VSZW1vdmVSZXNwb25zZSIAQkVaQ2dpdGh1Yi5jb20vYWRvYmUvYXF1YXJpdW0tZmlzaC9saWIvcnBjL3Byb3RvL2FxdWFyaXVtL3YyO2FxdWFyaXVtdjJiBnByb3RvMw", [file_google_protobuf_timestamp, file_google_protobuf_struct, file_aquarium_v2_options_rbac, file_aquarium_v2_options_streaming, file_aquarium_v2_options_ui]);
+  fileDesc("ChZhcXVhcml1bS92Mi91c2VyLnByb3RvEgthcXVhcml1bS52MiLqAgoEVXNlchIUCgRuYW1lGAEgASgJQgaatRgCEAESOAoKY3JlYXRlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCCJq1GAQIARABEjgKCnVwZGF0ZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgiatRgECAEQARI0CgRoYXNoGAQgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdEIImrUYBAgBEAFIAIgBARIVCghwYXNzd29yZBgFIAEoCUgBiAEBEiwKBmNvbmZpZxgGIAEoCzIXLmFxdWFyaXVtLnYyLlVzZXJDb25maWdIAogBARIgCgVyb2xlcxgHIAMoCUIRmrUYDRoFUm9sZXMiBFJvbGU6Goq1GBAKDlVzZXJTZXJ2aWNlR2V0krUYAggBQgcKBV9oYXNoQgsKCV9wYXNzd29yZEIJCgdfY29uZmlnIjwKClVzZXJDb25maWcSFwoKcmF0ZV9saW1pdBgBIAEoBUgAiAEBOgaStRgCCAFCDQoLX3JhdGVfbGltaXQiGQoXVXNlclNlcnZpY2VHZXRNZVJlcXVlc3QiXAoYVXNlclNlcnZpY2VHZXRNZVJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEh8KBGRhdGEYAyABKAsyES5hcXVhcml1bS52Mi5Vc2VyIhgKFlVzZXJTZXJ2aWNlTGlzdFJlcXVlc3QiWwoXVXNlclNlcnZpY2VMaXN0UmVzcG9uc2USDgoGc3RhdHVzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkSHwoEZGF0YRgDIAMoCzIRLmFxdWFyaXVtLnYyLlVzZXIiKgoVVXNlclNlcnZpY2VHZXRSZXF1ZXN0EhEKCXVzZXJfbmFtZRgBIAEoCSJaChZVc2VyU2VydmljZUdldFJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEh8KBGRhdGEYAyABKAsyES5hcXVhcml1bS52Mi5Vc2VyIjsKGFVzZXJTZXJ2aWNlQ3JlYXRlUmVxdWVzdBIfCgR1c2VyGAEgASgLMhEuYXF1YXJpdW0udjIuVXNlciJdChlVc2VyU2VydmljZUNyZWF0ZVJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEh8KBGRhdGEYAyABKAsyES5hcXVhcml1bS52Mi5Vc2VyIjsKGFVzZXJTZXJ2aWNlVXBkYXRlUmVxdWVzdBIfCgR1c2VyGAEgASgLMhEuYXF1YXJpdW0udjIuVXNlciJdChlVc2VyU2VydmljZVVwZGF0ZVJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEh8KBGRhdGEYAyABKAsyES5hcXVhcml1bS52Mi5Vc2VyIi0KGFVzZXJTZXJ2aWNlUmVtb3ZlUmVxdWVzdBIRCgl1c2VyX25hbWUYASABKAkiPAoZVXNlclNlcnZpY2VSZW1vdmVSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCTLQBAoLVXNlclNlcnZpY2USXAoFR2V0TWUSJC5hcXVhcml1bS52Mi5Vc2VyU2VydmljZUdldE1lUmVxdWVzdBolLmFxdWFyaXVtLnYyLlVzZXJTZXJ2aWNlR2V0TWVSZXNwb25zZSIGgrUYAhABElMKBExpc3QSIy5hcXVhcml1bS52Mi5Vc2VyU2VydmljZUxpc3RSZXF1ZXN0GiQuYXF1YXJpdW0udjIuVXNlclNlcnZpY2VMaXN0UmVzcG9uc2UiABJQCgNHZXQSIi5hcXVhcml1bS52Mi5Vc2VyU2VydmljZUdldFJlcXVlc3QaIy5hcXVhcml1bS52Mi5Vc2VyU2VydmljZUdldFJlc3BvbnNlIgASWQoGQ3JlYXRlEiUuYXF1YXJpdW0udjIuVXNlclNlcnZpY2VDcmVhdGVSZXF1ZXN0GiYuYXF1YXJpdW0udjIuVXNlclNlcnZpY2VDcmVhdGVSZXNwb25zZSIAEoUBCgZVcGRhdGUSJS5hcXVhcml1bS52Mi5Vc2VyU2VydmljZVVwZGF0ZVJlcXVlc3QaJi5hcXVhcml1bS52Mi5Vc2VyU2VydmljZVVwZGF0ZVJlc3BvbnNlIiyCtRgoIglVcGRhdGVBbGwiDlVwZGF0ZVBhc3N3b3JkIgtVcGRhdGVSb2xlcxJZCgZSZW1vdmUSJS5hcXVhcml1bS52Mi5Vc2VyU2VydmljZVJlbW92ZVJlcXVlc3QaJi5hcXVhcml1bS52Mi5Vc2VyU2VydmljZVJlbW92ZVJlc3BvbnNlIgBCRVpDZ2l0aHViLmNvbS9hZG9iZS9hcXVhcml1bS1maXNoL2xpYi9ycGMvcHJvdG8vYXF1YXJpdW0vdjI7YXF1YXJpdW12MmIGcHJvdG8z", [file_google_protobuf_timestamp, file_google_protobuf_struct, file_aquarium_v2_options_rbac, file_aquarium_v2_options_streaming, file_aquarium_v2_options_ui]);
 
 /**
  * User represents a user in the system
@@ -70,9 +70,16 @@ export type User = Message<"aquarium.v2.User"> & {
   password?: string;
 
   /**
+   * User configuration settings
+   *
+   * @generated from field: optional aquarium.v2.UserConfig config = 6;
+   */
+  config?: UserConfig;
+
+  /**
    * List of role names assigned to the user
    *
-   * @generated from field: repeated string roles = 6;
+   * @generated from field: repeated string roles = 7;
    */
   roles: string[];
 };
@@ -85,6 +92,25 @@ export const UserSchema: GenMessage<User> = /*@__PURE__*/
   messageDesc(file_aquarium_v2_user, 0);
 
 /**
+ * @generated from message aquarium.v2.UserConfig
+ */
+export type UserConfig = Message<"aquarium.v2.UserConfig"> & {
+  /**
+   * Request rate limit per minute
+   *
+   * @generated from field: optional int32 rate_limit = 1;
+   */
+  rateLimit?: number;
+};
+
+/**
+ * Describes the message aquarium.v2.UserConfig.
+ * Use `create(UserConfigSchema)` to create a new message.
+ */
+export const UserConfigSchema: GenMessage<UserConfig> = /*@__PURE__*/
+  messageDesc(file_aquarium_v2_user, 1);
+
+/**
  * @generated from message aquarium.v2.UserServiceGetMeRequest
  */
 export type UserServiceGetMeRequest = Message<"aquarium.v2.UserServiceGetMeRequest"> & {
@@ -95,7 +121,7 @@ export type UserServiceGetMeRequest = Message<"aquarium.v2.UserServiceGetMeReque
  * Use `create(UserServiceGetMeRequestSchema)` to create a new message.
  */
 export const UserServiceGetMeRequestSchema: GenMessage<UserServiceGetMeRequest> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_user, 1);
+  messageDesc(file_aquarium_v2_user, 2);
 
 /**
  * @generated from message aquarium.v2.UserServiceGetMeResponse
@@ -122,7 +148,7 @@ export type UserServiceGetMeResponse = Message<"aquarium.v2.UserServiceGetMeResp
  * Use `create(UserServiceGetMeResponseSchema)` to create a new message.
  */
 export const UserServiceGetMeResponseSchema: GenMessage<UserServiceGetMeResponse> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_user, 2);
+  messageDesc(file_aquarium_v2_user, 3);
 
 /**
  * @generated from message aquarium.v2.UserServiceListRequest
@@ -135,7 +161,7 @@ export type UserServiceListRequest = Message<"aquarium.v2.UserServiceListRequest
  * Use `create(UserServiceListRequestSchema)` to create a new message.
  */
 export const UserServiceListRequestSchema: GenMessage<UserServiceListRequest> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_user, 3);
+  messageDesc(file_aquarium_v2_user, 4);
 
 /**
  * @generated from message aquarium.v2.UserServiceListResponse
@@ -162,7 +188,7 @@ export type UserServiceListResponse = Message<"aquarium.v2.UserServiceListRespon
  * Use `create(UserServiceListResponseSchema)` to create a new message.
  */
 export const UserServiceListResponseSchema: GenMessage<UserServiceListResponse> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_user, 4);
+  messageDesc(file_aquarium_v2_user, 5);
 
 /**
  * @generated from message aquarium.v2.UserServiceGetRequest
@@ -179,7 +205,7 @@ export type UserServiceGetRequest = Message<"aquarium.v2.UserServiceGetRequest">
  * Use `create(UserServiceGetRequestSchema)` to create a new message.
  */
 export const UserServiceGetRequestSchema: GenMessage<UserServiceGetRequest> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_user, 5);
+  messageDesc(file_aquarium_v2_user, 6);
 
 /**
  * @generated from message aquarium.v2.UserServiceGetResponse
@@ -206,7 +232,7 @@ export type UserServiceGetResponse = Message<"aquarium.v2.UserServiceGetResponse
  * Use `create(UserServiceGetResponseSchema)` to create a new message.
  */
 export const UserServiceGetResponseSchema: GenMessage<UserServiceGetResponse> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_user, 6);
+  messageDesc(file_aquarium_v2_user, 7);
 
 /**
  * @generated from message aquarium.v2.UserServiceCreateRequest
@@ -223,7 +249,7 @@ export type UserServiceCreateRequest = Message<"aquarium.v2.UserServiceCreateReq
  * Use `create(UserServiceCreateRequestSchema)` to create a new message.
  */
 export const UserServiceCreateRequestSchema: GenMessage<UserServiceCreateRequest> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_user, 7);
+  messageDesc(file_aquarium_v2_user, 8);
 
 /**
  * @generated from message aquarium.v2.UserServiceCreateResponse
@@ -250,7 +276,7 @@ export type UserServiceCreateResponse = Message<"aquarium.v2.UserServiceCreateRe
  * Use `create(UserServiceCreateResponseSchema)` to create a new message.
  */
 export const UserServiceCreateResponseSchema: GenMessage<UserServiceCreateResponse> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_user, 8);
+  messageDesc(file_aquarium_v2_user, 9);
 
 /**
  * @generated from message aquarium.v2.UserServiceUpdateRequest
@@ -267,7 +293,7 @@ export type UserServiceUpdateRequest = Message<"aquarium.v2.UserServiceUpdateReq
  * Use `create(UserServiceUpdateRequestSchema)` to create a new message.
  */
 export const UserServiceUpdateRequestSchema: GenMessage<UserServiceUpdateRequest> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_user, 9);
+  messageDesc(file_aquarium_v2_user, 10);
 
 /**
  * @generated from message aquarium.v2.UserServiceUpdateResponse
@@ -294,7 +320,7 @@ export type UserServiceUpdateResponse = Message<"aquarium.v2.UserServiceUpdateRe
  * Use `create(UserServiceUpdateResponseSchema)` to create a new message.
  */
 export const UserServiceUpdateResponseSchema: GenMessage<UserServiceUpdateResponse> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_user, 10);
+  messageDesc(file_aquarium_v2_user, 11);
 
 /**
  * @generated from message aquarium.v2.UserServiceRemoveRequest
@@ -311,7 +337,7 @@ export type UserServiceRemoveRequest = Message<"aquarium.v2.UserServiceRemoveReq
  * Use `create(UserServiceRemoveRequestSchema)` to create a new message.
  */
 export const UserServiceRemoveRequestSchema: GenMessage<UserServiceRemoveRequest> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_user, 11);
+  messageDesc(file_aquarium_v2_user, 12);
 
 /**
  * @generated from message aquarium.v2.UserServiceRemoveResponse
@@ -333,7 +359,7 @@ export type UserServiceRemoveResponse = Message<"aquarium.v2.UserServiceRemoveRe
  * Use `create(UserServiceRemoveResponseSchema)` to create a new message.
  */
 export const UserServiceRemoveResponseSchema: GenMessage<UserServiceRemoveResponse> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_user, 12);
+  messageDesc(file_aquarium_v2_user, 13);
 
 /**
  * User service handles user management operations

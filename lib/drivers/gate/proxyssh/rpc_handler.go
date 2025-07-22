@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
@@ -52,7 +53,11 @@ func (d *Driver) newRPCHandler() gate.RPCService {
 }
 
 // GetResourceAccess implements the GateProxySSHServiceHandler interface
-func (d *driverRPCHandler) GetResourceAccess(ctx context.Context, req *connect.Request[aquariumv2.GateProxySSHServiceGetResourceAccessRequest]) (*connect.Response[aquariumv2.GateProxySSHServiceGetResourceAccessResponse], error) {
+func (d *driverRPCHandler) GetResourceAccess(reqCtx context.Context, req *connect.Request[aquariumv2.GateProxySSHServiceGetResourceAccessRequest]) (*connect.Response[aquariumv2.GateProxySSHServiceGetResourceAccessResponse], error) {
+	// Establish timeout for the request
+	ctx, cancel := context.WithTimeout(reqCtx, 10*time.Second)
+	defer cancel() // Ensure the context is canceled when the handler exits
+
 	// Parsing ApplicationResource UID
 	appResourceUID := req.Msg.GetApplicationResourceUid()
 	if appResourceUID == "" {
@@ -89,7 +94,7 @@ func (d *driverRPCHandler) GetResourceAccess(ctx context.Context, req *connect.R
 	}
 
 	// Get user information from context (set by auth interceptor)
-	//userCtx, ok := ctx.Value("user").(string)
+	// userCtx, ok := ctx.Value("user").(string)
 	userName := rpcutil.GetUserName(ctx)
 
 	// Check if the user is owner or has permissions to get access to someone's else's resources

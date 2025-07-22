@@ -30,6 +30,21 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
+// authResponseWriter is a helper to capture response data from middleware
+type authResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+	written    bool
+}
+
+func (w *authResponseWriter) WriteHeader(code int) {
+	if !w.written {
+		w.statusCode = code
+		w.ResponseWriter.WriteHeader(code)
+		w.written = true
+	}
+}
+
 // Global JWT secret (generated once on startup)
 var (
 	jwtSecret     []byte
@@ -80,12 +95,16 @@ func GetJWTSecret() []byte {
 
 // AuthHandler is a HTTP middleware that handles authentication
 type AuthHandler struct {
-	db *database.Database
+	db            *database.Database
+	ipRateLimiter *IPRateLimitHandler
 }
 
 // NewAuthHandler creates a new auth handler
-func NewAuthHandler(db *database.Database) *AuthHandler {
-	return &AuthHandler{db: db}
+func NewAuthHandler(db *database.Database, ipRateLimiter *IPRateLimitHandler) *AuthHandler {
+	return &AuthHandler{
+		db:            db,
+		ipRateLimiter: ipRateLimiter,
+	}
 }
 
 // Handler implements HTTP middleware for authentication
@@ -102,61 +121,85 @@ func (h *AuthHandler) Handler(next http.Handler) http.Handler {
 			return
 		}
 
-		auth := r.Header.Get("Authorization")
+		authHeader := r.Header.Get("Authorization")
 
 		var user *typesv2.User
+		var authFailed bool
 
 		// Check for JWT Bearer token first
-		if strings.HasPrefix(auth, "Bearer ") {
-			tokenString := auth[7:]
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			tokenString := authHeader[7:]
 			logger.Debug("JWT Bearer token found")
 
 			// Parse JWT token
 			claims, err := ParseJWTToken(tokenString)
 			if err != nil {
 				logger.Debug("Failed to parse JWT token", "err", err)
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-				return
+				authFailed = true
+			} else {
+				// Get user from database
+				user, err = h.db.UserGet(r.Context(), claims.UserName)
+				if err != nil {
+					logger.Debug("Failed to get user from JWT", "username", claims.UserName, "err", err)
+					authFailed = true
+				} else {
+					logger.Debug("JWT authentication successful", "user", user.Name)
+				}
 			}
-
-			// Get user from database
-			user, err = h.db.UserGet(r.Context(), claims.UserName)
-			if err != nil {
-				logger.Debug("Failed to get user from JWT", "username", claims.UserName, "err", err)
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-				return
-			}
-
-			logger.Debug("JWT authentication successful", "user", user.Name)
-		} else if strings.HasPrefix(auth, "Basic ") {
+		} else if strings.HasPrefix(authHeader, "Basic ") {
 			// Fall back to Basic auth for compatibility
-			payload, err := base64.StdEncoding.DecodeString(auth[6:])
+			payload, err := base64.StdEncoding.DecodeString(authHeader[6:])
 			if err != nil {
 				logger.Debug("Failed to decode auth header", "err", err)
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-				return
+				authFailed = true
+			} else {
+				parts := strings.SplitN(string(payload), ":", 2)
+				if len(parts) != 2 {
+					logger.Debug("Invalid auth format")
+					authFailed = true
+				} else {
+					username, password := parts[0], parts[1]
+					logger.Debug("Basic auth request received", "user", username)
+
+					user = h.db.UserAuth(r.Context(), username, password)
+					if user == nil {
+						logger.Debug("Authentication failed for user", "user", username)
+						authFailed = true
+					} else {
+						logger.Debug("Basic authentication successful", "user", user.Name)
+					}
+				}
 			}
-
-			parts := strings.SplitN(string(payload), ":", 2)
-			if len(parts) != 2 {
-				logger.Debug("Invalid auth format")
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-				return
-			}
-
-			username, password := parts[0], parts[1]
-			logger.Debug("Basic auth request received", "user", username)
-
-			user = h.db.UserAuth(r.Context(), username, password)
-			if user == nil {
-				logger.Debug("Authentication failed for user", "user", username)
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-				return
-			}
-
-			logger.Debug("Basic authentication successful", "user", user.Name)
 		} else {
 			logger.Debug("No valid auth header found")
+			authFailed = true
+		}
+
+		// If authentication failed, apply IP rate limiting for unauthenticated requests
+		if authFailed {
+			if h.ipRateLimiter != nil {
+				logger.Debug("Applying IP rate limiting for unauthenticated request")
+
+				// Create a response writer to capture IP rate limit response
+				authRespWriter := &authResponseWriter{ResponseWriter: w, statusCode: 200}
+
+				// Create a dummy handler that just sets success
+				rateLimitPassed := false
+				dummyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					rateLimitPassed = true
+				})
+
+				// Apply IP rate limiting
+				h.ipRateLimiter.Handler(dummyHandler).ServeHTTP(authRespWriter, r)
+
+				// If rate limit was exceeded, the response was already written by IP rate limiter
+				if !rateLimitPassed {
+					logger.Debug("IP rate limit exceeded for unauthenticated request")
+					return
+				}
+			}
+
+			// Rate limit passed (or no rate limiter configured), return unauthorized
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}

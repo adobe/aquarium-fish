@@ -19,3 +19,4 @@ export { ResourcesForm } from './ResourcesForm';
 export { ResourcesDiskForm } from './ResourcesDiskForm';
 export { RoleForm } from './RoleForm';
 export { UserForm } from './UserForm';
+export { UserConfigForm } from './UserConfigForm';

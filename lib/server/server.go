@@ -107,12 +107,11 @@ func Init(f *fish.Fish, apiAddress, caPath, certPath, keyPath string) (*Wrapper,
 		},
 
 		// Security settings - optimized for streaming operations
-		ReadHeaderTimeout: 30 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
 		// For streaming operations, we need much longer timeouts or no timeout at all
-		// ReadTimeout: 0 means no timeout (infinite), which is appropriate for streaming
-		ReadTimeout:  0,                 // No timeout for streaming operations
-		WriteTimeout: 300 * time.Second, // 5 minutes for streaming responses
-		IdleTimeout:  600 * time.Second, // 10 minutes to prevent connection close on inactivity
+		ReadTimeout:  0,               // No timeout for streaming operations, handled per-request
+		WriteTimeout: 0,               // No timeout for streaming operations, handled per-request
+		IdleTimeout:  2 * time.Minute, // 2 minutes to prevent connection close on inactivity (ping is sent every 30 sec)
 	}
 
 	errChan := make(chan error)

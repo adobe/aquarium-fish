@@ -35,6 +35,7 @@ interface UserFormState {
   updatedAt: string;
   hash: Record<string, any>;
   password: string;
+  config: any;
   roles: string;
 }
 const defaultUserState: UserFormState = {
@@ -43,6 +44,7 @@ const defaultUserState: UserFormState = {
   updatedAt: '',
   hash: undefined,
   password: undefined,
+  config: undefined,
   roles: [],
 };
 
@@ -75,6 +77,7 @@ export const UserForm: React.FC<UserFormProps> = ({
         updatedAt: initialData.updatedAt ? new Date(Number(initialData.updatedAt.seconds) * 1000).toISOString().slice(0, 16) : '',
         hash: initialData.hash || {},
         password: initialData.password ?? undefined,
+        config: initialData.config ?? undefined,
         roles: initialData.roles || [],
       };
       setFormData(newFormData);
@@ -118,6 +121,9 @@ const handleYamlLoad = () => {
     }
     if (parsedData.password !== undefined) {
       newFormData.password = parsedData.password;
+    }
+    if (parsedData.config !== undefined) {
+      newFormData.config = parsedData.config;
     }
     if (parsedData.roles !== undefined) {
       if (Array.isArray(parsedData.roles)) {
@@ -166,6 +172,7 @@ const handleSubmit = () => {
       updatedAt: formData.updatedAt ? { seconds: BigInt(Math.floor(new Date(formData.updatedAt).getTime() / 1000)) } : undefined,
       hash: formData.hash,
       password: formData.password || undefined,
+      config: formData.config || undefined,
       roles: formData.roles,
     });
 
@@ -482,6 +489,129 @@ const isSimpleField = (field: any) => {
   </div>
 </div>
 
+  </div>{/* Config field */}
+  <div>
+    {/* Complex field - traditional layout */}
+    <div className="space-y-2">
+<div className="flex items-center space-x-2">
+  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+    Config
+  </label>
+  <div className="relative group">
+    <span className="cursor-help text-gray-400 hover:text-gray-600">
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    </span>
+    <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
+      <pre className="whitespace-pre-wrap text-xs leading-relaxed">User configuration settings</pre>
+    </div>
+  </div>
+</div>
+
+{(() => {
+  const ComponentName = 'UserConfigForm';
+  const NestedComponent = (Components as any)[ComponentName];
+  // Optional message field - show Add/Remove buttons
+  if (!formData.config) {
+    return (
+      <div className="border border-dashed border-gray-300 rounded-md p-6 text-center dark:border-gray-600">
+        <div className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+          Config is not set
+        </div>
+        {!isReadOnly && !(mode === 'edit' && false) && (
+          <button
+            type="button"
+            onClick={() => handleFieldChange('config', {})}
+            className="px-4 py-2 text-sm bg-blue-100 text-blue-800 rounded-md hover:bg-blue-200"
+          >
+            Add Config
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  if (NestedComponent) {
+    return (
+      <div className="relative border-2 border-gray-200 rounded-lg p-3 dark:border-gray-600 bg-gray-50 dark:bg-gray-800">
+        <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200 dark:border-gray-600">
+          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Config
+          </h4>
+          {!isReadOnly && !(mode === 'edit' && false) && (
+            <button
+              type="button"
+              onClick={() => handleFieldChange('config', null)}
+              className="flex items-center justify-center w-6 h-6 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors"
+              title="Remove Config"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+        <div className="pl-2">
+          <NestedComponent
+            mode={mode}
+            initialData={formData.config}
+            onSubmit={(data: any) => handleFieldChange('config', data)}
+            onCancel={() => {}}
+            title={'Config'}
+            readonly={isReadOnly || (mode === 'edit' && false)}
+            nested={true}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback to textarea for JSON editing
+  return (
+    <div className="border border-gray-300 rounded-md p-3 dark:border-gray-600 space-y-2">
+      <div className="flex justify-between items-center mb-2">
+        <div className="text-sm text-gray-500">
+          UserConfig (Component not available - using JSON editor)
+        </div>
+        {!isReadOnly && !(mode === 'edit' && false) && (
+          <button
+            type="button"
+            onClick={() => handleFieldChange('config', null)}
+            className="flex items-center justify-center w-6 h-6 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors"
+            title="Remove Config"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+      <textarea
+        value={JSON.stringify(formData.config, null, 2)}
+        onChange={(e) => {
+          try {
+            const parsed = JSON.parse(e.target.value);
+            handleFieldChange('config', parsed);
+          } catch (error) {
+            // Invalid JSON, keep the text value for user to fix
+          }
+        }}
+        disabled={isReadOnly || (mode === 'edit' && false)}
+        className="w-full h-32 px-3 py-2 border-0 font-mono text-sm dark:bg-gray-700 dark:text-white resize-none"
+        placeholder="Enter JSON object for UserConfig..."
+      />
+    </div>
+  );
+})()}
+
+{validationErrors.config && (
+  <div className="text-sm text-red-600 dark:text-red-400 mt-1">
+    {validationErrors.config}
+  </div>
+)}
+
+    </div>
   </div>{/* Roles field */}
   <div>
     {/* Complex field - traditional layout */}

@@ -15,11 +15,13 @@
 package web
 
 import (
+	"context"
 	"embed"
 	"io/fs"
 	"net/http"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/adobe/aquarium-fish/lib/log"
 )
@@ -77,6 +79,10 @@ func Handler() http.Handler {
 	fileServer := http.FileServer(http.FS(distFS))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Establish timeout for the request
+		_, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel() // Ensure the context is canceled when the handler exits
+
 		logger := logger.With("path", r.URL.Path)
 
 		// Clean the path

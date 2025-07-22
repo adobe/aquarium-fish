@@ -64,12 +64,22 @@ message User {
   string name = 1 [(field_ui_config) = { noedit: true }];
   google.protobuf.Timestamp created_at = 2 [(field_ui_config) = { nocreate: true, noedit: true }];
   google.protobuf.Timestamp updated_at = 3 [(field_ui_config) = { nocreate: true, noedit: true }];
+
   // Where the hashed password stored
   optional google.protobuf.Struct hash = 4 [(field_ui_config) = { nocreate: true, noedit: true }];
   // Set when the user was generated with no password
   optional string password = 5;
+  // User configuration settings
+  optional UserConfig config = 6;
   // List of role names assigned to the user
-  repeated string roles = 6 [(field_ui_config) = { name: "Roles", autofill: "Role" }];
+  repeated string roles = 7 [(field_ui_config) = { name: "Roles", autofill: "Role" }];
+}
+
+message UserConfig {
+  option (ui_config) = { generate_ui: true };
+
+  // Request rate limit per minute
+  optional int32 rate_limit = 1;
 }
 
 message UserServiceGetMeRequest {}
