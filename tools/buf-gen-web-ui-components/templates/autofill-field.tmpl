@@ -19,7 +19,7 @@
       <option value="">Select {{.AutofillType}}...</option>
       {getAutofillOptions('{{.AutofillType}}').map((item: any) => {
         const key = item.uid || item.name || item.id || JSON.stringify(item);
-        const label = item.name ? (item.name + (item.version ? (' v' + item.version) : '')) : key;
+        const label = item.name ? (item.name + (item.version ? (':' + item.version) : '')) : key;
         return (
           <option key={key} value={key}>
             {label}

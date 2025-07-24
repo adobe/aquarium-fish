@@ -139,7 +139,7 @@ message ApplicationState {
   string uid = 1;
   google.protobuf.Timestamp created_at = 2;
   string application_uid = 3;
-  // Status of the state - everything starts with new and could end in 3 states: DEALLOCATED, ERROR
+  // Status of the state - everything starts with new and could end in 2 states: DEALLOCATED or ERROR
   Status status = 4;
   // Additional information for the state
   string description = 5;
@@ -153,11 +153,12 @@ message ApplicationState {
 //
 // Could be created and updated only by the node which won the Application execution.
 message ApplicationResource {
+  option (ui_config) = { generate_ui: true };
   option (subscribe_config) = { permission_check: "ApplicationServiceGetResource" };
 
-  string uid = 1;
-  google.protobuf.Timestamp created_at = 2;
-  google.protobuf.Timestamp updated_at = 3;
+  string uid = 1 [(field_ui_config) = { nocreate: true, noedit: true }];
+  google.protobuf.Timestamp created_at = 2 [(field_ui_config) = { nocreate: true, noedit: true }];
+  google.protobuf.Timestamp updated_at = 3 [(field_ui_config) = { nocreate: true, noedit: true }];
   string application_uid = 4;
   string node_uid = 5;
   string label_uid = 6;

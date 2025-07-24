@@ -16,7 +16,9 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import type { ReactNode } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useStreaming } from '../contexts/StreamingContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { ErrorNotifications } from './ErrorNotifications';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -29,10 +31,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
+  const { isConnected, connectionStatus } = useStreaming();
 
   const navigation = [
     { name: 'Applications', href: '/applications', icon: '📱' },
+    { name: 'Labels', href: '/labels', icon: '🏷️' },
     { name: 'Status', href: '/status', icon: '📊' },
     { name: 'Manage', href: '/manage', icon: '⚙️' },
   ];
@@ -165,6 +169,14 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
             {/* Push content to the right */}
             <div className="flex-1"></div>
 
+            {/* Connection Status */}
+            <div className="flex items-center space-x-2">
+              <div className={`w-2 h-2 rounded-full ${ isConnected ? 'bg-green-500' : 'bg-red-500' }`} title={`${connectionStatus}`} />
+            </div>
+
+            {/* Space between items */}
+            <div class="flex w-2"></div>
+
             <div className="flex items-center space-x-4">
               {/* User menu */}
               <div className="relative">
@@ -230,6 +242,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
           {children}
         </main>
       </div>
+
+      {/* Error notifications - shown on top of everything */}
+      <ErrorNotifications />
     </div>
   );
 };

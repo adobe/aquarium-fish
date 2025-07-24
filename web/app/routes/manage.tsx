@@ -12,95 +12,41 @@
 
 // Author: Sergei Parshev (@sparshev)
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { DashboardLayout } from '../components/DashboardLayout';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
 import { useStreaming } from '../contexts/StreamingContext';
-import { labelServiceHelpers, userServiceHelpers, roleServiceHelpers } from '../lib/services';
+import { StreamingList, type ListColumn, type ListItemAction } from '../components/StreamingList';
+
 import { create } from '@bufbuild/protobuf';
-import { LabelServiceCreateRequestSchema } from '../../gen/aquarium/v2/label_pb';
-import type { Label } from '../../gen/aquarium/v2/label_pb';
+import { UserServiceCreateRequestSchema, UserServiceUpdateRequestSchema, UserServiceRemoveRequestSchema } from '../../gen/aquarium/v2/user_pb';
 import type { User } from '../../gen/aquarium/v2/user_pb';
+import { RoleServiceCreateRequestSchema, RoleServiceUpdateRequestSchema, RoleServiceRemoveRequestSchema } from '../../gen/aquarium/v2/role_pb';
 import type { Role } from '../../gen/aquarium/v2/role_pb';
-import * as yaml from 'js-yaml';
-import { LabelForm, UserForm } from '../../gen/components';
+import { UserForm, RoleForm } from '../../gen/components';
 
 export function meta() {
   return [
     { title: 'Management - Aquarium Fish' },
-    { name: 'description', content: 'Manage labels and users' },
+    { name: 'description', content: 'Manage users and roles' },
   ];
 }
 
 export default function Manage() {
   const { user, hasPermission } = useAuth();
   const { sendRequest } = useStreaming();
-  const [activeTab, setActiveTab] = useState<'labels' | 'users'>('labels');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Labels state
-  const [labels, setLabels] = useState<Label[]>([]);
-  const [showCreateLabelModal, setShowCreateLabelModal] = useState(false);
-  const [showLabelDetailsModal, setShowLabelDetailsModal] = useState(false);
-  const [selectedLabel, setSelectedLabel] = useState<Label | null>(null);
-  const [labelNameFilter, setLabelNameFilter] = useState('');
-  const [labelVersionFilter, setLabelVersionFilter] = useState('');
+  const [activeTab, setActiveTab] = useState<'users' | 'roles'>('users');
 
   // Users state
-  const [users, setUsers] = useState<User[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
   const [showUserDetailsModal, setShowUserDetailsModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [userFormError, setUserFormError] = useState<string | null>(null);
 
-  // Fetch data
-  const fetchData = async () => {
-    try {
-      setError(null);
-      setLoading(true);
-
-      const promises: Promise<any>[] = [];
-
-      if (hasPermission('LabelService', 'List')) {
-        promises.push(labelServiceHelpers.list());
-      }
-
-      if (hasPermission('UserService', 'List')) {
-        promises.push(userServiceHelpers.list());
-      }
-
-      if (hasPermission('RoleService', 'List')) {
-        promises.push(roleServiceHelpers.list());
-      }
-
-      const results = await Promise.all(promises);
-      let resultIndex = 0;
-
-      if (hasPermission('LabelService', 'List')) {
-        setLabels(results[resultIndex++] || []);
-      }
-
-      if (hasPermission('UserService', 'List')) {
-        setUsers(results[resultIndex++] || []);
-      }
-
-      if (hasPermission('RoleService', 'List')) {
-        setRoles(results[resultIndex++] || []);
-      }
-
-      setLoading(false);
-    } catch (err) {
-      setError(`Failed to fetch data: ${err}`);
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
+  // Roles state
+  const [showCreateRoleModal, setShowCreateRoleModal] = useState(false);
+  const [showRoleDetailsModal, setShowRoleDetailsModal] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
 
   // Format timestamp
   const formatTimestamp = (timestamp: any) => {
@@ -109,47 +55,57 @@ export default function Manage() {
     return date.toLocaleString();
   };
 
-  // Label operations
-  const handleCreateLabel = async (labelData: Label) => {
+  // Role operations
+  const handleCreateRole = async (roleData: Role) => {
     try {
-      // Create label request using streaming
-      const labelRequest = create(LabelServiceCreateRequestSchema, {
-        label: {
-          ...labelData,
-          uid: crypto.randomUUID(),
-        },
+      const createRequest = create(RoleServiceCreateRequestSchema, {
+        role: roleData,
       });
-
-      console.log('Creating label:', labelRequest);
-      await sendRequest(labelRequest, 'LabelServiceCreateRequest');
-      await fetchData(); // Refresh data
-      setShowCreateLabelModal(false);
+      await sendRequest(createRequest, 'RoleServiceCreateRequest');
+      setShowCreateRoleModal(false);
     } catch (error) {
-      setError(`Failed to create label: ${error}`);
+      console.error(`Failed to create role: ${error}`);
     }
   };
 
-  const handleDeleteLabel = async (uid: string) => {
-    if (!confirm('Are you sure you want to delete this label?')) return;
+  const handleUpdateRole = async (roleData: Role) => {
+    if (!selectedRole) return;
 
     try {
-      await labelServiceHelpers.delete(uid);
-      await fetchData(); // Refresh data
+      const updateRequest = create(RoleServiceUpdateRequestSchema, {
+        role: roleData,
+      });
+      await sendRequest(updateRequest, 'RoleServiceUpdateRequest');
+      setShowRoleDetailsModal(false);
+      setSelectedRole(null);
     } catch (error) {
-      setError(`Failed to delete label: ${error}`);
+      console.error(`Failed to update role: ${error}`);
+    }
+  };
+
+  const handleRemoveRole = async (role: Role) => {
+    if (!confirm('Are you sure you want to delete this role?')) return;
+
+    try {
+      const deleteRequest = create(RoleServiceRemoveRequestSchema, {
+        roleName: role.name,
+      });
+      await sendRequest(deleteRequest, 'RoleServiceRemoveRequest');
+    } catch (error) {
+      console.error(`Failed to delete role: ${error}`);
     }
   };
 
   // User operations
   const handleCreateUser = async (userData: User) => {
     try {
-      setUserFormError(null);
-
-      await userServiceHelpers.create(userData as any);
-      await fetchData(); // Refresh data
+      const createRequest = create(UserServiceCreateRequestSchema, {
+        user: userData,
+      });
+      await sendRequest(createRequest, 'UserServiceCreateRequest');
       setShowCreateUserModal(false);
     } catch (error) {
-      setUserFormError(`Failed to create user: ${error}`);
+      console.error(`Failed to create user: ${error}`);
     }
   };
 
@@ -157,60 +113,111 @@ export default function Manage() {
     if (!selectedUser) return;
 
     try {
-      setUserFormError(null);
-
-      await userServiceHelpers.update(userData);
-      await fetchData(); // Refresh data
+      const updateRequest = create(UserServiceUpdateRequestSchema, {
+        user: userData,
+      });
+      await sendRequest(updateRequest, 'UserServiceUpdateRequest');
       setShowUserDetailsModal(false);
       setSelectedUser(null);
     } catch (error) {
-      setUserFormError(`Failed to update user: ${error}`);
+      console.error(`Failed to update user: ${error}`);
     }
   };
 
-  const handleDeleteUser = async (userName: string) => {
+  const handleRemoveUser = async (user: User) => {
     if (!confirm('Are you sure you want to delete this user?')) return;
 
     try {
-      await userServiceHelpers.delete(userName);
-      await fetchData(); // Refresh data
+      const deleteRequest = create(UserServiceRemoveRequestSchema, {
+        userName: user.name,
+      });
+      await sendRequest(deleteRequest, 'UserServiceRemoveRequest');
     } catch (error) {
-      setError(`Failed to delete user: ${error}`);
+      console.error(`Failed to delete user: ${error}`);
     }
   };
 
-  // Filter labels
-  const filteredLabels = labels.filter(label => {
-    if (labelNameFilter && !label.name.includes(labelNameFilter)) return false;
-    if (labelVersionFilter && labelVersionFilter !== 'all') {
-      if (labelVersionFilter === 'latest') {
-        // Show only latest version of each label
-        const latestVersion = Math.max(...labels.filter(l => l.name === label.name).map(l => l.version));
-        return label.version === latestVersion;
-      } else {
-        return label.version.toString() === labelVersionFilter;
-      }
-    }
-    return true;
-  });
+  // Define columns for users list
+  const userColumns: ListColumn[] = [
+    {
+      key: 'name',
+      label: 'User',
+      filterable: true,
+      render: (user: User) => (
+        <div>
+          <div className="text-sm font-medium text-gray-900 dark:text-white">
+            {user.name}
+          </div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            Roles: {(user.roles || []).join(', ') || 'None'}
+          </div>
+        </div>
+      ),
+    },
+  ];
 
-  // Group labels by name for version display
-  const labelsByName = labels.reduce((acc, label) => {
-    if (!acc[label.name]) {
-      acc[label.name] = [];
-    }
-    acc[label.name].push(label);
-    return acc;
-  }, {} as Record<string, Label[]>);
+  // Define actions for users
+  const userActions: ListItemAction[] = [
+    {
+      label: 'Edit',
+      onClick: (user: User) => {
+        setSelectedUser(user);
+        setShowUserDetailsModal(true);
+      },
+      className: 'px-3 py-1 text-sm bg-green-100 text-green-800 rounded-md hover:bg-green-200',
+      permission: { resource: 'UserService', action: 'Update' },
+    },
+    {
+      label: 'Remove',
+      onClick: handleRemoveUser,
+      className: 'px-3 py-1 text-sm bg-red-100 text-red-800 rounded-md hover:bg-red-200',
+      condition: (user: User) => user.name !== 'admin',
+      permission: { resource: 'UserService', action: 'Remove' },
+    },
+  ];
+
+  // Define columns for roles list
+  const roleColumns: ListColumn[] = [
+    {
+      key: 'name',
+      label: 'Role',
+      filterable: true,
+      render: (role: Role) => (
+        <div>
+          <div className="text-sm font-medium text-gray-900 dark:text-white">
+            {role.name}
+          </div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            Permissions: {role.permissions?.length || 0}
+          </div>
+        </div>
+      ),
+    },
+  ];
+
+  // Define actions for roles
+  const roleActions: ListItemAction[] = [
+    {
+      label: 'Edit',
+      onClick: (role: Role) => {
+        setSelectedRole(role);
+        setShowRoleDetailsModal(true);
+      },
+      className: 'px-3 py-1 text-sm bg-green-100 text-green-800 rounded-md hover:bg-green-200',
+      permission: { resource: 'RoleService', action: 'Update' },
+    },
+    {
+      label: 'Remove',
+      onClick: handleRemoveRole,
+      className: 'px-3 py-1 text-sm bg-red-100 text-red-800 rounded-md hover:bg-red-200',
+      condition: (role: Role) => role.name !== 'admin',
+      permission: { resource: 'RoleService', action: 'Remove' },
+    },
+  ];
 
   // Permissions
-  const canCreateLabel = hasPermission('LabelService', 'Create');
-  const canDeleteLabel = hasPermission('LabelService', 'Delete');
-  const canListLabels = hasPermission('LabelService', 'List');
   const canCreateUser = hasPermission('UserService', 'Create');
-  const canUpdateUser = hasPermission('UserService', 'Update');
-  const canDeleteUser = hasPermission('UserService', 'Delete');
-  const canListUsers = hasPermission('UserService', 'List');
+  const canCreateRole = hasPermission('RoleService', 'Create');
 
   return (
     <ProtectedRoute>
@@ -226,27 +233,11 @@ export default function Manage() {
                 Manage labels and users
               </p>
             </div>
-            <button
-              onClick={fetchData}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              Refresh
-            </button>
           </div>
 
           {/* Tabs */}
           <div className="border-b border-gray-200 dark:border-gray-700">
             <nav className="flex space-x-8">
-              <button
-                onClick={() => setActiveTab('labels')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'labels'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Labels
-              </button>
               <button
                 onClick={() => setActiveTab('users')}
                 className={`py-2 px-1 border-b-2 font-medium text-sm ${
@@ -257,111 +248,18 @@ export default function Manage() {
               >
                 Users
               </button>
+              <button
+                onClick={() => setActiveTab('roles')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'roles'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Roles
+              </button>
             </nav>
           </div>
-
-          {/* Error */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
-              {error}
-            </div>
-          )}
-
-          {/* Labels Tab */}
-          {activeTab === 'labels' && (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center space-x-4">
-                  <input
-                    type="text"
-                    placeholder="Filter by name"
-                    value={labelNameFilter}
-                    onChange={(e) => setLabelNameFilter(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600"
-                  />
-                  <select
-                    value={labelVersionFilter}
-                    onChange={(e) => setLabelVersionFilter(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600"
-                  >
-                    <option value="all">All Versions</option>
-                    <option value="latest">Latest Only</option>
-                  </select>
-                </div>
-                {canCreateLabel && (
-                  <button
-                    onClick={() => setShowCreateLabelModal(true)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                  >
-                    Create Label
-                  </button>
-                )}
-              </div>
-
-              {!canListLabels ? (
-                <div className="text-center py-8">
-                  <p className="text-red-600 dark:text-red-400">
-                    You don't have permission to view labels.
-                  </p>
-                  <p className="text-gray-600 dark:text-gray-400 mt-2">
-                    Required permission: LabelService.List
-                  </p>
-                </div>
-              ) : loading ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                  <p className="mt-2 text-gray-600 dark:text-gray-400">Loading labels...</p>
-                </div>
-              ) : filteredLabels.length === 0 ? (
-                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  No labels found
-                </div>
-              ) : (
-                <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-md">
-                  <ul className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {filteredLabels.map((label) => (
-                      <li
-                        key={label.uid}
-                        className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4">
-                            <div>
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                {label.name} v{label.version}
-                              </div>
-                              <div className="text-sm text-gray-500 dark:text-gray-400">
-                                Created: {formatTimestamp(label.createdAt)}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <button
-                              onClick={() => {
-                                setSelectedLabel(label);
-                                setShowLabelDetailsModal(true);
-                              }}
-                              className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded-md hover:bg-blue-200"
-                            >
-                              View Details
-                            </button>
-                            {canDeleteLabel && (
-                              <button
-                                onClick={() => handleDeleteLabel(label.uid)}
-                                className="px-3 py-1 text-sm bg-red-100 text-red-800 rounded-md hover:bg-red-200"
-                              >
-                                Delete
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Users Tab */}
           {activeTab === 'users' && (
@@ -382,185 +280,78 @@ export default function Manage() {
                 )}
               </div>
 
-              {!canListUsers ? (
-                <div className="text-center py-8">
-                  <p className="text-red-600 dark:text-red-400">
-                    You don't have permission to view users.
-                  </p>
-                  <p className="text-gray-600 dark:text-gray-400 mt-2">
-                    Required permission: UserService.List
-                  </p>
+              <StreamingList
+                objectType="users"
+                columns={userColumns}
+                actions={userActions}
+                filterBy={['name']}
+                itemKey={(user: User) => user.name}
+                permissions={{ list: { resource: 'UserService', action: 'List' } }}
+                emptyMessage="No users found"
+              />
+            </div>
+          )}
+
+          {/* Roles Tab */}
+          {activeTab === 'roles' && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                    Role Management
+                  </h2>
                 </div>
-              ) : loading ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                  <p className="mt-2 text-gray-600 dark:text-gray-400">Loading users...</p>
-                </div>
-              ) : users.length === 0 ? (
-                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  No users found
-                </div>
-              ) : (
-                <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-md">
-                  <ul className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {users.map((user) => (
-                      <li
-                        key={user.name}
-                        className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4">
-                            <div>
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                {user.name}
-                              </div>
-                              <div className="text-sm text-gray-500 dark:text-gray-400">
-                                Roles: {user.roles.join(', ') || 'None'}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            {canUpdateUser && (
-                              <button
-                                onClick={() => {
-                                  setSelectedUser(user);
-                                  setShowUserDetailsModal(true);
-                                }}
-                                className="px-3 py-1 text-sm bg-green-100 text-green-800 rounded-md hover:bg-green-200"
-                              >
-                                Edit
-                              </button>
-                            )}
-                            {canDeleteUser && user.name !== 'admin' && (
-                              <button
-                                onClick={() => handleDeleteUser(user.name)}
-                                className="px-3 py-1 text-sm bg-red-100 text-red-800 rounded-md hover:bg-red-200"
-                              >
-                                Delete
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+                {canCreateRole && (
+                  <button
+                    onClick={() => setShowCreateRoleModal(true)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  >
+                    Create Role
+                  </button>
+                )}
+              </div>
+
+              <StreamingList
+                objectType="roles"
+                columns={roleColumns}
+                actions={roleActions}
+                filterBy={['name']}
+                itemKey={(role: Role) => role.name}
+                permissions={{ list: { resource: 'RoleService', action: 'List' } }}
+                emptyMessage="No roles found"
+              />
             </div>
           )}
         </div>
 
-        {/* Create Label Modal */}
-        {showCreateLabelModal && (
+        {/* Create Role Modal */}
+        {showCreateRoleModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-              <LabelForm
+              <RoleForm
                 mode="create"
-                onSubmit={handleCreateLabel}
-                onCancel={() => setShowCreateLabelModal(false)}
-                title="Create Label"
+                onSubmit={handleCreateRole}
+                onCancel={() => setShowCreateRoleModal(false)}
+                title="Create Role"
               />
             </div>
           </div>
         )}
 
-        {/* Label Details Modal */}
-        {showLabelDetailsModal && selectedLabel && (
+        {/* Edit Role Modal */}
+        {showRoleDetailsModal && selectedRole && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  Label Details: {selectedLabel.name} v{selectedLabel.version}
-                </h2>
-                <button
-                  onClick={() => setShowLabelDetailsModal(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ×
-                </button>
-              </div>
-
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                    Basic Information
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">UID</p>
-                      <p className="text-sm text-gray-900 dark:text-white">{selectedLabel.uid}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Name</p>
-                      <p className="text-sm text-gray-900 dark:text-white">{selectedLabel.name}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Version</p>
-                      <p className="text-sm text-gray-900 dark:text-white">{selectedLabel.version}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Created</p>
-                      <p className="text-sm text-gray-900 dark:text-white">
-                        {formatTimestamp(selectedLabel.createdAt)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                    Definitions
-                  </h3>
-                  <pre className="bg-gray-100 dark:bg-gray-700 p-4 rounded-md text-sm overflow-x-auto">
-                    {JSON.stringify(selectedLabel.definitions, null, 2)}
-                  </pre>
-                </div>
-
-                {selectedLabel.metadata && (
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                      Metadata
-                    </h3>
-                    <pre className="bg-gray-100 dark:bg-gray-700 p-4 rounded-md text-sm overflow-x-auto">
-                      {JSON.stringify(selectedLabel.metadata, null, 2)}
-                    </pre>
-                  </div>
-                )}
-
-                {/* Other versions */}
-                {labelsByName[selectedLabel.name] && labelsByName[selectedLabel.name].length > 1 && (
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                      Other Versions
-                    </h3>
-                    <div className="space-y-2">
-                      {labelsByName[selectedLabel.name]
-                        .filter(l => l.uid !== selectedLabel.uid)
-                        .map((label) => (
-                          <div
-                            key={label.uid}
-                            className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-md"
-                          >
-                            <div>
-                              <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                Version {label.version}
-                              </span>
-                              <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
-                                Created: {formatTimestamp(label.createdAt)}
-                              </span>
-                            </div>
-                            <button
-                              onClick={() => setSelectedLabel(label)}
-                              className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded-md hover:bg-blue-200"
-                            >
-                              View
-                            </button>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+              <RoleForm
+                mode="edit"
+                initialData={selectedRole}
+                onSubmit={handleUpdateRole}
+                onCancel={() => {
+                  setShowRoleDetailsModal(false);
+                  setSelectedRole(null);
+                }}
+                title={`Edit Role: ${selectedRole.name}`}
+              />
             </div>
           </div>
         )}

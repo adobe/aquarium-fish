@@ -102,16 +102,42 @@ import {
   type GateProxySSHServiceGetResourceAccessResponse,
 } from '../../gen/aquarium/v2/gate_proxyssh_access_pb';
 
-// Create transport with auth header
+// Create transport with auth header and automatic token refresh
 const transport = createGrpcWebTransport({
   baseUrl: typeof window !== 'undefined' ? `${window.location.origin}/grpc` : 'http://localhost:8001/grpc',
   interceptors: [
     (next) => async (req) => {
-      const tokens = tokenStorage.getTokens();
+      let tokens = tokenStorage.getTokens();
       if (tokens?.accessToken) {
         req.header.set('authorization', `Bearer ${tokens.accessToken}`);
       }
-      return next(req);
+
+      try {
+        return await next(req);
+      } catch (error: any) {
+        // If we get an authentication error, try to refresh the token and retry once
+        if (error?.code === 'unauthenticated' && tokens && !tokenStorage.isRefreshTokenExpired(tokens)) {
+          try {
+            const { authService } = await import('./auth');
+            const refreshResult = await authService.refreshToken(tokens.refreshToken);
+
+            if (refreshResult.success && refreshResult.tokens) {
+              tokenStorage.setTokens(refreshResult.tokens);
+              // Retry the request with the new token
+              req.header.set('authorization', `Bearer ${refreshResult.tokens.accessToken}`);
+              return await next(req);
+            }
+          } catch (refreshError) {
+            console.error('Token refresh failed:', refreshError);
+            tokenStorage.clearTokens();
+            // Redirect to login if refresh fails
+            if (typeof window !== 'undefined') {
+              window.location.href = '/login';
+            }
+          }
+        }
+        throw error;
+      }
     },
   ],
 });

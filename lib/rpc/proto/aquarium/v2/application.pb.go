@@ -193,7 +193,7 @@ type ApplicationState struct {
 	Uid            string                 `protobuf:"bytes,1,opt,name=uid,proto3" json:"uid,omitempty"`
 	CreatedAt      *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	ApplicationUid string                 `protobuf:"bytes,3,opt,name=application_uid,json=applicationUid,proto3" json:"application_uid,omitempty"`
-	// Status of the state - everything starts with new and could end in 3 states: DEALLOCATED, ERROR
+	// Status of the state - everything starts with new and could end in 2 states: DEALLOCATED or ERROR
 	Status ApplicationState_Status `protobuf:"varint,4,opt,name=status,proto3,enum=aquarium.v2.ApplicationState_Status" json:"status,omitempty"`
 	// Additional information for the state
 	Description   string `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
@@ -1501,13 +1501,13 @@ const file_aquarium_v2_application_proto_rawDesc = "" +
 	"DEALLOCATE\x10\x04\x12\x0f\n" +
 	"\vDEALLOCATED\x10\x05\x12\t\n" +
 	"\x05ERROR\x10\x06: \x8a\xb5\x18\x1c\n" +
-	"\x1aApplicationServiceGetState\"\xf9\x04\n" +
-	"\x13ApplicationResource\x12\x10\n" +
-	"\x03uid\x18\x01 \x01(\tR\x03uid\x129\n" +
+	"\x1aApplicationServiceGetState\"\x9d\x05\n" +
+	"\x13ApplicationResource\x12\x1a\n" +
+	"\x03uid\x18\x01 \x01(\tB\b\x9a\xb5\x18\x04\b\x01\x10\x01R\x03uid\x12C\n" +
 	"\n" +
-	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\b\x9a\xb5\x18\x04\b\x01\x10\x01R\tcreatedAt\x12C\n" +
 	"\n" +
-	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12'\n" +
+	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\b\x9a\xb5\x18\x04\b\x01\x10\x01R\tupdatedAt\x12'\n" +
 	"\x0fapplication_uid\x18\x04 \x01(\tR\x0eapplicationUid\x12\x19\n" +
 	"\bnode_uid\x18\x05 \x01(\tR\anodeUid\x12\x1b\n" +
 	"\tlabel_uid\x18\x06 \x01(\tR\blabelUid\x12)\n" +
@@ -1520,8 +1520,8 @@ const file_aquarium_v2_application_proto_rawDesc = "" +
 	" \x01(\tR\x06hwAddr\x123\n" +
 	"\bmetadata\x18\v \x01(\v2\x17.google.protobuf.StructR\bmetadata\x129\n" +
 	"\atimeout\x18\f \x01(\v2\x1a.google.protobuf.TimestampH\x00R\atimeout\x88\x01\x01\x12H\n" +
-	"\x0eauthentication\x18\r \x01(\v2\x1b.aquarium.v2.AuthenticationH\x01R\x0eauthentication\x88\x01\x01:#\x8a\xb5\x18\x1f\n" +
-	"\x1dApplicationServiceGetResourceB\n" +
+	"\x0eauthentication\x18\r \x01(\v2\x1b.aquarium.v2.AuthenticationH\x01R\x0eauthentication\x88\x01\x01:)\x8a\xb5\x18\x1f\n" +
+	"\x1dApplicationServiceGetResource\x92\xb5\x18\x02\b\x01B\n" +
 	"\n" +
 	"\b_timeoutB\x11\n" +
 	"\x0f_authentication\"\x95\x03\n" +

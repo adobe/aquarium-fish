@@ -680,11 +680,11 @@ const file_aquarium_v2_role_proto_rawDesc = "" +
 	"\n" +
 	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x129\n" +
 	"\vpermissions\x18\x04 \x03(\v2\x17.aquarium.v2.PermissionR\vpermissions:\x1a\x8a\xb5\x18\x10\n" +
-	"\x0eRoleServiceGet\x92\xb5\x18\x02\b\x01\"@\n" +
+	"\x0eRoleServiceGet\x92\xb5\x18\x02\b\x01\"H\n" +
 	"\n" +
 	"Permission\x12\x1a\n" +
 	"\bresource\x18\x01 \x01(\tR\bresource\x12\x16\n" +
-	"\x06action\x18\x02 \x01(\tR\x06action\"\x18\n" +
+	"\x06action\x18\x02 \x01(\tR\x06action:\x06\x92\xb5\x18\x02\b\x01\"\x18\n" +
 	"\x16RoleServiceListRequest\"r\n" +
 	"\x17RoleServiceListResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +

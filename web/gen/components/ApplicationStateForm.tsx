@@ -14,38 +14,38 @@
 
 import React, { useState, useEffect } from 'react';
 import { create } from '@bufbuild/protobuf';
-import { ApplicationSchema, type Application } from '../../gen/aquarium/v2/application_pb';
+import { ApplicationStateSchema, type ApplicationState } from '../../gen/aquarium/v2/application_pb';
 import * as yaml from 'js-yaml';
 import * as Components from './index';
 import { useStreaming } from '../../app/contexts/StreamingContext';
 
-interface ApplicationFormProps {
+interface ApplicationStateFormProps {
   mode: 'create' | 'edit' | 'view';
-  initialData?: Application;
-  onSubmit: (data: Application) => void;
+  initialData?: ApplicationState;
+  onSubmit: (data: ApplicationState) => void;
   onCancel: () => void;
   title?: string;
   readonly?: boolean;
   nested?: boolean;
 }
 
-interface ApplicationFormState {
+interface ApplicationStateFormState {
   uid: string;
   createdAt: string;
-  ownerName: string;
-  labelUid: string;
-  metadata: Record<string, any>;
+  applicationUid: string;
+  status: number;
+  description: string;
 }
-const defaultApplicationState: ApplicationFormState = {
+const defaultApplicationStateState: ApplicationStateFormState = {
   uid: '',
   createdAt: '',
-  ownerName: '',
-  labelUid: '',
-  metadata: {},
+  applicationUid: '',
+  status: 0,
+  description: '',
 };
 
 
-export const ApplicationForm: React.FC<ApplicationFormProps> = ({
+export const ApplicationStateForm: React.FC<ApplicationStateFormProps> = ({
   initialData,
   onSubmit,
   onCancel,
@@ -54,7 +54,7 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
   readonly,
   nested = false
 }) => {
-  const [formData, setFormData] = useState<ApplicationFormState>(defaultApplicationState);
+  const [formData, setFormData] = useState<ApplicationStateFormState>(defaultApplicationStateState);
   const [yamlText, setYamlText] = useState('');
   const [showYamlInput, setShowYamlInput] = useState(false);
   const [yamlError, setYamlError] = useState<string | null>(null);
@@ -67,18 +67,17 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
   // Initialize form data from initialData
   useEffect(() => {
     if (initialData) {
-      const newFormData: ApplicationFormState = {
+      const newFormData: ApplicationStateFormState = {
         uid: initialData.uid || '',
         createdAt: initialData.createdAt ? new Date(Number(initialData.createdAt.seconds) * 1000).toISOString().slice(0, 16) : '',
-        ownerName: initialData.ownerName || '',
-        labelUid: initialData.labelUid || '',
-        metadata: initialData.metadata || {},
+        applicationUid: initialData.applicationUid || '',
+        status: initialData.status || 0,
+        description: initialData.description || '',
       };
       setFormData(newFormData);
 
       // Initialize struct field text
       const newStructText: Record<string, string> = {};
-      newStructText['metadata'] = initialData.metadata ? yaml.dump(initialData.metadata) : '';
       setStructFieldText(newStructText);
     }
   }, [initialData]);
@@ -94,7 +93,7 @@ const handleYamlLoad = () => {
       throw new Error('Invalid YAML format');
     }
 
-    const newFormData: ApplicationFormState = { ...defaultApplicationState };
+    const newFormData: ApplicationStateFormState = { ...defaultApplicationStateState };
     if (parsedData.uid !== undefined) {
       newFormData.uid = parsedData.uid;
     }
@@ -103,16 +102,14 @@ const handleYamlLoad = () => {
         newFormData.createdAt = new Date(parsedData.createdAt).toISOString().slice(0, 16);
       }
     }
-    if (parsedData.ownerName !== undefined) {
-      newFormData.ownerName = parsedData.ownerName;
+    if (parsedData.applicationUid !== undefined) {
+      newFormData.applicationUid = parsedData.applicationUid;
     }
-    if (parsedData.labelUid !== undefined) {
-      newFormData.labelUid = parsedData.labelUid;
+    if (parsedData.status !== undefined) {
+      newFormData.status = parsedData.status;
     }
-    if (parsedData.metadata !== undefined) {
-      if (typeof parsedData.metadata === 'object') {
-        newFormData.metadata = parsedData.metadata;
-      }
+    if (parsedData.description !== undefined) {
+      newFormData.description = parsedData.description;
     }
 
     setFormData(newFormData);
@@ -125,20 +122,20 @@ const handleYamlLoad = () => {
 // Validate form data
 const validateForm = (): boolean => {
   const errors: Record<string, string> = {};
-  if (mode !== 'create' && (!formData.uid)) {
+  if (!formData.uid) {
     errors.uid = 'Uid is required';
   }
-  if (mode !== 'create' && (!formData.createdAt)) {
+  if (!formData.createdAt) {
     errors.createdAt = 'Created At is required';
   }
-  if (mode !== 'create' && (!formData.ownerName)) {
-    errors.ownerName = 'Owner Name is required';
+  if (!formData.applicationUid) {
+    errors.applicationUid = 'Application Uid is required';
   }
-  if (!formData.labelUid) {
-    errors.labelUid = 'Label is required';
+  if (!formData.status) {
+    errors.status = 'Status is required';
   }
-  if (!formData.metadata) {
-    errors.metadata = 'Metadata is required';
+  if (!formData.description) {
+    errors.description = 'Description is required';
   }
 
   setValidationErrors(errors);
@@ -153,17 +150,17 @@ const handleSubmit = () => {
 
   try {
     // Convert form data to protobuf message
-    const data = create(ApplicationSchema, {
+    const data = create(ApplicationStateSchema, {
       uid: formData.uid,
       createdAt: formData.createdAt ? { seconds: BigInt(Math.floor(new Date(formData.createdAt).getTime() / 1000)) } : undefined,
-      ownerName: formData.ownerName,
-      labelUid: formData.labelUid,
-      metadata: formData.metadata,
+      applicationUid: formData.applicationUid,
+      status: formData.status,
+      description: formData.description,
     });
 
     onSubmit(data);
   } catch (error) {
-    setYamlError('Failed to create Application: ' + error);
+    setYamlError('Failed to create ApplicationState: ' + error);
   }
 };
 
@@ -187,7 +184,7 @@ const handleFieldChange = (field: string, value: any) => {
 const handleArrayChange = (field: string, index: number, value: any) => {
   setFormData(prev => ({
     ...prev,
-    [field]: prev[field as keyof ApplicationFormState].map((item: any, i: number) =>
+    [field]: prev[field as keyof ApplicationStateFormState].map((item: any, i: number) =>
       i === index ? value : item
     )
   }));
@@ -197,7 +194,7 @@ const handleArrayChange = (field: string, index: number, value: any) => {
 const addArrayItem = (field: string, defaultValue: any) => {
   setFormData(prev => ({
     ...prev,
-    [field]: [...(prev[field as keyof ApplicationFormState] as any[]), defaultValue]
+    [field]: [...(prev[field as keyof ApplicationStateFormState] as any[]), defaultValue]
   }));
 };
 
@@ -205,12 +202,12 @@ const addArrayItem = (field: string, defaultValue: any) => {
 const removeArrayItem = (field: string, index: number) => {
   setFormData(prev => ({
     ...prev,
-    [field]: (prev[field as keyof ApplicationFormState] as any[]).filter((_, i) => i !== index)
+    [field]: (prev[field as keyof ApplicationStateFormState] as any[]).filter((_, i) => i !== index)
   }));
 };
 
 const isReadOnly = readonly || mode === 'view';
-const formTitle = title || (mode === 'create' ? 'Create Application' : mode === 'edit' ? 'Edit Application' : 'View Application');
+const formTitle = title || (mode === 'create' ? 'Create ApplicationState' : mode === 'edit' ? 'Edit ApplicationState' : 'View ApplicationState');
 
 // Helper function to get autofill options
 const getAutofillOptions = (type: string) => {
@@ -307,8 +304,7 @@ const isSimpleField = (field: any) => {
       {(!nested || !showYamlInput) && (
         <div className="space-y-3">
 {/* Uid field */}
-  {!(mode === 'create' && true) && (
-    <div>
+  <div>
 {/* Simple string field - inline layout */}
 <div className="flex items-center justify-between">
   <div className="flex items-center space-x-2 min-w-0 flex-1">
@@ -321,7 +317,7 @@ const isSimpleField = (field: any) => {
       type="text"
       value={formData.uid}
       onChange={(e) => handleFieldChange('uid', e.target.value)}
-      disabled={isReadOnly || (mode === 'edit' && true)}
+      disabled={isReadOnly || (mode === 'edit' && false)}
       className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
     />
     {validationErrors.uid && (
@@ -332,12 +328,10 @@ const isSimpleField = (field: any) => {
   </div>
 </div>
 
-    </div>
-  )}{/* Created At field */}
-  {!(mode === 'create' && true) && (
-    <div>
-      {/* Complex field - traditional layout */}
-      <div className="space-y-2">
+  </div>{/* Created At field */}
+  <div>
+    {/* Complex field - traditional layout */}
+    <div className="space-y-2">
 <div className="flex items-center space-x-2">
   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
     Created At *
@@ -348,7 +342,7 @@ const isSimpleField = (field: any) => {
   type="datetime-local"
   value={formData.createdAt}
   onChange={(e) => handleFieldChange('createdAt', e.target.value)}
-  disabled={isReadOnly || (mode === 'edit' && true)}
+  disabled={isReadOnly || (mode === 'edit' && false)}
   className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
 />
 
@@ -358,145 +352,102 @@ const isSimpleField = (field: any) => {
   </div>
 )}
 
-      </div>
     </div>
-  )}{/* Owner Name field */}
-  {!(mode === 'create' && true) && (
-    <div>
+  </div>{/* Application Uid field */}
+  <div>
 {/* Simple string field - inline layout */}
 <div className="flex items-center justify-between">
   <div className="flex items-center space-x-2 min-w-0 flex-1">
     <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-      Owner Name *
+      Application Uid *
     </label>
   </div>
   <div className="flex-1 max-w-xs ml-4">
     <input
       type="text"
-      value={formData.ownerName}
-      onChange={(e) => handleFieldChange('ownerName', e.target.value)}
-      disabled={isReadOnly || (mode === 'edit' && true)}
+      value={formData.applicationUid}
+      onChange={(e) => handleFieldChange('applicationUid', e.target.value)}
+      disabled={isReadOnly || (mode === 'edit' && false)}
       className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
     />
-    {validationErrors.ownerName && (
+    {validationErrors.applicationUid && (
       <div className="text-xs text-red-600 dark:text-red-400 mt-1">
-        {validationErrors.ownerName}
+        {validationErrors.applicationUid}
       </div>
     )}
   </div>
 </div>
 
-    </div>
-  )}{/* Label field */}
+  </div>{/* Status field */}
   <div>
-    {/* Complex field - traditional layout */}
-    <div className="space-y-2">
-<div className="flex items-center space-x-2">
-  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-    Label *
-  </label>
+{/* Simple number field - inline layout */}
+<div className="flex items-center justify-between">
+  <div className="flex items-center space-x-2 min-w-0 flex-1">
+    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+      Status *
+    </label>
+    <div className="relative group">
+      <span className="cursor-help text-gray-400 hover:text-gray-600">
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </span>
+      <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
+        <pre className="whitespace-pre-wrap text-xs leading-relaxed">Status of the state - everything starts with new and could end in 2 states: DEALLOCATED or ERROR</pre>
+      </div>
+    </div>
+  </div>
+  <div className="flex-1 max-w-xs ml-4">
+    <input
+      type="number"
+      value={formData.status}
+      onChange={(e) => handleFieldChange('status', parseInt(e.target.value) || 0)}
+      disabled={isReadOnly || (mode === 'edit' && false)}
+      className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+    />
+    {validationErrors.status && (
+      <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+        {validationErrors.status}
+      </div>
+    )}
+  </div>
 </div>
 
-<div className="flex space-x-2">
-  {autofillMode.labelUid === 'text' ? (
+  </div>{/* Description field */}
+  <div>
+{/* Simple string field - inline layout */}
+<div className="flex items-center justify-between">
+  <div className="flex items-center space-x-2 min-w-0 flex-1">
+    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+      Description *
+    </label>
+    <div className="relative group">
+      <span className="cursor-help text-gray-400 hover:text-gray-600">
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </span>
+      <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
+        <pre className="whitespace-pre-wrap text-xs leading-relaxed">Additional information for the state</pre>
+      </div>
+    </div>
+  </div>
+  <div className="flex-1 max-w-xs ml-4">
     <input
       type="text"
-      value={formData.labelUid}
-      onChange={(e) => handleFieldChange('labelUid', e.target.value)}
+      value={formData.description}
+      onChange={(e) => handleFieldChange('description', e.target.value)}
       disabled={isReadOnly || (mode === 'edit' && false)}
-      className="flex-1 px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-      placeholder="Enter Label UID..."
+      className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
     />
-  ) : (
-    <select
-      value={formData.labelUid}
-      onChange={(e) => handleFieldChange('labelUid', e.target.value)}
-      disabled={isReadOnly || (mode === 'edit' && false)}
-      className="flex-1 px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-    >
-      <option value="">Select Label...</option>
-      {getAutofillOptions('Label').map((item: any) => {
-        const key = item.uid || item.name || item.id || JSON.stringify(item);
-        const label = item.name ? (item.name + (item.version ? (':' + item.version) : '')) : key;
-        return (
-          <option key={key} value={key}>
-            {label}
-          </option>
-        );
-      })}
-    </select>
-  )}
-  {!isReadOnly && !(mode === 'edit' && false) && (
-    <button
-      type="button"
-      onClick={() => setAutofillMode(prev => ({ ...prev, labelUid: prev.labelUid === 'text' ? 'dropdown' : 'text' }))}
-      className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
-      title={autofillMode.labelUid === 'text' ? 'Switch to dropdown' : 'Switch to text input'}
-    >
-      {autofillMode.labelUid === 'text' ? '📋' : '✏️'}
-    </button>
-  )}
-</div>
-
-{validationErrors.labelUid && (
-  <div className="text-sm text-red-600 dark:text-red-400 mt-1">
-    {validationErrors.labelUid}
-  </div>
-)}
-
-    </div>
-  </div>{/* Metadata field */}
-  <div>
-    {/* Complex field - traditional layout */}
-    <div className="space-y-2">
-<div className="flex items-center space-x-2">
-  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-    Metadata *
-  </label>
-  <div className="relative group">
-    <span className="cursor-help text-gray-400 hover:text-gray-600">
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    </span>
-    <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
-      <pre className="whitespace-pre-wrap text-xs leading-relaxed">Additional metadata in JSON format (can't override Label metadata) example: JENKINS_URL: 'http://172.16.1.1:8085/' JENKINS_AGENT_SECRET: 03839eabcf945b1e780be8f9488d264c4c57bf388546da9a84588345555f29b0 JENKINS_AGENT_NAME: test-node</pre>
-    </div>
+    {validationErrors.description && (
+      <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+        {validationErrors.description}
+      </div>
+    )}
   </div>
 </div>
 
-<div className="border border-gray-300 rounded-md p-3 dark:border-gray-600 space-y-2">
-  <textarea
-    value={structFieldText.metadata || ''}
-    onChange={(e) => setStructFieldText(prev => ({ ...prev, metadata: e.target.value }))}
-    onBlur={() => parseStructField('metadata', structFieldText.metadata || '')}
-    disabled={isReadOnly || (mode === 'edit' && false)}
-    className="w-full h-32 px-3 py-2 border-0 font-mono text-sm dark:bg-gray-700 dark:text-white resize-none"
-    placeholder="Enter YAML or JSON object..."
-  />
-  {structFieldErrors.metadata && (
-    <div className="text-sm text-red-600 dark:text-red-400">
-      {structFieldErrors.metadata}
-    </div>
-  )}
-  {!isReadOnly && !(mode === 'edit' && false) && (
-    <button
-      type="button"
-      onClick={() => parseStructField('metadata', structFieldText.metadata || '')}
-      className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded-md hover:bg-blue-200"
-    >
-      Parse & Update
-    </button>
-  )}
-</div>
-
-{validationErrors.metadata && (
-  <div className="text-sm text-red-600 dark:text-red-400 mt-1">
-    {validationErrors.metadata}
-  </div>
-)}
-
-    </div>
   </div>
 
         </div>

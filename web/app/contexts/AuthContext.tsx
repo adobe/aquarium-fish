@@ -12,7 +12,7 @@
 
 // Author: Sergei Parshev (@sparshev)
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { authService, tokenStorage, type AuthTokens, type AuthUser } from '../lib/auth';
 
@@ -44,6 +44,7 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const refreshTimerRef = useRef<number | null>(null);
 
   const isAuthenticated = user !== null;
 
@@ -73,6 +74,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           if (permissionsResult.success && permissionsResult.user) {
             setUser(permissionsResult.user);
           }
+          scheduleTokenRefresh(refreshResult.tokens);
         } else {
           tokenStorage.clearTokens();
           setUser(null);
@@ -84,6 +86,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const validateResult = await authService.validateToken(tokens.accessToken);
       if (validateResult.success && validateResult.user) {
         setUser(validateResult.user);
+        scheduleTokenRefresh(tokens);
       } else {
         tokenStorage.clearTokens();
         setUser(null);
@@ -104,6 +107,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (result.success && result.tokens && result.user) {
         tokenStorage.setTokens(result.tokens);
         setUser(result.user);
+        scheduleTokenRefresh(result.tokens);
       }
 
       return {
@@ -122,6 +126,62 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = () => {
     tokenStorage.clearTokens();
     setUser(null);
+    clearRefreshTimer();
+  };
+
+  // Clear the refresh timer
+  const clearRefreshTimer = () => {
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = null;
+    }
+  };
+
+  // Schedule proactive token refresh
+  const scheduleTokenRefresh = (tokens: AuthTokens) => {
+    clearRefreshTimer();
+
+    // Calculate time until token expires (refresh 5 minutes before expiration)
+    const refreshBuffer = 5 * 60 * 1000; // 5 minutes in milliseconds
+    const expiresAt = tokens.expiresAt.getTime();
+    const now = Date.now();
+    const timeUntilRefresh = Math.max(0, expiresAt - now - refreshBuffer);
+
+    console.log(`[AuthContext] Scheduling token refresh in ${Math.round(timeUntilRefresh / 1000 / 60)} minutes`);
+
+    refreshTimerRef.current = window.setTimeout(async () => {
+      try {
+        console.log('[AuthContext] Proactive token refresh triggered');
+        const currentTokens = tokenStorage.getTokens();
+
+        if (!currentTokens || tokenStorage.isRefreshTokenExpired(currentTokens)) {
+          console.log('[AuthContext] Refresh token expired, logging out');
+          logout();
+          return;
+        }
+
+        const refreshResult = await authService.refreshToken(currentTokens.refreshToken);
+        if (refreshResult.success && refreshResult.tokens) {
+          console.log('[AuthContext] Token refreshed successfully');
+          tokenStorage.setTokens(refreshResult.tokens);
+
+          // Get updated user permissions
+          const permissionsResult = await authService.getPermissions();
+          if (permissionsResult.success && permissionsResult.user) {
+            setUser(permissionsResult.user);
+          }
+
+          // Schedule the next refresh
+          scheduleTokenRefresh(refreshResult.tokens);
+        } else {
+          console.log('[AuthContext] Token refresh failed, logging out');
+          logout();
+        }
+      } catch (error) {
+        console.error('[AuthContext] Proactive token refresh error:', error);
+        logout();
+      }
+    }, timeUntilRefresh);
   };
 
   const hasPermission = (resource: string, action: string): boolean => {
@@ -140,6 +200,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     checkAuth();
+
+    // Cleanup timer on unmount
+    return () => {
+      clearRefreshTimer();
+    };
   }, []);
 
   const value: AuthContextType = {

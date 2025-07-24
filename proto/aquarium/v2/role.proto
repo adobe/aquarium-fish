@@ -57,6 +57,8 @@ message Role {
 //
 // Defines a permission that can be granted to roles.
 message Permission {
+  option (ui_config) = { generate_ui: true };
+
   // Resource type or specific resource ID this permission applies to
   string resource = 1;
   // Action allowed on the resource (e.g., read, write, remove)

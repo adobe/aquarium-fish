@@ -16,6 +16,8 @@ import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../components/DashboardLayout';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
+import { useStreaming } from '../contexts/StreamingContext';
+import { StreamingList, type ListColumn, type ListItemAction } from '../components/StreamingList';
 import { nodeServiceHelpers } from '../lib/services';
 import type { Node } from '../../gen/aquarium/v2/node_pb';
 
@@ -28,7 +30,7 @@ export function meta() {
 
 export default function Status() {
   const { user, hasPermission } = useAuth();
-  const [nodes, setNodes] = useState<Node[]>([]);
+  const { data } = useStreaming();
   const [thisNode, setThisNode] = useState<Node | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,18 +42,12 @@ export default function Status() {
   const [shutdownDelay, setShutdownDelay] = useState('1m');
   const [maintenanceLoading, setMaintenanceLoading] = useState(false);
 
-  const fetchNodes = async () => {
+  const fetchThisNode = async () => {
     try {
       setError(null);
       setRefreshing(true);
 
-      const canListNodes = hasPermission('NodeService', 'List');
       const canGetThisNode = hasPermission('NodeService', 'GetThis');
-
-      if (canListNodes) {
-        const nodesList = await nodeServiceHelpers.list();
-        setNodes(nodesList);
-      }
 
       if (canGetThisNode) {
         const currentNode = await nodeServiceHelpers.getThis();
@@ -60,7 +56,7 @@ export default function Status() {
 
       setLoading(false);
     } catch (err) {
-      setError(`Failed to fetch nodes: ${err}`);
+      setError(`Failed to fetch current node: ${err}`);
       setLoading(false);
     } finally {
       setRefreshing(false);
@@ -68,7 +64,7 @@ export default function Status() {
   };
 
   useEffect(() => {
-    fetchNodes();
+    fetchThisNode();
   }, []);
 
   const formatBytes = (bytes: number) => {
@@ -90,7 +86,7 @@ export default function Status() {
       setMaintenanceLoading(true);
       await nodeServiceHelpers.setMaintenance(enable);
       setShowMaintenanceModal(false);
-      await fetchNodes(); // Refresh data
+      await fetchThisNode(); // Refresh current node data
     } catch (err) {
       setError(`Failed to ${enable ? 'enable' : 'disable'} maintenance mode: ${err}`);
     } finally {
@@ -103,13 +99,56 @@ export default function Status() {
       setMaintenanceLoading(true);
       await nodeServiceHelpers.setMaintenance(undefined, true, shutdownDelay);
       setShowShutdownModal(false);
-      await fetchNodes(); // Refresh data
+      await fetchThisNode(); // Refresh current node data
     } catch (err) {
       setError(`Failed to initiate shutdown: ${err}`);
     } finally {
       setMaintenanceLoading(false);
     }
   };
+
+  // Define columns for nodes list
+  const nodeColumns: ListColumn[] = [
+    {
+      key: 'name',
+      label: 'Node',
+      filterable: true,
+      render: (node: Node) => (
+        <div className="flex items-center space-x-4">
+          <div className="w-3 h-3 bg-green-500 rounded-full" />
+          <div>
+            <div className="text-sm font-medium text-gray-900 dark:text-white">
+              {node.name}
+            </div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">
+              {node.location} • {node.address}
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'updated',
+      label: 'Last Updated',
+      render: (node: Node) => (
+        <span className="text-sm text-gray-500 dark:text-gray-400">
+          {formatTimestamp(node.updatedAt)}
+        </span>
+      ),
+    },
+  ];
+
+  // Define actions for nodes
+  const nodeActions: ListItemAction[] = [
+    {
+      label: 'View Details',
+      onClick: (node: Node) => {
+        setSelectedNode(node);
+        setShowDetailsModal(true);
+      },
+      className: 'px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded-md hover:bg-blue-200',
+    },
+  ];
 
   const canListNodes = hasPermission('NodeService', 'List');
   const canGetThisNode = hasPermission('NodeService', 'GetThis');
@@ -315,53 +354,24 @@ export default function Status() {
 
           {/* All Nodes */}
           {canListNodes && (
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
-              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <h2 className="text-lg font-medium text-gray-900 dark:text-white">
-                  All Nodes
-                </h2>
-              </div>
+            <div className="space-y-4">
+              <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                All Nodes
+              </h2>
 
-              {loading ? (
-                <div className="p-6 text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                  <p className="mt-2 text-gray-600 dark:text-gray-400">Loading nodes...</p>
-                </div>
-              ) : nodes.length === 0 ? (
-                <div className="p-6 text-center text-gray-500 dark:text-gray-400">
-                  No nodes found
-                </div>
-              ) : (
-                <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {nodes.map((node) => (
-                    <div
-                      key={node.uid}
-                      className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
-                      onClick={() => {
-                        setSelectedNode(node);
-                        setShowDetailsModal(true);
-                      }}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <div className="w-3 h-3 bg-green-500 rounded-full" />
-                          <div>
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">
-                              {node.name}
-                            </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              {node.location} • {node.address}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          Updated: {formatTimestamp(node.updatedAt)}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <StreamingList
+                objectType="nodes"
+                columns={nodeColumns}
+                actions={nodeActions}
+                filterBy={['name']}
+                itemKey={(node: Node) => node.uid}
+                onItemClick={(node: Node) => {
+                  setSelectedNode(node);
+                  setShowDetailsModal(true);
+                }}
+                permissions={{ list: { resource: 'NodeService', action: 'List' } }}
+                emptyMessage="No nodes found"
+              />
             </div>
           )}
         </div>

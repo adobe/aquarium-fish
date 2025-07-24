@@ -12,17 +12,24 @@
 
 // Author: Sergei Parshev (@sparshev)
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { DashboardLayout } from '../components/DashboardLayout';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
 import { useStreaming } from '../contexts/StreamingContext';
+import { StreamingList, type ListColumn, type ListItemAction } from '../components/StreamingList';
 import { create } from '@bufbuild/protobuf';
-import { ApplicationServiceCreateRequestSchema, type Application, type ApplicationState, type ApplicationResource } from '../../gen/aquarium/v2/application_pb';
-import { utils } from '../lib/services';
-import * as yaml from 'js-yaml';
-import { ApplicationServiceDeallocateRequestSchema, ApplicationServiceGetResourceRequestSchema } from '../../gen/aquarium/v2/application_pb';
-import { ApplicationForm } from '../../gen/components';
+import {
+  ApplicationServiceCreateRequestSchema,
+  ApplicationServiceDeallocateRequestSchema,
+  type Application,
+  type ApplicationState,
+  type ApplicationResource
+} from '../../gen/aquarium/v2/application_pb';
+import { ApplicationForm, ApplicationResourceForm } from '../../gen/components';
+import { timestampToDate } from '../lib/auth';
+import { Resources, ResourcesSchema } from '../../gen/aquarium/v2/label_pb';
+import { GateProxySSHServiceGetResourceAccessRequestSchema } from '../../gen/aquarium/v2/gate_proxyssh_access_pb';
 
 export function meta() {
   return [
@@ -37,70 +44,40 @@ interface ApplicationWithDetails extends Application {
   isUserOwned?: boolean;
 }
 
+// Helper to convert ApplicationResource to Resources (for display only)
+function applicationResourceToResources(resource: ApplicationResource): Resources | undefined {
+  const meta = resource?.metadata;
+  if (!meta) return undefined;
+  // Helper type guards
+  const asNumber = (v: any, def = 0) => typeof v === 'number' ? v : def;
+  const asString = (v: any, def = '') => typeof v === 'string' ? v : def;
+  const asBool = (v: any, def = false) => typeof v === 'boolean' ? v : def;
+  const asArray = (v: any, def: string[] = []) => Array.isArray(v) ? v.filter(x => typeof x === 'string') : def;
+  const asDisks = (v: any) => (typeof v === 'object' && v !== null) ? v : {};
+
+  return create(ResourcesSchema, {
+    cpu: asNumber(meta.cpu),
+    ram: asNumber(meta.ram),
+    disks: asDisks(meta.disks),
+    network: asString(meta.network),
+    nodeFilter: asArray(meta.nodeFilter),
+    multitenancy: asBool(meta.multitenancy),
+    cpuOverbook: asBool(meta.cpuOverbook),
+    ramOverbook: asBool(meta.ramOverbook),
+    lifetime: asString(meta.lifetime),
+    slots: meta.slots !== undefined ? asNumber(meta.slots, undefined) : undefined,
+  });
+}
+
 export default function Applications() {
   const { user, hasPermission } = useAuth();
   const { data, isConnected, connectionStatus, sendRequest } = useStreaming();
-  const [applications, setApplications] = useState<ApplicationWithDetails[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedApp, setSelectedApp] = useState<ApplicationWithDetails | null>(null);
-  const [sortField, setSortField] = useState<'name' | 'created' | 'status'>('created');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterOwner, setFilterOwner] = useState<string>('all');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-
-  // Process streaming data
-  useEffect(() => {
-    const processedApps = data.applications.map(app => {
-      const state = data.applicationStates.get(app.uid);
-      const resource = data.applicationResources.get(app.uid);
-      const isUserOwned = user?.userName === app.ownerName;
-
-      return {
-        ...app,
-        state,
-        resource,
-        isUserOwned,
-      };
-    });
-
-    // Sort applications - prioritize user-owned ones first
-    const sortedApps = processedApps.sort((a, b) => {
-      // First priority: user-owned applications
-      if (a.isUserOwned && !b.isUserOwned) return -1;
-      if (!a.isUserOwned && b.isUserOwned) return 1;
-
-      // Second priority: selected sort field
-      const aValue = getSortValue(a, sortField);
-      const bValue = getSortValue(b, sortField);
-
-      if (sortDirection === 'asc') {
-        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-      } else {
-        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-      }
-    });
-
-    setApplications(sortedApps);
-    setLoading(false);
-  }, [data, user, sortField, sortDirection]);
-
-  const getSortValue = (app: ApplicationWithDetails, field: string) => {
-    switch (field) {
-      case 'name':
-        return app.labelUid || '';
-      case 'created':
-        return app.createdAt?.seconds || '0';
-      case 'status':
-        return app.state?.status || 0;
-      default:
-        return '';
-    }
-  };
+  const [showSSHModal, setShowSSHModal] = useState(false);
+  const [sshCredentials, setSSHCredentials] = useState<any>(null);
+  const [sshLoading, setSSHLoading] = useState(false);
 
   const getStatusText = (state?: ApplicationState) => {
     if (!state) return 'Unknown';
@@ -143,54 +120,129 @@ export default function Applications() {
 
       setShowCreateModal(false);
     } catch (error) {
-      setError(`Failed to create application: ${error}`);
+      console.error(`Failed to create application: ${error}`);
     }
   };
 
-  const handleDeallocateApplication = async (uid: string) => {
+  const handleDeallocateApplication = async (app: ApplicationWithDetails) => {
     if (!confirm('Are you sure you want to deallocate this application?')) return;
 
     try {
       const deallocateRequest = create(ApplicationServiceDeallocateRequestSchema, {
-        applicationUid: uid,
+        applicationUid: app.uid,
       });
       await sendRequest(deallocateRequest, 'ApplicationServiceDeallocateRequest');
-      console.log('Application deallocated:', uid);
+      console.log('Application deallocated:', app.uid);
     } catch (error) {
-      setError(`Failed to deallocate application: ${error}`);
+      console.error(`Failed to deallocate application: ${error}`);
     }
   };
 
-  const handleGetResourceAccess = async (uid: string) => {
+  const handleGetResourceAccess = async (app: ApplicationWithDetails) => {
+    if (!app.resource) {
+      console.error('No resource available for this application');
+      return;
+    }
+
     try {
-      const resourceRequest = create(ApplicationServiceGetResourceRequestSchema, {
-        applicationUid: uid,
+      setSSHLoading(true);
+      const resourceAccessRequest = create(GateProxySSHServiceGetResourceAccessRequestSchema, {
+        applicationResourceUid: app.resource.uid,
       });
-      const response = await sendRequest(resourceRequest, 'ApplicationServiceGetResourceRequest');
+      const response = await sendRequest(resourceAccessRequest, 'GateProxySSHServiceGetResourceAccessRequest');
       console.log('Resource access info:', response);
-      // TODO: Display resource access information or SSH connection details
+      setSSHCredentials(response.data);
+      setShowSSHModal(true);
     } catch (error) {
-      setError(`Failed to get resource access: ${error}`);
+      console.error(`Failed to get resource access: ${error}`);
+    } finally {
+      setSSHLoading(false);
     }
   };
 
-  const filteredApps = applications.filter(app => {
-    if (filterStatus !== 'all' && getStatusText(app.state) !== filterStatus) return false;
-    if (filterOwner === 'mine' && !app.isUserOwned) return false;
-    if (filterOwner === 'others' && app.isUserOwned) return false;
-    return true;
-  });
+  // Process applications with their state and resources
+  const processedApplications = useMemo((): ApplicationWithDetails[] => {
+    return data.applications.map(app => {
+      const state = data.applicationStates.get(app.uid);
+      const resource = data.applicationResources.get(app.uid);
+      const isUserOwned = user?.userName === app.ownerName;
 
-  const paginatedApps = filteredApps.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
+      return {
+        ...app,
+        state,
+        resource,
+        isUserOwned,
+      };
+    });
+  }, [data.applications, data.applicationStates, data.applicationResources, user?.userName]);
 
-  const totalPages = Math.ceil(filteredApps.length / pageSize);
+  // Define columns for the applications list
+  const columns: ListColumn[] = [
+    {
+      key: 'name',
+      label: 'Application',
+      filterable: true,
+      render: (app: ApplicationWithDetails) => {
+        const label = data.labels.find(l => l.uid === app.labelUid);
+        const labelName = label ? `${label.name}:${label.version}` : app.labelUid || 'Unknown Label';
+
+        return (
+          <div>
+            <div className="text-sm font-medium text-gray-900 dark:text-white">
+              {labelName} - {app.uid}
+              {app.isUserOwned && (
+                <span className="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                  Mine
+                </span>
+              )}
+            </div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">
+              Owner: {app.ownerName || 'Unknown'}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (app: ApplicationWithDetails) => (
+        <div className="flex items-center">
+          <div className={`w-3 h-3 rounded-full ${getStatusColor(app.state)} mr-2`} />
+          <span className="text-sm text-gray-900 dark:text-white">
+            {getStatusText(app.state)}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: 'created',
+      label: 'Created',
+      render: (app: ApplicationWithDetails) => (
+        <span className="text-sm text-gray-500 dark:text-gray-400">
+          {app.createdAt ? new Date(Number(app.createdAt.seconds) * 1000).toLocaleString() : 'Unknown'}
+        </span>
+      ),
+    },
+  ];
+
+  // Define actions for each application
+  const actions: ListItemAction[] = [
+    {
+      label: 'SSH Access',
+      onClick: handleGetResourceAccess,
+      className: 'px-3 py-1 text-sm bg-green-100 text-green-800 rounded-md hover:bg-green-200',
+      condition: (app: ApplicationWithDetails) => !!app.resource,
+    },
+    {
+      label: 'Deallocate',
+      onClick: handleDeallocateApplication,
+      className: 'px-3 py-1 text-sm bg-red-100 text-red-800 rounded-md hover:bg-red-200',
+      condition: (app: ApplicationWithDetails) => app.isUserOwned || hasPermission('ApplicationService', 'DeallocateAll'),
+    },
+  ];
 
   const canCreateApp = hasPermission('ApplicationService', 'Create');
-  const canViewAllApps = hasPermission('ApplicationService', 'GetAll');
-  const canDeallocateAll = hasPermission('ApplicationService', 'DeallocateAll');
 
   return (
     <ProtectedRoute>
@@ -207,16 +259,6 @@ export default function Applications() {
               </p>
             </div>
             <div className="flex items-center space-x-4">
-              {/* Connection Status */}
-              <div className="flex items-center space-x-2">
-                <div className={`w-2 h-2 rounded-full ${
-                  isConnected ? 'bg-green-500' : 'bg-red-500'
-                }`} />
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  {connectionStatus}
-                </span>
-              </div>
-
               {/* Create Button */}
               <button
                 onClick={() => setShowCreateModal(true)}
@@ -233,165 +275,22 @@ export default function Applications() {
             </div>
           </div>
 
-          {/* Filters and Controls */}
-          <div className="flex flex-wrap gap-4 items-center">
-            <div className="flex items-center space-x-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Sort by:
-              </label>
-              <select
-                value={sortField}
-                onChange={(e) => setSortField(e.target.value as 'name' | 'created' | 'status')}
-                className="px-3 py-1 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600"
-              >
-                <option value="created">Created</option>
-                <option value="name">Name</option>
-                <option value="status">Status</option>
-              </select>
-              <button
-                onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
-                className="px-2 py-1 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-              >
-                {sortDirection === 'asc' ? '↑' : '↓'}
-              </button>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Status:
-              </label>
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="px-3 py-1 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600"
-              >
-                <option value="all">All</option>
-                <option value="New">New</option>
-                <option value="Elected">Elected</option>
-                <option value="Allocated">Allocated</option>
-                <option value="Deallocate">Deallocate</option>
-                <option value="Deallocated">Deallocated</option>
-                <option value="Error">Error</option>
-              </select>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Owner:
-              </label>
-              <select
-                value={filterOwner}
-                onChange={(e) => setFilterOwner(e.target.value)}
-                className="px-3 py-1 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600"
-              >
-                <option value="all">All</option>
-                <option value="mine">Mine</option>
-                <option value="others">Others</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Applications Table */}
-          <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-md">
-            {loading ? (
-              <div className="p-6 text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                <p className="mt-2 text-gray-600 dark:text-gray-400">Loading applications...</p>
-              </div>
-            ) : paginatedApps.length === 0 ? (
-              <div className="p-6 text-center text-gray-500 dark:text-gray-400">
-                No applications found
-              </div>
-            ) : (
-              <ul className="divide-y divide-gray-200 dark:divide-gray-700">
-                {paginatedApps.map((app) => (
-                  <li
-                    key={app.uid}
-                    className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
-                    onClick={() => {
-                      setSelectedApp(app);
-                      setShowDetailsModal(true);
-                    }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <div className={`w-3 h-3 rounded-full ${getStatusColor(app.state)}`} />
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">
-                              {app.labelUid}
-                            </p>
-                            {app.isUserOwned && (
-                              <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
-                                Mine
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400 space-x-4">
-                            <span>Owner: {app.ownerName}</span>
-                            <span>Status: {getStatusText(app.state)}</span>
-                                                         <span>Created: {app.createdAt ? new Date(Number(app.createdAt.seconds) * 1000).toLocaleString() : 'Unknown'}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        {(app.isUserOwned || canDeallocateAll) && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeallocateApplication(app.uid);
-                            }}
-                            className="px-3 py-1 text-sm bg-red-100 text-red-800 rounded-md hover:bg-red-200"
-                            title="Deallocate Application"
-                          >
-                            Deallocate
-                          </button>
-                        )}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleGetResourceAccess(app.uid);
-                          }}
-                          className="px-3 py-1 text-sm bg-green-100 text-green-800 rounded-md hover:bg-green-200"
-                          title="Get SSH Access"
-                        >
-                          SSH Access
-                        </button>
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-700 dark:text-gray-300">
-                Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredApps.length)} of {filteredApps.length} applications
-              </div>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 disabled:opacity-50"
-                >
-                  Previous
-                </button>
-                <span className="text-sm text-gray-700 dark:text-gray-300">
-                  {currentPage} of {totalPages}
-                </span>
-                <button
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Streaming Applications List */}
+          <StreamingList
+            objectType="applications"
+            customData={processedApplications}
+            columns={columns}
+            actions={actions}
+            filterBy={['name']}
+            sortBy={{ key: 'created', direction: 'desc' }}
+            itemKey={(app: ApplicationWithDetails) => app.uid}
+            onItemClick={(app: ApplicationWithDetails) => {
+              setSelectedApp(app);
+              setShowDetailsModal(true);
+            }}
+            permissions={{ list: { resource: 'ApplicationService', action: 'List' } }}
+            emptyMessage="No applications found"
+          />
         </div>
 
         {/* Create Application Modal */}
@@ -419,6 +318,95 @@ export default function Applications() {
                 onCancel={() => setShowDetailsModal(false)}
                 title="Application Details"
               />
+              {/* Show ApplicationState and ApplicationResource if available */}
+              <div className="mt-6">
+                {selectedApp.state && (
+                  <div className="mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Current State</h3>
+                    <div className="space-y-1 text-sm">
+                      <div>
+                        <span className="font-medium">Created at:</span> {selectedApp.state?.createdAt ? timestampToDate(selectedApp.state.createdAt).toLocaleString() : 'Unknown'}
+                      </div>
+                      <div>
+                        <span className="font-medium">Status:</span> {getStatusText(selectedApp.state)}
+                      </div>
+                      <div>
+                        <span className="font-medium">Description:</span> {selectedApp.state?.description || '—'}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {selectedApp.resource && (
+                  <div className="mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Resource</h3>
+                    {(() => {
+                      return (
+                        <ApplicationResourceForm
+                          mode="view"
+                          initialData={selectedApp.resource}
+                          onSubmit={() => {}}
+                          onCancel={() => {}}
+                          title="Application Resource"
+                        />
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* SSH Resource Access Modal */}
+        {showSSHModal && sshCredentials && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  SSH Resource Access
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowSSHModal(false);
+                    setSSHCredentials(null);
+                  }}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Connection Details</h3>
+                  <div className="space-y-2">
+                    <div>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Command:</span>
+                      <div className="mt-1 p-3 bg-gray-100 dark:bg-gray-700 rounded font-mono text-sm">
+                        ssh -p {sshCredentials.address.split(':')[1]} {sshCredentials.username}@{sshCredentials.address.split(':')[0]}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Username:</span>
+                      <div className="mt-1 p-2 bg-gray-100 dark:bg-gray-700 rounded font-mono text-sm">
+                        {sshCredentials.username}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Password:</span>
+                      <div className="mt-1 p-2 bg-gray-100 dark:bg-gray-700 rounded font-mono text-sm">
+                        {sshCredentials.password}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Private Key:</span>
+                      <div className="mt-1 p-3 bg-gray-100 dark:bg-gray-700 rounded font-mono text-xs overflow-x-auto">
+                        <pre className="whitespace-pre-wrap">{sshCredentials.key}</pre>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}

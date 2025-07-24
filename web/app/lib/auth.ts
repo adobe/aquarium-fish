@@ -83,7 +83,7 @@ export interface ValidationResult {
 }
 
 // Helper function to convert protobuf timestamp to Date
-function timestampToDate(timestamp: any): Date | undefined {
+export function timestampToDate(timestamp: any): Date | undefined {
   if (!timestamp) return undefined;
   return new Date(Number(timestamp.seconds) * 1000 + timestamp.nanos / 1000000);
 }
