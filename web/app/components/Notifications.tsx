@@ -153,9 +153,9 @@ const NotificationsUI: React.FC<{
       className="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm flex flex-col-reverse"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      style={{ alignItems: 'flex-end' }}
+      style={{ alignItems: 'flex-end', height: '0px' }}
     >
-      <div className="flex justify-end w-full">
+      <div className="flex justify-end">
         {notifications.length > 1 && (
           <button
             onClick={clearAllNotifications}
