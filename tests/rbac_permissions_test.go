@@ -45,10 +45,6 @@ drivers:
   providers:
     test:`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	// Create test users
 	regularUserPass := "regular-pass"
 	powerUserPass := "power-pass"

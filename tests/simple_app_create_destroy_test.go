@@ -49,10 +49,6 @@ drivers:
   providers:
     test:`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	cli := &http.Client{
 		Timeout: time.Second * 5,
 		Transport: &http.Transport{

@@ -49,10 +49,6 @@ drivers:
       instance_key: generate
       base_url: `+mockServer.GetURL())
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	// Create admin client
 	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
 

@@ -94,6 +94,11 @@ func NewAfInstance(tb testing.TB, name, cfg string) *AFInstance {
 	}
 	tb.Log("INFO: Created workspace:", afi.nodeName, afi.workspace)
 
+	// Automatically cleaning up the workspace after the test is complete
+	tb.Cleanup(func() {
+		afi.Cleanup(tb)
+	})
+
 	// Enabling monitoring if env variable FISH_MONITORING is set
 	if envAddr, ok := os.LookupEnv("FISH_MONITORING"); ok {
 		if strings.Contains(cfg, "monitoring:") {
@@ -218,6 +223,7 @@ func (afi *AFInstance) Restart(tb testing.TB, args ...string) {
 }
 
 // Cleanup after the test execution
+// You don't need to call it if you use NewAfInstance(), NewAquariumFish() or NewStoppedAquariumFish()
 func (afi *AFInstance) Cleanup(tb testing.TB) {
 	tb.Helper()
 	tb.Log("INFO: Cleaning up:", afi.nodeName, afi.workspace)

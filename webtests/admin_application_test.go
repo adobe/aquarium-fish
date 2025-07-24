@@ -36,10 +36,6 @@ drivers:
   providers:
     test:`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	afp, page := hp.NewPlaywright(t, afi.Workspace(), playwright.BrowserNewContextOptions{
 		IgnoreHttpsErrors: playwright.Bool(true),
 		ColorScheme:       playwright.ColorSchemeDark,
@@ -55,7 +51,7 @@ drivers:
 
 	screenshots.WithScreenshots(t, "create_label", func(t *testing.T) {
 		// First create a label that applications can use
-		hp.CreateLabel(t, page, afp, "test-label", "test-label-uid")
+		hp.CreateLabel(t, page, afp, "test-label")
 	})
 
 	screenshots.WithScreenshots(t, "create_application", func(t *testing.T) {
@@ -76,7 +72,7 @@ drivers:
 
 	screenshots.WithScreenshots(t, "test_list_updates", func(t *testing.T) {
 		// Create another label first
-		hp.CreateLabel(t, page, afp, "test-label-2", "test-label-uid-2")
+		hp.CreateLabel(t, page, afp, "test-label-2")
 
 		// Create second application to test list updates
 		hp.CreateApplicationForm(t, page, afp, "test-label-uid-2", map[string]string{

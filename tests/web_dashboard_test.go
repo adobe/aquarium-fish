@@ -38,10 +38,6 @@ drivers:
   providers:
     test:`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	// Create HTTP client with custom transport to skip TLS verification
 	client := &http.Client{
 		Timeout: 10 * time.Second,
@@ -164,10 +160,6 @@ drivers:
   gates: {}
   providers:
     test:`)
-
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
 
 	// Create HTTP client with custom transport to skip TLS verification
 	tr := &http.Transport{

@@ -37,10 +37,6 @@ drivers:
   providers:
     test:`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	afp, page := hp.NewPlaywright(t, afi.Workspace(), playwright.BrowserNewContextOptions{
 		IgnoreHttpsErrors: playwright.Bool(true),
 		ColorScheme:       playwright.ColorSchemeDark,

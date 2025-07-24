@@ -106,7 +106,7 @@ func LoginUser(t *testing.T, page playwright.Page, afp *AFPlaywright, afi *h.AFI
 	}
 
 	// Verify we're on the applications page
-	if err := page.Locator("text=Applications").First().WaitFor(); err != nil {
+	if err := page.GetByRole(*playwright.AriaRoleHeading, playwright.PageGetByRoleOptions{Name: "Applications"}).First().WaitFor(); err != nil {
 		t.Fatalf("ERROR: Applications page not loaded after login: %v", err)
 	}
 
@@ -287,11 +287,11 @@ func CreateApplicationForm(t *testing.T, page playwright.Page, afp *AFPlaywright
 }
 
 // CreateLabel creates a label with the given name and UID
-func CreateLabel(t *testing.T, page playwright.Page, afp *AFPlaywright, labelName, labelUid string) {
+func CreateLabel(t *testing.T, page playwright.Page, afp *AFPlaywright, labelName string) {
 	t.Helper()
 
 	// Navigate to manage page
-	NavigateToPage(t, page, "Management")
+	NavigateToPage(t, page, "Labels")
 
 	// Click Create Label button
 	if err := page.Locator("text=Create Label").Click(); err != nil {
@@ -303,30 +303,33 @@ func CreateLabel(t *testing.T, page playwright.Page, afp *AFPlaywright, labelNam
 		t.Fatalf("ERROR: Create Label modal did not appear: %v", err)
 	}
 
+	// Create basic label definition
+	definitionYAML := `
+name: test-label
+version: 1
+definitions:
+  - driver: test
+    resources:
+      cpu: 1
+      ram: 2
+`
+	// Click Load from YAML button in modal
+	if err := page.Locator("button:has-text('Load from YAML')").First().Click(); err != nil {
+		t.Fatalf("ERROR: Could not click Load from YAML button in modal: %v", err)
+	}
+
+	if err := page.Locator("label:has-text('YAML Configuration')").Locator("..").Locator("textarea").Fill(definitionYAML); err != nil {
+		t.Fatalf("ERROR: Could not fill Definitions field: %v", err)
+	}
+
+	// Click Load from YAML button in modal to confirm loading
+	if err := page.Locator("button:has-text('Load from YAML')").Last().Click(); err != nil {
+		t.Fatalf("ERROR: Could not click Load from YAML button in modal to confirm load: %v", err)
+	}
+
 	// Fill Name field
 	if err := page.Locator("label:has-text('Name')").Locator("..").Locator("input").Fill(labelName); err != nil {
 		t.Fatalf("ERROR: Could not fill Name field: %v", err)
-	}
-
-	// Fill Version field (default to 1)
-	if err := page.Locator("label:has-text('Version')").Locator("..").Locator("input").Fill("1"); err != nil {
-		t.Fatalf("ERROR: Could not fill Version field: %v", err)
-	}
-
-	// Create basic label definition
-	definitionJSON := `[{
-		"driver": "test",
-		"options": {},
-		"resources": {
-			"cpu": 1,
-			"ram": 1,
-			"disks": {},
-			"network": "default"
-		}
-	}]`
-
-	if err := page.Locator("label:has-text('Definitions')").Locator("..").Locator("textarea").Fill(definitionJSON); err != nil {
-		t.Fatalf("ERROR: Could not fill Definitions field: %v", err)
 	}
 
 	// Click Create button in modal

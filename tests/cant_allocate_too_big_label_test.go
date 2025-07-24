@@ -46,10 +46,6 @@ drivers:
       cpu_limit: 4
       ram_limit: 8`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in f", r)

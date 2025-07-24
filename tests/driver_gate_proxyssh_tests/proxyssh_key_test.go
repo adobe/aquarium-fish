@@ -73,10 +73,6 @@ drivers:
 
 	afi.Start(t)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in f", r)
@@ -317,10 +313,6 @@ drivers:
 
 	afi.Start(t)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in f", r)
@@ -362,7 +354,7 @@ drivers:
 	// First executing a simple one directly over the mock server with a little validation
 	// NOTE: Previously we used it to compare with proxyssh output, but multiple variables made it
 	// very unstable, so I leave it for now here commented and check just for echo output
-	//var sshdTestOutput string
+	// var sshdTestOutput string
 	t.Run("Executing SSH shell directly on mock SSHD", func(t *testing.T) {
 		// Writing ssh private key to temp file
 		sshdKeyFile, err := os.CreateTemp("", "sshdkey")
@@ -423,7 +415,7 @@ drivers:
 			//} else {
 			//	t.Log(fmt.Sprintf("Correct response from command on mock sshd: %q in %q (stderr: %s)", "Its ALIVE!\n", stdout, stderr))
 		}
-		//sshdTestOutput = stdout
+		// sshdTestOutput = stdout
 	})
 
 	var labelUID string
@@ -594,7 +586,7 @@ drivers:
 		}
 
 		// SSH output is full of special symbols, so looking just for the desired output
-		//if stdout != sshdTestOutput {
+		// if stdout != sshdTestOutput {
 		if !strings.Contains(stdout, "\nIts ALIVE!") {
 			t.Fatalf("Incorrect response from command through PROXYSSH: %q != %q (stderr: %s)", "\nIts ALIVE!", stdout, stderr)
 			//} else {
@@ -663,10 +655,6 @@ drivers:
 	})
 
 	afi.Start(t)
-
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -1001,10 +989,6 @@ drivers:
 	})
 
 	afi.Start(t)
-
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
 
 	defer func() {
 		if r := recover(); r != nil {

@@ -31,7 +31,7 @@ import (
 
 // Benchmark to check how many nodes could wait for Application
 func Test_jenkins_agents_awaiting_stress(t *testing.T) {
-	//t.Parallel()  - nope just one at a time
+	// t.Parallel()  - nope just one at a time
 	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 
@@ -43,10 +43,6 @@ drivers:
     test:
       cpu_limit: 100000
       ram_limit: 200000`)
-
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
 
 	defer func() {
 		if r := recover(); r != nil {

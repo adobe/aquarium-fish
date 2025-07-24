@@ -32,7 +32,7 @@ import (
 // Checks if node can handle multiple application requests at a time
 // Fish node should be able to handle ~20 requests / second when limited to 2 CPU core and 500MB of memory
 func Test_allocate_apps_stress(t *testing.T) {
-	//t.Parallel()  - nope just one at a time
+	// t.Parallel()  - nope just one at a time
 	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 cpu_limit: 2
@@ -46,10 +46,6 @@ drivers:
     test:
       cpu_limit: 1000
       ram_limit: 2000`)
-
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -136,7 +132,7 @@ drivers:
 // Checks if node can handle multiple application requests at a time with no auth
 // Without auth it should be relatively simple for the fish node to ingest 200 requests in less then a second
 func Test_allocate_apps_noauth_stress(t *testing.T) {
-	//t.Parallel()  - nope just one at a time
+	// t.Parallel()  - nope just one at a time
 	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 cpu_limit: 8
@@ -150,10 +146,6 @@ drivers:
   gates: {}
   providers:
     test:`)
-
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
 
 	defer func() {
 		if r := recover(); r != nil {

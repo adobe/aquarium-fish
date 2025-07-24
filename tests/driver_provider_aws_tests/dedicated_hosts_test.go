@@ -16,7 +16,6 @@ package driver_provider_aws_tests
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -57,10 +56,6 @@ drivers:
           scrubbing_delay: 5m
           pending_to_available_delay: 2m
 `)
-
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
 
 	// Create admin client
 	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
@@ -157,10 +152,6 @@ drivers:
           release_delay: 1h
 `)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	// Add dedicated hosts with different capacities
 	mockServer.AddDedicatedHost("h-compute001", "c5.metal", "us-west-2a", "available", 4) // 4 c5.xlarge instances
 	mockServer.AddDedicatedHost("h-compute002", "c5.metal", "us-west-2a", "available", 2) // 2 available (2 used)
@@ -232,10 +223,6 @@ drivers:
           max: 1
           release_delay: 1h
 `)
-
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
 
 	// No dedicated hosts available and simulate allocation failure
 	mockServer.SetAllocateHostsError("InsufficientHostCapacity", "No hosts available")
@@ -316,7 +303,7 @@ func Test_dedicated_hosts_mac_instance_lifecycle(t *testing.T) {
 	defer mockServer.Close()
 
 	// Create AquariumFish instance with AWS driver configuration using BaseEndpoint
-	fishConfig := fmt.Sprintf(`---
+	afi := h.NewAquariumFish(t, "aws-node-1", `---
 node_location: test_loc
 api_address: 127.0.0.1:0
 drivers:
@@ -327,13 +314,7 @@ drivers:
       key_id: mock-access-key
       secret_key: mock-secret-key
       instance_key: generate
-      base_url: %s
-`, mockServer.GetURL())
-
-	afi := h.NewAquariumFish(t, "aws-node-1", fishConfig)
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
+      base_url: `+mockServer.GetURL())
 
 	// Create admin client
 	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
@@ -398,7 +379,6 @@ drivers:
 				},
 			}),
 		)
-
 		if err != nil {
 			t.Fatalf("Failed to create Mac label: %v", err)
 		}
@@ -442,7 +422,6 @@ drivers:
 				},
 			}),
 		)
-
 		if err != nil {
 			t.Fatalf("Failed to create Mac application: %v", err)
 		}
@@ -523,7 +502,6 @@ drivers:
 				ApplicationUid: appUID,
 			}),
 		)
-
 		if err != nil {
 			t.Fatalf("Failed to deallocate Mac application: %v", err)
 		}
@@ -658,7 +636,7 @@ func Test_dedicated_hosts_allocation_and_management(t *testing.T) {
 	defer mockServer.Close()
 
 	// Create AquariumFish instance with AWS driver configuration
-	fishConfig := fmt.Sprintf(`---
+	afi := h.NewAquariumFish(t, "aws-node-2", `---
 node_location: test_loc
 api_address: 127.0.0.1:0
 drivers:
@@ -669,13 +647,7 @@ drivers:
       key_id: mock-access-key
       secret_key: mock-secret-key
       instance_key: generate
-      base_url: %s
-`, mockServer.GetURL())
-
-	afi := h.NewAquariumFish(t, "aws-node-2", fishConfig)
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
+      base_url: `+mockServer.GetURL())
 
 	// Create RPC clients
 	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
@@ -722,7 +694,6 @@ drivers:
 				},
 			}),
 		)
-
 		if err != nil {
 			t.Fatalf("Failed to create dedicated host label: %v", err)
 		}
@@ -761,7 +732,6 @@ drivers:
 				},
 			}),
 		)
-
 		if err != nil {
 			t.Fatalf("Failed to create error simulation label: %v", err)
 		}

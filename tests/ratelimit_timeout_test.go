@@ -43,10 +43,6 @@ drivers:
   providers:
     test:`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	// Create admin client
 	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
 	userClient := aquariumv2connect.NewUserServiceClient(adminCli, afi.APIAddress("grpc"), adminOpts...)
@@ -115,10 +111,6 @@ drivers:
   providers:
     test:`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	cli := &http.Client{
 		Timeout: time.Second * 5,
 		Transport: &http.Transport{
@@ -183,10 +175,6 @@ drivers:
   providers:
     test:`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	// Create admin client with a very long timeout to avoid client-side timeouts
 	adminCli := &http.Client{
 		Timeout: 60 * time.Second,
@@ -241,10 +229,6 @@ drivers:
   providers:
     test:`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	// Create streaming client
 	streamingCli, streamingOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientGRPC, afi.GetCA(t))
 	streamingServiceClient := aquariumv2connect.NewStreamingServiceClient(streamingCli, afi.APIAddress("grpc"), streamingOpts...)
@@ -296,10 +280,6 @@ drivers:
   providers:
     test:`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	cli := &http.Client{
 		Timeout: time.Second * 5,
 		Transport: &http.Transport{
@@ -341,10 +321,6 @@ drivers:
   gates: {}
   providers:
     test:`)
-
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
 
 	// First create an application so meta endpoint has data
 	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
@@ -406,10 +382,6 @@ drivers:
   gates: {}
   providers:
     test:`)
-
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
 
 	t.Run("Server handles slow body sending", func(t *testing.T) {
 		// Create a custom transport to test slow requests
@@ -515,10 +487,6 @@ drivers:
   gates: {}
   providers:
     test:`)
-
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
 
 	// Create admin client
 	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))

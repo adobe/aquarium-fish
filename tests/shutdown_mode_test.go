@@ -46,10 +46,6 @@ drivers:
   providers:
     test:`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in f", r)
@@ -201,10 +197,6 @@ drivers:
   providers:
     test:`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in f", r)
@@ -333,10 +325,6 @@ drivers:
   gates: {}
   providers:
     test:`)
-
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -480,10 +468,6 @@ drivers:
   gates: {}
   providers:
     test:`)
-
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -665,10 +649,6 @@ drivers:
   gates: {}
   providers:
     test:`)
-
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
 
 	defer func() {
 		if r := recover(); r != nil {

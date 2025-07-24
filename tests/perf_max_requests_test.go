@@ -31,7 +31,7 @@ import (
 
 // Benchmark to find the max amount of requests per second
 func Test_max_requests_stress(t *testing.T) {
-	//t.Parallel()  - nope just one at a time
+	// t.Parallel()  - nope just one at a time
 	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 cpu_limit: 2
@@ -45,10 +45,6 @@ drivers:
     test:
       cpu_limit: 1
       ram_limit: 2`)
-
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
 
 	defer func() {
 		if r := recover(); r != nil {

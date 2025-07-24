@@ -332,6 +332,10 @@ Both of them will build the linux binary for testing and you can disable that by
 also any argument given to those scripts will be passed to go test. By default the scripts will use
 `./tests/...` and `./webtests/...` respectively.
 
+In order to create tests - you can run local Fish node and use chromium "playwright-crx" extension to
+figure out what kind of locators to use. It's mostly for js/python but allows to find the right
+functions to look in the https://pkg.go.dev/github.com/playwright-community/playwright-go after that.
+
 ### Benchmarks
 
 Fish contains a few benchmarks to make sure the performance of the node & cluster will be stable.

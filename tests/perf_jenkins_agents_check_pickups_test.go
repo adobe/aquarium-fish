@@ -30,13 +30,15 @@ import (
 	h "github.com/adobe/aquarium-fish/tests/helper"
 )
 
-const STEP = 50
-const ATTEMPTS = 10
+const (
+	STEP     = 50
+	ATTEMPTS = 10
+)
 
 // Benchmark to run multiple persistent vote processes and measure the allocation time for
 // It also checks that the amount of pickups is equal the amount of application requests
 func Test_jenkins_agents_check_pickups_stress(t *testing.T) {
-	//t.Parallel()  - nope just one at a time
+	// t.Parallel()  - nope just one at a time
 	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 
@@ -49,10 +51,6 @@ drivers:
       is_remote: true
       cpu_limit: 100000
       ram_limit: 200000`, "--timestamp=true")
-
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -203,7 +201,7 @@ drivers:
 		defer func() {
 			// Notifying the test of a failure in Application processing
 			if r := recover(); r != nil {
-				//exitTest = true
+				// exitTest = true
 				t.Errorf("Detected not expected Application processing: %s: %v", line, r)
 			}
 		}()
