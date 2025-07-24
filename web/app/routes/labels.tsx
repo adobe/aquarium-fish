@@ -66,14 +66,14 @@ export default function Labels() {
     }
   };
 
-  const handleDeleteLabel = async (label: Label) => {
+  const handleRemoveLabel = async (label: Label) => {
     if (!confirm('Are you sure you want to delete this label?')) return;
 
     try {
-      const deleteRequest = create(LabelServiceRemoveRequestSchema, {
+      const removeRequest = create(LabelServiceRemoveRequestSchema, {
         labelUid: label.uid,
       });
-      await sendRequest(deleteRequest, 'LabelServiceRemoveRequest');
+      await sendRequest(removeRequest, 'LabelServiceRemoveRequest');
     } catch (error) {
       console.error(`Failed to delete label: ${error}`);
     }
@@ -109,10 +109,10 @@ export default function Labels() {
       className: 'px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded-md hover:bg-blue-200',
     },
     {
-      label: 'Delete',
-      onClick: handleDeleteLabel,
+      label: 'Remove',
+      onClick: handleRemoveLabel,
       className: 'px-3 py-1 text-sm bg-red-100 text-red-800 rounded-md hover:bg-red-200',
-      permission: { resource: 'LabelService', action: 'Delete' },
+      permission: { resource: 'LabelService', action: 'Remove' },
     },
   ];
 

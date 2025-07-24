@@ -87,10 +87,10 @@ export default function Manage() {
     if (!confirm('Are you sure you want to delete this role?')) return;
 
     try {
-      const deleteRequest = create(RoleServiceRemoveRequestSchema, {
+      const removeRequest = create(RoleServiceRemoveRequestSchema, {
         roleName: role.name,
       });
-      await sendRequest(deleteRequest, 'RoleServiceRemoveRequest');
+      await sendRequest(removeRequest, 'RoleServiceRemoveRequest');
     } catch (error) {
       console.error(`Failed to delete role: ${error}`);
     }
@@ -128,10 +128,10 @@ export default function Manage() {
     if (!confirm('Are you sure you want to delete this user?')) return;
 
     try {
-      const deleteRequest = create(UserServiceRemoveRequestSchema, {
+      const removeRequest = create(UserServiceRemoveRequestSchema, {
         userName: user.name,
       });
-      await sendRequest(deleteRequest, 'UserServiceRemoveRequest');
+      await sendRequest(removeRequest, 'UserServiceRemoveRequest');
     } catch (error) {
       console.error(`Failed to delete user: ${error}`);
     }
