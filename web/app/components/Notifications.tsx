@@ -12,13 +12,101 @@
 
 // Author: Sergei Parshev (@sparshev)
 
-import React from 'react';
-import { useStreaming } from '../contexts/StreamingContext';
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 
-export const ErrorNotifications: React.FC = () => {
-  const { notifications, clearNotification, clearAllNotifications } = useStreaming();
+// Notification types
+export type NotificationType = 'error' | 'warning' | 'info';
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  message: string;
+  timestamp: Date;
+  details?: string;
+}
 
-  if (notifications.length === 0) {
+interface NotificationContextType {
+  sendNotification: (type: NotificationType, message: string, details?: string) => void;
+  clearNotification: (id: string) => void;
+  clearAllNotifications: () => void;
+}
+
+const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
+
+export const useNotification = () => {
+  const ctx = useContext(NotificationContext);
+  if (!ctx) throw new Error('useNotification must be used within a NotificationProvider');
+  return ctx;
+};
+
+export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isHovered, setIsHovered] = useState(false);
+  const [visible, setVisible] = useState(true);
+  const hideTimeout = useRef<number | null>(null);
+
+  const sendNotification = useCallback((type: NotificationType, message: string, details?: string) => {
+    const notification: Notification = {
+      id: crypto.randomUUID(),
+      type,
+      message,
+      timestamp: new Date(),
+      details,
+    };
+    setNotifications(prev => [notification, ...prev.slice(0, 4)]); // Keep last 5
+  }, []);
+
+  const clearNotification = useCallback((id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  }, []);
+
+  const clearAllNotifications = useCallback(() => {
+    setNotifications([]);
+  }, []);
+
+  useEffect(() => {
+    if (notifications.length === 0) {
+      setVisible(false);
+      return;
+    }
+    setVisible(true);
+    if (!isHovered) {
+      if (hideTimeout.current) clearTimeout(hideTimeout.current);
+      hideTimeout.current = window.setTimeout(() => {
+        setVisible(false);
+      }, 10000);
+    } else {
+      if (hideTimeout.current) clearTimeout(hideTimeout.current);
+    }
+    return () => {
+      if (hideTimeout.current) clearTimeout(hideTimeout.current);
+    };
+  }, [notifications, isHovered]);
+
+  return (
+    <NotificationContext.Provider value={{ sendNotification, clearNotification, clearAllNotifications }}>
+      {children}
+      <NotificationsUI
+        notifications={notifications}
+        clearNotification={clearNotification}
+        clearAllNotifications={clearAllNotifications}
+        isHovered={isHovered}
+        setIsHovered={setIsHovered}
+        visible={visible}
+      />
+    </NotificationContext.Provider>
+  );
+};
+
+// UI component for notifications
+const NotificationsUI: React.FC<{
+  notifications: Notification[];
+  clearNotification: (id: string) => void;
+  clearAllNotifications: () => void;
+  isHovered: boolean;
+  setIsHovered: (v: boolean) => void;
+  visible: boolean;
+}> = ({ notifications, clearNotification, clearAllNotifications, isHovered, setIsHovered, visible }) => {
+  if (notifications.length === 0 || !visible) {
     return null;
   }
 
@@ -61,8 +149,13 @@ export const ErrorNotifications: React.FC = () => {
   };
 
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2 max-w-sm">
-      <div className="flex justify-end">
+    <div
+      className="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm flex flex-col-reverse"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{ alignItems: 'flex-end' }}
+    >
+      <div className="flex justify-end w-full">
         {notifications.length > 1 && (
           <button
             onClick={clearAllNotifications}
@@ -73,14 +166,14 @@ export const ErrorNotifications: React.FC = () => {
         )}
       </div>
 
-      {notifications.map((notification, index) => (
+      {notifications.slice().reverse().map((notification, index) => (
         <div
           key={notification.id}
           className={`border-l-4 p-4 rounded-md shadow-lg transition-all duration-300 ease-in-out transform ${
             index === 0 ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-90'
           } ${getNotificationColors(notification.type)}`}
           style={{
-            marginTop: index * 8,
+            marginBottom: index * 8,
             zIndex: 50 - index,
           }}
         >

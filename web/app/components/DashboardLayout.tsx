@@ -18,7 +18,6 @@ import type { ReactNode } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useStreaming } from '../contexts/StreamingContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { ErrorNotifications } from './ErrorNotifications';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -175,7 +174,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
             </div>
 
             {/* Space between items */}
-            <div class="flex w-2"></div>
+            <div className="flex w-2"></div>
 
             <div className="flex items-center space-x-4">
               {/* User menu */}
@@ -242,9 +241,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
           {children}
         </main>
       </div>
-
-      {/* Error notifications - shown on top of everything */}
-      <ErrorNotifications />
     </div>
   );
 };

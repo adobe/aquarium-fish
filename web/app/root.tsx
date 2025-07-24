@@ -26,6 +26,7 @@ import "./app.css";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { StreamingProvider } from "./contexts/StreamingContext";
+import { NotificationProvider } from './components/Notifications';
 
 export const links: LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -71,13 +72,17 @@ export function HydrateFallback() {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <StreamingProvider>
-          <Outlet />
-        </StreamingProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <NotificationProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <StreamingProvider>
+            <Layout>
+              <Outlet />
+            </Layout>
+          </StreamingProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </NotificationProvider>
   );
 }
 

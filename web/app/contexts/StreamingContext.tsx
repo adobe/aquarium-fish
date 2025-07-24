@@ -13,6 +13,7 @@
 // Author: Sergei Parshev (@sparshev)
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { useNotification } from '../components/Notifications';
 import type { ReactNode } from 'react';
 import { createClient } from '@connectrpc/connect';
 import { createGrpcWebTransport } from '@connectrpc/connect-web';
@@ -73,15 +74,6 @@ import {
   RoleSchema,
 } from '../../gen/aquarium/v2/role_pb';
 import { GateProxySSHService } from '../../gen/aquarium/v2/gate_proxyssh_access_pb';
-
-// Add error notification interface
-interface ErrorNotification {
-  id: string;
-  type: 'error' | 'warning' | 'info';
-  message: string;
-  timestamp: Date;
-  details?: string;
-}
 
 // Transport configuration with automatic token refresh
 const transport = createGrpcWebTransport({
@@ -187,12 +179,9 @@ interface StreamingContextType {
   isConnected: boolean;
   connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
   error: string | null;
-  notifications: ErrorNotification[];
   subscribe: (callback: DataUpdateCallback) => () => void;
   sendRequest: <T>(request: T, requestType: string) => Promise<any>;
   refreshData: () => Promise<void>;
-  clearNotification: (id: string) => void;
-  clearAllNotifications: () => void;
 }
 
 const StreamingContext = createContext<StreamingContextType | undefined>(undefined);
@@ -226,44 +215,15 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
   const [error, setError] = useState<string | null>(null);
-  const [notifications, setNotifications] = useState<ErrorNotification[]>([]);
-
-  // Refs for managing streams
-  const connectStreamRef = useRef<AsyncIterable<StreamingServiceConnectResponse> | null>(null);
-  const subscribeStreamRef = useRef<AsyncIterable<StreamingServiceSubscribeResponse> | null>(null);
-  const callbacksRef = useRef<Set<DataUpdateCallback>>(new Set());
-  const currentDataRef = useRef<StreamingData>(initialData);
-  const reconnectTimeoutRef = useRef<number | null>(null);
-  const isReconnectingRef = useRef(false);
-  const pendingRequestsRef = useRef<Map<string, { resolve: (value: any) => void; reject: (reason?: any) => void }>>(new Map());
-  const requestQueueRef = useRef<StreamingServiceConnectRequest[]>([]);
-  const connectWriterRef = useRef<WritableStream<StreamingServiceConnectRequest> | null>(null);
-
-  // Add notification helper
+  // Use notification context
+  const { sendNotification } = useNotification();
   const addNotification = useCallback((type: 'error' | 'warning' | 'info', message: string, details?: string) => {
-    const notification: ErrorNotification = {
-      id: crypto.randomUUID(),
-      type,
-      message,
-      timestamp: new Date(),
-      details
-    };
-
-    setNotifications(prev => [notification, ...prev.slice(0, 4)]); // Keep last 5 notifications
-
-    // Auto-remove notifications after 5 seconds for non-errors
-    if (type !== 'error') {
-      setTimeout(() => {
-        setNotifications(prev => prev.filter(n => n.id !== notification.id));
-      }, 5000);
-    }
-
+    sendNotification(type, message, details);
     // Log to console as well
     var args: [string, string?] = [message]
     if (details !== undefined) {
       args.push(details);
     }
-
     switch (type) {
       case 'error':
         logger.error(...args);
@@ -275,15 +235,18 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
         logger.info(...args);
         break;
     }
-  }, []);
+  }, [sendNotification]);
 
-  const clearNotification = useCallback((id: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
-  }, []);
-
-  const clearAllNotifications = useCallback(() => {
-    setNotifications([]);
-  }, []);
+  // Refs for managing streams
+  const connectStreamRef = useRef<AsyncIterable<StreamingServiceConnectResponse> | null>(null);
+  const subscribeStreamRef = useRef<AsyncIterable<StreamingServiceSubscribeResponse> | null>(null);
+  const callbacksRef = useRef<Set<DataUpdateCallback>>(new Set());
+  const currentDataRef = useRef<StreamingData>(initialData);
+  const reconnectTimeoutRef = useRef<number | null>(null);
+  const isReconnectingRef = useRef(false);
+  const pendingRequestsRef = useRef<Map<string, { resolve: (value: any) => void; reject: (reason?: any) => void }>>(new Map());
+  const requestQueueRef = useRef<StreamingServiceConnectRequest[]>([]);
+  const connectWriterRef = useRef<WritableStream<StreamingServiceConnectRequest> | null>(null);
 
   // Subscribe to data updates
   const subscribe = useCallback((callback: DataUpdateCallback) => {
@@ -680,6 +643,9 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
 
   // Disconnect from streaming
   const disconnect = useCallback(() => {
+    if (!isConnected) {
+      return
+    }
     logger.info('Disconnecting from streaming service...');
 
     if (reconnectTimeoutRef.current) {
@@ -732,12 +698,9 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
     isConnected,
     connectionStatus,
     error,
-    notifications,
     subscribe,
     sendRequest,
     refreshData,
-    clearNotification,
-    clearAllNotifications,
   };
 
   return (
