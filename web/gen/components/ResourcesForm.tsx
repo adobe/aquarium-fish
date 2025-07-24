@@ -359,11 +359,7 @@ const isSimpleField = (field: any) => {
       Slots
     </label>
     <div className="relative group">
-      <span className="cursor-help text-gray-400 hover:text-gray-600">
-        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      </span>
+      <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
       <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
         <pre className="whitespace-pre-wrap text-xs leading-relaxed">Global amount of slots to be filled with ApplicationResources</pre>
       </div>
@@ -394,11 +390,7 @@ const isSimpleField = (field: any) => {
       Cpu *
     </label>
     <div className="relative group">
-      <span className="cursor-help text-gray-400 hover:text-gray-600">
-        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      </span>
+      <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
       <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
         <pre className="whitespace-pre-wrap text-xs leading-relaxed">Amount of vCPUs (logical CPU with HT enabled will have 2 per core)</pre>
       </div>
@@ -429,11 +421,7 @@ const isSimpleField = (field: any) => {
       Ram *
     </label>
     <div className="relative group">
-      <span className="cursor-help text-gray-400 hover:text-gray-600">
-        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      </span>
+      <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
       <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
         <pre className="whitespace-pre-wrap text-xs leading-relaxed">Amount of RAM in GB</pre>
       </div>
@@ -464,11 +452,7 @@ const isSimpleField = (field: any) => {
     Disks *
   </label>
   <div className="relative group">
-    <span className="cursor-help text-gray-400 hover:text-gray-600">
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    </span>
+    <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
     <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
       <pre className="whitespace-pre-wrap text-xs leading-relaxed">Defines disks to attach/clone...</pre>
     </div>
@@ -600,11 +584,7 @@ const isSimpleField = (field: any) => {
       Network *
     </label>
     <div className="relative group">
-      <span className="cursor-help text-gray-400 hover:text-gray-600">
-        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      </span>
+      <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
       <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
         <pre className="whitespace-pre-wrap text-xs leading-relaxed">Which network configuration to use for the environment</pre>
       </div>
@@ -635,11 +615,7 @@ const isSimpleField = (field: any) => {
     Node Filter *
   </label>
   <div className="relative group">
-    <span className="cursor-help text-gray-400 hover:text-gray-600">
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    </span>
+    <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
     <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
       <pre className="whitespace-pre-wrap text-xs leading-relaxed">The list of the Node identifiers to run resource on, supports path wildcards example: - OS:darwin - OSVersion:12.* - Arch:x86_64</pre>
     </div>
@@ -698,11 +674,7 @@ const isSimpleField = (field: any) => {
       Multitenancy *
     </label>
     <div className="relative group">
-      <span className="cursor-help text-gray-400 hover:text-gray-600">
-        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      </span>
+      <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
       <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
         <pre className="whitespace-pre-wrap text-xs leading-relaxed">Tolerate to run along with the other envs on the same node</pre>
       </div>
@@ -733,11 +705,7 @@ const isSimpleField = (field: any) => {
       Cpu Overbook *
     </label>
     <div className="relative group">
-      <span className="cursor-help text-gray-400 hover:text-gray-600">
-        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      </span>
+      <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
       <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
         <pre className="whitespace-pre-wrap text-xs leading-relaxed">Tolerate to node CPU overbooking when executed together with other envs</pre>
       </div>
@@ -768,11 +736,7 @@ const isSimpleField = (field: any) => {
       Ram Overbook *
     </label>
     <div className="relative group">
-      <span className="cursor-help text-gray-400 hover:text-gray-600">
-        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      </span>
+      <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
       <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
         <pre className="whitespace-pre-wrap text-xs leading-relaxed">Tolerate to RAM overbooking when executed together with other envs</pre>
       </div>
@@ -803,11 +767,7 @@ const isSimpleField = (field: any) => {
       Lifetime *
     </label>
     <div className="relative group">
-      <span className="cursor-help text-gray-400 hover:text-gray-600">
-        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      </span>
+      <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
       <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
         <pre className="whitespace-pre-wrap text-xs leading-relaxed">Total lifetime of the ApplicationResource in Time Duration (ex. "1h30m30s"). Begins on ApplicationResource create time till deallocate by user or auto deallocate by timeout. If it's empty or "0" then default value from fish node config will be used. If it's negative (ex. "-1s") then the ApplicationResource will live forever or until the user requests deallocate.</pre>
       </div>
