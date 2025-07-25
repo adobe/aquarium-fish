@@ -15,7 +15,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useNotification } from '../components/Notifications';
 import type { ReactNode } from 'react';
-import { createClient } from '@connectrpc/connect';
+import { createClient, ConnectError, Code } from '@connectrpc/connect';
 import { createGrpcWebTransport } from '@connectrpc/connect-web';
 import { create, fromBinary } from '@bufbuild/protobuf';
 import { useAuth } from './AuthContext';
@@ -117,6 +117,7 @@ const transport = createGrpcWebTransport({
 });
 
 // Create clients
+var streamingController = new AbortController();
 const streamingClient = createClient(StreamingService, transport);
 const applicationClient = createClient(ApplicationService, transport);
 const labelClient = createClient(LabelService, transport);
@@ -140,21 +141,13 @@ const logger = {
     console.error(`[StreamingContext] ${message}`, ...args);
   },
   request: (type: string, request: any) => {
-    console.group(`[StreamingContext] REQUEST: ${type}`);
-    console.debug('Request data:', request);
-    console.groupEnd();
+    console.debug(`[StreamingContext] REQUEST: ${type}`, request);
   },
   response: (type: string, response: any) => {
-    console.group(`[StreamingContext] RESPONSE: ${type}`);
-    console.debug('Response data:', response);
-    console.groupEnd();
+    console.debug(`[StreamingContext] RESPONSE: ${type}`, response);
   },
   subscription: (update: StreamingServiceSubscribeResponse) => {
-    console.group(`[StreamingContext] SUBSCRIPTION UPDATE`);
-    console.debug('Subscription type:', update.objectType);
-    console.debug('Change type:', update.changeType);
-    console.debug('Object type:', update.objectData?.typeUrl || 'No object data');
-    console.groupEnd();
+    console.debug(`[StreamingContext] SUBSCRIPTION UPDATE: ${ChangeType[update.changeType]}, ${SubscriptionType[update.objectType]}`);
   }
 };
 
@@ -604,8 +597,8 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
 
       logger.debug('Subscribing with request:', subscribeRequest);
 
-      // Create subscription stream
-      subscribeStreamRef.current = streamingClient.subscribe(subscribeRequest);
+      // Create subscription stream with abort signal
+      subscribeStreamRef.current = streamingClient.subscribe(subscribeRequest, { signal: streamingController.signal });
 
       setConnectionStatus('connected');
       setIsConnected(true);
@@ -616,8 +609,11 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
       for await (const response of subscribeStreamRef.current) {
         handleSubscriptionUpdate(response);
       }
-
     } catch (err) {
+      if (err instanceof ConnectError && err.code === Code.Canceled) {
+        // This is a valid abort due to logout - no need to panic
+        return
+      }
       logger.error('Streaming connection error:', err);
       const errorMsg = `Connection error: ${err}`;
       setError(errorMsg);
@@ -628,20 +624,19 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
       // Schedule reconnection
       if (!isReconnectingRef.current) {
         isReconnectingRef.current = true;
-        logger.info('Scheduling reconnection in 5 seconds...');
+        logger.info('Scheduling reconnection in 10 seconds...');
         reconnectTimeoutRef.current = window.setTimeout(() => {
           isReconnectingRef.current = false;
           connect();
-        }, 5000);
+        }, 10000);
       }
     }
   }, [isAuthenticated, handleSubscriptionUpdate, addNotification]);
 
   // Disconnect from streaming
   const disconnect = useCallback(() => {
-    if (!isConnected) {
-      return
-    }
+    const wasConnected = subscribeStreamRef.current !== null
+
     logger.info('Disconnecting from streaming service...');
 
     if (reconnectTimeoutRef.current) {
@@ -661,9 +656,17 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
     pendingRequestsRef.current.clear();
     requestQueueRef.current = [];
 
-    setIsConnected(false);
-    setConnectionStatus('disconnected');
-    addNotification('info', 'Disconnected from streaming service');
+    if (wasConnected) {
+      // Disconnect from stream
+      streamingController.abort("Disconnected by client");
+      // Updating controller to allow the new user to login again
+      streamingController = new AbortController();
+
+      setIsConnected(false);
+      setConnectionStatus('disconnected');
+      addNotification('info', 'Disconnected from streaming service');
+    }
+
   }, [addNotification]);
 
   // Effect to manage connection
