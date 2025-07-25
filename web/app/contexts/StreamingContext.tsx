@@ -519,8 +519,6 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
         case 'ApplicationServiceCreateRequest':
           response = await applicationClient.create(request);
           addNotification('info', 'Application created successfully');
-          // Refresh data to ensure UI is updated
-          setTimeout(() => refreshData(), 500);
           break;
         case 'ApplicationServiceDeallocateRequest':
           response = await applicationClient.deallocate(request);
@@ -537,8 +535,6 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
         case 'LabelServiceCreateRequest':
           response = await labelClient.create(request);
           addNotification('info', 'Label created successfully');
-          // Refresh data to ensure UI is updated
-          setTimeout(() => refreshData(), 500);
           break;
         case 'LabelServiceRemoveRequest':
           response = await labelClient.remove(request);
@@ -581,7 +577,7 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
       addNotification('error', `Operation failed`, errorMsg);
       throw err;
     }
-  }, [addNotification, refreshData]);
+  }, [addNotification]);
 
   // Connect to streaming
   const connect = useCallback(async () => {
