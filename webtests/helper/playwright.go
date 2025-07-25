@@ -115,6 +115,8 @@ func (afp *AFPlaywright) Run(t *testing.T, name string, fn func(t *testing.T)) {
 		// Defer screenshot at end of subtest
 		defer afp.Screenshot(t, "end")
 
+		defer CloseAllNotifications(t, afp.page)
+
 		// Run the actual test function
 		fn(t)
 	})

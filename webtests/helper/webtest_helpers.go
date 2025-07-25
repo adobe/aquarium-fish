@@ -60,49 +60,32 @@ func LoginUser(t *testing.T, page pw.Page, afp *AFPlaywright, afi *h.AFInstance,
 func LogoutUser(t *testing.T, page pw.Page, afp *AFPlaywright, afi *h.AFInstance) {
 	t.Helper()
 
-	// Try multiple logout methods as UI might vary
-	logoutMethods := []func() error{
-		// Method 1: Look for user menu button and click logout
-		func() error {
-			userMenuButton := page.Locator("button").Filter(pw.LocatorFilterOptions{
-				HasText: "admin",
-			})
-			if err := userMenuButton.Click(); err != nil {
-				return err
-			}
-			return page.Locator("text=Logout").Click()
-		},
-		// Method 2: Direct logout link
-		func() error {
-			return page.Locator("text=Logout").Click()
-		},
-		// Method 3: Force logout by navigating to login page
-		func() error {
-			_, err := page.Goto(afi.APIAddress(""), pw.PageGotoOptions{
-				WaitUntil: pw.WaitUntilStateDomcontentloaded,
-			})
-			return err
-		},
+	// Look for user menu button and click logout
+	err := page.GetByRole(*pw.AriaRoleButton).
+		Filter(pw.LocatorFilterOptions{
+			HasText: "Open user menu",
+		}).
+		Click()
+	if err != nil {
+		t.Fatalf("ERROR: Unable to find user menu button: %v", err)
 	}
 
-	var lastErr error
-	for i, method := range logoutMethods {
-		if err := method(); err != nil {
-			lastErr = err
-			t.Logf("WARNING: Logout method %d failed: %v", i+1, err)
-			continue
-		}
-		break
+	// Click sign out button from menu
+	err = page.GetByRole(*pw.AriaRoleButton, pw.PageGetByRoleOptions{Name: "Sign Out"}).Click()
+	if err != nil {
+		t.Fatalf("ERROR: Unable to click user menu logout button: %v", err)
 	}
 
 	// Wait for redirect to login page
-	if err := page.WaitForURL("**/login", pw.PageWaitForURLOptions{
-		Timeout: pw.Float(2000),
-	}); err != nil {
-		// If we're already on login page, check for username field
-		if err := page.Locator("#username").WaitFor(); err != nil {
-			t.Fatalf("ERROR: Could not reach login page after logout: %v (last logout error: %v)", err, lastErr)
-		}
+	err = page.WaitForURL("**/login")
+	if err != nil {
+		t.Fatalf("ERROR: Unable to reach login page location: %v", err)
+	}
+
+	// Check for username field
+	err = page.Locator("#username").WaitFor()
+	if err != nil {
+		t.Fatalf("ERROR: Could not find username field on login page: %v", err)
 	}
 
 	t.Log("INFO: Successfully logged out")
@@ -192,6 +175,9 @@ definitions:
 		t.Fatalf("ERROR: Could not fill Name field: %v", err)
 	}
 
+	// Ensure no notifications is here blocking the view
+	CloseAllNotifications(t, page)
+
 	// Click Create button in modal
 	err = page.GetByRole(*pw.AriaRoleButton, pw.PageGetByRoleOptions{Name: "Create"}).
 		Last().
@@ -211,13 +197,19 @@ definitions:
 	}
 
 	// Wait for label to appear in list and getting into details to find the labelUID
-	err = page.GetByRole(*pw.AriaRoleListitem).
+	labelItem := page.GetByRole(*pw.AriaRoleListitem).
 		Filter(pw.LocatorFilterOptions{HasText: labelName + ":1"}).
-		First().
-		GetByRole(*pw.AriaRoleButton, pw.LocatorGetByRoleOptions{Name: "View Details"}).
-		Click()
+		First()
+
+	err = labelItem.WaitFor()
 	if err != nil {
 		t.Fatalf("ERROR: Label %s did not appear in list: %v", labelName, err)
+	}
+
+	err = labelItem.GetByRole(*pw.AriaRoleButton, pw.LocatorGetByRoleOptions{Name: "View Details"}).
+		Click()
+	if err != nil {
+		t.Fatalf("ERROR: Could not click Label %s View Details button: %v", labelName, err)
 	}
 
 	// Wait for modal to appear
@@ -361,56 +353,99 @@ func CreateUser(t *testing.T, page pw.Page, afp *AFPlaywright, username, passwor
 	t.Helper()
 
 	// Navigate to manage page
-	NavigateToPage(t, page, "management")
+	NavigateToPage(t, page, "manage")
 
 	// Click on Users tab
-	if err := page.Locator("text=Users").Click(); err != nil {
+	err := page.GetByRole(*pw.AriaRoleButton, pw.PageGetByRoleOptions{Name: "Users"}).
+		Click()
+	if err != nil {
 		t.Fatalf("ERROR: Could not click Users tab: %v", err)
 	}
 
 	// Click Create User button
-	if err := page.Locator("text=Create User").Click(); err != nil {
+	err = page.GetByRole(*pw.AriaRoleButton, pw.PageGetByRoleOptions{Name: "Create User"}).
+		Click()
+	if err != nil {
 		t.Fatalf("ERROR: Could not click Create User button: %v", err)
 	}
 
 	// Wait for create user modal
-	if err := page.Locator("text=Create User").Last().WaitFor(); err != nil {
+	err = page.GetByRole(*pw.AriaRoleHeading, pw.PageGetByRoleOptions{Name: "Create User"}).
+		WaitFor()
+	if err != nil {
 		t.Fatalf("ERROR: Create User modal did not appear: %v", err)
 	}
 
 	// Fill user creation form
-	if err := page.Locator("input[type=text]").Fill(username); err != nil {
-		t.Fatalf("ERROR: Could not fill username: %v", err)
+	err = page.Locator("label:has-text('Name')").
+		Locator("..").
+		Locator("..").
+		Locator("input").
+		Fill(username)
+	if err != nil {
+		t.Fatalf("ERROR: Could not fill Name field: %v", err)
 	}
 
-	if err := page.Locator("input[type=password]").Fill(password); err != nil {
-		t.Fatalf("ERROR: Could not fill password: %v", err)
+	err = page.Locator("label:has-text('Password')").
+		Locator("..").
+		Locator("..").
+		Locator("input").
+		Fill(password)
+	if err != nil {
+		t.Fatalf("ERROR: Could not fill Password field: %v", err)
 	}
 
-	// Select roles
+	// Put roles in
+	rolesElement := page.Locator("label:has-text('Roles')").
+		Locator("..").
+		Locator("..")
 	for _, role := range roles {
-		roleCheckbox := page.Locator("text=" + role).Locator("..").Locator("input[type=checkbox]")
-		if err := roleCheckbox.Check(); err != nil {
-			t.Logf("WARNING: Could not select role %s: %v", role, err)
+		err = rolesElement.GetByRole(*pw.AriaRoleButton, pw.LocatorGetByRoleOptions{Name: "+ Add Roles"}).
+			Click()
+		if err != nil {
+			t.Fatalf("ERROR: Could not add new Role field: %v", err)
+		}
+		err = rolesElement.GetByRole(*pw.AriaRoleTextbox).
+			Last().
+			Fill(role)
+		if err != nil {
+			t.Fatalf("ERROR: Could not fill the Role field: %v", err)
 		}
 	}
 
+	// Ensure no notifications is here blocking the view
+	CloseAllNotifications(t, page)
+
 	// Click Create button in modal
-	if err := page.Locator("text=Create").Last().Click(); err != nil {
+	err = page.GetByRole(*pw.AriaRoleButton, pw.PageGetByRoleOptions{Name: "Create"}).
+		Last().
+		Click()
+	if err != nil {
 		t.Fatalf("ERROR: Could not click Create button in modal: %v", err)
 	}
 
 	// Wait for modal to close
-	if err := page.Locator("text=Create User").Last().WaitFor(pw.LocatorWaitForOptions{
-		State:   pw.WaitForSelectorStateHidden,
-		Timeout: pw.Float(5000),
-	}); err != nil {
+	err = page.GetByRole(*pw.AriaRoleHeading, pw.PageGetByRoleOptions{Name: "Create User"}).
+		Last().
+		WaitFor(pw.LocatorWaitForOptions{
+			State:   pw.WaitForSelectorStateHidden,
+			Timeout: pw.Float(2000),
+		})
+	if err != nil {
 		t.Logf("WARNING: Create User modal did not close as expected: %v", err)
 	}
 
 	// Wait for user to appear in list
+	userItem := page.GetByRole(*pw.AriaRoleListitem).
+		Filter(pw.LocatorFilterOptions{HasText: username}).
+		First()
+
+	err = userItem.WaitFor()
+	if err != nil {
+		t.Fatalf("ERROR: User %s did not appear in list: %v", username, err)
+	}
 	if err := page.Locator("text=" + username).First().WaitFor(pw.LocatorWaitForOptions{
-		Timeout: pw.Float(5000),
+		Timeout: pw.Float(2000),
 	}); err != nil {
 		t.Fatalf("ERROR: Created user %s did not appear in list: %v", username, err)
 	}
@@ -475,4 +510,25 @@ func VerifyApplicationInList(t *testing.T, page pw.Page, labelName, owner, statu
 	}
 
 	t.Logf("INFO: Successfully verified application %s in list", labelName)
+}
+
+// CloseAllNotifications checks here is no error notifications and closes to clear the view
+func CloseAllNotifications(t *testing.T, page pw.Page) {
+	notificationsElement := page.Locator("#notifications")
+
+	// Check there is no error notifications
+	foundErrors, _ := notificationsElement.Locator(".notification-error").All()
+	for _, notification := range foundErrors {
+		content, _ := notification.TextContent()
+		t.Errorf("ERROR: Found error user notification: %q", content)
+	}
+
+	// Close all notifications
+	err := notificationsElement.
+		GetByRole(*pw.AriaRoleButton).
+		Filter(pw.LocatorFilterOptions{HasText: "Clear All"}).
+		Click()
+	if err != nil {
+		t.Logf("INFO: No notifications to close")
+	}
 }

@@ -150,26 +150,25 @@ const NotificationsUI: React.FC<{
 
   return (
     <div
+      id="notifications"
       className="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm flex flex-col-reverse"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{ alignItems: 'flex-end', height: '0px' }}
     >
       <div className="flex justify-end">
-        {notifications.length > 1 && (
           <button
             onClick={clearAllNotifications}
             className="mb-2 px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
           >
             Clear All ({notifications.length})
           </button>
-        )}
       </div>
 
       {notifications.slice().reverse().map((notification, index) => (
         <div
           key={notification.id}
-          className={`border-l-4 p-4 rounded-md shadow-lg transition-all duration-300 ease-in-out transform ${
+          className={`notification-${notification.type} border-l-4 p-4 rounded-md shadow-lg transition-all duration-300 ease-in-out transform ${
             index === 0 ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-90'
           } ${getNotificationColors(notification.type)}`}
           style={{

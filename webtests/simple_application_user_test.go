@@ -23,9 +23,9 @@ import (
 	"github.com/playwright-community/playwright-go"
 )
 
-// Test_simple_application_admin tests the complete lifecycle of application creation and deallocation by admin user
+// Test_simple_application_user tests the complete lifecycle of application creation and deallocation by regular user
 // This test verifies that applications appear in the list without page refresh and can be deallocated
-func Test_simple_application_admin(t *testing.T) {
+func Test_simple_application_user(t *testing.T) {
 	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 
@@ -48,17 +48,34 @@ drivers:
 		t.Fatalf("ERROR: Could not goto Web Dashboard page: %v", err)
 	}
 
-	const testLabel = "test-label"
-
 	afp.Run(t, "Login as admin user", func(t *testing.T) {
 		// Login as admin using correct admin token
 		hp.LoginUser(t, page, afp, afi, "admin", afi.AdminToken())
 	})
 
+	const testLabel = "test-label"
+	const testUsername = "testuser"
+	const testPassword = "testpass123"
+
+	afp.Run(t, "Create test user", func(t *testing.T) {
+		// Create test user with User role
+		hp.CreateUser(t, page, afp, testUsername, testPassword, []string{"User"})
+	})
+
 	var labelUID string
 	afp.Run(t, "Create test label", func(t *testing.T) {
-		// First create a label that applications can use
+		// Create a label that applications can use
 		labelUID = hp.CreateLabel(t, page, afp, testLabel)
+	})
+
+	afp.Run(t, "Logout and login as testuser", func(t *testing.T) {
+		// Logout admin user
+		hp.LogoutUser(t, page, afp, afi)
+
+		// Login as test user
+		hp.LoginUser(t, page, afp, afi, testUsername, testPassword)
+
+		t.Log("INFO: Successfully logged in as test user")
 	})
 
 	afp.Run(t, "Create application", func(t *testing.T) {
@@ -71,7 +88,7 @@ drivers:
 
 	afp.Run(t, "Check list of apps got update that Application is Allocated", func(t *testing.T) {
 		// Verify application details in list
-		hp.VerifyApplicationInList(t, page, testLabel, "admin", "Allocated")
+		hp.VerifyApplicationInList(t, page, testLabel, testUsername, "Allocated")
 	})
 
 	afp.Run(t, "Deallocate application", func(t *testing.T) {
@@ -81,6 +98,6 @@ drivers:
 
 	afp.Run(t, "Check list of apps got update that Application is Deallocated", func(t *testing.T) {
 		// Verify second application appears in list
-		hp.VerifyApplicationInList(t, page, testLabel, "admin", "Deallocated")
+		hp.VerifyApplicationInList(t, page, testLabel, testUsername, "Deallocated")
 	})
 }
