@@ -25,6 +25,7 @@ import type { User } from '../../gen/aquarium/v2/user_pb';
 import { RoleServiceCreateRequestSchema, RoleServiceUpdateRequestSchema, RoleServiceRemoveRequestSchema } from '../../gen/aquarium/v2/role_pb';
 import type { Role } from '../../gen/aquarium/v2/role_pb';
 import { UserForm, RoleForm } from '../../gen/components';
+import { PermService, PermUser, PermRole } from '../../gen/permissions/permissions_grpc';
 
 export function meta() {
   return [
@@ -165,14 +166,14 @@ export default function Manage() {
         setShowUserDetailsModal(true);
       },
       className: 'px-3 py-1 text-sm bg-green-100 text-green-800 rounded-md hover:bg-green-200',
-      permission: { resource: 'UserService', action: 'Update' },
+      permission: { resource: PermService.User, action: PermUser.Update },
     },
     {
       label: 'Remove',
       onClick: handleRemoveUser,
       className: 'px-3 py-1 text-sm bg-red-100 text-red-800 rounded-md hover:bg-red-200',
       condition: (user: User) => user.name !== 'admin',
-      permission: { resource: 'UserService', action: 'Remove' },
+      permission: { resource: PermService.User, action: PermUser.Remove },
     },
   ];
 
@@ -204,20 +205,20 @@ export default function Manage() {
         setShowRoleDetailsModal(true);
       },
       className: 'px-3 py-1 text-sm bg-green-100 text-green-800 rounded-md hover:bg-green-200',
-      permission: { resource: 'RoleService', action: 'Update' },
+      permission: { resource: PermService.Role, action: PermRole.Update },
     },
     {
       label: 'Remove',
       onClick: handleRemoveRole,
       className: 'px-3 py-1 text-sm bg-red-100 text-red-800 rounded-md hover:bg-red-200',
       condition: (role: Role) => role.name !== 'admin',
-      permission: { resource: 'RoleService', action: 'Remove' },
+      permission: { resource: PermService.Role, action: PermRole.Remove },
     },
   ];
 
   // Permissions
-  const canCreateUser = hasPermission('UserService', 'Create');
-  const canCreateRole = hasPermission('RoleService', 'Create');
+  const canCreateUser = hasPermission(PermService.User, PermUser.Create);
+  const canCreateRole = hasPermission(PermService.Role, PermRole.Create);
 
   return (
     <ProtectedRoute>
@@ -286,7 +287,7 @@ export default function Manage() {
                 actions={userActions}
                 filterBy={['name']}
                 itemKey={(user: User) => user.name}
-                permissions={{ list: { resource: 'UserService', action: 'List' } }}
+                permissions={{ list: { resource: PermService.User, action: PermUserList } }}
                 emptyMessage="No users found"
               />
             </div>
@@ -317,7 +318,7 @@ export default function Manage() {
                 actions={roleActions}
                 filterBy={['name']}
                 itemKey={(role: Role) => role.name}
-                permissions={{ list: { resource: 'RoleService', action: 'List' } }}
+                permissions={{ list: { resource: PermService.Role, action: PermRole.List } }}
                 emptyMessage="No roles found"
               />
             </div>

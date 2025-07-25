@@ -301,11 +301,6 @@ export const roleServiceHelpers = {
 
 // Utility functions
 export const utils = {
-  // Check if user has specific permission
-  hasPermission(userPermissions: Array<{ resource: string; action: string }>, resource: string, action: string): boolean {
-    return userPermissions.some(p => p.resource === resource && p.action === action);
-  },
-
   // Format timestamp to human readable
   formatTimestamp(timestamp: { seconds: string } | undefined): string {
     if (!timestamp) return 'Unknown';

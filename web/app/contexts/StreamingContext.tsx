@@ -74,6 +74,14 @@ import {
   RoleSchema,
 } from '../../gen/aquarium/v2/role_pb';
 import { GateProxySSHService } from '../../gen/aquarium/v2/gate_proxyssh_access_pb';
+import {
+  PermService,
+  PermApplication,
+  PermLabel,
+  PermNode,
+  PermUser,
+  PermRole,
+} from '../../gen/permissions/permissions_grpc';
 
 // Transport configuration with automatic token refresh
 const transport = createGrpcWebTransport({
@@ -192,7 +200,7 @@ interface StreamingProviderProps {
 }
 
 export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }) => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, hasPermission } = useAuth();
   const initialData: StreamingData = {
     applications: [],
     applicationStates: new Map(),
@@ -264,47 +272,117 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
     logger.info('Refreshing data...');
 
     try {
-      // Use direct calls for initial data load - this ensures we have data immediately
-      // The streaming will update this data in real-time
-      const [appsRes, labelsRes, nodesRes, usersRes, rolesRes] = await Promise.all([
-        applicationClient.list(create(ApplicationServiceListRequestSchema)),
-        labelClient.list(create(LabelServiceListRequestSchema)),
-        nodeClient.list(create(NodeServiceListRequestSchema)),
-        userClient.list(create(UserServiceListRequestSchema)),
-        roleClient.list(create(RoleServiceListRequestSchema)),
-      ]);
+      // Check permissions before making API calls
+      const canListApplications = hasPermission(PermService.Application, PermApplication.List);
+      const canListLabels = hasPermission(PermService.Label, PermLabel.List);
+      const canListNodes = hasPermission(PermService.Node, PermNode.List);
+      const canListUsers = hasPermission(PermService.User, PermUser.List);
+      const canListRoles = hasPermission(PermService.Role, PermRole.List);
+      const canGetApplicationState = hasPermission(PermService.Application, PermApplication.GetState);
+      const canGetApplicationResource = hasPermission(PermService.Application, PermApplication.GetResource);
 
-      const applications = appsRes.data || [];
-
-      // Fetch all states and resources in parallel
-      const statePromises = applications.map(app =>
-        applicationClient.getState(create(ApplicationServiceGetStateRequestSchema, { applicationUid: app.uid }))
-          .then(res => [app.uid, res.data] as [string, ApplicationState | undefined])
-          .catch(() => [app.uid, undefined] as [string, ApplicationState | undefined])
-      );
-      const resourcePromises = applications.map(app =>
-        applicationClient.getResource(create(ApplicationServiceGetResourceRequestSchema, { applicationUid: app.uid }))
-          .then(res => [app.uid, res.data] as [string, ApplicationResource | undefined])
-          .catch(() => [app.uid, undefined] as [string, ApplicationResource | undefined])
-      );
-      const stateResults = await Promise.all(statePromises);
-      const resourceResults = await Promise.all(resourcePromises);
-
-      const applicationStates = new Map<string, ApplicationState>();
-      stateResults.forEach(([uid, state]) => {
-        if (state) applicationStates.set(uid, state);
+      logger.info('Permission check results:', {
+        canListApplications,
+        canListLabels,
+        canListNodes,
+        canListUsers,
+        canListRoles,
+        canGetApplicationState,
+        canGetApplicationResource,
       });
-      const applicationResources = new Map<string, ApplicationResource>();
-      resourceResults.forEach(([uid, resource]) => {
-        if (resource) applicationResources.set(uid, resource);
+
+      // Prepare API calls based on permissions
+      const apiCalls: Promise<any>[] = [];
+      const callTypes: string[] = [];
+
+      if (canListApplications) {
+        apiCalls.push(applicationClient.list(create(ApplicationServiceListRequestSchema)));
+        callTypes.push('applications');
+      }
+      if (canListLabels) {
+        apiCalls.push(labelClient.list(create(LabelServiceListRequestSchema)));
+        callTypes.push('labels');
+      }
+      if (canListNodes) {
+        apiCalls.push(nodeClient.list(create(NodeServiceListRequestSchema)));
+        callTypes.push('nodes');
+      }
+      if (canListUsers) {
+        apiCalls.push(userClient.list(create(UserServiceListRequestSchema)));
+        callTypes.push('users');
+      }
+      if (canListRoles) {
+        apiCalls.push(roleClient.list(create(RoleServiceListRequestSchema)));
+        callTypes.push('roles');
+      }
+
+      // Execute API calls for which user has permissions
+      const results = await Promise.all(apiCalls);
+
+      // Process results based on call types
+      let applications: Application[] = [];
+      let labels: Label[] = [];
+      let nodes: Node[] = [];
+      let users: User[] = [];
+      let roles: Role[] = [];
+
+      results.forEach((result, index) => {
+        const callType = callTypes[index];
+        switch (callType) {
+          case 'applications':
+            applications = result.data || [];
+            break;
+          case 'labels':
+            labels = result.data || [];
+            break;
+          case 'nodes':
+            nodes = result.data || [];
+            break;
+          case 'users':
+            users = result.data || [];
+            break;
+          case 'roles':
+            roles = result.data || [];
+            break;
+        }
       });
+
+      // Fetch application states and resources if user has permissions
+      let applicationStates = new Map<string, ApplicationState>();
+      let applicationResources = new Map<string, ApplicationResource>();
+
+      if (applications.length > 0) {
+        if (canGetApplicationState) {
+          const statePromises = applications.map(app =>
+            applicationClient.getState(create(ApplicationServiceGetStateRequestSchema, { applicationUid: app.uid }))
+              .then(res => [app.uid, res.data] as [string, ApplicationState | undefined])
+              .catch(() => [app.uid, undefined] as [string, ApplicationState | undefined])
+          );
+          const stateResults = await Promise.all(statePromises);
+          stateResults.forEach(([uid, state]) => {
+            if (state) applicationStates.set(uid, state);
+          });
+        }
+
+        if (canGetApplicationResource) {
+          const resourcePromises = applications.map(app =>
+            applicationClient.getResource(create(ApplicationServiceGetResourceRequestSchema, { applicationUid: app.uid }))
+              .then(res => [app.uid, res.data] as [string, ApplicationResource | undefined])
+              .catch(() => [app.uid, undefined] as [string, ApplicationResource | undefined])
+          );
+          const resourceResults = await Promise.all(resourcePromises);
+          resourceResults.forEach(([uid, resource]) => {
+            if (resource) applicationResources.set(uid, resource);
+          });
+        }
+      }
 
       logger.info('Initial data loaded:', {
         applications: applications.length,
-        labels: labelsRes.data?.length || 0,
-        nodes: nodesRes.data?.length || 0,
-        users: usersRes.data?.length || 0,
-        roles: rolesRes.data?.length || 0,
+        labels: labels.length,
+        nodes: nodes.length,
+        users: users.length,
+        roles: roles.length,
         applicationStates: applicationStates.size,
         applicationResources: applicationResources.size,
       });
@@ -314,10 +392,10 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
         applicationStates,
         applicationResources,
         applicationTasks: new Map(),
-        labels: labelsRes.data || [],
-        nodes: nodesRes.data || [],
-        users: usersRes.data || [],
-        roles: rolesRes.data || [],
+        labels,
+        nodes,
+        users,
+        roles,
       };
 
       currentDataRef.current = newData;
@@ -330,7 +408,7 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
       addNotification('error', 'Failed to refresh data', String(err));
       logger.error('Data refresh failed:', err);
     }
-  }, [isAuthenticated, notifySubscribers, addNotification]);
+  }, [isAuthenticated, hasPermission, notifySubscribers, addNotification]);
 
   // Handle subscription updates
   const handleSubscriptionUpdate = useCallback((response: StreamingServiceSubscribeResponse) => {

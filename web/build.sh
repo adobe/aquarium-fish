@@ -47,6 +47,10 @@ docker run --rm \
         echo 'Installing dependencies...'
         npm --prefer-offline install
 
+        #echo 'Running eslint...'
+        # Disabled for now
+        #npx eslint ./app
+
         if [ "x$RELEASE" != 'x' ]; then
             echo 'Building release SPA...'
             npm run build

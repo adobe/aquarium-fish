@@ -27,9 +27,11 @@ import {
   type ApplicationResource
 } from '../../gen/aquarium/v2/application_pb';
 import { ApplicationForm, ApplicationResourceForm } from '../../gen/components';
+import { ApplicationForm, ApplicationResourceForm } from '../../gen/components';
 import { timestampToDate } from '../lib/auth';
 import { Resources, ResourcesSchema } from '../../gen/aquarium/v2/label_pb';
 import { GateProxySSHServiceGetResourceAccessRequestSchema } from '../../gen/aquarium/v2/gate_proxyssh_access_pb';
+import { PermService, PermApplication } from '../../gen/permissions/permissions_grpc';
 
 export function meta() {
   return [
@@ -238,11 +240,11 @@ export default function Applications() {
       label: 'Deallocate',
       onClick: handleDeallocateApplication,
       className: 'px-3 py-1 text-sm bg-red-100 text-red-800 rounded-md hover:bg-red-200',
-      condition: (app: ApplicationWithDetails) => app.isUserOwned || hasPermission('ApplicationService', 'DeallocateAll'),
+      condition: (app: ApplicationWithDetails) => app.isUserOwned || hasPermission(PermService.Application, PermApplication.DeallocateAll),
     },
   ];
 
-  const canCreateApp = hasPermission('ApplicationService', 'Create');
+  const canCreateApp = hasPermission(PermService.Applciation, PermApplication.Create);
 
   return (
     <ProtectedRoute>
@@ -288,7 +290,7 @@ export default function Applications() {
               setSelectedApp(app);
               setShowDetailsModal(true);
             }}
-            permissions={{ list: { resource: 'ApplicationService', action: 'List' } }}
+            permissions={{ list: { resource: PermService.Application, action: PermApplication.List } }}
             emptyMessage="No applications found"
           />
         </div>

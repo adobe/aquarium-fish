@@ -23,6 +23,7 @@ import { create } from '@bufbuild/protobuf';
 import { LabelServiceCreateRequestSchema, LabelServiceRemoveRequestSchema } from '../../gen/aquarium/v2/label_pb';
 import type { Label } from '../../gen/aquarium/v2/label_pb';
 import { LabelForm } from '../../gen/components';
+import { PermService, PermLabel } from '../../gen/permissions/permissions_grpc';
 
 export function meta() {
   return [
@@ -112,11 +113,11 @@ export default function Labels() {
       label: 'Remove',
       onClick: handleRemoveLabel,
       className: 'px-3 py-1 text-sm bg-red-100 text-red-800 rounded-md hover:bg-red-200',
-      permission: { resource: 'LabelService', action: 'Remove' },
+      permission: { resource: PermService.Label, action: PermLabel.Remove },
     },
   ];
 
-  const canCreateLabel = hasPermission('LabelService', 'Create');
+  const canCreateLabel = hasPermission(PermService.Label, PermLabel.Create);
 
   return (
     <ProtectedRoute>
@@ -150,7 +151,7 @@ export default function Labels() {
             filterBy={['name']}
             sortBy={{ key: 'name', direction: 'asc' }}
             itemKey={(label: Label) => label.uid}
-            permissions={{ list: { resource: 'LabelService', action: 'List' } }}
+            permissions={{ list: { resource: PermService.Label, action: PermLabel.List } }}
             emptyMessage="No labels found"
           />
         </div>

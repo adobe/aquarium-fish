@@ -47,7 +47,7 @@ export default function Status() {
       setError(null);
       setRefreshing(true);
 
-      const canGetThisNode = hasPermission('NodeService', 'GetThis');
+      const canGetThisNode = hasPermission(PermService.Node, PermNode.GetThis);
 
       if (canGetThisNode) {
         const currentNode = await nodeServiceHelpers.getThis();
@@ -150,9 +150,9 @@ export default function Status() {
     },
   ];
 
-  const canListNodes = hasPermission('NodeService', 'List');
-  const canGetThisNode = hasPermission('NodeService', 'GetThis');
-  const canSetMaintenance = hasPermission('NodeService', 'SetMaintenance');
+  const canListNodes = hasPermission(PermService.Node, PermNode.List);
+  const canGetThisNode = hasPermission(PermService.Node, PermNode.GetThis);
+  const canSetMaintenance = hasPermission(PermService.Node, PermNode.SetMaintenance);
 
   if (!canListNodes && !canGetThisNode) {
     return (
@@ -369,7 +369,7 @@ export default function Status() {
                   setSelectedNode(node);
                   setShowDetailsModal(true);
                 }}
-                permissions={{ list: { resource: 'NodeService', action: 'List' } }}
+                permissions={{ list: { resource: PermService.Node, action: PermNode.List } }}
                 emptyMessage="No nodes found"
               />
             </div>

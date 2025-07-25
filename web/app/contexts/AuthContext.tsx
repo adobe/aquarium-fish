@@ -15,6 +15,17 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { authService, tokenStorage, type AuthTokens, type AuthUser } from '../lib/auth';
+import {
+  PermService,
+  PermApplication,
+  PermAuth,
+  PermGateProxySSH,
+  PermLabel,
+  PermNode,
+  PermRole,
+  PermStreaming,
+  PermUserService,
+} from '../../gen/permissions/permissions_grpc';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -184,7 +195,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }, timeUntilRefresh);
   };
 
-  const hasPermission = (resource: string, action: string): boolean => {
+  const hasPermission = (resource: PermService, action: PermApplication | PermAuth | PermGateProxySSH | PermLabel | PermNode | PermRole | PermStreaming | PermUserService): boolean => {
     if (!user) return false;
 
     return user.permissions.some(
