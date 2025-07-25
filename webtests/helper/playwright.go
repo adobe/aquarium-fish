@@ -12,11 +12,15 @@
 
 // Author: Sergei Parshev (@sparshev)
 
+// Package helper allows to run playwright WebUI tests with Aquarium Fish
 package helper
 
 import (
+	"fmt"
 	"os"
+	"path"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/playwright-community/playwright-go"
@@ -28,7 +32,6 @@ type AFPlaywright struct {
 	browser playwright.Browser
 	context playwright.BrowserContext
 	page    playwright.Page
-	expect  playwright.PlaywrightAssertions
 
 	captureDir string
 
@@ -38,6 +41,10 @@ type AFPlaywright struct {
 
 	browserName string
 	browserType playwright.BrowserType
+
+	// Automatic tests screenshoting
+	stepMu sync.Mutex
+	step   int
 }
 
 // Default context options for most tests
@@ -59,26 +66,25 @@ func NewPlaywright(tb testing.TB, workspace string, options playwright.BrowserNe
 		tb.Fatalf("ERROR: Could not start Playwright: %v", err)
 	}
 
-	if afp.browserName == "chromium" || afp.browserName == "" {
-		afp.browserType = afp.pw.Chromium
-	} else if afp.browserName == "firefox" {
+	switch afp.browserName {
+	case "firefox":
 		afp.browserType = afp.pw.Firefox
-	} else if afp.browserName == "webkit" {
+		afp.isFirefox = true
+	case "webkit":
 		afp.browserType = afp.pw.WebKit
+		afp.isWebKit = true
+	default:
+		afp.browserType = afp.pw.Chromium
+		afp.isChromium = true
 	}
 
+	// By default tests are running headless, but there could be a need to run them with UI
 	afp.browser, err = afp.browserType.Launch(playwright.BrowserTypeLaunchOptions{
 		Headless: playwright.Bool(os.Getenv("HEADFUL") == ""),
 	})
 	if err != nil {
 		tb.Fatalf("ERROR: Could not launch: %v", err)
 	}
-
-	afp.expect = playwright.NewPlaywrightAssertions(1000)
-
-	afp.isChromium = afp.browserName == "chromium" || afp.browserName == ""
-	afp.isFirefox = afp.browserName == "firefox"
-	afp.isWebKit = afp.browserName == "webkit"
 
 	tb.Cleanup(func() {
 		if err = afp.browser.Close(); err != nil {
@@ -93,10 +99,48 @@ func NewPlaywright(tb testing.TB, workspace string, options playwright.BrowserNe
 	// Creating context
 	afp.newBrowserContext(tb, options)
 
-	return afp, afp.NewPage(tb)
+	// Probably with multiple pages in the future we will need to keep a slice of them to screenshot
+	afp.page = afp.newPage(tb)
+
+	return afp, afp.page
 }
 
-func (afp *AFPlaywright) NewPage(tb testing.TB) playwright.Page {
+func (afp *AFPlaywright) Run(t *testing.T, name string, fn func(t *testing.T)) {
+	t.Helper()
+
+	t.Run(name, func(t *testing.T) {
+		// Take screenshot at beginning of subtest
+		afp.Screenshot(t, "start")
+
+		// Defer screenshot at end of subtest
+		defer afp.Screenshot(t, "end")
+
+		// Run the actual test function
+		fn(t)
+	})
+}
+
+// Screenshot takes a screenshot with automatic naming
+func (afp *AFPlaywright) Screenshot(t *testing.T, phase string) {
+	afp.stepMu.Lock()
+	defer afp.stepMu.Unlock()
+
+	// Increment step counter for this subtest
+	afp.step++
+
+	subtestName := path.Base(t.Name())
+
+	// Create filename: step_subtestName_phase.png
+	filename := fmt.Sprintf("%02d-%s-%s.png", afp.step, subtestName, phase)
+
+	if _, err := afp.page.Screenshot(playwright.PageScreenshotOptions{
+		Path: playwright.String(afp.CaptureDir("screenshots", filename)),
+	}); err != nil {
+		t.Logf("WARNING: Could not take screenshot %s: %v", filename, err)
+	}
+}
+
+func (afp *AFPlaywright) newPage(tb testing.TB) playwright.Page {
 	page, err := afp.context.NewPage()
 	if err != nil {
 		tb.Fatalf("ERROR: Could not create page: %v", err)

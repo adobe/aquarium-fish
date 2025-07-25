@@ -41,48 +41,44 @@ drivers:
 		ColorScheme:       playwright.ColorSchemeDark,
 	})
 
-	// Create automated screenshot manager
-	screenshots := hp.NewTestScreenshots(afp, page)
+	// Go to WebUI
+	if _, err := page.Goto(afi.APIAddress(""), playwright.PageGotoOptions{
+		WaitUntil: playwright.WaitUntilStateDomcontentloaded,
+	}); err != nil {
+		t.Fatalf("ERROR: Could not goto Web Dashboard page: %v", err)
+	}
 
-	screenshots.WithScreenshots(t, "admin_login", func(t *testing.T) {
+	afp.Run(t, "Login as admin user", func(t *testing.T) {
 		// Login as admin using correct admin token
 		hp.LoginUser(t, page, afp, afi, "admin", afi.AdminToken())
 	})
 
-	screenshots.WithScreenshots(t, "create_label", func(t *testing.T) {
+	var labelUID string
+	afp.Run(t, "Create test label", func(t *testing.T) {
 		// First create a label that applications can use
-		hp.CreateLabel(t, page, afp, "test-label")
+		labelUID = hp.CreateLabel(t, page, afp, "test-label")
 	})
 
-	screenshots.WithScreenshots(t, "create_application", func(t *testing.T) {
+	afp.Run(t, "Create application", func(t *testing.T) {
 		// Create application using form interface
-		hp.CreateApplicationForm(t, page, afp, "test-label-uid", map[string]string{
+		hp.CreateApplication(t, page, afp, labelUID, map[string]string{
 			"TEST_VAR":    "test-value",
 			"DESCRIPTION": "Test application created by admin",
 		})
+	})
 
+	afp.Run(t, "Check list of apps got update that Application is Allocated", func(t *testing.T) {
 		// Verify application details in list
-		hp.VerifyApplicationInList(t, page, "test-label-uid", "admin")
+		hp.VerifyApplicationInList(t, page, "test-label", "admin", "Allocated")
 	})
 
-	screenshots.WithScreenshots(t, "deallocate_application", func(t *testing.T) {
+	afp.Run(t, "Deallocate application", func(t *testing.T) {
 		// Deallocate the application using helper
-		hp.DeallocateApplication(t, page, "test-label-uid")
+		hp.DeallocateApplication(t, page, "test-label")
 	})
 
-	screenshots.WithScreenshots(t, "test_list_updates", func(t *testing.T) {
-		// Create another label first
-		hp.CreateLabel(t, page, afp, "test-label-2")
-
-		// Create second application to test list updates
-		hp.CreateApplicationForm(t, page, afp, "test-label-uid-2", map[string]string{
-			"TEST_VAR":    "test-value-2",
-			"DESCRIPTION": "Second test application",
-		})
-
+	afp.Run(t, "Check list of apps got update that Application is Deallocated", func(t *testing.T) {
 		// Verify second application appears in list
-		hp.VerifyApplicationInList(t, page, "test-label-uid-2", "admin")
-
-		t.Log("INFO: List updates working correctly without page refresh")
+		hp.VerifyApplicationInList(t, page, "test-label", "admin", "Deallocated")
 	})
 }
