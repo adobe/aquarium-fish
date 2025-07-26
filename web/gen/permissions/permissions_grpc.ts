@@ -42,6 +42,10 @@ export enum PermApplication {
   GetTaskAll = "GetTaskAll",
   List = "List",
   ListAll = "ListAll",
+  ListResource = "ListResource",
+  ListResourceAll = "ListResourceAll",
+  ListState = "ListState",
+  ListStateAll = "ListStateAll",
   ListTask = "ListTask",
   ListTaskAll = "ListTaskAll",
 }

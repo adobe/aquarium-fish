@@ -51,9 +51,15 @@ const (
 	// ApplicationServiceCreateProcedure is the fully-qualified name of the ApplicationService's Create
 	// RPC.
 	ApplicationServiceCreateProcedure = "/aquarium.v2.ApplicationService/Create"
+	// ApplicationServiceListStateProcedure is the fully-qualified name of the ApplicationService's
+	// ListState RPC.
+	ApplicationServiceListStateProcedure = "/aquarium.v2.ApplicationService/ListState"
 	// ApplicationServiceGetStateProcedure is the fully-qualified name of the ApplicationService's
 	// GetState RPC.
 	ApplicationServiceGetStateProcedure = "/aquarium.v2.ApplicationService/GetState"
+	// ApplicationServiceListResourceProcedure is the fully-qualified name of the ApplicationService's
+	// ListResource RPC.
+	ApplicationServiceListResourceProcedure = "/aquarium.v2.ApplicationService/ListResource"
 	// ApplicationServiceGetResourceProcedure is the fully-qualified name of the ApplicationService's
 	// GetResource RPC.
 	ApplicationServiceGetResourceProcedure = "/aquarium.v2.ApplicationService/GetResource"
@@ -79,8 +85,12 @@ type ApplicationServiceClient interface {
 	Get(context.Context, *connect.Request[v2.ApplicationServiceGetRequest]) (*connect.Response[v2.ApplicationServiceGetResponse], error)
 	// Create new application
 	Create(context.Context, *connect.Request[v2.ApplicationServiceCreateRequest]) (*connect.Response[v2.ApplicationServiceCreateResponse], error)
+	// List application states
+	ListState(context.Context, *connect.Request[v2.ApplicationServiceListStateRequest]) (*connect.Response[v2.ApplicationServiceListStateResponse], error)
 	// Get application state
 	GetState(context.Context, *connect.Request[v2.ApplicationServiceGetStateRequest]) (*connect.Response[v2.ApplicationServiceGetStateResponse], error)
+	// List all available application resources
+	ListResource(context.Context, *connect.Request[v2.ApplicationServiceListResourceRequest]) (*connect.Response[v2.ApplicationServiceListResourceResponse], error)
 	// Get application resource
 	GetResource(context.Context, *connect.Request[v2.ApplicationServiceGetResourceRequest]) (*connect.Response[v2.ApplicationServiceGetResourceResponse], error)
 	// List application tasks
@@ -122,10 +132,22 @@ func NewApplicationServiceClient(httpClient connect.HTTPClient, baseURL string, 
 			connect.WithSchema(applicationServiceMethods.ByName("Create")),
 			connect.WithClientOptions(opts...),
 		),
+		listState: connect.NewClient[v2.ApplicationServiceListStateRequest, v2.ApplicationServiceListStateResponse](
+			httpClient,
+			baseURL+ApplicationServiceListStateProcedure,
+			connect.WithSchema(applicationServiceMethods.ByName("ListState")),
+			connect.WithClientOptions(opts...),
+		),
 		getState: connect.NewClient[v2.ApplicationServiceGetStateRequest, v2.ApplicationServiceGetStateResponse](
 			httpClient,
 			baseURL+ApplicationServiceGetStateProcedure,
 			connect.WithSchema(applicationServiceMethods.ByName("GetState")),
+			connect.WithClientOptions(opts...),
+		),
+		listResource: connect.NewClient[v2.ApplicationServiceListResourceRequest, v2.ApplicationServiceListResourceResponse](
+			httpClient,
+			baseURL+ApplicationServiceListResourceProcedure,
+			connect.WithSchema(applicationServiceMethods.ByName("ListResource")),
 			connect.WithClientOptions(opts...),
 		),
 		getResource: connect.NewClient[v2.ApplicationServiceGetResourceRequest, v2.ApplicationServiceGetResourceResponse](
@@ -163,15 +185,17 @@ func NewApplicationServiceClient(httpClient connect.HTTPClient, baseURL string, 
 
 // applicationServiceClient implements ApplicationServiceClient.
 type applicationServiceClient struct {
-	list        *connect.Client[v2.ApplicationServiceListRequest, v2.ApplicationServiceListResponse]
-	get         *connect.Client[v2.ApplicationServiceGetRequest, v2.ApplicationServiceGetResponse]
-	create      *connect.Client[v2.ApplicationServiceCreateRequest, v2.ApplicationServiceCreateResponse]
-	getState    *connect.Client[v2.ApplicationServiceGetStateRequest, v2.ApplicationServiceGetStateResponse]
-	getResource *connect.Client[v2.ApplicationServiceGetResourceRequest, v2.ApplicationServiceGetResourceResponse]
-	listTask    *connect.Client[v2.ApplicationServiceListTaskRequest, v2.ApplicationServiceListTaskResponse]
-	createTask  *connect.Client[v2.ApplicationServiceCreateTaskRequest, v2.ApplicationServiceCreateTaskResponse]
-	getTask     *connect.Client[v2.ApplicationServiceGetTaskRequest, v2.ApplicationServiceGetTaskResponse]
-	deallocate  *connect.Client[v2.ApplicationServiceDeallocateRequest, v2.ApplicationServiceDeallocateResponse]
+	list         *connect.Client[v2.ApplicationServiceListRequest, v2.ApplicationServiceListResponse]
+	get          *connect.Client[v2.ApplicationServiceGetRequest, v2.ApplicationServiceGetResponse]
+	create       *connect.Client[v2.ApplicationServiceCreateRequest, v2.ApplicationServiceCreateResponse]
+	listState    *connect.Client[v2.ApplicationServiceListStateRequest, v2.ApplicationServiceListStateResponse]
+	getState     *connect.Client[v2.ApplicationServiceGetStateRequest, v2.ApplicationServiceGetStateResponse]
+	listResource *connect.Client[v2.ApplicationServiceListResourceRequest, v2.ApplicationServiceListResourceResponse]
+	getResource  *connect.Client[v2.ApplicationServiceGetResourceRequest, v2.ApplicationServiceGetResourceResponse]
+	listTask     *connect.Client[v2.ApplicationServiceListTaskRequest, v2.ApplicationServiceListTaskResponse]
+	createTask   *connect.Client[v2.ApplicationServiceCreateTaskRequest, v2.ApplicationServiceCreateTaskResponse]
+	getTask      *connect.Client[v2.ApplicationServiceGetTaskRequest, v2.ApplicationServiceGetTaskResponse]
+	deallocate   *connect.Client[v2.ApplicationServiceDeallocateRequest, v2.ApplicationServiceDeallocateResponse]
 }
 
 // List calls aquarium.v2.ApplicationService.List.
@@ -189,9 +213,19 @@ func (c *applicationServiceClient) Create(ctx context.Context, req *connect.Requ
 	return c.create.CallUnary(ctx, req)
 }
 
+// ListState calls aquarium.v2.ApplicationService.ListState.
+func (c *applicationServiceClient) ListState(ctx context.Context, req *connect.Request[v2.ApplicationServiceListStateRequest]) (*connect.Response[v2.ApplicationServiceListStateResponse], error) {
+	return c.listState.CallUnary(ctx, req)
+}
+
 // GetState calls aquarium.v2.ApplicationService.GetState.
 func (c *applicationServiceClient) GetState(ctx context.Context, req *connect.Request[v2.ApplicationServiceGetStateRequest]) (*connect.Response[v2.ApplicationServiceGetStateResponse], error) {
 	return c.getState.CallUnary(ctx, req)
+}
+
+// ListResource calls aquarium.v2.ApplicationService.ListResource.
+func (c *applicationServiceClient) ListResource(ctx context.Context, req *connect.Request[v2.ApplicationServiceListResourceRequest]) (*connect.Response[v2.ApplicationServiceListResourceResponse], error) {
+	return c.listResource.CallUnary(ctx, req)
 }
 
 // GetResource calls aquarium.v2.ApplicationService.GetResource.
@@ -227,8 +261,12 @@ type ApplicationServiceHandler interface {
 	Get(context.Context, *connect.Request[v2.ApplicationServiceGetRequest]) (*connect.Response[v2.ApplicationServiceGetResponse], error)
 	// Create new application
 	Create(context.Context, *connect.Request[v2.ApplicationServiceCreateRequest]) (*connect.Response[v2.ApplicationServiceCreateResponse], error)
+	// List application states
+	ListState(context.Context, *connect.Request[v2.ApplicationServiceListStateRequest]) (*connect.Response[v2.ApplicationServiceListStateResponse], error)
 	// Get application state
 	GetState(context.Context, *connect.Request[v2.ApplicationServiceGetStateRequest]) (*connect.Response[v2.ApplicationServiceGetStateResponse], error)
+	// List all available application resources
+	ListResource(context.Context, *connect.Request[v2.ApplicationServiceListResourceRequest]) (*connect.Response[v2.ApplicationServiceListResourceResponse], error)
 	// Get application resource
 	GetResource(context.Context, *connect.Request[v2.ApplicationServiceGetResourceRequest]) (*connect.Response[v2.ApplicationServiceGetResourceResponse], error)
 	// List application tasks
@@ -266,10 +304,22 @@ func NewApplicationServiceHandler(svc ApplicationServiceHandler, opts ...connect
 		connect.WithSchema(applicationServiceMethods.ByName("Create")),
 		connect.WithHandlerOptions(opts...),
 	)
+	applicationServiceListStateHandler := connect.NewUnaryHandler(
+		ApplicationServiceListStateProcedure,
+		svc.ListState,
+		connect.WithSchema(applicationServiceMethods.ByName("ListState")),
+		connect.WithHandlerOptions(opts...),
+	)
 	applicationServiceGetStateHandler := connect.NewUnaryHandler(
 		ApplicationServiceGetStateProcedure,
 		svc.GetState,
 		connect.WithSchema(applicationServiceMethods.ByName("GetState")),
+		connect.WithHandlerOptions(opts...),
+	)
+	applicationServiceListResourceHandler := connect.NewUnaryHandler(
+		ApplicationServiceListResourceProcedure,
+		svc.ListResource,
+		connect.WithSchema(applicationServiceMethods.ByName("ListResource")),
 		connect.WithHandlerOptions(opts...),
 	)
 	applicationServiceGetResourceHandler := connect.NewUnaryHandler(
@@ -310,8 +360,12 @@ func NewApplicationServiceHandler(svc ApplicationServiceHandler, opts ...connect
 			applicationServiceGetHandler.ServeHTTP(w, r)
 		case ApplicationServiceCreateProcedure:
 			applicationServiceCreateHandler.ServeHTTP(w, r)
+		case ApplicationServiceListStateProcedure:
+			applicationServiceListStateHandler.ServeHTTP(w, r)
 		case ApplicationServiceGetStateProcedure:
 			applicationServiceGetStateHandler.ServeHTTP(w, r)
+		case ApplicationServiceListResourceProcedure:
+			applicationServiceListResourceHandler.ServeHTTP(w, r)
 		case ApplicationServiceGetResourceProcedure:
 			applicationServiceGetResourceHandler.ServeHTTP(w, r)
 		case ApplicationServiceListTaskProcedure:
@@ -343,8 +397,16 @@ func (UnimplementedApplicationServiceHandler) Create(context.Context, *connect.R
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.ApplicationService.Create is not implemented"))
 }
 
+func (UnimplementedApplicationServiceHandler) ListState(context.Context, *connect.Request[v2.ApplicationServiceListStateRequest]) (*connect.Response[v2.ApplicationServiceListStateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.ApplicationService.ListState is not implemented"))
+}
+
 func (UnimplementedApplicationServiceHandler) GetState(context.Context, *connect.Request[v2.ApplicationServiceGetStateRequest]) (*connect.Response[v2.ApplicationServiceGetStateResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.ApplicationService.GetState is not implemented"))
+}
+
+func (UnimplementedApplicationServiceHandler) ListResource(context.Context, *connect.Request[v2.ApplicationServiceListResourceRequest]) (*connect.Response[v2.ApplicationServiceListResourceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.ApplicationService.ListResource is not implemented"))
 }
 
 func (UnimplementedApplicationServiceHandler) GetResource(context.Context, *connect.Request[v2.ApplicationServiceGetResourceRequest]) (*connect.Response[v2.ApplicationServiceGetResourceResponse], error) {

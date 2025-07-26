@@ -17,7 +17,7 @@
 
 TEST="$@"
 # If no args was specified - run all the tests
-[ "x$TEST" ] || TEST='./webtests/...'
+[ "x$TEST" != x ] || TEST='./webtests/...'
 
 # Preparing playwright docker image if not exists
 if [ "x$(docker images -q aquarium-fish-webtests-playwright)" = 'x' ]; then

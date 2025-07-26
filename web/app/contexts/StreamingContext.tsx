@@ -34,9 +34,11 @@ import {
 import {
   ApplicationService,
   ApplicationServiceListRequestSchema,
-  ApplicationServiceGetStateRequestSchema,
-  ApplicationServiceGetResourceRequestSchema,
+  ApplicationServiceListStateRequestSchema,
+  ApplicationServiceListResourceRequestSchema,
   type ApplicationServiceListResponse,
+  type ApplicationServiceListStateResponse,
+  type ApplicationServiceListResourceResponse,
   type Application,
   ApplicationSchema,
   type ApplicationState,
@@ -188,8 +190,8 @@ interface StreamingContextType {
   fetchNodes: () => Promise<void>;
   fetchUsers: () => Promise<void>;
   fetchRoles: () => Promise<void>;
-  fetchApplicationStates: (applicationUids: string[]) => Promise<void>;
-  fetchApplicationResources: (applicationUids: string[]) => Promise<void>;
+  fetchApplicationStates: () => Promise<void>;
+  fetchApplicationResources: () => Promise<void>;
   // Utility functions
   resetFetchedDataTypes: () => void;
 }
@@ -306,10 +308,9 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
 
       // If we have applications, fetch their states and resources
       if (applications.length > 0) {
-        const appUids = applications.map(app => app.uid);
         await Promise.all([
-          fetchApplicationStates(appUids),
-          fetchApplicationResources(appUids)
+          fetchApplicationStates(),
+          fetchApplicationResources()
         ]);
       }
 
@@ -466,8 +467,8 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
     }
   }, [isAuthenticated, hasPermission, notifySubscribers, addNotification, fetchedDataTypes]);
 
-  const fetchApplicationStates = useCallback(async (applicationUids: string[]) => {
-    if (!isAuthenticated || applicationUids.length === 0) return;
+  const fetchApplicationStates = useCallback(async () => {
+    if (!isAuthenticated) return;
 
     // Check if application states have already been fetched in this session
     if (fetchedDataTypes.has('applicationStates')) {
@@ -475,26 +476,23 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
       return;
     }
 
-    const canGetApplicationState = hasPermission(PermService.Application, PermApplication.GetState);
-    if (!canGetApplicationState) {
-      logger.info('User does not have permission to get application states');
+    const canListApplicationState = hasPermission(PermService.Application, PermApplication.ListState);
+    if (!canListApplicationState) {
+      logger.info('User does not have permission to list application states');
       return;
     }
 
     try {
-      logger.info('Fetching application states for:', applicationUids.length, 'applications');
+      logger.info('Fetching all application states...');
 
-      const statePromises = applicationUids.map(appUid =>
-        applicationClient.getState(create(ApplicationServiceGetStateRequestSchema, { applicationUid: appUid }))
-          .then(res => [appUid, res.data] as [string, ApplicationState | undefined])
-          .catch(() => [appUid, undefined] as [string, ApplicationState | undefined])
-      );
-
-      const stateResults = await Promise.all(statePromises);
+      const response = await applicationClient.listState(create(ApplicationServiceListStateRequestSchema));
+      const states = response.data || [];
       const newStates = new Map<string, ApplicationState>();
 
-      stateResults.forEach(([uid, state]) => {
-        if (state) newStates.set(uid, state);
+      states.forEach(state => {
+        if (state.applicationUid) {
+          newStates.set(state.applicationUid, state);
+        }
       });
 
       setData(prevData => {
@@ -514,10 +512,10 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
       logger.error('Failed to fetch application states:', err);
       addNotification('error', 'Failed to fetch application states', String(err));
     }
-  }, [isAuthenticated, hasPermission, notifySubscribers, addNotification]);
+  }, [isAuthenticated, hasPermission, notifySubscribers, addNotification, fetchedDataTypes]);
 
-  const fetchApplicationResources = useCallback(async (applicationUids: string[]) => {
-    if (!isAuthenticated || applicationUids.length === 0) return;
+  const fetchApplicationResources = useCallback(async () => {
+    if (!isAuthenticated) return;
 
     // Check if application resources have already been fetched in this session
     if (fetchedDataTypes.has('applicationResources')) {
@@ -525,26 +523,23 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
       return;
     }
 
-    const canGetApplicationResource = hasPermission(PermService.Application, PermApplication.GetResource);
-    if (!canGetApplicationResource) {
-      logger.info('User does not have permission to get application resources');
+    const canListApplicationResource = hasPermission(PermService.Application, PermApplication.ListResource);
+    if (!canListApplicationResource) {
+      logger.info('User does not have permission to list application resources');
       return;
     }
 
     try {
-      logger.info('Fetching application resources for:', applicationUids.length, 'applications');
+      logger.info('Fetching all application resources...');
 
-      const resourcePromises = applicationUids.map(appUid =>
-        applicationClient.getResource(create(ApplicationServiceGetResourceRequestSchema, { applicationUid: appUid }))
-          .then(res => [appUid, res.data] as [string, ApplicationResource | undefined])
-          .catch(() => [appUid, undefined] as [string, ApplicationResource | undefined])
-      );
-
-      const resourceResults = await Promise.all(resourcePromises);
+      const response = await applicationClient.listResource(create(ApplicationServiceListResourceRequestSchema));
+      const resources = response.data || [];
       const newResources = new Map<string, ApplicationResource>();
 
-      resourceResults.forEach(([uid, resource]) => {
-        if (resource) newResources.set(uid, resource);
+      resources.forEach(resource => {
+        if (resource.applicationUid) {
+          newResources.set(resource.applicationUid, resource);
+        }
       });
 
       setData(prevData => {
@@ -564,7 +559,7 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
       logger.error('Failed to fetch application resources:', err);
       addNotification('error', 'Failed to fetch application resources', String(err));
     }
-  }, [isAuthenticated, hasPermission, notifySubscribers, addNotification]);
+  }, [isAuthenticated, hasPermission, notifySubscribers, addNotification, fetchedDataTypes]);
 
   // Utility function to reset fetched data types (useful for manual refresh)
   const resetFetchedDataTypes = useCallback(() => {
@@ -757,10 +752,6 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
           response = await applicationClient.deallocate(request);
           addNotification('info', 'Application deallocated successfully');
           break;
-        case 'ApplicationServiceGetResourceRequest':
-          response = await applicationClient.getResource(request);
-          addNotification('info', 'Resource access information retrieved');
-          break;
         case 'GateProxySSHServiceGetResourceAccessRequest':
           response = await gateProxySSHClient.getResourceAccess(request);
           addNotification('info', 'Resource access information retrieved');
@@ -822,15 +813,15 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
       setError(null);
 
       // Create subscription request
-    var subscriptionTypes = []
-    hasPermission(PermService.Application, PermApplication.Get) && subscriptionTypes.push(SubscriptionType.APPLICATION);
-    hasPermission(PermService.Application, PermApplication.GetState) && subscriptionTypes.push(SubscriptionType.APPLICATION_STATE);
-    hasPermission(PermService.Application, PermApplication.GetResource) && subscriptionTypes.push(SubscriptionType.APPLICATION_RESOURCE);
-    hasPermission(PermService.Application, PermApplication.GetTask) && subscriptionTypes.push(SubscriptionType.APPLICATION_TASK);
-    hasPermission(PermService.Label, PermLabel.Get) && subscriptionTypes.push(SubscriptionType.LABEL);
-    hasPermission(PermService.Node, PermNode.Get) && subscriptionTypes.push(SubscriptionType.NODE);
-    hasPermission(PermService.User, PermUser.Get) && subscriptionTypes.push(SubscriptionType.USER);
-    hasPermission(PermService.Role, PermRole.Get) && subscriptionTypes.push(SubscriptionType.ROLE);
+      const subscriptionTypes: SubscriptionType[] = [];
+      hasPermission(PermService.Application, PermApplication.Get) && subscriptionTypes.push(SubscriptionType.APPLICATION);
+      hasPermission(PermService.Application, PermApplication.GetState) && subscriptionTypes.push(SubscriptionType.APPLICATION_STATE);
+      hasPermission(PermService.Application, PermApplication.GetResource) && subscriptionTypes.push(SubscriptionType.APPLICATION_RESOURCE);
+      hasPermission(PermService.Application, PermApplication.GetTask) && subscriptionTypes.push(SubscriptionType.APPLICATION_TASK);
+      hasPermission(PermService.Label, PermLabel.Get) && subscriptionTypes.push(SubscriptionType.LABEL);
+      hasPermission(PermService.Node, PermNode.Get) && subscriptionTypes.push(SubscriptionType.NODE);
+      hasPermission(PermService.User, PermUser.Get) && subscriptionTypes.push(SubscriptionType.USER);
+      hasPermission(PermService.Role, PermRole.Get) && subscriptionTypes.push(SubscriptionType.ROLE);
 
       const subscribeRequest = create(StreamingServiceSubscribeRequestSchema, {
         subscriptionTypes: subscriptionTypes,

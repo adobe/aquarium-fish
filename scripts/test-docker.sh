@@ -17,7 +17,7 @@
 
 TEST="$@"
 # If no args was specified - run all the tests
-[ "x$TEST" ] || TEST='./tests/...'
+[ "x$TEST" != x ] || TEST='./tests/...'
 
 # Building for host os to generate & build web
 [ "x$NOBUILD" != 'x' ] || SKIPCHECK=1 ./build.sh

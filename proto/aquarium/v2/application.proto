@@ -48,11 +48,27 @@ service ApplicationService {
     };
   }
 
+  // List application states
+  rpc ListState(ApplicationServiceListStateRequest) returns (ApplicationServiceListStateResponse) {
+    option (access_control) = {
+      allowed_roles: ["User"],
+      additional_actions: ["ListStateAll"],
+    };
+  }
+
   // Get application state
   rpc GetState(ApplicationServiceGetStateRequest) returns (ApplicationServiceGetStateResponse) {
     option (access_control) = {
       allowed_roles: ["User"],
       additional_actions: ["GetStateAll"],
+    };
+  }
+
+  // List all available application resources
+  rpc ListResource(ApplicationServiceListResourceRequest) returns (ApplicationServiceListResourceResponse) {
+    option (access_control) = {
+      allowed_roles: ["User"],
+      additional_actions: ["ListResourceAll"],
     };
   }
 
@@ -241,6 +257,14 @@ message ApplicationServiceCreateResponse {
   Application data = 3;
 }
 
+message ApplicationServiceListStateRequest {}
+
+message ApplicationServiceListStateResponse {
+  bool status = 1;
+  string message = 2;
+  repeated ApplicationState data = 3;
+}
+
 message ApplicationServiceGetStateRequest {
   string application_uid = 1;
 }
@@ -249,6 +273,16 @@ message ApplicationServiceGetStateResponse {
   bool status = 1;
   string message = 2;
   ApplicationState data = 3;
+}
+
+message ApplicationServiceListResourceRequest {
+  string application_uid = 1;
+}
+
+message ApplicationServiceListResourceResponse {
+  bool status = 1;
+  string message = 2;
+  repeated ApplicationResource data = 3;
 }
 
 message ApplicationServiceGetResourceRequest {

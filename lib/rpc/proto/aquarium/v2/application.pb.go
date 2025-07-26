@@ -847,6 +847,102 @@ func (x *ApplicationServiceCreateResponse) GetData() *Application {
 	return nil
 }
 
+type ApplicationServiceListStateRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ApplicationServiceListStateRequest) Reset() {
+	*x = ApplicationServiceListStateRequest{}
+	mi := &file_aquarium_v2_application_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApplicationServiceListStateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApplicationServiceListStateRequest) ProtoMessage() {}
+
+func (x *ApplicationServiceListStateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aquarium_v2_application_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApplicationServiceListStateRequest.ProtoReflect.Descriptor instead.
+func (*ApplicationServiceListStateRequest) Descriptor() ([]byte, []int) {
+	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{10}
+}
+
+type ApplicationServiceListStateResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        bool                   `protobuf:"varint,1,opt,name=status,proto3" json:"status,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Data          []*ApplicationState    `protobuf:"bytes,3,rep,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ApplicationServiceListStateResponse) Reset() {
+	*x = ApplicationServiceListStateResponse{}
+	mi := &file_aquarium_v2_application_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApplicationServiceListStateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApplicationServiceListStateResponse) ProtoMessage() {}
+
+func (x *ApplicationServiceListStateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aquarium_v2_application_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApplicationServiceListStateResponse.ProtoReflect.Descriptor instead.
+func (*ApplicationServiceListStateResponse) Descriptor() ([]byte, []int) {
+	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *ApplicationServiceListStateResponse) GetStatus() bool {
+	if x != nil {
+		return x.Status
+	}
+	return false
+}
+
+func (x *ApplicationServiceListStateResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *ApplicationServiceListStateResponse) GetData() []*ApplicationState {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
 type ApplicationServiceGetStateRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	ApplicationUid string                 `protobuf:"bytes,1,opt,name=application_uid,json=applicationUid,proto3" json:"application_uid,omitempty"`
@@ -856,7 +952,7 @@ type ApplicationServiceGetStateRequest struct {
 
 func (x *ApplicationServiceGetStateRequest) Reset() {
 	*x = ApplicationServiceGetStateRequest{}
-	mi := &file_aquarium_v2_application_proto_msgTypes[10]
+	mi := &file_aquarium_v2_application_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -868,7 +964,7 @@ func (x *ApplicationServiceGetStateRequest) String() string {
 func (*ApplicationServiceGetStateRequest) ProtoMessage() {}
 
 func (x *ApplicationServiceGetStateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_application_proto_msgTypes[10]
+	mi := &file_aquarium_v2_application_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -881,7 +977,7 @@ func (x *ApplicationServiceGetStateRequest) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use ApplicationServiceGetStateRequest.ProtoReflect.Descriptor instead.
 func (*ApplicationServiceGetStateRequest) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{10}
+	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ApplicationServiceGetStateRequest) GetApplicationUid() string {
@@ -902,7 +998,7 @@ type ApplicationServiceGetStateResponse struct {
 
 func (x *ApplicationServiceGetStateResponse) Reset() {
 	*x = ApplicationServiceGetStateResponse{}
-	mi := &file_aquarium_v2_application_proto_msgTypes[11]
+	mi := &file_aquarium_v2_application_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -914,7 +1010,7 @@ func (x *ApplicationServiceGetStateResponse) String() string {
 func (*ApplicationServiceGetStateResponse) ProtoMessage() {}
 
 func (x *ApplicationServiceGetStateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_application_proto_msgTypes[11]
+	mi := &file_aquarium_v2_application_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -927,7 +1023,7 @@ func (x *ApplicationServiceGetStateResponse) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use ApplicationServiceGetStateResponse.ProtoReflect.Descriptor instead.
 func (*ApplicationServiceGetStateResponse) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{11}
+	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ApplicationServiceGetStateResponse) GetStatus() bool {
@@ -951,6 +1047,110 @@ func (x *ApplicationServiceGetStateResponse) GetData() *ApplicationState {
 	return nil
 }
 
+type ApplicationServiceListResourceRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ApplicationUid string                 `protobuf:"bytes,1,opt,name=application_uid,json=applicationUid,proto3" json:"application_uid,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ApplicationServiceListResourceRequest) Reset() {
+	*x = ApplicationServiceListResourceRequest{}
+	mi := &file_aquarium_v2_application_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApplicationServiceListResourceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApplicationServiceListResourceRequest) ProtoMessage() {}
+
+func (x *ApplicationServiceListResourceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aquarium_v2_application_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApplicationServiceListResourceRequest.ProtoReflect.Descriptor instead.
+func (*ApplicationServiceListResourceRequest) Descriptor() ([]byte, []int) {
+	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ApplicationServiceListResourceRequest) GetApplicationUid() string {
+	if x != nil {
+		return x.ApplicationUid
+	}
+	return ""
+}
+
+type ApplicationServiceListResourceResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        bool                   `protobuf:"varint,1,opt,name=status,proto3" json:"status,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Data          []*ApplicationResource `protobuf:"bytes,3,rep,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ApplicationServiceListResourceResponse) Reset() {
+	*x = ApplicationServiceListResourceResponse{}
+	mi := &file_aquarium_v2_application_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApplicationServiceListResourceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApplicationServiceListResourceResponse) ProtoMessage() {}
+
+func (x *ApplicationServiceListResourceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aquarium_v2_application_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApplicationServiceListResourceResponse.ProtoReflect.Descriptor instead.
+func (*ApplicationServiceListResourceResponse) Descriptor() ([]byte, []int) {
+	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *ApplicationServiceListResourceResponse) GetStatus() bool {
+	if x != nil {
+		return x.Status
+	}
+	return false
+}
+
+func (x *ApplicationServiceListResourceResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *ApplicationServiceListResourceResponse) GetData() []*ApplicationResource {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
 type ApplicationServiceGetResourceRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	ApplicationUid string                 `protobuf:"bytes,1,opt,name=application_uid,json=applicationUid,proto3" json:"application_uid,omitempty"`
@@ -960,7 +1160,7 @@ type ApplicationServiceGetResourceRequest struct {
 
 func (x *ApplicationServiceGetResourceRequest) Reset() {
 	*x = ApplicationServiceGetResourceRequest{}
-	mi := &file_aquarium_v2_application_proto_msgTypes[12]
+	mi := &file_aquarium_v2_application_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -972,7 +1172,7 @@ func (x *ApplicationServiceGetResourceRequest) String() string {
 func (*ApplicationServiceGetResourceRequest) ProtoMessage() {}
 
 func (x *ApplicationServiceGetResourceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_application_proto_msgTypes[12]
+	mi := &file_aquarium_v2_application_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -985,7 +1185,7 @@ func (x *ApplicationServiceGetResourceRequest) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use ApplicationServiceGetResourceRequest.ProtoReflect.Descriptor instead.
 func (*ApplicationServiceGetResourceRequest) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{12}
+	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ApplicationServiceGetResourceRequest) GetApplicationUid() string {
@@ -1006,7 +1206,7 @@ type ApplicationServiceGetResourceResponse struct {
 
 func (x *ApplicationServiceGetResourceResponse) Reset() {
 	*x = ApplicationServiceGetResourceResponse{}
-	mi := &file_aquarium_v2_application_proto_msgTypes[13]
+	mi := &file_aquarium_v2_application_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1018,7 +1218,7 @@ func (x *ApplicationServiceGetResourceResponse) String() string {
 func (*ApplicationServiceGetResourceResponse) ProtoMessage() {}
 
 func (x *ApplicationServiceGetResourceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_application_proto_msgTypes[13]
+	mi := &file_aquarium_v2_application_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1031,7 +1231,7 @@ func (x *ApplicationServiceGetResourceResponse) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use ApplicationServiceGetResourceResponse.ProtoReflect.Descriptor instead.
 func (*ApplicationServiceGetResourceResponse) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{13}
+	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ApplicationServiceGetResourceResponse) GetStatus() bool {
@@ -1064,7 +1264,7 @@ type ApplicationServiceListTaskRequest struct {
 
 func (x *ApplicationServiceListTaskRequest) Reset() {
 	*x = ApplicationServiceListTaskRequest{}
-	mi := &file_aquarium_v2_application_proto_msgTypes[14]
+	mi := &file_aquarium_v2_application_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1076,7 +1276,7 @@ func (x *ApplicationServiceListTaskRequest) String() string {
 func (*ApplicationServiceListTaskRequest) ProtoMessage() {}
 
 func (x *ApplicationServiceListTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_application_proto_msgTypes[14]
+	mi := &file_aquarium_v2_application_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1089,7 +1289,7 @@ func (x *ApplicationServiceListTaskRequest) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use ApplicationServiceListTaskRequest.ProtoReflect.Descriptor instead.
 func (*ApplicationServiceListTaskRequest) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{14}
+	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ApplicationServiceListTaskRequest) GetApplicationUid() string {
@@ -1110,7 +1310,7 @@ type ApplicationServiceListTaskResponse struct {
 
 func (x *ApplicationServiceListTaskResponse) Reset() {
 	*x = ApplicationServiceListTaskResponse{}
-	mi := &file_aquarium_v2_application_proto_msgTypes[15]
+	mi := &file_aquarium_v2_application_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1122,7 +1322,7 @@ func (x *ApplicationServiceListTaskResponse) String() string {
 func (*ApplicationServiceListTaskResponse) ProtoMessage() {}
 
 func (x *ApplicationServiceListTaskResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_application_proto_msgTypes[15]
+	mi := &file_aquarium_v2_application_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1135,7 +1335,7 @@ func (x *ApplicationServiceListTaskResponse) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use ApplicationServiceListTaskResponse.ProtoReflect.Descriptor instead.
 func (*ApplicationServiceListTaskResponse) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{15}
+	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ApplicationServiceListTaskResponse) GetStatus() bool {
@@ -1169,7 +1369,7 @@ type ApplicationServiceCreateTaskRequest struct {
 
 func (x *ApplicationServiceCreateTaskRequest) Reset() {
 	*x = ApplicationServiceCreateTaskRequest{}
-	mi := &file_aquarium_v2_application_proto_msgTypes[16]
+	mi := &file_aquarium_v2_application_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1181,7 +1381,7 @@ func (x *ApplicationServiceCreateTaskRequest) String() string {
 func (*ApplicationServiceCreateTaskRequest) ProtoMessage() {}
 
 func (x *ApplicationServiceCreateTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_application_proto_msgTypes[16]
+	mi := &file_aquarium_v2_application_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1194,7 +1394,7 @@ func (x *ApplicationServiceCreateTaskRequest) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use ApplicationServiceCreateTaskRequest.ProtoReflect.Descriptor instead.
 func (*ApplicationServiceCreateTaskRequest) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{16}
+	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ApplicationServiceCreateTaskRequest) GetApplicationUid() string {
@@ -1222,7 +1422,7 @@ type ApplicationServiceCreateTaskResponse struct {
 
 func (x *ApplicationServiceCreateTaskResponse) Reset() {
 	*x = ApplicationServiceCreateTaskResponse{}
-	mi := &file_aquarium_v2_application_proto_msgTypes[17]
+	mi := &file_aquarium_v2_application_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1234,7 +1434,7 @@ func (x *ApplicationServiceCreateTaskResponse) String() string {
 func (*ApplicationServiceCreateTaskResponse) ProtoMessage() {}
 
 func (x *ApplicationServiceCreateTaskResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_application_proto_msgTypes[17]
+	mi := &file_aquarium_v2_application_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1247,7 +1447,7 @@ func (x *ApplicationServiceCreateTaskResponse) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use ApplicationServiceCreateTaskResponse.ProtoReflect.Descriptor instead.
 func (*ApplicationServiceCreateTaskResponse) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{17}
+	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ApplicationServiceCreateTaskResponse) GetStatus() bool {
@@ -1280,7 +1480,7 @@ type ApplicationServiceGetTaskRequest struct {
 
 func (x *ApplicationServiceGetTaskRequest) Reset() {
 	*x = ApplicationServiceGetTaskRequest{}
-	mi := &file_aquarium_v2_application_proto_msgTypes[18]
+	mi := &file_aquarium_v2_application_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1292,7 +1492,7 @@ func (x *ApplicationServiceGetTaskRequest) String() string {
 func (*ApplicationServiceGetTaskRequest) ProtoMessage() {}
 
 func (x *ApplicationServiceGetTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_application_proto_msgTypes[18]
+	mi := &file_aquarium_v2_application_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1305,7 +1505,7 @@ func (x *ApplicationServiceGetTaskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApplicationServiceGetTaskRequest.ProtoReflect.Descriptor instead.
 func (*ApplicationServiceGetTaskRequest) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{18}
+	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ApplicationServiceGetTaskRequest) GetApplicationTaskUid() string {
@@ -1326,7 +1526,7 @@ type ApplicationServiceGetTaskResponse struct {
 
 func (x *ApplicationServiceGetTaskResponse) Reset() {
 	*x = ApplicationServiceGetTaskResponse{}
-	mi := &file_aquarium_v2_application_proto_msgTypes[19]
+	mi := &file_aquarium_v2_application_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1338,7 +1538,7 @@ func (x *ApplicationServiceGetTaskResponse) String() string {
 func (*ApplicationServiceGetTaskResponse) ProtoMessage() {}
 
 func (x *ApplicationServiceGetTaskResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_application_proto_msgTypes[19]
+	mi := &file_aquarium_v2_application_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1351,7 +1551,7 @@ func (x *ApplicationServiceGetTaskResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use ApplicationServiceGetTaskResponse.ProtoReflect.Descriptor instead.
 func (*ApplicationServiceGetTaskResponse) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{19}
+	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ApplicationServiceGetTaskResponse) GetStatus() bool {
@@ -1384,7 +1584,7 @@ type ApplicationServiceDeallocateRequest struct {
 
 func (x *ApplicationServiceDeallocateRequest) Reset() {
 	*x = ApplicationServiceDeallocateRequest{}
-	mi := &file_aquarium_v2_application_proto_msgTypes[20]
+	mi := &file_aquarium_v2_application_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1396,7 +1596,7 @@ func (x *ApplicationServiceDeallocateRequest) String() string {
 func (*ApplicationServiceDeallocateRequest) ProtoMessage() {}
 
 func (x *ApplicationServiceDeallocateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_application_proto_msgTypes[20]
+	mi := &file_aquarium_v2_application_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1409,7 +1609,7 @@ func (x *ApplicationServiceDeallocateRequest) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use ApplicationServiceDeallocateRequest.ProtoReflect.Descriptor instead.
 func (*ApplicationServiceDeallocateRequest) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{20}
+	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *ApplicationServiceDeallocateRequest) GetApplicationUid() string {
@@ -1429,7 +1629,7 @@ type ApplicationServiceDeallocateResponse struct {
 
 func (x *ApplicationServiceDeallocateResponse) Reset() {
 	*x = ApplicationServiceDeallocateResponse{}
-	mi := &file_aquarium_v2_application_proto_msgTypes[21]
+	mi := &file_aquarium_v2_application_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1441,7 +1641,7 @@ func (x *ApplicationServiceDeallocateResponse) String() string {
 func (*ApplicationServiceDeallocateResponse) ProtoMessage() {}
 
 func (x *ApplicationServiceDeallocateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_application_proto_msgTypes[21]
+	mi := &file_aquarium_v2_application_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1454,7 +1654,7 @@ func (x *ApplicationServiceDeallocateResponse) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use ApplicationServiceDeallocateResponse.ProtoReflect.Descriptor instead.
 func (*ApplicationServiceDeallocateResponse) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{21}
+	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ApplicationServiceDeallocateResponse) GetStatus() bool {
@@ -1553,13 +1753,24 @@ const file_aquarium_v2_application_proto_rawDesc = "" +
 	" ApplicationServiceCreateResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12,\n" +
-	"\x04data\x18\x03 \x01(\v2\x18.aquarium.v2.ApplicationR\x04data\"L\n" +
+	"\x04data\x18\x03 \x01(\v2\x18.aquarium.v2.ApplicationR\x04data\"$\n" +
+	"\"ApplicationServiceListStateRequest\"\x8a\x01\n" +
+	"#ApplicationServiceListStateResponse\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x121\n" +
+	"\x04data\x18\x03 \x03(\v2\x1d.aquarium.v2.ApplicationStateR\x04data\"L\n" +
 	"!ApplicationServiceGetStateRequest\x12'\n" +
 	"\x0fapplication_uid\x18\x01 \x01(\tR\x0eapplicationUid\"\x89\x01\n" +
 	"\"ApplicationServiceGetStateResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x121\n" +
-	"\x04data\x18\x03 \x01(\v2\x1d.aquarium.v2.ApplicationStateR\x04data\"O\n" +
+	"\x04data\x18\x03 \x01(\v2\x1d.aquarium.v2.ApplicationStateR\x04data\"P\n" +
+	"%ApplicationServiceListResourceRequest\x12'\n" +
+	"\x0fapplication_uid\x18\x01 \x01(\tR\x0eapplicationUid\"\x90\x01\n" +
+	"&ApplicationServiceListResourceResponse\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x124\n" +
+	"\x04data\x18\x03 \x03(\v2 .aquarium.v2.ApplicationResourceR\x04data\"O\n" +
 	"$ApplicationServiceGetResourceRequest\x12'\n" +
 	"\x0fapplication_uid\x18\x01 \x01(\tR\x0eapplicationUid\"\x8f\x01\n" +
 	"%ApplicationServiceGetResourceResponse\x12\x16\n" +
@@ -1589,13 +1800,15 @@ const file_aquarium_v2_application_proto_rawDesc = "" +
 	"\x0fapplication_uid\x18\x01 \x01(\tR\x0eapplicationUid\"X\n" +
 	"$ApplicationServiceDeallocateResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage2\xb4\t\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage2\xd6\v\n" +
 	"\x12ApplicationService\x12t\n" +
 	"\x04List\x12*.aquarium.v2.ApplicationServiceListRequest\x1a+.aquarium.v2.ApplicationServiceListResponse\"\x13\x82\xb5\x18\x0f\x1a\x04User\"\aListAll\x12p\n" +
 	"\x03Get\x12).aquarium.v2.ApplicationServiceGetRequest\x1a*.aquarium.v2.ApplicationServiceGetResponse\"\x12\x82\xb5\x18\x0e\x1a\x04User\"\x06GetAll\x12q\n" +
 	"\x06Create\x12,.aquarium.v2.ApplicationServiceCreateRequest\x1a-.aquarium.v2.ApplicationServiceCreateResponse\"\n" +
-	"\x82\xb5\x18\x06\x1a\x04User\x12\x84\x01\n" +
-	"\bGetState\x12..aquarium.v2.ApplicationServiceGetStateRequest\x1a/.aquarium.v2.ApplicationServiceGetStateResponse\"\x17\x82\xb5\x18\x13\x1a\x04User\"\vGetStateAll\x12\x90\x01\n" +
+	"\x82\xb5\x18\x06\x1a\x04User\x12\x88\x01\n" +
+	"\tListState\x12/.aquarium.v2.ApplicationServiceListStateRequest\x1a0.aquarium.v2.ApplicationServiceListStateResponse\"\x18\x82\xb5\x18\x14\x1a\x04User\"\fListStateAll\x12\x84\x01\n" +
+	"\bGetState\x12..aquarium.v2.ApplicationServiceGetStateRequest\x1a/.aquarium.v2.ApplicationServiceGetStateResponse\"\x17\x82\xb5\x18\x13\x1a\x04User\"\vGetStateAll\x12\x94\x01\n" +
+	"\fListResource\x122.aquarium.v2.ApplicationServiceListResourceRequest\x1a3.aquarium.v2.ApplicationServiceListResourceResponse\"\x1b\x82\xb5\x18\x17\x1a\x04User\"\x0fListResourceAll\x12\x90\x01\n" +
 	"\vGetResource\x121.aquarium.v2.ApplicationServiceGetResourceRequest\x1a2.aquarium.v2.ApplicationServiceGetResourceResponse\"\x1a\x82\xb5\x18\x16\x1a\x04User\"\x0eGetResourceAll\x12\x85\x01\n" +
 	"\bListTask\x12..aquarium.v2.ApplicationServiceListTaskRequest\x1a/.aquarium.v2.ApplicationServiceListTaskResponse\"\x18\x82\xb5\x18\x14\x1a\x05Power\"\vListTaskAll\x12\x8d\x01\n" +
 	"\n" +
@@ -1618,83 +1831,93 @@ func file_aquarium_v2_application_proto_rawDescGZIP() []byte {
 }
 
 var file_aquarium_v2_application_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_aquarium_v2_application_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_aquarium_v2_application_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
 var file_aquarium_v2_application_proto_goTypes = []any{
-	(ApplicationState_Status)(0),                  // 0: aquarium.v2.ApplicationState.Status
-	(*Application)(nil),                           // 1: aquarium.v2.Application
-	(*ApplicationState)(nil),                      // 2: aquarium.v2.ApplicationState
-	(*ApplicationResource)(nil),                   // 3: aquarium.v2.ApplicationResource
-	(*ApplicationTask)(nil),                       // 4: aquarium.v2.ApplicationTask
-	(*ApplicationServiceListRequest)(nil),         // 5: aquarium.v2.ApplicationServiceListRequest
-	(*ApplicationServiceListResponse)(nil),        // 6: aquarium.v2.ApplicationServiceListResponse
-	(*ApplicationServiceGetRequest)(nil),          // 7: aquarium.v2.ApplicationServiceGetRequest
-	(*ApplicationServiceGetResponse)(nil),         // 8: aquarium.v2.ApplicationServiceGetResponse
-	(*ApplicationServiceCreateRequest)(nil),       // 9: aquarium.v2.ApplicationServiceCreateRequest
-	(*ApplicationServiceCreateResponse)(nil),      // 10: aquarium.v2.ApplicationServiceCreateResponse
-	(*ApplicationServiceGetStateRequest)(nil),     // 11: aquarium.v2.ApplicationServiceGetStateRequest
-	(*ApplicationServiceGetStateResponse)(nil),    // 12: aquarium.v2.ApplicationServiceGetStateResponse
-	(*ApplicationServiceGetResourceRequest)(nil),  // 13: aquarium.v2.ApplicationServiceGetResourceRequest
-	(*ApplicationServiceGetResourceResponse)(nil), // 14: aquarium.v2.ApplicationServiceGetResourceResponse
-	(*ApplicationServiceListTaskRequest)(nil),     // 15: aquarium.v2.ApplicationServiceListTaskRequest
-	(*ApplicationServiceListTaskResponse)(nil),    // 16: aquarium.v2.ApplicationServiceListTaskResponse
-	(*ApplicationServiceCreateTaskRequest)(nil),   // 17: aquarium.v2.ApplicationServiceCreateTaskRequest
-	(*ApplicationServiceCreateTaskResponse)(nil),  // 18: aquarium.v2.ApplicationServiceCreateTaskResponse
-	(*ApplicationServiceGetTaskRequest)(nil),      // 19: aquarium.v2.ApplicationServiceGetTaskRequest
-	(*ApplicationServiceGetTaskResponse)(nil),     // 20: aquarium.v2.ApplicationServiceGetTaskResponse
-	(*ApplicationServiceDeallocateRequest)(nil),   // 21: aquarium.v2.ApplicationServiceDeallocateRequest
-	(*ApplicationServiceDeallocateResponse)(nil),  // 22: aquarium.v2.ApplicationServiceDeallocateResponse
-	(*timestamppb.Timestamp)(nil),                 // 23: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),                       // 24: google.protobuf.Struct
-	(*Authentication)(nil),                        // 25: aquarium.v2.Authentication
+	(ApplicationState_Status)(0),                   // 0: aquarium.v2.ApplicationState.Status
+	(*Application)(nil),                            // 1: aquarium.v2.Application
+	(*ApplicationState)(nil),                       // 2: aquarium.v2.ApplicationState
+	(*ApplicationResource)(nil),                    // 3: aquarium.v2.ApplicationResource
+	(*ApplicationTask)(nil),                        // 4: aquarium.v2.ApplicationTask
+	(*ApplicationServiceListRequest)(nil),          // 5: aquarium.v2.ApplicationServiceListRequest
+	(*ApplicationServiceListResponse)(nil),         // 6: aquarium.v2.ApplicationServiceListResponse
+	(*ApplicationServiceGetRequest)(nil),           // 7: aquarium.v2.ApplicationServiceGetRequest
+	(*ApplicationServiceGetResponse)(nil),          // 8: aquarium.v2.ApplicationServiceGetResponse
+	(*ApplicationServiceCreateRequest)(nil),        // 9: aquarium.v2.ApplicationServiceCreateRequest
+	(*ApplicationServiceCreateResponse)(nil),       // 10: aquarium.v2.ApplicationServiceCreateResponse
+	(*ApplicationServiceListStateRequest)(nil),     // 11: aquarium.v2.ApplicationServiceListStateRequest
+	(*ApplicationServiceListStateResponse)(nil),    // 12: aquarium.v2.ApplicationServiceListStateResponse
+	(*ApplicationServiceGetStateRequest)(nil),      // 13: aquarium.v2.ApplicationServiceGetStateRequest
+	(*ApplicationServiceGetStateResponse)(nil),     // 14: aquarium.v2.ApplicationServiceGetStateResponse
+	(*ApplicationServiceListResourceRequest)(nil),  // 15: aquarium.v2.ApplicationServiceListResourceRequest
+	(*ApplicationServiceListResourceResponse)(nil), // 16: aquarium.v2.ApplicationServiceListResourceResponse
+	(*ApplicationServiceGetResourceRequest)(nil),   // 17: aquarium.v2.ApplicationServiceGetResourceRequest
+	(*ApplicationServiceGetResourceResponse)(nil),  // 18: aquarium.v2.ApplicationServiceGetResourceResponse
+	(*ApplicationServiceListTaskRequest)(nil),      // 19: aquarium.v2.ApplicationServiceListTaskRequest
+	(*ApplicationServiceListTaskResponse)(nil),     // 20: aquarium.v2.ApplicationServiceListTaskResponse
+	(*ApplicationServiceCreateTaskRequest)(nil),    // 21: aquarium.v2.ApplicationServiceCreateTaskRequest
+	(*ApplicationServiceCreateTaskResponse)(nil),   // 22: aquarium.v2.ApplicationServiceCreateTaskResponse
+	(*ApplicationServiceGetTaskRequest)(nil),       // 23: aquarium.v2.ApplicationServiceGetTaskRequest
+	(*ApplicationServiceGetTaskResponse)(nil),      // 24: aquarium.v2.ApplicationServiceGetTaskResponse
+	(*ApplicationServiceDeallocateRequest)(nil),    // 25: aquarium.v2.ApplicationServiceDeallocateRequest
+	(*ApplicationServiceDeallocateResponse)(nil),   // 26: aquarium.v2.ApplicationServiceDeallocateResponse
+	(*timestamppb.Timestamp)(nil),                  // 27: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),                        // 28: google.protobuf.Struct
+	(*Authentication)(nil),                         // 29: aquarium.v2.Authentication
 }
 var file_aquarium_v2_application_proto_depIdxs = []int32{
-	23, // 0: aquarium.v2.Application.created_at:type_name -> google.protobuf.Timestamp
-	24, // 1: aquarium.v2.Application.metadata:type_name -> google.protobuf.Struct
-	23, // 2: aquarium.v2.ApplicationState.created_at:type_name -> google.protobuf.Timestamp
+	27, // 0: aquarium.v2.Application.created_at:type_name -> google.protobuf.Timestamp
+	28, // 1: aquarium.v2.Application.metadata:type_name -> google.protobuf.Struct
+	27, // 2: aquarium.v2.ApplicationState.created_at:type_name -> google.protobuf.Timestamp
 	0,  // 3: aquarium.v2.ApplicationState.status:type_name -> aquarium.v2.ApplicationState.Status
-	23, // 4: aquarium.v2.ApplicationResource.created_at:type_name -> google.protobuf.Timestamp
-	23, // 5: aquarium.v2.ApplicationResource.updated_at:type_name -> google.protobuf.Timestamp
-	24, // 6: aquarium.v2.ApplicationResource.metadata:type_name -> google.protobuf.Struct
-	23, // 7: aquarium.v2.ApplicationResource.timeout:type_name -> google.protobuf.Timestamp
-	25, // 8: aquarium.v2.ApplicationResource.authentication:type_name -> aquarium.v2.Authentication
-	23, // 9: aquarium.v2.ApplicationTask.created_at:type_name -> google.protobuf.Timestamp
-	23, // 10: aquarium.v2.ApplicationTask.updated_at:type_name -> google.protobuf.Timestamp
+	27, // 4: aquarium.v2.ApplicationResource.created_at:type_name -> google.protobuf.Timestamp
+	27, // 5: aquarium.v2.ApplicationResource.updated_at:type_name -> google.protobuf.Timestamp
+	28, // 6: aquarium.v2.ApplicationResource.metadata:type_name -> google.protobuf.Struct
+	27, // 7: aquarium.v2.ApplicationResource.timeout:type_name -> google.protobuf.Timestamp
+	29, // 8: aquarium.v2.ApplicationResource.authentication:type_name -> aquarium.v2.Authentication
+	27, // 9: aquarium.v2.ApplicationTask.created_at:type_name -> google.protobuf.Timestamp
+	27, // 10: aquarium.v2.ApplicationTask.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 11: aquarium.v2.ApplicationTask.when:type_name -> aquarium.v2.ApplicationState.Status
-	24, // 12: aquarium.v2.ApplicationTask.options:type_name -> google.protobuf.Struct
-	24, // 13: aquarium.v2.ApplicationTask.result:type_name -> google.protobuf.Struct
+	28, // 12: aquarium.v2.ApplicationTask.options:type_name -> google.protobuf.Struct
+	28, // 13: aquarium.v2.ApplicationTask.result:type_name -> google.protobuf.Struct
 	1,  // 14: aquarium.v2.ApplicationServiceListResponse.data:type_name -> aquarium.v2.Application
 	1,  // 15: aquarium.v2.ApplicationServiceGetResponse.data:type_name -> aquarium.v2.Application
 	1,  // 16: aquarium.v2.ApplicationServiceCreateRequest.application:type_name -> aquarium.v2.Application
 	1,  // 17: aquarium.v2.ApplicationServiceCreateResponse.data:type_name -> aquarium.v2.Application
-	2,  // 18: aquarium.v2.ApplicationServiceGetStateResponse.data:type_name -> aquarium.v2.ApplicationState
-	3,  // 19: aquarium.v2.ApplicationServiceGetResourceResponse.data:type_name -> aquarium.v2.ApplicationResource
-	4,  // 20: aquarium.v2.ApplicationServiceListTaskResponse.data:type_name -> aquarium.v2.ApplicationTask
-	4,  // 21: aquarium.v2.ApplicationServiceCreateTaskRequest.task:type_name -> aquarium.v2.ApplicationTask
-	4,  // 22: aquarium.v2.ApplicationServiceCreateTaskResponse.data:type_name -> aquarium.v2.ApplicationTask
-	4,  // 23: aquarium.v2.ApplicationServiceGetTaskResponse.data:type_name -> aquarium.v2.ApplicationTask
-	5,  // 24: aquarium.v2.ApplicationService.List:input_type -> aquarium.v2.ApplicationServiceListRequest
-	7,  // 25: aquarium.v2.ApplicationService.Get:input_type -> aquarium.v2.ApplicationServiceGetRequest
-	9,  // 26: aquarium.v2.ApplicationService.Create:input_type -> aquarium.v2.ApplicationServiceCreateRequest
-	11, // 27: aquarium.v2.ApplicationService.GetState:input_type -> aquarium.v2.ApplicationServiceGetStateRequest
-	13, // 28: aquarium.v2.ApplicationService.GetResource:input_type -> aquarium.v2.ApplicationServiceGetResourceRequest
-	15, // 29: aquarium.v2.ApplicationService.ListTask:input_type -> aquarium.v2.ApplicationServiceListTaskRequest
-	17, // 30: aquarium.v2.ApplicationService.CreateTask:input_type -> aquarium.v2.ApplicationServiceCreateTaskRequest
-	19, // 31: aquarium.v2.ApplicationService.GetTask:input_type -> aquarium.v2.ApplicationServiceGetTaskRequest
-	21, // 32: aquarium.v2.ApplicationService.Deallocate:input_type -> aquarium.v2.ApplicationServiceDeallocateRequest
-	6,  // 33: aquarium.v2.ApplicationService.List:output_type -> aquarium.v2.ApplicationServiceListResponse
-	8,  // 34: aquarium.v2.ApplicationService.Get:output_type -> aquarium.v2.ApplicationServiceGetResponse
-	10, // 35: aquarium.v2.ApplicationService.Create:output_type -> aquarium.v2.ApplicationServiceCreateResponse
-	12, // 36: aquarium.v2.ApplicationService.GetState:output_type -> aquarium.v2.ApplicationServiceGetStateResponse
-	14, // 37: aquarium.v2.ApplicationService.GetResource:output_type -> aquarium.v2.ApplicationServiceGetResourceResponse
-	16, // 38: aquarium.v2.ApplicationService.ListTask:output_type -> aquarium.v2.ApplicationServiceListTaskResponse
-	18, // 39: aquarium.v2.ApplicationService.CreateTask:output_type -> aquarium.v2.ApplicationServiceCreateTaskResponse
-	20, // 40: aquarium.v2.ApplicationService.GetTask:output_type -> aquarium.v2.ApplicationServiceGetTaskResponse
-	22, // 41: aquarium.v2.ApplicationService.Deallocate:output_type -> aquarium.v2.ApplicationServiceDeallocateResponse
-	33, // [33:42] is the sub-list for method output_type
-	24, // [24:33] is the sub-list for method input_type
-	24, // [24:24] is the sub-list for extension type_name
-	24, // [24:24] is the sub-list for extension extendee
-	0,  // [0:24] is the sub-list for field type_name
+	2,  // 18: aquarium.v2.ApplicationServiceListStateResponse.data:type_name -> aquarium.v2.ApplicationState
+	2,  // 19: aquarium.v2.ApplicationServiceGetStateResponse.data:type_name -> aquarium.v2.ApplicationState
+	3,  // 20: aquarium.v2.ApplicationServiceListResourceResponse.data:type_name -> aquarium.v2.ApplicationResource
+	3,  // 21: aquarium.v2.ApplicationServiceGetResourceResponse.data:type_name -> aquarium.v2.ApplicationResource
+	4,  // 22: aquarium.v2.ApplicationServiceListTaskResponse.data:type_name -> aquarium.v2.ApplicationTask
+	4,  // 23: aquarium.v2.ApplicationServiceCreateTaskRequest.task:type_name -> aquarium.v2.ApplicationTask
+	4,  // 24: aquarium.v2.ApplicationServiceCreateTaskResponse.data:type_name -> aquarium.v2.ApplicationTask
+	4,  // 25: aquarium.v2.ApplicationServiceGetTaskResponse.data:type_name -> aquarium.v2.ApplicationTask
+	5,  // 26: aquarium.v2.ApplicationService.List:input_type -> aquarium.v2.ApplicationServiceListRequest
+	7,  // 27: aquarium.v2.ApplicationService.Get:input_type -> aquarium.v2.ApplicationServiceGetRequest
+	9,  // 28: aquarium.v2.ApplicationService.Create:input_type -> aquarium.v2.ApplicationServiceCreateRequest
+	11, // 29: aquarium.v2.ApplicationService.ListState:input_type -> aquarium.v2.ApplicationServiceListStateRequest
+	13, // 30: aquarium.v2.ApplicationService.GetState:input_type -> aquarium.v2.ApplicationServiceGetStateRequest
+	15, // 31: aquarium.v2.ApplicationService.ListResource:input_type -> aquarium.v2.ApplicationServiceListResourceRequest
+	17, // 32: aquarium.v2.ApplicationService.GetResource:input_type -> aquarium.v2.ApplicationServiceGetResourceRequest
+	19, // 33: aquarium.v2.ApplicationService.ListTask:input_type -> aquarium.v2.ApplicationServiceListTaskRequest
+	21, // 34: aquarium.v2.ApplicationService.CreateTask:input_type -> aquarium.v2.ApplicationServiceCreateTaskRequest
+	23, // 35: aquarium.v2.ApplicationService.GetTask:input_type -> aquarium.v2.ApplicationServiceGetTaskRequest
+	25, // 36: aquarium.v2.ApplicationService.Deallocate:input_type -> aquarium.v2.ApplicationServiceDeallocateRequest
+	6,  // 37: aquarium.v2.ApplicationService.List:output_type -> aquarium.v2.ApplicationServiceListResponse
+	8,  // 38: aquarium.v2.ApplicationService.Get:output_type -> aquarium.v2.ApplicationServiceGetResponse
+	10, // 39: aquarium.v2.ApplicationService.Create:output_type -> aquarium.v2.ApplicationServiceCreateResponse
+	12, // 40: aquarium.v2.ApplicationService.ListState:output_type -> aquarium.v2.ApplicationServiceListStateResponse
+	14, // 41: aquarium.v2.ApplicationService.GetState:output_type -> aquarium.v2.ApplicationServiceGetStateResponse
+	16, // 42: aquarium.v2.ApplicationService.ListResource:output_type -> aquarium.v2.ApplicationServiceListResourceResponse
+	18, // 43: aquarium.v2.ApplicationService.GetResource:output_type -> aquarium.v2.ApplicationServiceGetResourceResponse
+	20, // 44: aquarium.v2.ApplicationService.ListTask:output_type -> aquarium.v2.ApplicationServiceListTaskResponse
+	22, // 45: aquarium.v2.ApplicationService.CreateTask:output_type -> aquarium.v2.ApplicationServiceCreateTaskResponse
+	24, // 46: aquarium.v2.ApplicationService.GetTask:output_type -> aquarium.v2.ApplicationServiceGetTaskResponse
+	26, // 47: aquarium.v2.ApplicationService.Deallocate:output_type -> aquarium.v2.ApplicationServiceDeallocateResponse
+	37, // [37:48] is the sub-list for method output_type
+	26, // [26:37] is the sub-list for method input_type
+	26, // [26:26] is the sub-list for extension type_name
+	26, // [26:26] is the sub-list for extension extendee
+	0,  // [0:26] is the sub-list for field type_name
 }
 
 func init() { file_aquarium_v2_application_proto_init() }
@@ -1713,7 +1936,7 @@ func file_aquarium_v2_application_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aquarium_v2_application_proto_rawDesc), len(file_aquarium_v2_application_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   22,
+			NumMessages:   26,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

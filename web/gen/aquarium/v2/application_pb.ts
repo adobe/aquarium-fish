@@ -29,7 +29,7 @@ import type { JsonObject, Message } from "@bufbuild/protobuf";
  * Describes the file aquarium/v2/application.proto.
  */
 export const file_aquarium_v2_application: GenFile = /*@__PURE__*/
-  fileDesc("Ch1hcXVhcml1bS92Mi9hcHBsaWNhdGlvbi5wcm90bxILYXF1YXJpdW0udjIi8QEKC0FwcGxpY2F0aW9uEhUKA3VpZBgBIAEoCUIImrUYBAgBEAESOAoKY3JlYXRlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCCJq1GAQIARABEhwKCm93bmVyX25hbWUYAyABKAlCCJq1GAQIARABEiUKCWxhYmVsX3VpZBgEIAEoCUISmrUYDhoFTGFiZWwiBUxhYmVsEikKCG1ldGFkYXRhGAUgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdDohirUYFwoVQXBwbGljYXRpb25TZXJ2aWNlR2V0krUYAggBIsECChBBcHBsaWNhdGlvblN0YXRlEgsKA3VpZBgBIAEoCRIuCgpjcmVhdGVkX2F0GAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIXCg9hcHBsaWNhdGlvbl91aWQYAyABKAkSNAoGc3RhdHVzGAQgASgOMiQuYXF1YXJpdW0udjIuQXBwbGljYXRpb25TdGF0ZS5TdGF0dXMSEwoLZGVzY3JpcHRpb24YBSABKAkiagoGU3RhdHVzEg8KC1VOU1BFQ0lGSUVEEAASBwoDTkVXEAESCwoHRUxFQ1RFRBACEg0KCUFMTE9DQVRFRBADEg4KCkRFQUxMT0NBVEUQBBIPCgtERUFMTE9DQVRFRBAFEgkKBUVSUk9SEAY6IIq1GBwKGkFwcGxpY2F0aW9uU2VydmljZUdldFN0YXRlIo8EChNBcHBsaWNhdGlvblJlc291cmNlEhUKA3VpZBgBIAEoCUIImrUYBAgBEAESOAoKY3JlYXRlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCCJq1GAQIARABEjgKCnVwZGF0ZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgiatRgECAEQARIXCg9hcHBsaWNhdGlvbl91aWQYBCABKAkSEAoIbm9kZV91aWQYBSABKAkSEQoJbGFiZWxfdWlkGAYgASgJEhgKEGRlZmluaXRpb25faW5kZXgYByABKAUSEgoKaWRlbnRpZmllchgIIAEoCRIPCgdpcF9hZGRyGAkgASgJEg8KB2h3X2FkZHIYCiABKAkSKQoIbWV0YWRhdGEYCyABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0EjAKB3RpbWVvdXQYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wSACIAQESOAoOYXV0aGVudGljYXRpb24YDSABKAsyGy5hcXVhcml1bS52Mi5BdXRoZW50aWNhdGlvbkgBiAEBOimKtRgfCh1BcHBsaWNhdGlvblNlcnZpY2VHZXRSZXNvdXJjZZK1GAIIAUIKCghfdGltZW91dEIRCg9fYXV0aGVudGljYXRpb24izQIKD0FwcGxpY2F0aW9uVGFzaxILCgN1aWQYASABKAkSLgoKY3JlYXRlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASFwoPYXBwbGljYXRpb25fdWlkGAQgASgJEgwKBHRhc2sYBSABKAkSMgoEd2hlbhgGIAEoDjIkLmFxdWFyaXVtLnYyLkFwcGxpY2F0aW9uU3RhdGUuU3RhdHVzEigKB29wdGlvbnMYByABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0EicKBnJlc3VsdBgIIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3Q6H4q1GBsKGUFwcGxpY2F0aW9uU2VydmljZUdldFRhc2siHwodQXBwbGljYXRpb25TZXJ2aWNlTGlzdFJlcXVlc3QiaQoeQXBwbGljYXRpb25TZXJ2aWNlTGlzdFJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEiYKBGRhdGEYAyADKAsyGC5hcXVhcml1bS52Mi5BcHBsaWNhdGlvbiI3ChxBcHBsaWNhdGlvblNlcnZpY2VHZXRSZXF1ZXN0EhcKD2FwcGxpY2F0aW9uX3VpZBgBIAEoCSJoCh1BcHBsaWNhdGlvblNlcnZpY2VHZXRSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRImCgRkYXRhGAMgASgLMhguYXF1YXJpdW0udjIuQXBwbGljYXRpb24iUAofQXBwbGljYXRpb25TZXJ2aWNlQ3JlYXRlUmVxdWVzdBItCgthcHBsaWNhdGlvbhgBIAEoCzIYLmFxdWFyaXVtLnYyLkFwcGxpY2F0aW9uImsKIEFwcGxpY2F0aW9uU2VydmljZUNyZWF0ZVJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEiYKBGRhdGEYAyABKAsyGC5hcXVhcml1bS52Mi5BcHBsaWNhdGlvbiI8CiFBcHBsaWNhdGlvblNlcnZpY2VHZXRTdGF0ZVJlcXVlc3QSFwoPYXBwbGljYXRpb25fdWlkGAEgASgJInIKIkFwcGxpY2F0aW9uU2VydmljZUdldFN0YXRlUmVzcG9uc2USDgoGc3RhdHVzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkSKwoEZGF0YRgDIAEoCzIdLmFxdWFyaXVtLnYyLkFwcGxpY2F0aW9uU3RhdGUiPwokQXBwbGljYXRpb25TZXJ2aWNlR2V0UmVzb3VyY2VSZXF1ZXN0EhcKD2FwcGxpY2F0aW9uX3VpZBgBIAEoCSJ4CiVBcHBsaWNhdGlvblNlcnZpY2VHZXRSZXNvdXJjZVJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEi4KBGRhdGEYAyABKAsyIC5hcXVhcml1bS52Mi5BcHBsaWNhdGlvblJlc291cmNlIjwKIUFwcGxpY2F0aW9uU2VydmljZUxpc3RUYXNrUmVxdWVzdBIXCg9hcHBsaWNhdGlvbl91aWQYASABKAkicQoiQXBwbGljYXRpb25TZXJ2aWNlTGlzdFRhc2tSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIqCgRkYXRhGAMgAygLMhwuYXF1YXJpdW0udjIuQXBwbGljYXRpb25UYXNrImoKI0FwcGxpY2F0aW9uU2VydmljZUNyZWF0ZVRhc2tSZXF1ZXN0EhcKD2FwcGxpY2F0aW9uX3VpZBgBIAEoCRIqCgR0YXNrGAIgASgLMhwuYXF1YXJpdW0udjIuQXBwbGljYXRpb25UYXNrInMKJEFwcGxpY2F0aW9uU2VydmljZUNyZWF0ZVRhc2tSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIqCgRkYXRhGAMgASgLMhwuYXF1YXJpdW0udjIuQXBwbGljYXRpb25UYXNrIkAKIEFwcGxpY2F0aW9uU2VydmljZUdldFRhc2tSZXF1ZXN0EhwKFGFwcGxpY2F0aW9uX3Rhc2tfdWlkGAEgASgJInAKIUFwcGxpY2F0aW9uU2VydmljZUdldFRhc2tSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIqCgRkYXRhGAMgASgLMhwuYXF1YXJpdW0udjIuQXBwbGljYXRpb25UYXNrIj4KI0FwcGxpY2F0aW9uU2VydmljZURlYWxsb2NhdGVSZXF1ZXN0EhcKD2FwcGxpY2F0aW9uX3VpZBgBIAEoCSJHCiRBcHBsaWNhdGlvblNlcnZpY2VEZWFsbG9jYXRlUmVzcG9uc2USDgoGc3RhdHVzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkytAkKEkFwcGxpY2F0aW9uU2VydmljZRJ0CgRMaXN0EiouYXF1YXJpdW0udjIuQXBwbGljYXRpb25TZXJ2aWNlTGlzdFJlcXVlc3QaKy5hcXVhcml1bS52Mi5BcHBsaWNhdGlvblNlcnZpY2VMaXN0UmVzcG9uc2UiE4K1GA8aBFVzZXIiB0xpc3RBbGwScAoDR2V0EikuYXF1YXJpdW0udjIuQXBwbGljYXRpb25TZXJ2aWNlR2V0UmVxdWVzdBoqLmFxdWFyaXVtLnYyLkFwcGxpY2F0aW9uU2VydmljZUdldFJlc3BvbnNlIhKCtRgOGgRVc2VyIgZHZXRBbGwScQoGQ3JlYXRlEiwuYXF1YXJpdW0udjIuQXBwbGljYXRpb25TZXJ2aWNlQ3JlYXRlUmVxdWVzdBotLmFxdWFyaXVtLnYyLkFwcGxpY2F0aW9uU2VydmljZUNyZWF0ZVJlc3BvbnNlIgqCtRgGGgRVc2VyEoQBCghHZXRTdGF0ZRIuLmFxdWFyaXVtLnYyLkFwcGxpY2F0aW9uU2VydmljZUdldFN0YXRlUmVxdWVzdBovLmFxdWFyaXVtLnYyLkFwcGxpY2F0aW9uU2VydmljZUdldFN0YXRlUmVzcG9uc2UiF4K1GBMaBFVzZXIiC0dldFN0YXRlQWxsEpABCgtHZXRSZXNvdXJjZRIxLmFxdWFyaXVtLnYyLkFwcGxpY2F0aW9uU2VydmljZUdldFJlc291cmNlUmVxdWVzdBoyLmFxdWFyaXVtLnYyLkFwcGxpY2F0aW9uU2VydmljZUdldFJlc291cmNlUmVzcG9uc2UiGoK1GBYaBFVzZXIiDkdldFJlc291cmNlQWxsEoUBCghMaXN0VGFzaxIuLmFxdWFyaXVtLnYyLkFwcGxpY2F0aW9uU2VydmljZUxpc3RUYXNrUmVxdWVzdBovLmFxdWFyaXVtLnYyLkFwcGxpY2F0aW9uU2VydmljZUxpc3RUYXNrUmVzcG9uc2UiGIK1GBQaBVBvd2VyIgtMaXN0VGFza0FsbBKNAQoKQ3JlYXRlVGFzaxIwLmFxdWFyaXVtLnYyLkFwcGxpY2F0aW9uU2VydmljZUNyZWF0ZVRhc2tSZXF1ZXN0GjEuYXF1YXJpdW0udjIuQXBwbGljYXRpb25TZXJ2aWNlQ3JlYXRlVGFza1Jlc3BvbnNlIhqCtRgWGgVQb3dlciINQ3JlYXRlVGFza0FsbBKBAQoHR2V0VGFzaxItLmFxdWFyaXVtLnYyLkFwcGxpY2F0aW9uU2VydmljZUdldFRhc2tSZXF1ZXN0Gi4uYXF1YXJpdW0udjIuQXBwbGljYXRpb25TZXJ2aWNlR2V0VGFza1Jlc3BvbnNlIheCtRgTGgVQb3dlciIKR2V0VGFza0FsbBKMAQoKRGVhbGxvY2F0ZRIwLmFxdWFyaXVtLnYyLkFwcGxpY2F0aW9uU2VydmljZURlYWxsb2NhdGVSZXF1ZXN0GjEuYXF1YXJpdW0udjIuQXBwbGljYXRpb25TZXJ2aWNlRGVhbGxvY2F0ZVJlc3BvbnNlIhmCtRgVGgRVc2VyIg1EZWFsbG9jYXRlQWxsQkVaQ2dpdGh1Yi5jb20vYWRvYmUvYXF1YXJpdW0tZmlzaC9saWIvcnBjL3Byb3RvL2FxdWFyaXVtL3YyO2FxdWFyaXVtdjJiBnByb3RvMw", [file_google_protobuf_timestamp, file_google_protobuf_struct, file_aquarium_v2_common, file_aquarium_v2_options_rbac, file_aquarium_v2_options_streaming, file_aquarium_v2_options_ui]);
+  fileDesc("Ch1hcXVhcml1bS92Mi9hcHBsaWNhdGlvbi5wcm90bxILYXF1YXJpdW0udjIi8QEKC0FwcGxpY2F0aW9uEhUKA3VpZBgBIAEoCUIImrUYBAgBEAESOAoKY3JlYXRlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCCJq1GAQIARABEhwKCm93bmVyX25hbWUYAyABKAlCCJq1GAQIARABEiUKCWxhYmVsX3VpZBgEIAEoCUISmrUYDhoFTGFiZWwiBUxhYmVsEikKCG1ldGFkYXRhGAUgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdDohirUYFwoVQXBwbGljYXRpb25TZXJ2aWNlR2V0krUYAggBIsECChBBcHBsaWNhdGlvblN0YXRlEgsKA3VpZBgBIAEoCRIuCgpjcmVhdGVkX2F0GAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIXCg9hcHBsaWNhdGlvbl91aWQYAyABKAkSNAoGc3RhdHVzGAQgASgOMiQuYXF1YXJpdW0udjIuQXBwbGljYXRpb25TdGF0ZS5TdGF0dXMSEwoLZGVzY3JpcHRpb24YBSABKAkiagoGU3RhdHVzEg8KC1VOU1BFQ0lGSUVEEAASBwoDTkVXEAESCwoHRUxFQ1RFRBACEg0KCUFMTE9DQVRFRBADEg4KCkRFQUxMT0NBVEUQBBIPCgtERUFMTE9DQVRFRBAFEgkKBUVSUk9SEAY6IIq1GBwKGkFwcGxpY2F0aW9uU2VydmljZUdldFN0YXRlIo8EChNBcHBsaWNhdGlvblJlc291cmNlEhUKA3VpZBgBIAEoCUIImrUYBAgBEAESOAoKY3JlYXRlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCCJq1GAQIARABEjgKCnVwZGF0ZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgiatRgECAEQARIXCg9hcHBsaWNhdGlvbl91aWQYBCABKAkSEAoIbm9kZV91aWQYBSABKAkSEQoJbGFiZWxfdWlkGAYgASgJEhgKEGRlZmluaXRpb25faW5kZXgYByABKAUSEgoKaWRlbnRpZmllchgIIAEoCRIPCgdpcF9hZGRyGAkgASgJEg8KB2h3X2FkZHIYCiABKAkSKQoIbWV0YWRhdGEYCyABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0EjAKB3RpbWVvdXQYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wSACIAQESOAoOYXV0aGVudGljYXRpb24YDSABKAsyGy5hcXVhcml1bS52Mi5BdXRoZW50aWNhdGlvbkgBiAEBOimKtRgfCh1BcHBsaWNhdGlvblNlcnZpY2VHZXRSZXNvdXJjZZK1GAIIAUIKCghfdGltZW91dEIRCg9fYXV0aGVudGljYXRpb24izQIKD0FwcGxpY2F0aW9uVGFzaxILCgN1aWQYASABKAkSLgoKY3JlYXRlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASFwoPYXBwbGljYXRpb25fdWlkGAQgASgJEgwKBHRhc2sYBSABKAkSMgoEd2hlbhgGIAEoDjIkLmFxdWFyaXVtLnYyLkFwcGxpY2F0aW9uU3RhdGUuU3RhdHVzEigKB29wdGlvbnMYByABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0EicKBnJlc3VsdBgIIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3Q6H4q1GBsKGUFwcGxpY2F0aW9uU2VydmljZUdldFRhc2siHwodQXBwbGljYXRpb25TZXJ2aWNlTGlzdFJlcXVlc3QiaQoeQXBwbGljYXRpb25TZXJ2aWNlTGlzdFJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEiYKBGRhdGEYAyADKAsyGC5hcXVhcml1bS52Mi5BcHBsaWNhdGlvbiI3ChxBcHBsaWNhdGlvblNlcnZpY2VHZXRSZXF1ZXN0EhcKD2FwcGxpY2F0aW9uX3VpZBgBIAEoCSJoCh1BcHBsaWNhdGlvblNlcnZpY2VHZXRSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRImCgRkYXRhGAMgASgLMhguYXF1YXJpdW0udjIuQXBwbGljYXRpb24iUAofQXBwbGljYXRpb25TZXJ2aWNlQ3JlYXRlUmVxdWVzdBItCgthcHBsaWNhdGlvbhgBIAEoCzIYLmFxdWFyaXVtLnYyLkFwcGxpY2F0aW9uImsKIEFwcGxpY2F0aW9uU2VydmljZUNyZWF0ZVJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEiYKBGRhdGEYAyABKAsyGC5hcXVhcml1bS52Mi5BcHBsaWNhdGlvbiIkCiJBcHBsaWNhdGlvblNlcnZpY2VMaXN0U3RhdGVSZXF1ZXN0InMKI0FwcGxpY2F0aW9uU2VydmljZUxpc3RTdGF0ZVJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEisKBGRhdGEYAyADKAsyHS5hcXVhcml1bS52Mi5BcHBsaWNhdGlvblN0YXRlIjwKIUFwcGxpY2F0aW9uU2VydmljZUdldFN0YXRlUmVxdWVzdBIXCg9hcHBsaWNhdGlvbl91aWQYASABKAkicgoiQXBwbGljYXRpb25TZXJ2aWNlR2V0U3RhdGVSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIrCgRkYXRhGAMgASgLMh0uYXF1YXJpdW0udjIuQXBwbGljYXRpb25TdGF0ZSJACiVBcHBsaWNhdGlvblNlcnZpY2VMaXN0UmVzb3VyY2VSZXF1ZXN0EhcKD2FwcGxpY2F0aW9uX3VpZBgBIAEoCSJ5CiZBcHBsaWNhdGlvblNlcnZpY2VMaXN0UmVzb3VyY2VSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIuCgRkYXRhGAMgAygLMiAuYXF1YXJpdW0udjIuQXBwbGljYXRpb25SZXNvdXJjZSI/CiRBcHBsaWNhdGlvblNlcnZpY2VHZXRSZXNvdXJjZVJlcXVlc3QSFwoPYXBwbGljYXRpb25fdWlkGAEgASgJIngKJUFwcGxpY2F0aW9uU2VydmljZUdldFJlc291cmNlUmVzcG9uc2USDgoGc3RhdHVzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkSLgoEZGF0YRgDIAEoCzIgLmFxdWFyaXVtLnYyLkFwcGxpY2F0aW9uUmVzb3VyY2UiPAohQXBwbGljYXRpb25TZXJ2aWNlTGlzdFRhc2tSZXF1ZXN0EhcKD2FwcGxpY2F0aW9uX3VpZBgBIAEoCSJxCiJBcHBsaWNhdGlvblNlcnZpY2VMaXN0VGFza1Jlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEioKBGRhdGEYAyADKAsyHC5hcXVhcml1bS52Mi5BcHBsaWNhdGlvblRhc2siagojQXBwbGljYXRpb25TZXJ2aWNlQ3JlYXRlVGFza1JlcXVlc3QSFwoPYXBwbGljYXRpb25fdWlkGAEgASgJEioKBHRhc2sYAiABKAsyHC5hcXVhcml1bS52Mi5BcHBsaWNhdGlvblRhc2sicwokQXBwbGljYXRpb25TZXJ2aWNlQ3JlYXRlVGFza1Jlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEioKBGRhdGEYAyABKAsyHC5hcXVhcml1bS52Mi5BcHBsaWNhdGlvblRhc2siQAogQXBwbGljYXRpb25TZXJ2aWNlR2V0VGFza1JlcXVlc3QSHAoUYXBwbGljYXRpb25fdGFza191aWQYASABKAkicAohQXBwbGljYXRpb25TZXJ2aWNlR2V0VGFza1Jlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEioKBGRhdGEYAyABKAsyHC5hcXVhcml1bS52Mi5BcHBsaWNhdGlvblRhc2siPgojQXBwbGljYXRpb25TZXJ2aWNlRGVhbGxvY2F0ZVJlcXVlc3QSFwoPYXBwbGljYXRpb25fdWlkGAEgASgJIkcKJEFwcGxpY2F0aW9uU2VydmljZURlYWxsb2NhdGVSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCTLWCwoSQXBwbGljYXRpb25TZXJ2aWNlEnQKBExpc3QSKi5hcXVhcml1bS52Mi5BcHBsaWNhdGlvblNlcnZpY2VMaXN0UmVxdWVzdBorLmFxdWFyaXVtLnYyLkFwcGxpY2F0aW9uU2VydmljZUxpc3RSZXNwb25zZSITgrUYDxoEVXNlciIHTGlzdEFsbBJwCgNHZXQSKS5hcXVhcml1bS52Mi5BcHBsaWNhdGlvblNlcnZpY2VHZXRSZXF1ZXN0GiouYXF1YXJpdW0udjIuQXBwbGljYXRpb25TZXJ2aWNlR2V0UmVzcG9uc2UiEoK1GA4aBFVzZXIiBkdldEFsbBJxCgZDcmVhdGUSLC5hcXVhcml1bS52Mi5BcHBsaWNhdGlvblNlcnZpY2VDcmVhdGVSZXF1ZXN0Gi0uYXF1YXJpdW0udjIuQXBwbGljYXRpb25TZXJ2aWNlQ3JlYXRlUmVzcG9uc2UiCoK1GAYaBFVzZXISiAEKCUxpc3RTdGF0ZRIvLmFxdWFyaXVtLnYyLkFwcGxpY2F0aW9uU2VydmljZUxpc3RTdGF0ZVJlcXVlc3QaMC5hcXVhcml1bS52Mi5BcHBsaWNhdGlvblNlcnZpY2VMaXN0U3RhdGVSZXNwb25zZSIYgrUYFBoEVXNlciIMTGlzdFN0YXRlQWxsEoQBCghHZXRTdGF0ZRIuLmFxdWFyaXVtLnYyLkFwcGxpY2F0aW9uU2VydmljZUdldFN0YXRlUmVxdWVzdBovLmFxdWFyaXVtLnYyLkFwcGxpY2F0aW9uU2VydmljZUdldFN0YXRlUmVzcG9uc2UiF4K1GBMaBFVzZXIiC0dldFN0YXRlQWxsEpQBCgxMaXN0UmVzb3VyY2USMi5hcXVhcml1bS52Mi5BcHBsaWNhdGlvblNlcnZpY2VMaXN0UmVzb3VyY2VSZXF1ZXN0GjMuYXF1YXJpdW0udjIuQXBwbGljYXRpb25TZXJ2aWNlTGlzdFJlc291cmNlUmVzcG9uc2UiG4K1GBcaBFVzZXIiD0xpc3RSZXNvdXJjZUFsbBKQAQoLR2V0UmVzb3VyY2USMS5hcXVhcml1bS52Mi5BcHBsaWNhdGlvblNlcnZpY2VHZXRSZXNvdXJjZVJlcXVlc3QaMi5hcXVhcml1bS52Mi5BcHBsaWNhdGlvblNlcnZpY2VHZXRSZXNvdXJjZVJlc3BvbnNlIhqCtRgWGgRVc2VyIg5HZXRSZXNvdXJjZUFsbBKFAQoITGlzdFRhc2sSLi5hcXVhcml1bS52Mi5BcHBsaWNhdGlvblNlcnZpY2VMaXN0VGFza1JlcXVlc3QaLy5hcXVhcml1bS52Mi5BcHBsaWNhdGlvblNlcnZpY2VMaXN0VGFza1Jlc3BvbnNlIhiCtRgUGgVQb3dlciILTGlzdFRhc2tBbGwSjQEKCkNyZWF0ZVRhc2sSMC5hcXVhcml1bS52Mi5BcHBsaWNhdGlvblNlcnZpY2VDcmVhdGVUYXNrUmVxdWVzdBoxLmFxdWFyaXVtLnYyLkFwcGxpY2F0aW9uU2VydmljZUNyZWF0ZVRhc2tSZXNwb25zZSIagrUYFhoFUG93ZXIiDUNyZWF0ZVRhc2tBbGwSgQEKB0dldFRhc2sSLS5hcXVhcml1bS52Mi5BcHBsaWNhdGlvblNlcnZpY2VHZXRUYXNrUmVxdWVzdBouLmFxdWFyaXVtLnYyLkFwcGxpY2F0aW9uU2VydmljZUdldFRhc2tSZXNwb25zZSIXgrUYExoFUG93ZXIiCkdldFRhc2tBbGwSjAEKCkRlYWxsb2NhdGUSMC5hcXVhcml1bS52Mi5BcHBsaWNhdGlvblNlcnZpY2VEZWFsbG9jYXRlUmVxdWVzdBoxLmFxdWFyaXVtLnYyLkFwcGxpY2F0aW9uU2VydmljZURlYWxsb2NhdGVSZXNwb25zZSIZgrUYFRoEVXNlciINRGVhbGxvY2F0ZUFsbEJFWkNnaXRodWIuY29tL2Fkb2JlL2FxdWFyaXVtLWZpc2gvbGliL3JwYy9wcm90by9hcXVhcml1bS92MjthcXVhcml1bXYyYgZwcm90bzM", [file_google_protobuf_timestamp, file_google_protobuf_struct, file_aquarium_v2_common, file_aquarium_v2_options_rbac, file_aquarium_v2_options_streaming, file_aquarium_v2_options_ui]);
 
 /**
  * Application represents an allocation request
@@ -494,6 +494,46 @@ export const ApplicationServiceCreateResponseSchema: GenMessage<ApplicationServi
   messageDesc(file_aquarium_v2_application, 9);
 
 /**
+ * @generated from message aquarium.v2.ApplicationServiceListStateRequest
+ */
+export type ApplicationServiceListStateRequest = Message<"aquarium.v2.ApplicationServiceListStateRequest"> & {
+};
+
+/**
+ * Describes the message aquarium.v2.ApplicationServiceListStateRequest.
+ * Use `create(ApplicationServiceListStateRequestSchema)` to create a new message.
+ */
+export const ApplicationServiceListStateRequestSchema: GenMessage<ApplicationServiceListStateRequest> = /*@__PURE__*/
+  messageDesc(file_aquarium_v2_application, 10);
+
+/**
+ * @generated from message aquarium.v2.ApplicationServiceListStateResponse
+ */
+export type ApplicationServiceListStateResponse = Message<"aquarium.v2.ApplicationServiceListStateResponse"> & {
+  /**
+   * @generated from field: bool status = 1;
+   */
+  status: boolean;
+
+  /**
+   * @generated from field: string message = 2;
+   */
+  message: string;
+
+  /**
+   * @generated from field: repeated aquarium.v2.ApplicationState data = 3;
+   */
+  data: ApplicationState[];
+};
+
+/**
+ * Describes the message aquarium.v2.ApplicationServiceListStateResponse.
+ * Use `create(ApplicationServiceListStateResponseSchema)` to create a new message.
+ */
+export const ApplicationServiceListStateResponseSchema: GenMessage<ApplicationServiceListStateResponse> = /*@__PURE__*/
+  messageDesc(file_aquarium_v2_application, 11);
+
+/**
  * @generated from message aquarium.v2.ApplicationServiceGetStateRequest
  */
 export type ApplicationServiceGetStateRequest = Message<"aquarium.v2.ApplicationServiceGetStateRequest"> & {
@@ -508,7 +548,7 @@ export type ApplicationServiceGetStateRequest = Message<"aquarium.v2.Application
  * Use `create(ApplicationServiceGetStateRequestSchema)` to create a new message.
  */
 export const ApplicationServiceGetStateRequestSchema: GenMessage<ApplicationServiceGetStateRequest> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_application, 10);
+  messageDesc(file_aquarium_v2_application, 12);
 
 /**
  * @generated from message aquarium.v2.ApplicationServiceGetStateResponse
@@ -535,7 +575,51 @@ export type ApplicationServiceGetStateResponse = Message<"aquarium.v2.Applicatio
  * Use `create(ApplicationServiceGetStateResponseSchema)` to create a new message.
  */
 export const ApplicationServiceGetStateResponseSchema: GenMessage<ApplicationServiceGetStateResponse> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_application, 11);
+  messageDesc(file_aquarium_v2_application, 13);
+
+/**
+ * @generated from message aquarium.v2.ApplicationServiceListResourceRequest
+ */
+export type ApplicationServiceListResourceRequest = Message<"aquarium.v2.ApplicationServiceListResourceRequest"> & {
+  /**
+   * @generated from field: string application_uid = 1;
+   */
+  applicationUid: string;
+};
+
+/**
+ * Describes the message aquarium.v2.ApplicationServiceListResourceRequest.
+ * Use `create(ApplicationServiceListResourceRequestSchema)` to create a new message.
+ */
+export const ApplicationServiceListResourceRequestSchema: GenMessage<ApplicationServiceListResourceRequest> = /*@__PURE__*/
+  messageDesc(file_aquarium_v2_application, 14);
+
+/**
+ * @generated from message aquarium.v2.ApplicationServiceListResourceResponse
+ */
+export type ApplicationServiceListResourceResponse = Message<"aquarium.v2.ApplicationServiceListResourceResponse"> & {
+  /**
+   * @generated from field: bool status = 1;
+   */
+  status: boolean;
+
+  /**
+   * @generated from field: string message = 2;
+   */
+  message: string;
+
+  /**
+   * @generated from field: repeated aquarium.v2.ApplicationResource data = 3;
+   */
+  data: ApplicationResource[];
+};
+
+/**
+ * Describes the message aquarium.v2.ApplicationServiceListResourceResponse.
+ * Use `create(ApplicationServiceListResourceResponseSchema)` to create a new message.
+ */
+export const ApplicationServiceListResourceResponseSchema: GenMessage<ApplicationServiceListResourceResponse> = /*@__PURE__*/
+  messageDesc(file_aquarium_v2_application, 15);
 
 /**
  * @generated from message aquarium.v2.ApplicationServiceGetResourceRequest
@@ -552,7 +636,7 @@ export type ApplicationServiceGetResourceRequest = Message<"aquarium.v2.Applicat
  * Use `create(ApplicationServiceGetResourceRequestSchema)` to create a new message.
  */
 export const ApplicationServiceGetResourceRequestSchema: GenMessage<ApplicationServiceGetResourceRequest> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_application, 12);
+  messageDesc(file_aquarium_v2_application, 16);
 
 /**
  * @generated from message aquarium.v2.ApplicationServiceGetResourceResponse
@@ -579,7 +663,7 @@ export type ApplicationServiceGetResourceResponse = Message<"aquarium.v2.Applica
  * Use `create(ApplicationServiceGetResourceResponseSchema)` to create a new message.
  */
 export const ApplicationServiceGetResourceResponseSchema: GenMessage<ApplicationServiceGetResourceResponse> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_application, 13);
+  messageDesc(file_aquarium_v2_application, 17);
 
 /**
  * @generated from message aquarium.v2.ApplicationServiceListTaskRequest
@@ -596,7 +680,7 @@ export type ApplicationServiceListTaskRequest = Message<"aquarium.v2.Application
  * Use `create(ApplicationServiceListTaskRequestSchema)` to create a new message.
  */
 export const ApplicationServiceListTaskRequestSchema: GenMessage<ApplicationServiceListTaskRequest> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_application, 14);
+  messageDesc(file_aquarium_v2_application, 18);
 
 /**
  * @generated from message aquarium.v2.ApplicationServiceListTaskResponse
@@ -623,7 +707,7 @@ export type ApplicationServiceListTaskResponse = Message<"aquarium.v2.Applicatio
  * Use `create(ApplicationServiceListTaskResponseSchema)` to create a new message.
  */
 export const ApplicationServiceListTaskResponseSchema: GenMessage<ApplicationServiceListTaskResponse> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_application, 15);
+  messageDesc(file_aquarium_v2_application, 19);
 
 /**
  * @generated from message aquarium.v2.ApplicationServiceCreateTaskRequest
@@ -645,7 +729,7 @@ export type ApplicationServiceCreateTaskRequest = Message<"aquarium.v2.Applicati
  * Use `create(ApplicationServiceCreateTaskRequestSchema)` to create a new message.
  */
 export const ApplicationServiceCreateTaskRequestSchema: GenMessage<ApplicationServiceCreateTaskRequest> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_application, 16);
+  messageDesc(file_aquarium_v2_application, 20);
 
 /**
  * @generated from message aquarium.v2.ApplicationServiceCreateTaskResponse
@@ -672,7 +756,7 @@ export type ApplicationServiceCreateTaskResponse = Message<"aquarium.v2.Applicat
  * Use `create(ApplicationServiceCreateTaskResponseSchema)` to create a new message.
  */
 export const ApplicationServiceCreateTaskResponseSchema: GenMessage<ApplicationServiceCreateTaskResponse> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_application, 17);
+  messageDesc(file_aquarium_v2_application, 21);
 
 /**
  * @generated from message aquarium.v2.ApplicationServiceGetTaskRequest
@@ -689,7 +773,7 @@ export type ApplicationServiceGetTaskRequest = Message<"aquarium.v2.ApplicationS
  * Use `create(ApplicationServiceGetTaskRequestSchema)` to create a new message.
  */
 export const ApplicationServiceGetTaskRequestSchema: GenMessage<ApplicationServiceGetTaskRequest> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_application, 18);
+  messageDesc(file_aquarium_v2_application, 22);
 
 /**
  * @generated from message aquarium.v2.ApplicationServiceGetTaskResponse
@@ -716,7 +800,7 @@ export type ApplicationServiceGetTaskResponse = Message<"aquarium.v2.Application
  * Use `create(ApplicationServiceGetTaskResponseSchema)` to create a new message.
  */
 export const ApplicationServiceGetTaskResponseSchema: GenMessage<ApplicationServiceGetTaskResponse> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_application, 19);
+  messageDesc(file_aquarium_v2_application, 23);
 
 /**
  * @generated from message aquarium.v2.ApplicationServiceDeallocateRequest
@@ -733,7 +817,7 @@ export type ApplicationServiceDeallocateRequest = Message<"aquarium.v2.Applicati
  * Use `create(ApplicationServiceDeallocateRequestSchema)` to create a new message.
  */
 export const ApplicationServiceDeallocateRequestSchema: GenMessage<ApplicationServiceDeallocateRequest> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_application, 20);
+  messageDesc(file_aquarium_v2_application, 24);
 
 /**
  * @generated from message aquarium.v2.ApplicationServiceDeallocateResponse
@@ -755,7 +839,7 @@ export type ApplicationServiceDeallocateResponse = Message<"aquarium.v2.Applicat
  * Use `create(ApplicationServiceDeallocateResponseSchema)` to create a new message.
  */
 export const ApplicationServiceDeallocateResponseSchema: GenMessage<ApplicationServiceDeallocateResponse> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_application, 21);
+  messageDesc(file_aquarium_v2_application, 25);
 
 /**
  * ApplicationService handles application management operations
@@ -794,6 +878,16 @@ export const ApplicationService: GenService<{
     output: typeof ApplicationServiceCreateResponseSchema;
   },
   /**
+   * List application states
+   *
+   * @generated from rpc aquarium.v2.ApplicationService.ListState
+   */
+  listState: {
+    methodKind: "unary";
+    input: typeof ApplicationServiceListStateRequestSchema;
+    output: typeof ApplicationServiceListStateResponseSchema;
+  },
+  /**
    * Get application state
    *
    * @generated from rpc aquarium.v2.ApplicationService.GetState
@@ -802,6 +896,16 @@ export const ApplicationService: GenService<{
     methodKind: "unary";
     input: typeof ApplicationServiceGetStateRequestSchema;
     output: typeof ApplicationServiceGetStateResponseSchema;
+  },
+  /**
+   * List all available application resources
+   *
+   * @generated from rpc aquarium.v2.ApplicationService.ListResource
+   */
+  listResource: {
+    methodKind: "unary";
+    input: typeof ApplicationServiceListResourceRequestSchema;
+    output: typeof ApplicationServiceListResourceResponseSchema;
   },
   /**
    * Get application resource

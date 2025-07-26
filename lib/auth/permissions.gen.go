@@ -22,23 +22,27 @@ import (
 var rolePermissions = map[string][]typesv2.Permission{
 	"Administrator": {
 		// ApplicationService
-		{Resource: ApplicationService, Action: ApplicationServiceCreate},         // gRPC
-		{Resource: ApplicationService, Action: ApplicationServiceCreateTask},     // gRPC
-		{Resource: ApplicationService, Action: ApplicationServiceCreateTaskAll},  // gRPC additional
-		{Resource: ApplicationService, Action: ApplicationServiceDeallocate},     // gRPC
-		{Resource: ApplicationService, Action: ApplicationServiceDeallocateAll},  // gRPC additional
-		{Resource: ApplicationService, Action: ApplicationServiceGet},            // gRPC
-		{Resource: ApplicationService, Action: ApplicationServiceGetAll},         // gRPC additional
-		{Resource: ApplicationService, Action: ApplicationServiceGetResource},    // gRPC
-		{Resource: ApplicationService, Action: ApplicationServiceGetResourceAll}, // gRPC additional
-		{Resource: ApplicationService, Action: ApplicationServiceGetState},       // gRPC
-		{Resource: ApplicationService, Action: ApplicationServiceGetStateAll},    // gRPC additional
-		{Resource: ApplicationService, Action: ApplicationServiceGetTask},        // gRPC
-		{Resource: ApplicationService, Action: ApplicationServiceGetTaskAll},     // gRPC additional
-		{Resource: ApplicationService, Action: ApplicationServiceList},           // gRPC
-		{Resource: ApplicationService, Action: ApplicationServiceListAll},        // gRPC additional
-		{Resource: ApplicationService, Action: ApplicationServiceListTask},       // gRPC
-		{Resource: ApplicationService, Action: ApplicationServiceListTaskAll},    // gRPC additional
+		{Resource: ApplicationService, Action: ApplicationServiceCreate},          // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceCreateTask},      // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceCreateTaskAll},   // gRPC additional
+		{Resource: ApplicationService, Action: ApplicationServiceDeallocate},      // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceDeallocateAll},   // gRPC additional
+		{Resource: ApplicationService, Action: ApplicationServiceGet},             // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceGetAll},          // gRPC additional
+		{Resource: ApplicationService, Action: ApplicationServiceGetResource},     // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceGetResourceAll},  // gRPC additional
+		{Resource: ApplicationService, Action: ApplicationServiceGetState},        // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceGetStateAll},     // gRPC additional
+		{Resource: ApplicationService, Action: ApplicationServiceGetTask},         // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceGetTaskAll},      // gRPC additional
+		{Resource: ApplicationService, Action: ApplicationServiceList},            // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceListAll},         // gRPC additional
+		{Resource: ApplicationService, Action: ApplicationServiceListResource},    // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceListResourceAll}, // gRPC additional
+		{Resource: ApplicationService, Action: ApplicationServiceListState},       // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceListStateAll},    // gRPC additional
+		{Resource: ApplicationService, Action: ApplicationServiceListTask},        // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceListTaskAll},     // gRPC additional
 
 		// GateProxySSHService
 		{Resource: GateProxySSHService, Action: GateProxySSHServiceGetResourceAccess},    // gRPC
@@ -88,12 +92,14 @@ var rolePermissions = map[string][]typesv2.Permission{
 	},
 	"User": {
 		// ApplicationService
-		{Resource: ApplicationService, Action: ApplicationServiceCreate},      // gRPC
-		{Resource: ApplicationService, Action: ApplicationServiceDeallocate},  // gRPC
-		{Resource: ApplicationService, Action: ApplicationServiceGet},         // gRPC
-		{Resource: ApplicationService, Action: ApplicationServiceGetResource}, // gRPC
-		{Resource: ApplicationService, Action: ApplicationServiceGetState},    // gRPC
-		{Resource: ApplicationService, Action: ApplicationServiceList},        // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceCreate},       // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceDeallocate},   // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceGet},          // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceGetResource},  // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceGetState},     // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceList},         // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceListResource}, // gRPC
+		{Resource: ApplicationService, Action: ApplicationServiceListState},    // gRPC
 
 		// LabelService
 		{Resource: LabelService, Action: LabelServiceList}, // gRPC

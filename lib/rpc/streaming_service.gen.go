@@ -53,34 +53,36 @@ type serviceMethodInfo struct {
 }
 
 var requestTypeMapping = map[string]serviceMethodInfo{
-	"ApplicationServiceCreateRequest":      {auth.ApplicationService, auth.ApplicationServiceCreate},
-	"ApplicationServiceCreateTaskRequest":  {auth.ApplicationService, auth.ApplicationServiceCreateTask},
-	"ApplicationServiceDeallocateRequest":  {auth.ApplicationService, auth.ApplicationServiceDeallocate},
-	"ApplicationServiceGetRequest":         {auth.ApplicationService, auth.ApplicationServiceGet},
-	"ApplicationServiceGetResourceRequest": {auth.ApplicationService, auth.ApplicationServiceGetResource},
-	"ApplicationServiceGetStateRequest":    {auth.ApplicationService, auth.ApplicationServiceGetState},
-	"ApplicationServiceGetTaskRequest":     {auth.ApplicationService, auth.ApplicationServiceGetTask},
-	"ApplicationServiceListRequest":        {auth.ApplicationService, auth.ApplicationServiceList},
-	"ApplicationServiceListTaskRequest":    {auth.ApplicationService, auth.ApplicationServiceListTask},
-	"LabelServiceCreateRequest":            {auth.LabelService, auth.LabelServiceCreate},
-	"LabelServiceGetRequest":               {auth.LabelService, auth.LabelServiceGet},
-	"LabelServiceListRequest":              {auth.LabelService, auth.LabelServiceList},
-	"LabelServiceRemoveRequest":            {auth.LabelService, auth.LabelServiceRemove},
-	"NodeServiceGetRequest":                {auth.NodeService, auth.NodeServiceGet},
-	"NodeServiceGetThisRequest":            {auth.NodeService, auth.NodeServiceGetThis},
-	"NodeServiceListRequest":               {auth.NodeService, auth.NodeServiceList},
-	"NodeServiceSetMaintenanceRequest":     {auth.NodeService, auth.NodeServiceSetMaintenance},
-	"RoleServiceCreateRequest":             {auth.RoleService, auth.RoleServiceCreate},
-	"RoleServiceGetRequest":                {auth.RoleService, auth.RoleServiceGet},
-	"RoleServiceListRequest":               {auth.RoleService, auth.RoleServiceList},
-	"RoleServiceRemoveRequest":             {auth.RoleService, auth.RoleServiceRemove},
-	"RoleServiceUpdateRequest":             {auth.RoleService, auth.RoleServiceUpdate},
-	"UserServiceCreateRequest":             {auth.UserService, auth.UserServiceCreate},
-	"UserServiceGetRequest":                {auth.UserService, auth.UserServiceGet},
-	"UserServiceGetMeRequest":              {auth.UserService, auth.UserServiceGetMe},
-	"UserServiceListRequest":               {auth.UserService, auth.UserServiceList},
-	"UserServiceRemoveRequest":             {auth.UserService, auth.UserServiceRemove},
-	"UserServiceUpdateRequest":             {auth.UserService, auth.UserServiceUpdate},
+	"ApplicationServiceCreateRequest":       {auth.ApplicationService, auth.ApplicationServiceCreate},
+	"ApplicationServiceCreateTaskRequest":   {auth.ApplicationService, auth.ApplicationServiceCreateTask},
+	"ApplicationServiceDeallocateRequest":   {auth.ApplicationService, auth.ApplicationServiceDeallocate},
+	"ApplicationServiceGetRequest":          {auth.ApplicationService, auth.ApplicationServiceGet},
+	"ApplicationServiceGetResourceRequest":  {auth.ApplicationService, auth.ApplicationServiceGetResource},
+	"ApplicationServiceGetStateRequest":     {auth.ApplicationService, auth.ApplicationServiceGetState},
+	"ApplicationServiceGetTaskRequest":      {auth.ApplicationService, auth.ApplicationServiceGetTask},
+	"ApplicationServiceListRequest":         {auth.ApplicationService, auth.ApplicationServiceList},
+	"ApplicationServiceListResourceRequest": {auth.ApplicationService, auth.ApplicationServiceListResource},
+	"ApplicationServiceListStateRequest":    {auth.ApplicationService, auth.ApplicationServiceListState},
+	"ApplicationServiceListTaskRequest":     {auth.ApplicationService, auth.ApplicationServiceListTask},
+	"LabelServiceCreateRequest":             {auth.LabelService, auth.LabelServiceCreate},
+	"LabelServiceGetRequest":                {auth.LabelService, auth.LabelServiceGet},
+	"LabelServiceListRequest":               {auth.LabelService, auth.LabelServiceList},
+	"LabelServiceRemoveRequest":             {auth.LabelService, auth.LabelServiceRemove},
+	"NodeServiceGetRequest":                 {auth.NodeService, auth.NodeServiceGet},
+	"NodeServiceGetThisRequest":             {auth.NodeService, auth.NodeServiceGetThis},
+	"NodeServiceListRequest":                {auth.NodeService, auth.NodeServiceList},
+	"NodeServiceSetMaintenanceRequest":      {auth.NodeService, auth.NodeServiceSetMaintenance},
+	"RoleServiceCreateRequest":              {auth.RoleService, auth.RoleServiceCreate},
+	"RoleServiceGetRequest":                 {auth.RoleService, auth.RoleServiceGet},
+	"RoleServiceListRequest":                {auth.RoleService, auth.RoleServiceList},
+	"RoleServiceRemoveRequest":              {auth.RoleService, auth.RoleServiceRemove},
+	"RoleServiceUpdateRequest":              {auth.RoleService, auth.RoleServiceUpdate},
+	"UserServiceCreateRequest":              {auth.UserService, auth.UserServiceCreate},
+	"UserServiceGetRequest":                 {auth.UserService, auth.UserServiceGet},
+	"UserServiceGetMeRequest":               {auth.UserService, auth.UserServiceGetMe},
+	"UserServiceListRequest":                {auth.UserService, auth.UserServiceList},
+	"UserServiceRemoveRequest":              {auth.UserService, auth.UserServiceRemove},
+	"UserServiceUpdateRequest":              {auth.UserService, auth.UserServiceUpdate},
 }
 
 // routeApplicationServiceRequest routes applicationService service requests
@@ -177,6 +179,28 @@ func (s *StreamingService) routeApplicationServiceRequest(ctx context.Context, r
 			return nil, connect.NewError(connect.CodeInvalidArgument, err)
 		}
 		resp, err := s.applicationService.List(ctx, connect.NewRequest(&req))
+		if err != nil {
+			return nil, err
+		}
+
+		return anypb.New(resp.Msg)
+	case "ApplicationServiceListResourceRequest":
+		var req aquariumv2.ApplicationServiceListResourceRequest
+		if err := requestData.UnmarshalTo(&req); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		resp, err := s.applicationService.ListResource(ctx, connect.NewRequest(&req))
+		if err != nil {
+			return nil, err
+		}
+
+		return anypb.New(resp.Msg)
+	case "ApplicationServiceListStateRequest":
+		var req aquariumv2.ApplicationServiceListStateRequest
+		if err := requestData.UnmarshalTo(&req); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		resp, err := s.applicationService.ListState(ctx, connect.NewRequest(&req))
 		if err != nil {
 			return nil, err
 		}
