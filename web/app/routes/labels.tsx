@@ -156,6 +156,10 @@ export default function Labels() {
             filterBy={['name']}
             sortBy={{ key: 'name', direction: 'asc' }}
             itemKey={(label: Label) => label.uid}
+            onItemClick={(label: Label) => {
+              setSelectedLabel(label);
+              setShowLabelDetailsModal(true);
+            }}
             permissions={{ list: { resource: PermService.Label, action: PermLabel.List } }}
             emptyMessage="No labels found"
           />

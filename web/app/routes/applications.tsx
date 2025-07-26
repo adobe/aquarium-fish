@@ -276,7 +276,10 @@ export default function Applications() {
             <div className="flex items-center space-x-4">
               {/* Create Button - we need to fetch labels for autofill */}
               <button
-                onClick={() => {fetchLabels(); setShowCreateModal(true)}}
+                onClick={() => {
+                  fetchLabels();
+                  setShowCreateModal(true);
+                }}
                 disabled={!canCreateApp}
                 className={`px-4 py-2 rounded-md text-white ${
                   canCreateApp
@@ -300,6 +303,7 @@ export default function Applications() {
             sortBy={{ key: 'created', direction: 'desc' }}
             itemKey={(app: ApplicationWithDetails) => app.uid}
             onItemClick={(app: ApplicationWithDetails) => {
+              fetchLabels(); // Needed to show the proper label in detals
               setSelectedApp(app);
               setShowDetailsModal(true);
             }}
@@ -326,12 +330,22 @@ export default function Applications() {
         {showDetailsModal && selectedApp && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Application Details: {selectedApp.uid}
+                </h2>
+                <button
+                  onClick={() => setShowDetailsModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ×
+                </button>
+              </div>
               <ApplicationForm
                 mode="view"
                 initialData={selectedApp}
                 onSubmit={() => {}} // Not used in view mode
                 onCancel={() => setShowDetailsModal(false)}
-                title="Application Details"
               />
               {/* Show ApplicationState and ApplicationResource if available */}
               <div className="mt-6">
