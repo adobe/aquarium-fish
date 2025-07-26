@@ -281,11 +281,15 @@ The election process:
          * If Vote round delay is passed
             * Increment Vote round and vote again on the current Node status
 
-## UI
+## Web UI Dashboard
 
-**TODO**
+Aquarium-Fish now have a nice Web-UI which allows users to quickly spin-up new environment and even
+connect to it using ProxySSH. It's static single-page application (SPA) based on React-Router v7
+which heavily utilizes server streaming to quickly share the latest DB updates and to reduce load
+on the server side.
 
-Simplify the cluster management, for example adding Labels or check the status [#8](https://github.com/adobe/aquarium-fish/issues/8).
+Web Dashboard could be visited on primary endpoint of the Fish right after start: https://localhost:8001/
+and will allow all the users to login with their user/password.
 
 ## Development
 
