@@ -1,0 +1,51 @@
+{{define "component-start" -}}
+export const {{.Name}}Form: React.FC<{{.Name -}}FormProps> = ({
+  initialData,
+  onSubmit,
+  onCancel,
+  mode,
+  title,
+  readonly,
+  nested = false
+}) => {
+  const [formData, setFormData] = useState<{{.Name}}FormState>(default{{.Name}}State);
+  const [yamlText, setYamlText] = useState('');
+  const [showYamlInput, setShowYamlInput] = useState(false);
+  const [yamlError, setYamlError] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [autofillMode, setAutofillMode] = useState<Record<string, 'dropdown' | 'text'>>({});
+  const [structFieldText, setStructFieldText] = useState<Record<string, string>>({});
+  const [structFieldErrors, setStructFieldErrors] = useState<Record<string, string>>({});
+  const { data } = useStreaming();
+
+  // Initialize form data from initialData
+  useEffect(() => {
+    if (initialData) {
+      const newFormData: {{.Name}}FormState = {
+{{- range .Fields }}
+{{- if .IsTimestamp }}
+        {{.JsonName}}: initialData.{{.JsonName}} ? new Date(Number(initialData.{{.JsonName}}.seconds) * 1000).toISOString().slice(0, 16) : '',
+{{- else if .IsRepeated }}
+        {{.JsonName}}: initialData.{{.JsonName}} || [],
+{{- else if .IsStruct }}
+        {{.JsonName}}: initialData.{{.JsonName}} || {},
+{{- else if .IsOptional }}
+        {{.JsonName}}: initialData.{{.JsonName}} ?? {{.DefaultValue}},
+{{- else }}
+        {{.JsonName}}: initialData.{{.JsonName}} || {{.DefaultValue}},
+{{- end }}
+{{- end }}
+      };
+      setFormData(newFormData);
+
+      // Initialize struct field text
+      const newStructText: Record<string, string> = {};
+{{- range .Fields }}
+{{- if .IsStruct }}
+      newStructText['{{.JsonName}}'] = initialData.{{.JsonName}} ? yaml.dump(initialData.{{.JsonName}}) : '';
+{{- end }}
+{{- end }}
+      setStructFieldText(newStructText);
+    }
+  }, [initialData]);
+{{end}}

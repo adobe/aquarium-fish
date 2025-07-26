@@ -243,7 +243,7 @@ var File_aquarium_v2_gate_proxyssh_access_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_gate_proxyssh_access_proto_rawDesc = "" +
 	"\n" +
-	"&aquarium/v2/gate_proxyssh_access.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16aquarium/v2/rbac.proto\"\xff\x01\n" +
+	"&aquarium/v2/gate_proxyssh_access.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1eaquarium/v2/options_rbac.proto\"\xff\x01\n" +
 	"\x12GateProxySSHAccess\x12\x10\n" +
 	"\x03uid\x18\x01 \x01(\tR\x03uid\x129\n" +
 	"\n" +
@@ -298,7 +298,7 @@ func file_aquarium_v2_gate_proxyssh_access_proto_init() {
 	if File_aquarium_v2_gate_proxyssh_access_proto != nil {
 		return
 	}
-	file_aquarium_v2_rbac_proto_init()
+	file_aquarium_v2_options_rbac_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

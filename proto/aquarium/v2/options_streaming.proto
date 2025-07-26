@@ -14,8 +14,7 @@
 // Example:
 // message ApplicationState {
 //   option (subscribe_config) = {
-//     subscription_type: SUBSCRIPTION_TYPE_APPLICATION_STATE,
-//     permission_check: "GetStateAll"
+//     permission_check: "ApplicationStateGetState"
 //   };
 //   // ... message fields
 // }
@@ -30,7 +29,8 @@ option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aq
 
 // StreamingConfig defines streaming configuration for a message
 message SubscribeConfig {
-  // RBAC permission method needed for full access to this message (e.g., "GetStateAll")
+  // RBAC permission method needed for access to this message (e.g., "ApplicationServiceGetState")
+  // It will use "All" suffix to check if non-owned objects could be delivered
   optional string permission_check = 1;
 }
 

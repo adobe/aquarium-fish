@@ -22,6 +22,15 @@ import (
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
+func (d *Database) subscribeRoleImpl(_ context.Context, ch chan RoleSubscriptionEvent) {
+	subscribeHelper(d, &d.subsRole, ch)
+}
+
+// unsubscribeRoleImpl removes a channel from the subscription list
+func (d *Database) unsubscribeRoleImpl(_ context.Context, ch chan RoleSubscriptionEvent) {
+	unsubscribeHelper(d, &d.subsRole, ch)
+}
+
 // roleListImpl returns a list of all roles
 func (d *Database) roleListImpl(_ context.Context) (rs []typesv2.Role, err error) {
 	d.beMu.RLock()
@@ -51,7 +60,14 @@ func (d *Database) roleCreateImpl(_ context.Context, r *typesv2.Role) error {
 
 	r.CreatedAt = time.Now()
 	r.UpdatedAt = r.CreatedAt
-	return d.be.Collection(ObjectRole).Add(r.Name, r)
+	err := d.be.Collection(ObjectRole).Add(r.Name, r)
+
+	if err == nil {
+		// Notify subscribers about the new Role
+		notifySubscribersHelper(d, &d.subsRole, NewCreateEvent(r), ObjectRole)
+	}
+
+	return err
 }
 
 // roleSaveImpl saves a role
@@ -63,17 +79,36 @@ func (d *Database) roleSaveImpl(_ context.Context, r *typesv2.Role) error {
 		return fmt.Errorf("Fish: Role.CreatedAt can't be empty")
 	}
 
-	d.beMu.RLock()
-	defer d.beMu.RUnlock()
-
 	r.UpdatedAt = time.Now()
-	return d.be.Collection(ObjectRole).Add(r.Name, r)
+
+	d.beMu.RLock()
+	err := d.be.Collection(ObjectRole).Add(r.Name, r)
+	d.beMu.RUnlock()
+
+	if err == nil {
+		// Notify subscribers about the updated Role
+		notifySubscribersHelper(d, &d.subsRole, NewUpdateEvent(r), ObjectRole)
+	}
+
+	return err
 }
 
 // roleDeleteImpl deletes a role
-func (d *Database) roleDeleteImpl(_ context.Context, name string) error {
-	d.beMu.RLock()
-	defer d.beMu.RUnlock()
+func (d *Database) roleDeleteImpl(ctx context.Context, name string) error {
+	// Get the object before deleting it for notification
+	r, getErr := d.RoleGet(ctx, name)
+	if getErr != nil {
+		return getErr
+	}
 
-	return d.be.Collection(ObjectRole).Delete(name)
+	d.beMu.RLock()
+	err := d.be.Collection(ObjectRole).Delete(name)
+	d.beMu.RUnlock()
+
+	if err == nil && r != nil {
+		// Notify subscribers about the removed Role
+		notifySubscribersHelper(d, &d.subsRole, NewRemoveEvent(r), ObjectRole)
+	}
+
+	return err
 }

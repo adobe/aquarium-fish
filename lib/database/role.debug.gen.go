@@ -26,6 +26,22 @@ import (
 
 var debugTracerDatabaseRole = otel.Tracer("aquarium-fish/database")
 
+func (d *Database) SubscribeRole(ctx context.Context, ch chan RoleSubscriptionEvent) {
+	ctx, span := debugTracerDatabaseRole.Start(ctx, "database.Database.subscribeRoleImpl")
+	defer span.End()
+
+	d.subscribeRoleImpl(ctx, ch)
+
+}
+
+func (d *Database) UnsubscribeRole(ctx context.Context, ch chan RoleSubscriptionEvent) {
+	ctx, span := debugTracerDatabaseRole.Start(ctx, "database.Database.unsubscribeRoleImpl")
+	defer span.End()
+
+	d.unsubscribeRoleImpl(ctx, ch)
+
+}
+
 func (d *Database) RoleList(ctx context.Context) ([]typesv2.Role, error) {
 	ctx, span := debugTracerDatabaseRole.Start(ctx, "database.Database.roleListImpl")
 	defer span.End()

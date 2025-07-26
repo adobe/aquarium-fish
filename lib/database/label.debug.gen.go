@@ -26,6 +26,22 @@ import (
 
 var debugTracerDatabaseLabel = otel.Tracer("aquarium-fish/database")
 
+func (d *Database) SubscribeLabel(ctx context.Context, ch chan LabelSubscriptionEvent) {
+	ctx, span := debugTracerDatabaseLabel.Start(ctx, "database.Database.subscribeLabelImpl")
+	defer span.End()
+
+	d.subscribeLabelImpl(ctx, ch)
+
+}
+
+func (d *Database) UnsubscribeLabel(ctx context.Context, ch chan LabelSubscriptionEvent) {
+	ctx, span := debugTracerDatabaseLabel.Start(ctx, "database.Database.unsubscribeLabelImpl")
+	defer span.End()
+
+	d.unsubscribeLabelImpl(ctx, ch)
+
+}
+
 func (d *Database) LabelList(ctx context.Context, filters LabelListParams) ([]typesv2.Label, error) {
 	ctx, span := debugTracerDatabaseLabel.Start(ctx, "database.Database.labelListImpl")
 	defer span.End()

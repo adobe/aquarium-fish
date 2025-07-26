@@ -32,6 +32,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/monitoring"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
@@ -87,8 +88,8 @@ type Fish struct {
 	applicationsTimeoutsUpdated chan struct{} // Notifies about the earlier timeout then exists
 
 	// When Application changes - fish figures that out through those channels
-	applicationStateChannel chan *typesv2.ApplicationState
-	applicationTaskChannel  chan *typesv2.ApplicationTask
+	applicationStateChannel chan database.ApplicationStateSubscriptionEvent
+	applicationTaskChannel  chan database.ApplicationTaskSubscriptionEvent
 
 	// Stores the current usage of the node resources
 	nodeUsageMutex sync.Mutex // Is needed to protect node resources from concurrent allocations
@@ -116,11 +117,11 @@ func (f *Fish) Init() error {
 	signal.Notify(f.Quit, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 
 	// Init channel for ApplicationState changes
-	f.applicationStateChannel = make(chan *typesv2.ApplicationState, 100)
+	f.applicationStateChannel = make(chan database.ApplicationStateSubscriptionEvent, 100)
 	f.db.SubscribeApplicationState(ctx, f.applicationStateChannel)
 
 	// Init channel for ApplicationTask changes
-	f.applicationTaskChannel = make(chan *typesv2.ApplicationTask, 100)
+	f.applicationTaskChannel = make(chan database.ApplicationTaskSubscriptionEvent, 100)
 	f.db.SubscribeApplicationTask(ctx, f.applicationTaskChannel)
 
 	// Init variables
@@ -153,9 +154,9 @@ func (f *Fish) Init() error {
 
 		// Assigning admin role
 		adminUser.Roles = []string{auth.AdminRoleName}
-		if err := f.db.UserSave(ctx, adminUser); err != nil {
-			logger.Error("Failed to assign Administrator Role to admin user", "err", err)
-			return fmt.Errorf("Fish: Failed to assign Administrator Role to admin user: %v", err)
+		if err := f.db.UserCreate(ctx, adminUser); err != nil {
+			logger.Error("Failed to create the admin user", "err", err)
+			return fmt.Errorf("Fish: Failed to create the admin user: %v", err)
 		}
 	} else if err != nil {
 		logger.Error("Unable to create admin", "err", err)
@@ -185,14 +186,14 @@ func (f *Fish) Init() error {
 		return fmt.Errorf("Fish: Unable to init node: %v", err)
 	}
 
-	f.db.SetNode(*node)
+	f.db.SetNode(node)
 
 	if createNode {
-		if err = f.db.NodeCreate(ctx, f.db.GetNode()); err != nil {
+		if err = f.db.NodeCreate(ctx, node); err != nil {
 			return fmt.Errorf("Fish: Unable to create node: %v", err)
 		}
 	} else {
-		if err = f.db.NodeSave(ctx, f.db.GetNode()); err != nil {
+		if err = f.db.NodeSave(ctx, node); err != nil {
 			return fmt.Errorf("Fish: Unable to save node: %v", err)
 		}
 	}
@@ -373,7 +374,7 @@ func (f *Fish) pingProcess(ctx context.Context) {
 			return
 		case <-pingTicker.C:
 			logger.Debug("Fish Node: ping")
-			f.db.NodePing(ctx, f.db.GetNode())
+			f.db.NodePing(ctx)
 		}
 	}
 }
@@ -393,7 +394,12 @@ func (f *Fish) applicationProcess() {
 		select {
 		case <-f.running.Done():
 			return
-		case appState := <-f.applicationStateChannel:
+		case appStateEvent := <-f.applicationStateChannel:
+			// Only process CREATED events for application states (new state changes)
+			if appStateEvent.ChangeType != aquariumv2.ChangeType_CHANGE_TYPE_CREATED {
+				continue
+			}
+			appState := appStateEvent.Object
 			switch appState.Status {
 			case typesv2.ApplicationState_UNSPECIFIED:
 				logger.Error("Application has unspecified state", "app_uid", appState.ApplicationUid, "app_status", appState.Status)
@@ -412,10 +418,15 @@ func (f *Fish) applicationProcess() {
 			case typesv2.ApplicationState_DEALLOCATED, typesv2.ApplicationState_ERROR:
 				// Not much to do here, but maybe later in the future?
 				// In this state the Application has no Resource to deal with, so no tasks for now
-				//f.maybeRunApplicationTask(appState.ApplicationUid, nil)
+				// f.maybeRunApplicationTask(appState.ApplicationUid, nil)
 				logger.Debug("Application reached end state", "app_uid", appState.ApplicationUid, "app_status", appState.Status)
 			}
-		case appTask := <-f.applicationTaskChannel:
+		case appTaskEvent := <-f.applicationTaskChannel:
+			// Only process CREATED events for application tasks (new tasks) or UPDATED events
+			if appTaskEvent.ChangeType != aquariumv2.ChangeType_CHANGE_TYPE_CREATED && appTaskEvent.ChangeType != aquariumv2.ChangeType_CHANGE_TYPE_UPDATED {
+				continue
+			}
+			appTask := appTaskEvent.Object
 			// Runs check for Application state and decides if need to execute or drop
 			// If the Application state doesn't fit the task - then it will be skipped to be
 			// started later by the ApplicationState change event

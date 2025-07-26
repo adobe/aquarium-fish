@@ -48,10 +48,6 @@ drivers:
       cpu_limit: 4
       ram_limit: 8`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in f", r)
@@ -59,7 +55,7 @@ drivers:
 	}()
 
 	// Create admin client
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
 
 	// Create service clients
 	labelClient := aquariumv2connect.NewLabelServiceClient(
@@ -210,7 +206,7 @@ drivers:
 	var notAllocatedUID string
 	t.Run("2 of 3 Applications should be ALLOCATED right after restart", func(t *testing.T) {
 		// Need to recreate clients after restart
-		adminCli, adminOpts = h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+		adminCli, adminOpts = h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
 		appClient = aquariumv2connect.NewApplicationServiceClient(
 			adminCli,
 			afi.APIAddress("grpc"),

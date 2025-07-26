@@ -25,23 +25,13 @@ import (
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
-func (d *Database) subscribeApplicationStateImpl(_ context.Context, ch chan *typesv2.ApplicationState) {
-	d.subsMu.Lock()
-	defer d.subsMu.Unlock()
-	d.subsApplicationState = append(d.subsApplicationState, ch)
+func (d *Database) subscribeApplicationStateImpl(_ context.Context, ch chan ApplicationStateSubscriptionEvent) {
+	subscribeHelper(d, &d.subsApplicationState, ch)
 }
 
 // unsubscribeApplicationStateImpl removes a channel from the subscription list
-func (d *Database) unsubscribeApplicationStateImpl(_ context.Context, ch chan *typesv2.ApplicationState) {
-	d.subsMu.Lock()
-	defer d.subsMu.Unlock()
-	for i, existing := range d.subsApplicationState {
-		if existing == ch {
-			// Remove channel from slice
-			d.subsApplicationState = append(d.subsApplicationState[:i], d.subsApplicationState[i+1:]...)
-			break
-		}
-	}
+func (d *Database) unsubscribeApplicationStateImpl(_ context.Context, ch chan ApplicationStateSubscriptionEvent) {
+	unsubscribeHelper(d, &d.subsApplicationState, ch)
 }
 
 // applicationStateListImpl returns list of ApplicationStates
@@ -69,24 +59,8 @@ func (d *Database) applicationStateCreateImpl(_ context.Context, as *typesv2.App
 	as.CreatedAt = time.Now()
 	err := d.be.Collection(ObjectApplicationState).Add(as.Uid.String(), as)
 
-	// Notifying the subscribers on change, doing that in goroutine to not block execution
-	go func(appState *typesv2.ApplicationState) {
-		d.subsMu.RLock()
-		channels := make([]chan *typesv2.ApplicationState, len(d.subsApplicationState))
-		copy(channels, d.subsApplicationState)
-		d.subsMu.RUnlock()
-
-		for _, ch := range channels {
-			// Use select with default to prevent panic if channel is closed
-			select {
-			case ch <- appState:
-				// Successfully sent notification
-			default:
-				// Channel is closed or full, skip this subscriber
-				log.WithFunc("database", "applicationStateCreateImpl").Debug("Failed to send ApplicationState notification, channel closed or full")
-			}
-		}
-	}(as)
+	// Notify subscribers about the new ApplicationState
+	notifySubscribersHelper(d, &d.subsApplicationState, NewCreateEvent(as), ObjectApplicationState)
 
 	return err
 }
@@ -109,11 +83,23 @@ func (d *Database) applicationStateGetImpl(_ context.Context, uid typesv2.Applic
 }
 
 // applicationStateDeleteImpl removes the ApplicationState
-func (d *Database) applicationStateDeleteImpl(_ context.Context, uid typesv2.ApplicationStateUID) (err error) {
-	d.beMu.RLock()
-	defer d.beMu.RUnlock()
+func (d *Database) applicationStateDeleteImpl(ctx context.Context, uid typesv2.ApplicationStateUID) (err error) {
+	// Get the object before deleting it for notification
+	as, getErr := d.ApplicationStateGet(ctx, uid)
+	if getErr != nil {
+		return getErr
+	}
 
-	return d.be.Collection(ObjectApplicationState).Delete(uid.String())
+	d.beMu.RLock()
+	err = d.be.Collection(ObjectApplicationState).Delete(uid.String())
+	d.beMu.RUnlock()
+
+	if err == nil && as != nil {
+		// Notify subscribers about the removed ApplicationState
+		notifySubscribersHelper(d, &d.subsApplicationState, NewRemoveEvent(as), ObjectApplicationState)
+	}
+
+	return err
 }
 
 // applicationStateListByApplicationImpl returns all ApplicationStates with ApplicationUID

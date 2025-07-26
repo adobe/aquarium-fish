@@ -21,27 +21,16 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/adobe/aquarium-fish/lib/log"
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
-func (d *Database) subscribeApplicationTaskImpl(_ context.Context, ch chan *typesv2.ApplicationTask) {
-	d.subsMu.Lock()
-	defer d.subsMu.Unlock()
-	d.subsApplicationTask = append(d.subsApplicationTask, ch)
+func (d *Database) subscribeApplicationTaskImpl(_ context.Context, ch chan ApplicationTaskSubscriptionEvent) {
+	subscribeHelper(d, &d.subsApplicationTask, ch)
 }
 
 // unsubscribeApplicationTaskImpl removes a channel from the subscription list
-func (d *Database) unsubscribeApplicationTaskImpl(_ context.Context, ch chan *typesv2.ApplicationTask) {
-	d.subsMu.Lock()
-	defer d.subsMu.Unlock()
-	for i, existing := range d.subsApplicationTask {
-		if existing == ch {
-			// Remove channel from slice
-			d.subsApplicationTask = append(d.subsApplicationTask[:i], d.subsApplicationTask[i+1:]...)
-			break
-		}
-	}
+func (d *Database) unsubscribeApplicationTaskImpl(_ context.Context, ch chan ApplicationTaskSubscriptionEvent) {
+	unsubscribeHelper(d, &d.subsApplicationTask, ch)
 }
 
 // applicationTaskListImpl returns all known ApplicationTasks
@@ -84,24 +73,8 @@ func (d *Database) applicationTaskCreateImpl(_ context.Context, at *typesv2.Appl
 
 	err := d.be.Collection(ObjectApplicationTask).Add(at.Uid.String(), at)
 
-	// Notifying the subscribers on change, doing that in goroutine to not block execution
-	go func(appTask *typesv2.ApplicationTask) {
-		d.subsMu.RLock()
-		channels := make([]chan *typesv2.ApplicationTask, len(d.subsApplicationTask))
-		copy(channels, d.subsApplicationTask)
-		d.subsMu.RUnlock()
-
-		for _, ch := range channels {
-			// Use select with default to prevent panic if channel is closed
-			select {
-			case ch <- appTask:
-				// Successfully sent notification
-			default:
-				// Channel is closed or full, skip this subscriber
-				log.WithFunc("database", "applicationTaskCreateImpl").Debug("Failed to send ApplicationTask notification, channel closed or full")
-			}
-		}
-	}(at)
+	// Notify subscribers about the new ApplicationTask
+	notifySubscribersHelper(d, &d.subsApplicationTask, NewCreateEvent(at), ObjectApplicationTask)
 
 	return err
 }
@@ -113,9 +86,15 @@ func (d *Database) applicationTaskSaveImpl(_ context.Context, at *typesv2.Applic
 	}
 
 	d.beMu.RLock()
-	defer d.beMu.RUnlock()
+	err := d.be.Collection(ObjectApplicationTask).Add(at.Uid.String(), at)
+	d.beMu.RUnlock()
 
-	return d.be.Collection(ObjectApplicationTask).Add(at.Uid.String(), at)
+	if err == nil {
+		// Notify subscribers about the updated ApplicationTask
+		notifySubscribersHelper(d, &d.subsApplicationTask, NewUpdateEvent(at), ObjectApplicationTask)
+	}
+
+	return err
 }
 
 // applicationTaskGetImpl returns the ApplicationTask by ApplicationTaskUID
@@ -128,11 +107,23 @@ func (d *Database) applicationTaskGetImpl(_ context.Context, uid typesv2.Applica
 }
 
 // applicationTaskDeleteImpl removes the ApplicationTask
-func (d *Database) applicationTaskDeleteImpl(_ context.Context, uid typesv2.ApplicationTaskUID) (err error) {
-	d.beMu.RLock()
-	defer d.beMu.RUnlock()
+func (d *Database) applicationTaskDeleteImpl(ctx context.Context, uid typesv2.ApplicationTaskUID) (err error) {
+	// Get the object before deleting it for notification
+	at, getErr := d.ApplicationTaskGet(ctx, uid)
+	if getErr != nil {
+		return getErr
+	}
 
-	return d.be.Collection(ObjectApplicationTask).Delete(uid.String())
+	d.beMu.RLock()
+	err = d.be.Collection(ObjectApplicationTask).Delete(uid.String())
+	d.beMu.RUnlock()
+
+	if err == nil && at != nil {
+		// Notify subscribers about the removed ApplicationTask
+		notifySubscribersHelper(d, &d.subsApplicationTask, NewRemoveEvent(at), ObjectApplicationTask)
+	}
+
+	return err
 }
 
 // applicationTaskListByApplicationAndWhenImpl returns list of ApplicationTasks by ApplicationUID and When it need to be executed

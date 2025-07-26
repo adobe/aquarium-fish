@@ -25,6 +25,15 @@ import (
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
+func (d *Database) subscribeNodeImpl(_ context.Context, ch chan NodeSubscriptionEvent) {
+	subscribeHelper(d, &d.subsNode, ch)
+}
+
+// unsubscribeNodeImpl removes a channel from the subscription list
+func (d *Database) unsubscribeNodeImpl(_ context.Context, ch chan NodeSubscriptionEvent) {
+	unsubscribeHelper(d, &d.subsNode, ch)
+}
+
 // nodeListImpl returns list of Nodes that fits filter
 func (d *Database) nodeListImpl(_ context.Context) (ns []typesv2.Node, err error) {
 	d.beMu.RLock()
@@ -77,7 +86,14 @@ func (d *Database) nodeCreateImpl(_ context.Context, n *typesv2.Node) error {
 	n.Uid = uuid.NewHash(hash, uuid.UUID{}, n.Pubkey, 0)
 	n.CreatedAt = time.Now()
 	n.UpdatedAt = n.CreatedAt
-	return d.be.Collection(ObjectNode).Add(n.Name, n)
+	err := d.be.Collection(ObjectNode).Add(n.Name, n)
+
+	if err == nil {
+		// Notify subscribers about the new Node
+		notifySubscribersHelper(d, &d.subsNode, NewCreateEvent(n), ObjectNode)
+	}
+
+	return err
 }
 
 // nodeSaveImpl stores Node
@@ -86,10 +102,61 @@ func (d *Database) nodeSaveImpl(_ context.Context, node *typesv2.Node) error {
 	defer d.beMu.RUnlock()
 
 	node.UpdatedAt = time.Now()
-	return d.be.Collection(ObjectNode).Add(node.Name, node)
+	err := d.be.Collection(ObjectNode).Add(node.Name, node)
+
+	if err == nil {
+		// Notify subscribers about the removed Node
+		notifySubscribersHelper(d, &d.subsNode, NewUpdateEvent(node), ObjectNode)
+	}
+
+	return err
 }
 
 // nodePingImpl updates Node and shows that it's active
-func (d *Database) nodePingImpl(ctx context.Context, node *typesv2.Node) error {
-	return d.NodeSave(ctx, node)
+func (d *Database) nodePingImpl(ctx context.Context) error {
+	d.nodeMu.Lock()
+	defer d.nodeMu.Unlock()
+	return d.NodeSave(ctx, d.node)
+}
+
+// SetNode puts current node in the memory storage
+func (d *Database) SetNode(node *typesv2.Node) {
+	d.nodeMu.Lock()
+	defer d.nodeMu.Unlock()
+	d.node = node
+}
+
+// GetNode returns current Fish node spec
+func (d *Database) GetNode() typesv2.Node {
+	d.nodeMu.RLock()
+	defer d.nodeMu.RUnlock()
+	return *d.node
+}
+
+// GetNodeUID returns node UID
+func (d *Database) GetNodeUID() typesv2.NodeUID {
+	d.nodeMu.RLock()
+	defer d.nodeMu.RUnlock()
+	return d.node.Uid
+}
+
+// GetNodeName returns current node name
+func (d *Database) GetNodeName() string {
+	d.nodeMu.RLock()
+	defer d.nodeMu.RUnlock()
+	return d.node.Name
+}
+
+// GetNodeAddress returns node external address
+func (d *Database) GetNodeAddress() string {
+	d.nodeMu.RLock()
+	defer d.nodeMu.RUnlock()
+	return d.node.Address
+}
+
+// GetNodeLocation returns current node location
+func (d *Database) GetNodeLocation() string {
+	d.nodeMu.RLock()
+	defer d.nodeMu.RUnlock()
+	return d.node.Location
 }

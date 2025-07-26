@@ -51,10 +51,6 @@ drivers:
   providers:
     test:`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in f", r)
@@ -68,7 +64,7 @@ drivers:
 	})
 
 	// Create admin client for gRPC streaming
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientGRPC)
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientGRPC, afi.GetCA(t))
 
 	// Create streaming service client for label creation
 	streamingClient := aquariumv2connect.NewStreamingServiceClient(
@@ -140,7 +136,7 @@ drivers:
 		defer wg.Done()
 
 		// Create streaming client for this worker
-		workerCli, workerOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientGRPC)
+		workerCli, workerOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientGRPC, afi.GetCA(t))
 		workerStreamingClient := aquariumv2connect.NewStreamingServiceClient(
 			workerCli,
 			afi.APIAddress("grpc"),

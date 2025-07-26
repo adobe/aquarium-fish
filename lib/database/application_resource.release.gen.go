@@ -54,10 +54,10 @@ func (d *Database) ApplicationResourceGetByApplication(ctx context.Context, appU
 	return d.applicationResourceGetByApplicationImpl(ctx, appUID)
 }
 
-func (d *Database) SubscribeApplicationResource(ctx context.Context, ch chan *typesv2.ApplicationResource) {
+func (d *Database) SubscribeApplicationResource(ctx context.Context, ch chan ApplicationResourceSubscriptionEvent) {
 	d.subscribeApplicationResourceImpl(ctx, ch)
 }
 
-func (d *Database) UnsubscribeApplicationResource(ctx context.Context, ch chan *typesv2.ApplicationResource) {
+func (d *Database) UnsubscribeApplicationResource(ctx context.Context, ch chan ApplicationResourceSubscriptionEvent) {
 	d.unsubscribeApplicationResourceImpl(ctx, ch)
 }

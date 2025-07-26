@@ -146,7 +146,7 @@ func (d *Database) ApplicationResourceGetByApplication(ctx context.Context, appU
 
 }
 
-func (d *Database) SubscribeApplicationResource(ctx context.Context, ch chan *typesv2.ApplicationResource) {
+func (d *Database) SubscribeApplicationResource(ctx context.Context, ch chan ApplicationResourceSubscriptionEvent) {
 	ctx, span := debugTracerDatabaseApplication_resource.Start(ctx, "database.Database.subscribeApplicationResourceImpl")
 	defer span.End()
 
@@ -154,7 +154,7 @@ func (d *Database) SubscribeApplicationResource(ctx context.Context, ch chan *ty
 
 }
 
-func (d *Database) UnsubscribeApplicationResource(ctx context.Context, ch chan *typesv2.ApplicationResource) {
+func (d *Database) UnsubscribeApplicationResource(ctx context.Context, ch chan ApplicationResourceSubscriptionEvent) {
 	ctx, span := debugTracerDatabaseApplication_resource.Start(ctx, "database.Database.unsubscribeApplicationResourceImpl")
 	defer span.End()
 

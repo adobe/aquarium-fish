@@ -43,22 +43,17 @@ drivers:
   providers:
     test:`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in f", r)
 		}
 	}()
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
 	cli := &http.Client{
-		Timeout:   time.Second * 5,
-		Transport: tr,
+		Timeout: time.Second * 5,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{RootCAs: afi.GetCA(t)},
+		},
 	}
 
 	var labelResp aquariumv2.LabelServiceCreateResponse

@@ -758,6 +758,110 @@ func (x *NodeServiceListResponse) GetData() []*Node {
 	return nil
 }
 
+type NodeServiceGetRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NodeName      string                 `protobuf:"bytes,1,opt,name=node_name,json=nodeName,proto3" json:"node_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NodeServiceGetRequest) Reset() {
+	*x = NodeServiceGetRequest{}
+	mi := &file_aquarium_v2_node_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NodeServiceGetRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NodeServiceGetRequest) ProtoMessage() {}
+
+func (x *NodeServiceGetRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aquarium_v2_node_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NodeServiceGetRequest.ProtoReflect.Descriptor instead.
+func (*NodeServiceGetRequest) Descriptor() ([]byte, []int) {
+	return file_aquarium_v2_node_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *NodeServiceGetRequest) GetNodeName() string {
+	if x != nil {
+		return x.NodeName
+	}
+	return ""
+}
+
+type NodeServiceGetResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        bool                   `protobuf:"varint,1,opt,name=status,proto3" json:"status,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Data          *Node                  `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NodeServiceGetResponse) Reset() {
+	*x = NodeServiceGetResponse{}
+	mi := &file_aquarium_v2_node_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NodeServiceGetResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NodeServiceGetResponse) ProtoMessage() {}
+
+func (x *NodeServiceGetResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aquarium_v2_node_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NodeServiceGetResponse.ProtoReflect.Descriptor instead.
+func (*NodeServiceGetResponse) Descriptor() ([]byte, []int) {
+	return file_aquarium_v2_node_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *NodeServiceGetResponse) GetStatus() bool {
+	if x != nil {
+		return x.Status
+	}
+	return false
+}
+
+func (x *NodeServiceGetResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *NodeServiceGetResponse) GetData() *Node {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
 type NodeServiceGetThisRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -766,7 +870,7 @@ type NodeServiceGetThisRequest struct {
 
 func (x *NodeServiceGetThisRequest) Reset() {
 	*x = NodeServiceGetThisRequest{}
-	mi := &file_aquarium_v2_node_proto_msgTypes[9]
+	mi := &file_aquarium_v2_node_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -778,7 +882,7 @@ func (x *NodeServiceGetThisRequest) String() string {
 func (*NodeServiceGetThisRequest) ProtoMessage() {}
 
 func (x *NodeServiceGetThisRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_node_proto_msgTypes[9]
+	mi := &file_aquarium_v2_node_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -791,7 +895,7 @@ func (x *NodeServiceGetThisRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeServiceGetThisRequest.ProtoReflect.Descriptor instead.
 func (*NodeServiceGetThisRequest) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_node_proto_rawDescGZIP(), []int{9}
+	return file_aquarium_v2_node_proto_rawDescGZIP(), []int{11}
 }
 
 type NodeServiceGetThisResponse struct {
@@ -805,7 +909,7 @@ type NodeServiceGetThisResponse struct {
 
 func (x *NodeServiceGetThisResponse) Reset() {
 	*x = NodeServiceGetThisResponse{}
-	mi := &file_aquarium_v2_node_proto_msgTypes[10]
+	mi := &file_aquarium_v2_node_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -817,7 +921,7 @@ func (x *NodeServiceGetThisResponse) String() string {
 func (*NodeServiceGetThisResponse) ProtoMessage() {}
 
 func (x *NodeServiceGetThisResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_node_proto_msgTypes[10]
+	mi := &file_aquarium_v2_node_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -830,7 +934,7 @@ func (x *NodeServiceGetThisResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeServiceGetThisResponse.ProtoReflect.Descriptor instead.
 func (*NodeServiceGetThisResponse) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_node_proto_rawDescGZIP(), []int{10}
+	return file_aquarium_v2_node_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *NodeServiceGetThisResponse) GetStatus() bool {
@@ -870,7 +974,7 @@ type NodeServiceSetMaintenanceRequest struct {
 
 func (x *NodeServiceSetMaintenanceRequest) Reset() {
 	*x = NodeServiceSetMaintenanceRequest{}
-	mi := &file_aquarium_v2_node_proto_msgTypes[11]
+	mi := &file_aquarium_v2_node_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -882,7 +986,7 @@ func (x *NodeServiceSetMaintenanceRequest) String() string {
 func (*NodeServiceSetMaintenanceRequest) ProtoMessage() {}
 
 func (x *NodeServiceSetMaintenanceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_node_proto_msgTypes[11]
+	mi := &file_aquarium_v2_node_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -895,7 +999,7 @@ func (x *NodeServiceSetMaintenanceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeServiceSetMaintenanceRequest.ProtoReflect.Descriptor instead.
 func (*NodeServiceSetMaintenanceRequest) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_node_proto_rawDescGZIP(), []int{11}
+	return file_aquarium_v2_node_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *NodeServiceSetMaintenanceRequest) GetMaintenance() bool {
@@ -929,7 +1033,7 @@ type NodeServiceSetMaintenanceResponse struct {
 
 func (x *NodeServiceSetMaintenanceResponse) Reset() {
 	*x = NodeServiceSetMaintenanceResponse{}
-	mi := &file_aquarium_v2_node_proto_msgTypes[12]
+	mi := &file_aquarium_v2_node_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -941,7 +1045,7 @@ func (x *NodeServiceSetMaintenanceResponse) String() string {
 func (*NodeServiceSetMaintenanceResponse) ProtoMessage() {}
 
 func (x *NodeServiceSetMaintenanceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_node_proto_msgTypes[12]
+	mi := &file_aquarium_v2_node_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -954,7 +1058,7 @@ func (x *NodeServiceSetMaintenanceResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use NodeServiceSetMaintenanceResponse.ProtoReflect.Descriptor instead.
 func (*NodeServiceSetMaintenanceResponse) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_node_proto_rawDescGZIP(), []int{12}
+	return file_aquarium_v2_node_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *NodeServiceSetMaintenanceResponse) GetStatus() bool {
@@ -975,7 +1079,7 @@ var File_aquarium_v2_node_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_node_proto_rawDesc = "" +
 	"\n" +
-	"\x16aquarium/v2/node.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\"\xad\x02\n" +
+	"\x16aquarium/v2/node.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a#aquarium/v2/options_streaming.proto\"\xc3\x02\n" +
 	"\x04Node\x12\x10\n" +
 	"\x03uid\x18\x01 \x01(\tR\x03uid\x129\n" +
 	"\n" +
@@ -988,7 +1092,8 @@ const file_aquarium_v2_node_proto_rawDesc = "" +
 	"definition\x12\x1a\n" +
 	"\blocation\x18\x06 \x01(\tR\blocation\x12\x18\n" +
 	"\aaddress\x18\a \x01(\tR\aaddress\x12\x16\n" +
-	"\x06pubkey\x18\b \x01(\fR\x06pubkey\"\xd7\x02\n" +
+	"\x06pubkey\x18\b \x01(\fR\x06pubkey:\x14\x8a\xb5\x18\x10\n" +
+	"\x0eNodeServiceGet\"\xd7\x02\n" +
 	"\x0eNodeDefinition\x12)\n" +
 	"\x04host\x18\x01 \x01(\v2\x15.aquarium.v2.HostInfoR\x04host\x12/\n" +
 	"\x06memory\x18\x02 \x01(\v2\x17.aquarium.v2.MemoryInfoR\x06memory\x12&\n" +
@@ -1046,7 +1151,13 @@ const file_aquarium_v2_node_proto_rawDesc = "" +
 	"\x17NodeServiceListResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12%\n" +
-	"\x04data\x18\x03 \x03(\v2\x11.aquarium.v2.NodeR\x04data\"\x1b\n" +
+	"\x04data\x18\x03 \x03(\v2\x11.aquarium.v2.NodeR\x04data\"4\n" +
+	"\x15NodeServiceGetRequest\x12\x1b\n" +
+	"\tnode_name\x18\x01 \x01(\tR\bnodeName\"q\n" +
+	"\x16NodeServiceGetResponse\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12%\n" +
+	"\x04data\x18\x03 \x01(\v2\x11.aquarium.v2.NodeR\x04data\"\x1b\n" +
 	"\x19NodeServiceGetThisRequest\"u\n" +
 	"\x1aNodeServiceGetThisResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
@@ -1061,9 +1172,10 @@ const file_aquarium_v2_node_proto_rawDesc = "" +
 	"\x0f_shutdown_delay\"U\n" +
 	"!NodeServiceSetMaintenanceResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage2\xb3\x02\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage2\x85\x03\n" +
 	"\vNodeService\x12S\n" +
-	"\x04List\x12#.aquarium.v2.NodeServiceListRequest\x1a$.aquarium.v2.NodeServiceListResponse\"\x00\x12\\\n" +
+	"\x04List\x12#.aquarium.v2.NodeServiceListRequest\x1a$.aquarium.v2.NodeServiceListResponse\"\x00\x12P\n" +
+	"\x03Get\x12\".aquarium.v2.NodeServiceGetRequest\x1a#.aquarium.v2.NodeServiceGetResponse\"\x00\x12\\\n" +
 	"\aGetThis\x12&.aquarium.v2.NodeServiceGetThisRequest\x1a'.aquarium.v2.NodeServiceGetThisResponse\"\x00\x12q\n" +
 	"\x0eSetMaintenance\x12-.aquarium.v2.NodeServiceSetMaintenanceRequest\x1a..aquarium.v2.NodeServiceSetMaintenanceResponse\"\x00BEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"
 
@@ -1079,7 +1191,7 @@ func file_aquarium_v2_node_proto_rawDescGZIP() []byte {
 	return file_aquarium_v2_node_proto_rawDescData
 }
 
-var file_aquarium_v2_node_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_aquarium_v2_node_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_aquarium_v2_node_proto_goTypes = []any{
 	(*Node)(nil),                              // 0: aquarium.v2.Node
 	(*NodeDefinition)(nil),                    // 1: aquarium.v2.NodeDefinition
@@ -1090,36 +1202,41 @@ var file_aquarium_v2_node_proto_goTypes = []any{
 	(*NetworkInterface)(nil),                  // 6: aquarium.v2.NetworkInterface
 	(*NodeServiceListRequest)(nil),            // 7: aquarium.v2.NodeServiceListRequest
 	(*NodeServiceListResponse)(nil),           // 8: aquarium.v2.NodeServiceListResponse
-	(*NodeServiceGetThisRequest)(nil),         // 9: aquarium.v2.NodeServiceGetThisRequest
-	(*NodeServiceGetThisResponse)(nil),        // 10: aquarium.v2.NodeServiceGetThisResponse
-	(*NodeServiceSetMaintenanceRequest)(nil),  // 11: aquarium.v2.NodeServiceSetMaintenanceRequest
-	(*NodeServiceSetMaintenanceResponse)(nil), // 12: aquarium.v2.NodeServiceSetMaintenanceResponse
-	nil,                           // 13: aquarium.v2.NodeDefinition.DisksEntry
-	(*timestamppb.Timestamp)(nil), // 14: google.protobuf.Timestamp
+	(*NodeServiceGetRequest)(nil),             // 9: aquarium.v2.NodeServiceGetRequest
+	(*NodeServiceGetResponse)(nil),            // 10: aquarium.v2.NodeServiceGetResponse
+	(*NodeServiceGetThisRequest)(nil),         // 11: aquarium.v2.NodeServiceGetThisRequest
+	(*NodeServiceGetThisResponse)(nil),        // 12: aquarium.v2.NodeServiceGetThisResponse
+	(*NodeServiceSetMaintenanceRequest)(nil),  // 13: aquarium.v2.NodeServiceSetMaintenanceRequest
+	(*NodeServiceSetMaintenanceResponse)(nil), // 14: aquarium.v2.NodeServiceSetMaintenanceResponse
+	nil,                           // 15: aquarium.v2.NodeDefinition.DisksEntry
+	(*timestamppb.Timestamp)(nil), // 16: google.protobuf.Timestamp
 }
 var file_aquarium_v2_node_proto_depIdxs = []int32{
-	14, // 0: aquarium.v2.Node.created_at:type_name -> google.protobuf.Timestamp
-	14, // 1: aquarium.v2.Node.updated_at:type_name -> google.protobuf.Timestamp
+	16, // 0: aquarium.v2.Node.created_at:type_name -> google.protobuf.Timestamp
+	16, // 1: aquarium.v2.Node.updated_at:type_name -> google.protobuf.Timestamp
 	1,  // 2: aquarium.v2.Node.definition:type_name -> aquarium.v2.NodeDefinition
 	2,  // 3: aquarium.v2.NodeDefinition.host:type_name -> aquarium.v2.HostInfo
 	3,  // 4: aquarium.v2.NodeDefinition.memory:type_name -> aquarium.v2.MemoryInfo
 	4,  // 5: aquarium.v2.NodeDefinition.cpu:type_name -> aquarium.v2.CpuInfo
-	13, // 6: aquarium.v2.NodeDefinition.disks:type_name -> aquarium.v2.NodeDefinition.DisksEntry
+	15, // 6: aquarium.v2.NodeDefinition.disks:type_name -> aquarium.v2.NodeDefinition.DisksEntry
 	6,  // 7: aquarium.v2.NodeDefinition.nets:type_name -> aquarium.v2.NetworkInterface
 	0,  // 8: aquarium.v2.NodeServiceListResponse.data:type_name -> aquarium.v2.Node
-	0,  // 9: aquarium.v2.NodeServiceGetThisResponse.data:type_name -> aquarium.v2.Node
-	5,  // 10: aquarium.v2.NodeDefinition.DisksEntry.value:type_name -> aquarium.v2.DiskUsage
-	7,  // 11: aquarium.v2.NodeService.List:input_type -> aquarium.v2.NodeServiceListRequest
-	9,  // 12: aquarium.v2.NodeService.GetThis:input_type -> aquarium.v2.NodeServiceGetThisRequest
-	11, // 13: aquarium.v2.NodeService.SetMaintenance:input_type -> aquarium.v2.NodeServiceSetMaintenanceRequest
-	8,  // 14: aquarium.v2.NodeService.List:output_type -> aquarium.v2.NodeServiceListResponse
-	10, // 15: aquarium.v2.NodeService.GetThis:output_type -> aquarium.v2.NodeServiceGetThisResponse
-	12, // 16: aquarium.v2.NodeService.SetMaintenance:output_type -> aquarium.v2.NodeServiceSetMaintenanceResponse
-	14, // [14:17] is the sub-list for method output_type
-	11, // [11:14] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	0,  // 9: aquarium.v2.NodeServiceGetResponse.data:type_name -> aquarium.v2.Node
+	0,  // 10: aquarium.v2.NodeServiceGetThisResponse.data:type_name -> aquarium.v2.Node
+	5,  // 11: aquarium.v2.NodeDefinition.DisksEntry.value:type_name -> aquarium.v2.DiskUsage
+	7,  // 12: aquarium.v2.NodeService.List:input_type -> aquarium.v2.NodeServiceListRequest
+	9,  // 13: aquarium.v2.NodeService.Get:input_type -> aquarium.v2.NodeServiceGetRequest
+	11, // 14: aquarium.v2.NodeService.GetThis:input_type -> aquarium.v2.NodeServiceGetThisRequest
+	13, // 15: aquarium.v2.NodeService.SetMaintenance:input_type -> aquarium.v2.NodeServiceSetMaintenanceRequest
+	8,  // 16: aquarium.v2.NodeService.List:output_type -> aquarium.v2.NodeServiceListResponse
+	10, // 17: aquarium.v2.NodeService.Get:output_type -> aquarium.v2.NodeServiceGetResponse
+	12, // 18: aquarium.v2.NodeService.GetThis:output_type -> aquarium.v2.NodeServiceGetThisResponse
+	14, // 19: aquarium.v2.NodeService.SetMaintenance:output_type -> aquarium.v2.NodeServiceSetMaintenanceResponse
+	16, // [16:20] is the sub-list for method output_type
+	12, // [12:16] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_aquarium_v2_node_proto_init() }
@@ -1127,14 +1244,15 @@ func file_aquarium_v2_node_proto_init() {
 	if File_aquarium_v2_node_proto != nil {
 		return
 	}
-	file_aquarium_v2_node_proto_msgTypes[11].OneofWrappers = []any{}
+	file_aquarium_v2_options_streaming_proto_init()
+	file_aquarium_v2_node_proto_msgTypes[13].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aquarium_v2_node_proto_rawDesc), len(file_aquarium_v2_node_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   14,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

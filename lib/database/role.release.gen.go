@@ -22,6 +22,14 @@ import (
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
+func (d *Database) SubscribeRole(ctx context.Context, ch chan RoleSubscriptionEvent) {
+	d.subscribeRoleImpl(ctx, ch)
+}
+
+func (d *Database) UnsubscribeRole(ctx context.Context, ch chan RoleSubscriptionEvent) {
+	d.unsubscribeRoleImpl(ctx, ch)
+}
+
 func (d *Database) RoleList(ctx context.Context) ([]typesv2.Role, error) {
 	return d.roleListImpl(ctx)
 }

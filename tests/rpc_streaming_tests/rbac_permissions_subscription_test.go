@@ -46,10 +46,6 @@ drivers:
   providers:
     test:`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	// Create test users
 	user1Pass := "user1-pass"
 	user2Pass := "user2-pass"
@@ -69,10 +65,10 @@ drivers:
 	}
 
 	// Create clients for different users
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientGRPC)
-	user1Cli, user1Opts := h.NewRPCClient(user1.Name, user1Pass, h.RPCClientGRPC)
-	user2Cli, user2Opts := h.NewRPCClient(user2.Name, user2Pass, h.RPCClientGRPC)
-	adminUserCli, adminUserOpts := h.NewRPCClient(adminUser.Name, adminUserPass, h.RPCClientGRPC)
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientGRPC, afi.GetCA(t))
+	user1Cli, user1Opts := h.NewRPCClient(user1.Name, user1Pass, h.RPCClientGRPC, afi.GetCA(t))
+	user2Cli, user2Opts := h.NewRPCClient(user2.Name, user2Pass, h.RPCClientGRPC, afi.GetCA(t))
+	adminUserCli, adminUserOpts := h.NewRPCClient(adminUser.Name, adminUserPass, h.RPCClientGRPC, afi.GetCA(t))
 
 	// Create streaming service clients
 	adminStreamingClient := aquariumv2connect.NewStreamingServiceClient(

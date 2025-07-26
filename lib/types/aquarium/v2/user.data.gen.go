@@ -31,6 +31,7 @@ import (
 
 // User is a data for User without internal locks
 type User struct {
+	Config    *UserConfig        `json:"config,omitempty"`
 	CreatedAt time.Time          `json:"created_at,omitempty"`
 	Hash      *util.UnparsedJSON `json:"hash,omitempty"`
 	Name      string             `json:"name,omitempty"`
@@ -46,6 +47,10 @@ func FromUser(src *pbTypes.User) User {
 	}
 
 	result := User{}
+	if src.GetConfig() != nil {
+		data := FromUserConfig(src.GetConfig())
+		result.Config = &data
+	}
 	if src.GetCreatedAt() != nil {
 		result.CreatedAt = src.GetCreatedAt().AsTime()
 	}
@@ -71,6 +76,9 @@ func FromUser(src *pbTypes.User) User {
 func (u User) ToUser() *pbTypes.User {
 	result := &pbTypes.User{}
 
+	if u.Config != nil {
+		result.Config = u.Config.ToUserConfig()
+	}
 	result.CreatedAt = timestamppb.New(u.CreatedAt)
 	if u.Hash != nil {
 		var mapData map[string]any
@@ -87,5 +95,34 @@ func (u User) ToUser() *pbTypes.User {
 	}
 	result.Roles = u.Roles
 	result.UpdatedAt = timestamppb.New(u.UpdatedAt)
+	return result
+}
+
+// UserConfig is a data for UserConfig without internal locks
+type UserConfig struct {
+	RateLimit *int32 `json:"rate_limit,omitempty"`
+}
+
+// FromUserConfig creates a UserConfig from UserConfig
+func FromUserConfig(src *pbTypes.UserConfig) UserConfig {
+	if src == nil {
+		return UserConfig{}
+	}
+
+	result := UserConfig{}
+	if src.GetRateLimit() != 0 {
+		val := src.GetRateLimit()
+		result.RateLimit = &val
+	}
+	return result
+}
+
+// ToUserConfig converts UserConfig to UserConfig
+func (u UserConfig) ToUserConfig() *pbTypes.UserConfig {
+	result := &pbTypes.UserConfig{}
+
+	if u.RateLimit != nil {
+		result.RateLimit = u.RateLimit
+	}
 	return result
 }

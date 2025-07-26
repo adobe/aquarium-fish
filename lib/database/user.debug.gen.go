@@ -26,6 +26,22 @@ import (
 
 var debugTracerDatabaseUser = otel.Tracer("aquarium-fish/database")
 
+func (d *Database) SubscribeUser(ctx context.Context, ch chan UserSubscriptionEvent) {
+	ctx, span := debugTracerDatabaseUser.Start(ctx, "database.Database.subscribeUserImpl")
+	defer span.End()
+
+	d.subscribeUserImpl(ctx, ch)
+
+}
+
+func (d *Database) UnsubscribeUser(ctx context.Context, ch chan UserSubscriptionEvent) {
+	ctx, span := debugTracerDatabaseUser.Start(ctx, "database.Database.unsubscribeUserImpl")
+	defer span.End()
+
+	d.unsubscribeUserImpl(ctx, ch)
+
+}
+
 func (d *Database) UserList(ctx context.Context) ([]typesv2.User, error) {
 	ctx, span := debugTracerDatabaseUser.Start(ctx, "database.Database.userListImpl")
 	defer span.End()

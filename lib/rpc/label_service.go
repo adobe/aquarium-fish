@@ -93,24 +93,24 @@ func (s *LabelService) Create(ctx context.Context, req *connect.Request[aquarium
 	}), nil
 }
 
-// Delete deletes a label
-func (s *LabelService) Delete(ctx context.Context, req *connect.Request[aquariumv2.LabelServiceDeleteRequest]) (*connect.Response[aquariumv2.LabelServiceDeleteResponse], error) {
+// Remove deletes a label
+func (s *LabelService) Remove(ctx context.Context, req *connect.Request[aquariumv2.LabelServiceRemoveRequest]) (*connect.Response[aquariumv2.LabelServiceRemoveResponse], error) {
 	// Get labels with the specified name
 	label, err := s.fish.DB().LabelGet(ctx, stringToUUID(req.Msg.GetLabelUid()))
 	if err != nil {
-		return connect.NewResponse(&aquariumv2.LabelServiceDeleteResponse{
+		return connect.NewResponse(&aquariumv2.LabelServiceRemoveResponse{
 			Status: false, Message: "Unable to get the label: " + err.Error(),
 		}), connect.NewError(connect.CodeInternal, err)
 	}
 
-	// Delete label
+	// Remove label
 	if err := s.fish.DB().LabelDelete(ctx, label.Uid); err != nil {
-		return connect.NewResponse(&aquariumv2.LabelServiceDeleteResponse{
-			Status: false, Message: "Unable to delete label: " + err.Error(),
+		return connect.NewResponse(&aquariumv2.LabelServiceRemoveResponse{
+			Status: false, Message: "Unable to remove label: " + err.Error(),
 		}), connect.NewError(connect.CodeInternal, err)
 	}
 
-	return connect.NewResponse(&aquariumv2.LabelServiceDeleteResponse{
-		Status: true, Message: "Label deleted successfully",
+	return connect.NewResponse(&aquariumv2.LabelServiceRemoveResponse{
+		Status: true, Message: "Label removed successfully",
 	}), nil
 }

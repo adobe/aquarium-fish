@@ -14,10 +14,14 @@ syntax = "proto3";
 
 package aquarium.v2;
 
+import "aquarium/v2/options_ui.proto";
+
 option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2";
 
 // Authentication information to enable connecting to the machine.
 message Authentication {
+  option (ui_config) = { generate_ui: true };
+
   // The username to login into the ApplicationResource.
   string username = 1;
 

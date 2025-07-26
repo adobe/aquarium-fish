@@ -16,6 +16,7 @@ package util
 
 import (
 	"context"
+	"strings"
 
 	"github.com/adobe/aquarium-fish/lib/auth"
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
@@ -92,4 +93,25 @@ func SetRBACContext(ctx context.Context, service, method string) context.Context
 	ctx = context.WithValue(ctx, rbacServiceContextKey, service)
 	ctx = context.WithValue(ctx, rbacMethodContextKey, method)
 	return ctx
+}
+
+// getServiceMethodFromPath extracts service and method from HTTP path
+// Expected format: /aquarium.v2.ServiceName/Method
+func getServiceMethodFromPath(path string) (string, string) {
+	// Remove leading slash and split
+	path = strings.TrimPrefix(path, "/")
+	parts := strings.Split(path, "/")
+	if len(parts) != 2 {
+		return "", ""
+	}
+
+	service := parts[0]
+	// Extract service name from package.service format
+	sub := strings.Split(service, ".")
+	if len(sub) > 1 {
+		service = sub[len(sub)-1]
+	}
+
+	method := parts[1]
+	return service, method
 }

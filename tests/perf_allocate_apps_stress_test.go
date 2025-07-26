@@ -32,7 +32,7 @@ import (
 // Checks if node can handle multiple application requests at a time
 // Fish node should be able to handle ~20 requests / second when limited to 2 CPU core and 500MB of memory
 func Test_allocate_apps_stress(t *testing.T) {
-	//t.Parallel()  - nope just one at a time
+	// t.Parallel()  - nope just one at a time
 	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 cpu_limit: 2
@@ -47,10 +47,6 @@ drivers:
       cpu_limit: 1000
       ram_limit: 2000`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in f", r)
@@ -58,7 +54,7 @@ drivers:
 	}()
 
 	// Create admin client
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
 
 	// Create service clients
 	labelClient := aquariumv2connect.NewLabelServiceClient(
@@ -103,7 +99,7 @@ drivers:
 			defer wg.Done()
 
 			// Create individual client for each goroutine
-			cli, opts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+			cli, opts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
 			appClient := aquariumv2connect.NewApplicationServiceClient(
 				cli,
 				afi.APIAddress("grpc"),
@@ -136,7 +132,7 @@ drivers:
 // Checks if node can handle multiple application requests at a time with no auth
 // Without auth it should be relatively simple for the fish node to ingest 200 requests in less then a second
 func Test_allocate_apps_noauth_stress(t *testing.T) {
-	//t.Parallel()  - nope just one at a time
+	// t.Parallel()  - nope just one at a time
 	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 cpu_limit: 8
@@ -151,10 +147,6 @@ drivers:
   providers:
     test:`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in f", r)
@@ -162,7 +154,7 @@ drivers:
 	}()
 
 	// Create admin client (no auth)
-	adminCli, adminOpts := h.NewRPCClient("admin", "notoken", h.RPCClientREST)
+	adminCli, adminOpts := h.NewRPCClient("admin", "notoken", h.RPCClientREST, afi.GetCA(t))
 
 	// Create service clients
 	labelClient := aquariumv2connect.NewLabelServiceClient(
@@ -210,7 +202,7 @@ drivers:
 				defer wg.Done()
 
 				// Create individual client for each goroutine (no auth)
-				cli, opts := h.NewRPCClient("admin", "notoken", h.RPCClientREST)
+				cli, opts := h.NewRPCClient("admin", "notoken", h.RPCClientREST, afi.GetCA(t))
 				appClient := aquariumv2connect.NewApplicationServiceClient(
 					cli,
 					afi.APIAddress("grpc"),

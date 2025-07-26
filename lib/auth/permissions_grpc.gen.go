@@ -17,24 +17,35 @@ package auth
 // Service and Method constants
 const (
 	// ApplicationService service constants
-	ApplicationService               = "ApplicationService"
-	ApplicationServiceCreate         = "Create"
-	ApplicationServiceCreateTask     = "CreateTask"
-	ApplicationServiceCreateTaskAll  = "CreateTaskAll"
-	ApplicationServiceDeallocate     = "Deallocate"
-	ApplicationServiceDeallocateAll  = "DeallocateAll"
-	ApplicationServiceGet            = "Get"
-	ApplicationServiceGetAll         = "GetAll"
-	ApplicationServiceGetResource    = "GetResource"
-	ApplicationServiceGetResourceAll = "GetResourceAll"
-	ApplicationServiceGetState       = "GetState"
-	ApplicationServiceGetStateAll    = "GetStateAll"
-	ApplicationServiceGetTask        = "GetTask"
-	ApplicationServiceGetTaskAll     = "GetTaskAll"
-	ApplicationServiceList           = "List"
-	ApplicationServiceListAll        = "ListAll"
-	ApplicationServiceListTask       = "ListTask"
-	ApplicationServiceListTaskAll    = "ListTaskAll"
+	ApplicationService                = "ApplicationService"
+	ApplicationServiceCreate          = "Create"
+	ApplicationServiceCreateTask      = "CreateTask"
+	ApplicationServiceCreateTaskAll   = "CreateTaskAll"
+	ApplicationServiceDeallocate      = "Deallocate"
+	ApplicationServiceDeallocateAll   = "DeallocateAll"
+	ApplicationServiceGet             = "Get"
+	ApplicationServiceGetAll          = "GetAll"
+	ApplicationServiceGetResource     = "GetResource"
+	ApplicationServiceGetResourceAll  = "GetResourceAll"
+	ApplicationServiceGetState        = "GetState"
+	ApplicationServiceGetStateAll     = "GetStateAll"
+	ApplicationServiceGetTask         = "GetTask"
+	ApplicationServiceGetTaskAll      = "GetTaskAll"
+	ApplicationServiceList            = "List"
+	ApplicationServiceListAll         = "ListAll"
+	ApplicationServiceListResource    = "ListResource"
+	ApplicationServiceListResourceAll = "ListResourceAll"
+	ApplicationServiceListState       = "ListState"
+	ApplicationServiceListStateAll    = "ListStateAll"
+	ApplicationServiceListTask        = "ListTask"
+	ApplicationServiceListTaskAll     = "ListTaskAll"
+
+	// AuthService service constants
+	AuthService               = "AuthService"
+	AuthServiceLogin          = "Login"
+	AuthServiceValidateToken  = "ValidateToken"
+	AuthServiceGetPermissions = "GetPermissions"
+	AuthServiceRefreshToken   = "RefreshToken"
 
 	// GateProxySSHService service constants
 	GateProxySSHService                     = "GateProxySSHService"
@@ -44,12 +55,13 @@ const (
 	// LabelService service constants
 	LabelService       = "LabelService"
 	LabelServiceCreate = "Create"
-	LabelServiceDelete = "Delete"
 	LabelServiceGet    = "Get"
 	LabelServiceList   = "List"
+	LabelServiceRemove = "Remove"
 
 	// NodeService service constants
 	NodeService               = "NodeService"
+	NodeServiceGet            = "Get"
 	NodeServiceGetThis        = "GetThis"
 	NodeServiceList           = "List"
 	NodeServiceSetMaintenance = "SetMaintenance"
@@ -57,9 +69,9 @@ const (
 	// RoleService service constants
 	RoleService       = "RoleService"
 	RoleServiceCreate = "Create"
-	RoleServiceDelete = "Delete"
 	RoleServiceGet    = "Get"
 	RoleServiceList   = "List"
+	RoleServiceRemove = "Remove"
 	RoleServiceUpdate = "Update"
 
 	// StreamingService service constants
@@ -71,17 +83,44 @@ const (
 	UserService               = "UserService"
 	UserServiceGetMe          = "GetMe"
 	UserServiceCreate         = "Create"
-	UserServiceDelete         = "Delete"
 	UserServiceGet            = "Get"
 	UserServiceList           = "List"
+	UserServiceRemove         = "Remove"
 	UserServiceUpdate         = "Update"
 	UserServiceUpdateAll      = "UpdateAll"
 	UserServiceUpdatePassword = "UpdatePassword"
 	UserServiceUpdateRoles    = "UpdateRoles"
 )
 
-// RBAC-excluded services and methods
+// Auth-excluded service-methods
+var authExcluded = map[string][]string{
+	"AuthService": {
+		"Login",
+		"ValidateToken",
+	},
+}
+
+// IsEcludedFromAuth helps connectrpc to exclude methods from Auth validation
+func IsEcludedFromAuth(service, method string) bool {
+	if methods, ok := authExcluded[service]; ok {
+		for _, m := range methods {
+			if m == method {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// RBAC-excluded service-methods
 var rbacExcluded = map[string][]string{
+	"AuthService": {
+		"Login",
+		"ValidateToken",
+		"GetPermissions",
+		"RefreshToken",
+	},
+
 	"UserService": {
 		"GetMe",
 	},

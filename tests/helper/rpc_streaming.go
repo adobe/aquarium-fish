@@ -184,7 +184,7 @@ func (sc *StreamingClient) EstablishSubscriptionStreaming(subscriptionTypes []aq
 					// This is a buffer overflow disconnection notification
 					sc.t.Errorf("Client %s:%s DISCONNECTED by server due to BUFFER OVERFLOW - client cannot keep up with notification rate!", sc.name, sc.subUID)
 					return // Exit the receive loop - server is disconnecting us
-				case aquariumv2.ChangeType_CHANGE_TYPE_DELETED:
+				case aquariumv2.ChangeType_CHANGE_TYPE_REMOVED:
 					// This is a shutdown notification
 					sc.logf("Received server shutdown notification for subscription, closing gracefully")
 					return // Exit the receive loop to allow graceful closure

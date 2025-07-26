@@ -1,0 +1,56 @@
+// Copyright 2025 Adobe. All rights reserved.
+// This file is licensed to you under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may obtain a copy
+// of the License at http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software distributed under
+// the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR REPRESENTATIONS
+// OF ANY KIND, either express or implied. See the License for the specific language
+// governing permissions and limitations under the License.
+
+// Author: Sergei Parshev (@sparshev)
+
+// Contains options for messages and fields to alter UI behavior
+// Example:
+// message Application {
+//   option (ui_config) = {};
+//   string uid = 1 [(field_ui_config) = { nocreate: true, noedit: true }];
+//   string label_uid = 2 [(field_ui_config) = { name: "Label", autofill: "Label" }];
+//   // ... other fields
+// }
+
+syntax = "proto3";
+
+package aquarium.v2;
+
+import "google/protobuf/descriptor.proto";
+
+option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2";
+
+// UiConfig defines UI configuration for a message
+message UiConfig {
+  // Whether this message should be processed for UI generation
+  optional bool generate_ui = 1;
+}
+
+// FieldUiConfig defines UI configuration for a field
+message FieldUiConfig {
+  // Field should be hidden during Create
+  optional bool nocreate = 1;
+  // Field should be read-only during Edit
+  optional bool noedit = 2;
+  // Custom name to display in UI instead of field name
+  optional string name = 3;
+  // Name of the message type to use for autofill dropdown
+  optional string autofill = 4;
+}
+
+extend google.protobuf.MessageOptions {
+  // UI configuration for the message
+  optional UiConfig ui_config = 50002;
+}
+
+extend google.protobuf.FieldOptions {
+  // UI configuration for the field
+  optional FieldUiConfig field_ui_config = 50003;
+}

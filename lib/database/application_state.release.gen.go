@@ -22,11 +22,11 @@ import (
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
-func (d *Database) SubscribeApplicationState(ctx context.Context, ch chan *typesv2.ApplicationState) {
+func (d *Database) SubscribeApplicationState(ctx context.Context, ch chan ApplicationStateSubscriptionEvent) {
 	d.subscribeApplicationStateImpl(ctx, ch)
 }
 
-func (d *Database) UnsubscribeApplicationState(ctx context.Context, ch chan *typesv2.ApplicationState) {
+func (d *Database) UnsubscribeApplicationState(ctx context.Context, ch chan ApplicationStateSubscriptionEvent) {
 	d.unsubscribeApplicationStateImpl(ctx, ch)
 }
 

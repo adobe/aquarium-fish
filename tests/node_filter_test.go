@@ -47,10 +47,6 @@ drivers:
   providers:
     test:`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in f", r)
@@ -58,7 +54,7 @@ drivers:
 	}()
 
 	// Create admin client
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
 
 	// Create service clients
 	labelClient := aquariumv2connect.NewLabelServiceClient(
@@ -160,10 +156,6 @@ drivers:
   providers:
     test:`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in f", r)
@@ -171,7 +163,7 @@ drivers:
 	}()
 
 	// Create admin client
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
 
 	// Create service clients
 	labelClient := aquariumv2connect.NewLabelServiceClient(
@@ -272,10 +264,6 @@ drivers:
   providers:
     test:`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in f", r)
@@ -283,7 +271,7 @@ drivers:
 	}()
 
 	// Create admin client
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
 
 	// Create service clients
 	labelClient := aquariumv2connect.NewLabelServiceClient(
@@ -383,10 +371,6 @@ drivers:
   providers:
     test:`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in f", r)
@@ -394,7 +378,7 @@ drivers:
 	}()
 
 	// Create admin client
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
 
 	// Create service clients
 	labelClient := aquariumv2connect.NewLabelServiceClient(

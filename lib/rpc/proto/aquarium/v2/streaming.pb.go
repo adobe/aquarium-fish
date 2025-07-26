@@ -110,7 +110,7 @@ const (
 	ChangeType_CHANGE_TYPE_UNSPECIFIED ChangeType = 0
 	ChangeType_CHANGE_TYPE_CREATED     ChangeType = 1
 	ChangeType_CHANGE_TYPE_UPDATED     ChangeType = 2
-	ChangeType_CHANGE_TYPE_DELETED     ChangeType = 3
+	ChangeType_CHANGE_TYPE_REMOVED     ChangeType = 3
 )
 
 // Enum value maps for ChangeType.
@@ -119,13 +119,13 @@ var (
 		0: "CHANGE_TYPE_UNSPECIFIED",
 		1: "CHANGE_TYPE_CREATED",
 		2: "CHANGE_TYPE_UPDATED",
-		3: "CHANGE_TYPE_DELETED",
+		3: "CHANGE_TYPE_REMOVED",
 	}
 	ChangeType_value = map[string]int32{
 		"CHANGE_TYPE_UNSPECIFIED": 0,
 		"CHANGE_TYPE_CREATED":     1,
 		"CHANGE_TYPE_UPDATED":     2,
-		"CHANGE_TYPE_DELETED":     3,
+		"CHANGE_TYPE_REMOVED":     3,
 	}
 )
 
@@ -399,7 +399,7 @@ type StreamingServiceSubscribeResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Type of the database object that changed
 	ObjectType SubscriptionType `protobuf:"varint,1,opt,name=object_type,json=objectType,proto3,enum=aquarium.v2.SubscriptionType" json:"object_type,omitempty"`
-	// Type of change (CREATED, UPDATED, DELETED)
+	// Type of change (CREATED, UPDATED, REMOVED)
 	ChangeType ChangeType `protobuf:"varint,2,opt,name=change_type,json=changeType,proto3,enum=aquarium.v2.ChangeType" json:"change_type,omitempty"`
 	// Timestamp when the change occurred
 	Timestamp *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
@@ -517,7 +517,7 @@ var File_aquarium_v2_streaming_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_streaming_proto_rawDesc = "" +
 	"\n" +
-	"\x1baquarium/v2/streaming.proto\x12\vaquarium.v2\x1a\x19google/protobuf/any.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16aquarium/v2/rbac.proto\"\x9b\x01\n" +
+	"\x1baquarium/v2/streaming.proto\x12\vaquarium.v2\x1a\x19google/protobuf/any.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1eaquarium/v2/options_rbac.proto\"\x9b\x01\n" +
 	"\x1eStreamingServiceConnectRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12!\n" +
@@ -561,7 +561,7 @@ const file_aquarium_v2_streaming_proto_rawDesc = "" +
 	"\x17CHANGE_TYPE_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13CHANGE_TYPE_CREATED\x10\x01\x12\x17\n" +
 	"\x13CHANGE_TYPE_UPDATED\x10\x02\x12\x17\n" +
-	"\x13CHANGE_TYPE_DELETED\x10\x032\x82\x02\n" +
+	"\x13CHANGE_TYPE_REMOVED\x10\x032\x82\x02\n" +
 	"\x10StreamingService\x12t\n" +
 	"\aConnect\x12+.aquarium.v2.StreamingServiceConnectRequest\x1a,.aquarium.v2.StreamingServiceConnectResponse\"\n" +
 	"\x82\xb5\x18\x06\x1a\x04User(\x010\x01\x12x\n" +
@@ -619,7 +619,7 @@ func file_aquarium_v2_streaming_proto_init() {
 	if File_aquarium_v2_streaming_proto != nil {
 		return
 	}
-	file_aquarium_v2_rbac_proto_init()
+	file_aquarium_v2_options_rbac_proto_init()
 	file_aquarium_v2_streaming_proto_msgTypes[1].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

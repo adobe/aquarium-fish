@@ -46,6 +46,8 @@ const (
 const (
 	// NodeServiceListProcedure is the fully-qualified name of the NodeService's List RPC.
 	NodeServiceListProcedure = "/aquarium.v2.NodeService/List"
+	// NodeServiceGetProcedure is the fully-qualified name of the NodeService's Get RPC.
+	NodeServiceGetProcedure = "/aquarium.v2.NodeService/Get"
 	// NodeServiceGetThisProcedure is the fully-qualified name of the NodeService's GetThis RPC.
 	NodeServiceGetThisProcedure = "/aquarium.v2.NodeService/GetThis"
 	// NodeServiceSetMaintenanceProcedure is the fully-qualified name of the NodeService's
@@ -57,6 +59,8 @@ const (
 type NodeServiceClient interface {
 	// Get list of nodes
 	List(context.Context, *connect.Request[v2.NodeServiceListRequest]) (*connect.Response[v2.NodeServiceListResponse], error)
+	// Get node by unique name
+	Get(context.Context, *connect.Request[v2.NodeServiceGetRequest]) (*connect.Response[v2.NodeServiceGetResponse], error)
 	// Get this node information
 	GetThis(context.Context, *connect.Request[v2.NodeServiceGetThisRequest]) (*connect.Response[v2.NodeServiceGetThisResponse], error)
 	// Set maintenance mode
@@ -84,6 +88,12 @@ func NewNodeServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(nodeServiceMethods.ByName("List")),
 			connect.WithClientOptions(opts...),
 		),
+		get: connect.NewClient[v2.NodeServiceGetRequest, v2.NodeServiceGetResponse](
+			httpClient,
+			baseURL+NodeServiceGetProcedure,
+			connect.WithSchema(nodeServiceMethods.ByName("Get")),
+			connect.WithClientOptions(opts...),
+		),
 		getThis: connect.NewClient[v2.NodeServiceGetThisRequest, v2.NodeServiceGetThisResponse](
 			httpClient,
 			baseURL+NodeServiceGetThisProcedure,
@@ -102,6 +112,7 @@ func NewNodeServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 // nodeServiceClient implements NodeServiceClient.
 type nodeServiceClient struct {
 	list           *connect.Client[v2.NodeServiceListRequest, v2.NodeServiceListResponse]
+	get            *connect.Client[v2.NodeServiceGetRequest, v2.NodeServiceGetResponse]
 	getThis        *connect.Client[v2.NodeServiceGetThisRequest, v2.NodeServiceGetThisResponse]
 	setMaintenance *connect.Client[v2.NodeServiceSetMaintenanceRequest, v2.NodeServiceSetMaintenanceResponse]
 }
@@ -109,6 +120,11 @@ type nodeServiceClient struct {
 // List calls aquarium.v2.NodeService.List.
 func (c *nodeServiceClient) List(ctx context.Context, req *connect.Request[v2.NodeServiceListRequest]) (*connect.Response[v2.NodeServiceListResponse], error) {
 	return c.list.CallUnary(ctx, req)
+}
+
+// Get calls aquarium.v2.NodeService.Get.
+func (c *nodeServiceClient) Get(ctx context.Context, req *connect.Request[v2.NodeServiceGetRequest]) (*connect.Response[v2.NodeServiceGetResponse], error) {
+	return c.get.CallUnary(ctx, req)
 }
 
 // GetThis calls aquarium.v2.NodeService.GetThis.
@@ -125,6 +141,8 @@ func (c *nodeServiceClient) SetMaintenance(ctx context.Context, req *connect.Req
 type NodeServiceHandler interface {
 	// Get list of nodes
 	List(context.Context, *connect.Request[v2.NodeServiceListRequest]) (*connect.Response[v2.NodeServiceListResponse], error)
+	// Get node by unique name
+	Get(context.Context, *connect.Request[v2.NodeServiceGetRequest]) (*connect.Response[v2.NodeServiceGetResponse], error)
 	// Get this node information
 	GetThis(context.Context, *connect.Request[v2.NodeServiceGetThisRequest]) (*connect.Response[v2.NodeServiceGetThisResponse], error)
 	// Set maintenance mode
@@ -148,6 +166,12 @@ func NewNodeServiceHandler(svc NodeServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(nodeServiceMethods.ByName("List")),
 		connect.WithHandlerOptions(opts...),
 	)
+	nodeServiceGetHandler := connect.NewUnaryHandler(
+		NodeServiceGetProcedure,
+		svc.Get,
+		connect.WithSchema(nodeServiceMethods.ByName("Get")),
+		connect.WithHandlerOptions(opts...),
+	)
 	nodeServiceGetThisHandler := connect.NewUnaryHandler(
 		NodeServiceGetThisProcedure,
 		svc.GetThis,
@@ -164,6 +188,8 @@ func NewNodeServiceHandler(svc NodeServiceHandler, opts ...connect.HandlerOption
 		switch r.URL.Path {
 		case NodeServiceListProcedure:
 			nodeServiceListHandler.ServeHTTP(w, r)
+		case NodeServiceGetProcedure:
+			nodeServiceGetHandler.ServeHTTP(w, r)
 		case NodeServiceGetThisProcedure:
 			nodeServiceGetThisHandler.ServeHTTP(w, r)
 		case NodeServiceSetMaintenanceProcedure:
@@ -179,6 +205,10 @@ type UnimplementedNodeServiceHandler struct{}
 
 func (UnimplementedNodeServiceHandler) List(context.Context, *connect.Request[v2.NodeServiceListRequest]) (*connect.Response[v2.NodeServiceListResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.NodeService.List is not implemented"))
+}
+
+func (UnimplementedNodeServiceHandler) Get(context.Context, *connect.Request[v2.NodeServiceGetRequest]) (*connect.Response[v2.NodeServiceGetResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.NodeService.Get is not implemented"))
 }
 
 func (UnimplementedNodeServiceHandler) GetThis(context.Context, *connect.Request[v2.NodeServiceGetThisRequest]) (*connect.Response[v2.NodeServiceGetThisResponse], error) {

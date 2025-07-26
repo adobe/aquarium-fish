@@ -49,7 +49,7 @@ func TestAuthHandler(t *testing.T) {
 	}
 
 	// Create auth handler
-	authHandler := NewAuthHandler(db)
+	authHandler := NewAuthHandler(db, nil)
 
 	// Test handler that should only be reached after successful authentication
 	yamlProcessingCalled := false
@@ -146,7 +146,7 @@ func TestAuthBeforeYAML(t *testing.T) {
 	}
 
 	// Create auth handler
-	authHandler := NewAuthHandler(db)
+	authHandler := NewAuthHandler(db, nil)
 
 	yamlProcessingCalled := false
 	yamlHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

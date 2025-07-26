@@ -100,6 +100,9 @@ jobs:
               -stdout_filter failed -junit integration_tests_report.xml -junit_truncate 4000 \
               -junit_filter failed -junit_timestamp test
 
+      - name: Web Integration Tests
+        run: ./scripts/webtest-docker.sh
+
       - name: Pack failed tests workspaces
         if: failure()
         run: |
@@ -137,6 +140,7 @@ jobs:
             /tmp/gobenchdata/*
             integration_tests_ws.tar.gz
             integration_tests_report.full.log
+            webtests_full.log
             integration_tests_report.xml
 
       - name: Test Summary
