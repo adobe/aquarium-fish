@@ -182,7 +182,16 @@ interface StreamingContextType {
   error: string | null;
   subscribe: (callback: DataUpdateCallback) => () => void;
   sendRequest: <T>(request: T, requestType: string) => Promise<any>;
-  refreshData: () => Promise<void>;
+  // Individual data fetching functions
+  fetchApplications: () => Promise<void>;
+  fetchLabels: () => Promise<void>;
+  fetchNodes: () => Promise<void>;
+  fetchUsers: () => Promise<void>;
+  fetchRoles: () => Promise<void>;
+  fetchApplicationStates: (applicationUids: string[]) => Promise<void>;
+  fetchApplicationResources: (applicationUids: string[]) => Promise<void>;
+  // Utility functions
+  resetFetchedDataTypes: () => void;
 }
 
 const StreamingContext = createContext<StreamingContextType | undefined>(undefined);
@@ -216,6 +225,8 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
   const [error, setError] = useState<string | null>(null);
+  // Track which data types have been fetched in this session
+  const [fetchedDataTypes, setFetchedDataTypes] = useState<Set<string>>(new Set());
   // Use notification context
   const { sendNotification } = useNotification();
   const addNotification = useCallback((type: 'error' | 'warning' | 'info', message: string, details?: string) => {
@@ -265,150 +276,301 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
     callbacksRef.current.forEach(callback => callback(newData));
   }, []);
 
-  // Initial data fetch using streaming where possible
-  const refreshData = useCallback(async () => {
+  // Individual data fetching functions
+  const fetchApplications = useCallback(async () => {
     if (!isAuthenticated) return;
 
-    logger.info('Refreshing data...');
+    // Check if applications have already been fetched in this session
+    if (fetchedDataTypes.has('applications')) {
+      logger.debug('Applications already fetched in this session, skipping');
+      return;
+    }
+
+    const canListApplications = hasPermission(PermService.Application, PermApplication.List);
+    if (!canListApplications) {
+      logger.info('User does not have permission to list applications');
+      return;
+    }
 
     try {
-      // Check permissions before making API calls
-      const canListApplications = hasPermission(PermService.Application, PermApplication.List);
-      const canListLabels = hasPermission(PermService.Label, PermLabel.List);
-      const canListNodes = hasPermission(PermService.Node, PermNode.List);
-      const canListUsers = hasPermission(PermService.User, PermUser.List);
-      const canListRoles = hasPermission(PermService.Role, PermRole.List);
-      const canGetApplicationState = hasPermission(PermService.Application, PermApplication.GetState);
-      const canGetApplicationResource = hasPermission(PermService.Application, PermApplication.GetResource);
+      logger.info('Fetching applications with status & resource...');
+      const response = await applicationClient.list(create(ApplicationServiceListRequestSchema));
+      const applications = response.data || [];
 
-      logger.info('Permission check results:', {
-        canListApplications,
-        canListLabels,
-        canListNodes,
-        canListUsers,
-        canListRoles,
-        canGetApplicationState,
-        canGetApplicationResource,
+      setData(prevData => {
+        const newData = { ...prevData, applications };
+        currentDataRef.current = newData;
+        notifySubscribers(newData);
+        return newData;
       });
 
-      // Prepare API calls based on permissions
-      const apiCalls: Promise<any>[] = [];
-      const callTypes: string[] = [];
-
-      if (canListApplications) {
-        apiCalls.push(applicationClient.list(create(ApplicationServiceListRequestSchema)));
-        callTypes.push('applications');
-      }
-      if (canListLabels) {
-        apiCalls.push(labelClient.list(create(LabelServiceListRequestSchema)));
-        callTypes.push('labels');
-      }
-      if (canListNodes) {
-        apiCalls.push(nodeClient.list(create(NodeServiceListRequestSchema)));
-        callTypes.push('nodes');
-      }
-      if (canListUsers) {
-        apiCalls.push(userClient.list(create(UserServiceListRequestSchema)));
-        callTypes.push('users');
-      }
-      if (canListRoles) {
-        apiCalls.push(roleClient.list(create(RoleServiceListRequestSchema)));
-        callTypes.push('roles');
-      }
-
-      // Execute API calls for which user has permissions
-      const results = await Promise.all(apiCalls);
-
-      // Process results based on call types
-      let applications: Application[] = [];
-      let labels: Label[] = [];
-      let nodes: Node[] = [];
-      let users: User[] = [];
-      let roles: Role[] = [];
-
-      results.forEach((result, index) => {
-        const callType = callTypes[index];
-        switch (callType) {
-          case 'applications':
-            applications = result.data || [];
-            break;
-          case 'labels':
-            labels = result.data || [];
-            break;
-          case 'nodes':
-            nodes = result.data || [];
-            break;
-          case 'users':
-            users = result.data || [];
-            break;
-          case 'roles':
-            roles = result.data || [];
-            break;
-        }
-      });
-
-      // Fetch application states and resources if user has permissions
-      let applicationStates = new Map<string, ApplicationState>();
-      let applicationResources = new Map<string, ApplicationResource>();
-
+      // If we have applications, fetch their states and resources
       if (applications.length > 0) {
-        if (canGetApplicationState) {
-          const statePromises = applications.map(app =>
-            applicationClient.getState(create(ApplicationServiceGetStateRequestSchema, { applicationUid: app.uid }))
-              .then(res => [app.uid, res.data] as [string, ApplicationState | undefined])
-              .catch(() => [app.uid, undefined] as [string, ApplicationState | undefined])
-          );
-          const stateResults = await Promise.all(statePromises);
-          stateResults.forEach(([uid, state]) => {
-            if (state) applicationStates.set(uid, state);
-          });
-        }
-
-        if (canGetApplicationResource) {
-          const resourcePromises = applications.map(app =>
-            applicationClient.getResource(create(ApplicationServiceGetResourceRequestSchema, { applicationUid: app.uid }))
-              .then(res => [app.uid, res.data] as [string, ApplicationResource | undefined])
-              .catch(() => [app.uid, undefined] as [string, ApplicationResource | undefined])
-          );
-          const resourceResults = await Promise.all(resourcePromises);
-          resourceResults.forEach(([uid, resource]) => {
-            if (resource) applicationResources.set(uid, resource);
-          });
-        }
+        const appUids = applications.map(app => app.uid);
+        await Promise.all([
+          fetchApplicationStates(appUids),
+          fetchApplicationResources(appUids)
+        ]);
       }
 
-      logger.info('Initial data loaded:', {
-        applications: applications.length,
-        labels: labels.length,
-        nodes: nodes.length,
-        users: users.length,
-        roles: roles.length,
-        applicationStates: applicationStates.size,
-        applicationResources: applicationResources.size,
+      // Mark applications as fetched
+      setFetchedDataTypes(prev => new Set([...prev, 'applications']));
+      logger.info('Applications fetched:', applications.length);
+    } catch (err) {
+      logger.error('Failed to fetch applications:', err);
+      addNotification('error', 'Failed to fetch applications', String(err));
+    }
+  }, [isAuthenticated, hasPermission, notifySubscribers, addNotification, fetchedDataTypes]);
+
+  const fetchLabels = useCallback(async () => {
+    if (!isAuthenticated) return;
+
+    // Check if labels have already been fetched in this session
+    if (fetchedDataTypes.has('labels')) {
+      logger.debug('Labels already fetched in this session, skipping');
+      return;
+    }
+
+    const canListLabels = hasPermission(PermService.Label, PermLabel.List);
+    if (!canListLabels) {
+      logger.info('User does not have permission to list labels');
+      return;
+    }
+
+    try {
+      logger.info('Fetching labels...');
+      const response = await labelClient.list(create(LabelServiceListRequestSchema));
+      const labels = response.data || [];
+
+      setData(prevData => {
+        const newData = { ...prevData, labels };
+        currentDataRef.current = newData;
+        notifySubscribers(newData);
+        return newData;
       });
 
-      const newData = {
-        applications,
-        applicationStates,
-        applicationResources,
-        applicationTasks: new Map(),
-        labels,
-        nodes,
-        users,
-        roles,
-      };
-
-      currentDataRef.current = newData;
-      setData(newData);
-      notifySubscribers(newData);
-      addNotification('info', 'Data refreshed successfully');
+      // Mark labels as fetched
+      setFetchedDataTypes(prev => new Set([...prev, 'labels']));
+      logger.info('Labels fetched:', labels.length);
     } catch (err) {
-      const errorMessage = `Failed to fetch data: ${err}`;
-      setError(errorMessage);
-      addNotification('error', 'Failed to refresh data', String(err));
-      logger.error('Data refresh failed:', err);
+      logger.error('Failed to fetch labels:', err);
+      addNotification('error', 'Failed to fetch labels', String(err));
+    }
+  }, [isAuthenticated, hasPermission, notifySubscribers, addNotification, fetchedDataTypes]);
+
+  const fetchNodes = useCallback(async () => {
+    if (!isAuthenticated) return;
+
+    // Check if nodes have already been fetched in this session
+    if (fetchedDataTypes.has('nodes')) {
+      logger.debug('Nodes already fetched in this session, skipping');
+      return;
+    }
+
+    const canListNodes = hasPermission(PermService.Node, PermNode.List);
+    if (!canListNodes) {
+      logger.info('User does not have permission to list nodes');
+      return;
+    }
+
+    try {
+      logger.info('Fetching nodes...');
+      const response = await nodeClient.list(create(NodeServiceListRequestSchema));
+      const nodes = response.data || [];
+
+      setData(prevData => {
+        const newData = { ...prevData, nodes };
+        currentDataRef.current = newData;
+        notifySubscribers(newData);
+        return newData;
+      });
+
+      // Mark nodes as fetched
+      setFetchedDataTypes(prev => new Set([...prev, 'nodes']));
+      logger.info('Nodes fetched:', nodes.length);
+    } catch (err) {
+      logger.error('Failed to fetch nodes:', err);
+      addNotification('error', 'Failed to fetch nodes', String(err));
+    }
+  }, [isAuthenticated, hasPermission, notifySubscribers, addNotification, fetchedDataTypes]);
+
+  const fetchUsers = useCallback(async () => {
+    if (!isAuthenticated) return;
+
+    // Check if users have already been fetched in this session
+    if (fetchedDataTypes.has('users')) {
+      logger.debug('Users already fetched in this session, skipping');
+      return;
+    }
+
+    const canListUsers = hasPermission(PermService.User, PermUser.List);
+    if (!canListUsers) {
+      logger.info('User does not have permission to list users');
+      return;
+    }
+
+    try {
+      logger.info('Fetching users...');
+      const response = await userClient.list(create(UserServiceListRequestSchema));
+      const users = response.data || [];
+
+      setData(prevData => {
+        const newData = { ...prevData, users };
+        currentDataRef.current = newData;
+        notifySubscribers(newData);
+        return newData;
+      });
+
+      // Mark users as fetched
+      setFetchedDataTypes(prev => new Set([...prev, 'users']));
+      logger.info('Users fetched:', users.length);
+    } catch (err) {
+      logger.error('Failed to fetch users:', err);
+      addNotification('error', 'Failed to fetch users', String(err));
+    }
+  }, [isAuthenticated, hasPermission, notifySubscribers, addNotification, fetchedDataTypes]);
+
+  const fetchRoles = useCallback(async () => {
+    if (!isAuthenticated) return;
+
+    // Check if roles have already been fetched in this session
+    if (fetchedDataTypes.has('roles')) {
+      logger.debug('Roles already fetched in this session, skipping');
+      return;
+    }
+
+    const canListRoles = hasPermission(PermService.Role, PermRole.List);
+    if (!canListRoles) {
+      logger.info('User does not have permission to list roles');
+      return;
+    }
+
+    try {
+      logger.info('Fetching roles...');
+      const response = await roleClient.list(create(RoleServiceListRequestSchema));
+      const roles = response.data || [];
+
+      setData(prevData => {
+        const newData = { ...prevData, roles };
+        currentDataRef.current = newData;
+        notifySubscribers(newData);
+        return newData;
+      });
+
+      // Mark roles as fetched
+      setFetchedDataTypes(prev => new Set([...prev, 'roles']));
+      logger.info('Roles fetched:', roles.length);
+    } catch (err) {
+      logger.error('Failed to fetch roles:', err);
+      addNotification('error', 'Failed to fetch roles', String(err));
+    }
+  }, [isAuthenticated, hasPermission, notifySubscribers, addNotification, fetchedDataTypes]);
+
+  const fetchApplicationStates = useCallback(async (applicationUids: string[]) => {
+    if (!isAuthenticated || applicationUids.length === 0) return;
+
+    // Check if application states have already been fetched in this session
+    if (fetchedDataTypes.has('applicationStates')) {
+      logger.debug('ApplicationStates already fetched in this session, skipping');
+      return;
+    }
+
+    const canGetApplicationState = hasPermission(PermService.Application, PermApplication.GetState);
+    if (!canGetApplicationState) {
+      logger.info('User does not have permission to get application states');
+      return;
+    }
+
+    try {
+      logger.info('Fetching application states for:', applicationUids.length, 'applications');
+
+      const statePromises = applicationUids.map(appUid =>
+        applicationClient.getState(create(ApplicationServiceGetStateRequestSchema, { applicationUid: appUid }))
+          .then(res => [appUid, res.data] as [string, ApplicationState | undefined])
+          .catch(() => [appUid, undefined] as [string, ApplicationState | undefined])
+      );
+
+      const stateResults = await Promise.all(statePromises);
+      const newStates = new Map<string, ApplicationState>();
+
+      stateResults.forEach(([uid, state]) => {
+        if (state) newStates.set(uid, state);
+      });
+
+      setData(prevData => {
+        const newData = {
+          ...prevData,
+          applicationStates: new Map([...prevData.applicationStates, ...newStates])
+        };
+        currentDataRef.current = newData;
+        notifySubscribers(newData);
+        return newData;
+      });
+
+      // Mark application states as fetched
+      setFetchedDataTypes(prev => new Set([...prev, 'applicationStates']));
+      logger.info('Application states fetched:', newStates.size);
+    } catch (err) {
+      logger.error('Failed to fetch application states:', err);
+      addNotification('error', 'Failed to fetch application states', String(err));
     }
   }, [isAuthenticated, hasPermission, notifySubscribers, addNotification]);
+
+  const fetchApplicationResources = useCallback(async (applicationUids: string[]) => {
+    if (!isAuthenticated || applicationUids.length === 0) return;
+
+    // Check if application resources have already been fetched in this session
+    if (fetchedDataTypes.has('applicationResources')) {
+      logger.debug('ApplicationResources already fetched in this session, skipping');
+      return;
+    }
+
+    const canGetApplicationResource = hasPermission(PermService.Application, PermApplication.GetResource);
+    if (!canGetApplicationResource) {
+      logger.info('User does not have permission to get application resources');
+      return;
+    }
+
+    try {
+      logger.info('Fetching application resources for:', applicationUids.length, 'applications');
+
+      const resourcePromises = applicationUids.map(appUid =>
+        applicationClient.getResource(create(ApplicationServiceGetResourceRequestSchema, { applicationUid: appUid }))
+          .then(res => [appUid, res.data] as [string, ApplicationResource | undefined])
+          .catch(() => [appUid, undefined] as [string, ApplicationResource | undefined])
+      );
+
+      const resourceResults = await Promise.all(resourcePromises);
+      const newResources = new Map<string, ApplicationResource>();
+
+      resourceResults.forEach(([uid, resource]) => {
+        if (resource) newResources.set(uid, resource);
+      });
+
+      setData(prevData => {
+        const newData = {
+          ...prevData,
+          applicationResources: new Map([...prevData.applicationResources, ...newResources])
+        };
+        currentDataRef.current = newData;
+        notifySubscribers(newData);
+        return newData;
+      });
+
+      // Mark application resources as fetched
+      setFetchedDataTypes(prev => new Set([...prev, 'applicationResources']));
+      logger.info('Application resources fetched:', newResources.size);
+    } catch (err) {
+      logger.error('Failed to fetch application resources:', err);
+      addNotification('error', 'Failed to fetch application resources', String(err));
+    }
+  }, [isAuthenticated, hasPermission, notifySubscribers, addNotification]);
+
+  // Utility function to reset fetched data types (useful for manual refresh)
+  const resetFetchedDataTypes = useCallback(() => {
+    logger.info('Resetting fetched data types');
+    setFetchedDataTypes(new Set());
+  }, []);
 
   // Handle subscription updates
   const handleSubscriptionUpdate = useCallback((response: StreamingServiceSubscribeResponse) => {
@@ -660,17 +822,18 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
       setError(null);
 
       // Create subscription request
+    var subscriptionTypes = []
+    hasPermission(PermService.Application, PermApplication.Get) && subscriptionTypes.push(SubscriptionType.APPLICATION);
+    hasPermission(PermService.Application, PermApplication.GetState) && subscriptionTypes.push(SubscriptionType.APPLICATION_STATE);
+    hasPermission(PermService.Application, PermApplication.GetResource) && subscriptionTypes.push(SubscriptionType.APPLICATION_RESOURCE);
+    hasPermission(PermService.Application, PermApplication.GetTask) && subscriptionTypes.push(SubscriptionType.APPLICATION_TASK);
+    hasPermission(PermService.Label, PermLabel.Get) && subscriptionTypes.push(SubscriptionType.LABEL);
+    hasPermission(PermService.Node, PermNode.Get) && subscriptionTypes.push(SubscriptionType.NODE);
+    hasPermission(PermService.User, PermUser.Get) && subscriptionTypes.push(SubscriptionType.USER);
+    hasPermission(PermService.Role, PermRole.Get) && subscriptionTypes.push(SubscriptionType.ROLE);
+
       const subscribeRequest = create(StreamingServiceSubscribeRequestSchema, {
-        subscriptionTypes: [
-          SubscriptionType.APPLICATION,
-          SubscriptionType.APPLICATION_STATE,
-          SubscriptionType.APPLICATION_RESOURCE,
-          SubscriptionType.APPLICATION_TASK,
-          SubscriptionType.LABEL,
-          SubscriptionType.NODE,
-          SubscriptionType.USER,
-          SubscriptionType.ROLE,
-        ],
+        subscriptionTypes: subscriptionTypes,
       });
 
       logger.debug('Subscribing with request:', subscribeRequest);
@@ -745,13 +908,15 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
       addNotification('info', 'Disconnected from streaming service');
     }
 
+    // Reset fetched data types when disconnecting (new session will need fresh data)
+    setFetchedDataTypes(new Set());
+
   }, [addNotification]);
 
   // Effect to manage connection
   useEffect(() => {
     if (isAuthenticated && user) {
       logger.info('User authenticated, initializing streaming...');
-      refreshData();
       connect();
     } else {
       logger.info('User not authenticated, disconnecting...');
@@ -761,7 +926,7 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
     return () => {
       disconnect();
     };
-  }, [isAuthenticated, user, refreshData, connect, disconnect]);
+  }, [isAuthenticated, user, connect, disconnect]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -777,7 +942,14 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
     error,
     subscribe,
     sendRequest,
-    refreshData,
+    fetchApplications,
+    fetchLabels,
+    fetchNodes,
+    fetchUsers,
+    fetchRoles,
+    fetchApplicationStates,
+    fetchApplicationResources,
+    resetFetchedDataTypes,
   };
 
   return (

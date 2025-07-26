@@ -12,7 +12,7 @@
 
 // Author: Sergei Parshev (@sparshev)
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../components/DashboardLayout';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
@@ -34,12 +34,17 @@ export function meta() {
 
 export default function Labels() {
   const { hasPermission } = useAuth();
-  const { data, sendRequest } = useStreaming();
+  const { data, sendRequest, fetchLabels } = useStreaming();
 
   // Labels state
   const [showCreateLabelModal, setShowCreateLabelModal] = useState(false);
   const [showLabelDetailsModal, setShowLabelDetailsModal] = useState(false);
   const [selectedLabel, setSelectedLabel] = useState<Label | null>(null);
+
+  // Fetch data when component mounts
+  useEffect(() => {
+    fetchLabels();
+  }, []);
 
   // Format timestamp
   const formatTimestamp = (timestamp: any) => {

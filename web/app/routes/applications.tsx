@@ -12,7 +12,7 @@
 
 // Author: Sergei Parshev (@sparshev)
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { DashboardLayout } from '../components/DashboardLayout';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
@@ -26,7 +26,6 @@ import {
   type ApplicationState,
   type ApplicationResource
 } from '../../gen/aquarium/v2/application_pb';
-import { ApplicationForm, ApplicationResourceForm } from '../../gen/components';
 import { ApplicationForm, ApplicationResourceForm } from '../../gen/components';
 import { timestampToDate } from '../lib/auth';
 import { Resources, ResourcesSchema } from '../../gen/aquarium/v2/label_pb';
@@ -73,13 +72,27 @@ function applicationResourceToResources(resource: ApplicationResource): Resource
 
 export default function Applications() {
   const { user, hasPermission } = useAuth();
-  const { data, isConnected, connectionStatus, sendRequest } = useStreaming();
+  const { data, isConnected, connectionStatus, sendRequest, fetchApplications, fetchLabels } = useStreaming();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedApp, setSelectedApp] = useState<ApplicationWithDetails | null>(null);
   const [showSSHModal, setShowSSHModal] = useState(false);
   const [sshCredentials, setSSHCredentials] = useState<any>(null);
   const [sshLoading, setSSHLoading] = useState(false);
+
+  // Fetch data when component mounts
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        // Fetch applications first
+        await fetchApplications();
+      } catch (error) {
+        console.error('Failed to load applications data:', error);
+      }
+    };
+
+    loadData();
+  }, []);
 
   const getStatusText = (state?: ApplicationState) => {
     if (!state) return 'Unknown';
@@ -244,7 +257,7 @@ export default function Applications() {
     },
   ];
 
-  const canCreateApp = hasPermission(PermService.Applciation, PermApplication.Create);
+  const canCreateApp = hasPermission(PermService.Application, PermApplication.Create);
 
   return (
     <ProtectedRoute>
@@ -261,9 +274,9 @@ export default function Applications() {
               </p>
             </div>
             <div className="flex items-center space-x-4">
-              {/* Create Button */}
+              {/* Create Button - we need to fetch labels for autofill */}
               <button
-                onClick={() => setShowCreateModal(true)}
+                onClick={() => {fetchLabels(); setShowCreateModal(true)}}
                 disabled={!canCreateApp}
                 className={`px-4 py-2 rounded-md text-white ${
                   canCreateApp
@@ -345,7 +358,7 @@ export default function Applications() {
                       return (
                         <ApplicationResourceForm
                           mode="view"
-                          initialData={selectedApp.resource}
+                          initialData={selectedApp.resource!}
                           onSubmit={() => {}}
                           onCancel={() => {}}
                           title="Application Resource"
@@ -385,7 +398,7 @@ export default function Applications() {
                     <div>
                       <span className="font-medium text-gray-700 dark:text-gray-300">Command:</span>
                       <div className="mt-1 p-3 bg-gray-100 dark:bg-gray-700 rounded font-mono text-sm">
-                        ssh -p {sshCredentials.address.split(':')[1]} {sshCredentials.username}@{sshCredentials.address.split(':')[0]}
+                        ssh -p {sshCredentials.address?.split(':')[1] || '22'} {sshCredentials.username}@{sshCredentials.address?.split(':')[0] || 'localhost'}
                       </div>
                     </div>
                     <div>

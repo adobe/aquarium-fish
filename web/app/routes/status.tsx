@@ -20,6 +20,7 @@ import { useStreaming } from '../contexts/StreamingContext';
 import { StreamingList, type ListColumn, type ListItemAction } from '../components/StreamingList';
 import { nodeServiceHelpers } from '../lib/services';
 import type { Node } from '../../gen/aquarium/v2/node_pb';
+import { PermService, PermNode } from '../../gen/permissions/permissions_grpc';
 
 export function meta() {
   return [
@@ -30,7 +31,7 @@ export function meta() {
 
 export default function Status() {
   const { user, hasPermission } = useAuth();
-  const { data } = useStreaming();
+  const { data, fetchNodes } = useStreaming();
   const [thisNode, setThisNode] = useState<Node | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +66,7 @@ export default function Status() {
 
   useEffect(() => {
     fetchThisNode();
+    fetchNodes();
   }, []);
 
   const formatBytes = (bytes: number) => {

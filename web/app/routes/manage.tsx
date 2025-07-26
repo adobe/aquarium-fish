@@ -12,7 +12,7 @@
 
 // Author: Sergei Parshev (@sparshev)
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../components/DashboardLayout';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
@@ -36,7 +36,7 @@ export function meta() {
 
 export default function Manage() {
   const { user, hasPermission } = useAuth();
-  const { sendRequest } = useStreaming();
+  const { sendRequest, fetchUsers, fetchRoles } = useStreaming();
   const [activeTab, setActiveTab] = useState<'users' | 'roles'>('users');
 
   // Users state
@@ -48,6 +48,12 @@ export default function Manage() {
   const [showCreateRoleModal, setShowCreateRoleModal] = useState(false);
   const [showRoleDetailsModal, setShowRoleDetailsModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+
+  // Fetch data when component mounts
+  useEffect(() => {
+    fetchUsers();
+    fetchRoles();
+  }, []);
 
   // Format timestamp
   const formatTimestamp = (timestamp: any) => {
@@ -287,7 +293,7 @@ export default function Manage() {
                 actions={userActions}
                 filterBy={['name']}
                 itemKey={(user: User) => user.name}
-                permissions={{ list: { resource: PermService.User, action: PermUserList } }}
+                permissions={{ list: { resource: PermService.User, action: PermUser.List } }}
                 emptyMessage="No users found"
               />
             </div>
