@@ -21,10 +21,6 @@ import {
   AuthServiceRefreshTokenRequestSchema,
   AuthServiceGetPermissionsRequestSchema,
   AuthServiceValidateTokenRequestSchema,
-  type AuthServiceLoginResponse,
-  type AuthServiceRefreshTokenResponse,
-  type AuthServiceGetPermissionsResponse,
-  type AuthServiceValidateTokenResponse,
   type JWTToken,
   type UserSession,
 } from "../../gen/aquarium/v2/auth_pb";

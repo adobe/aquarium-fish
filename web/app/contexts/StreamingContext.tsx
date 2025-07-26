@@ -22,11 +22,9 @@ import { useAuth } from './AuthContext';
 import { tokenStorage } from '../lib/auth';
 import {
   StreamingService,
-  StreamingServiceConnectRequestSchema,
   StreamingServiceSubscribeRequestSchema,
   type StreamingServiceConnectRequest,
   type StreamingServiceConnectResponse,
-  type StreamingServiceSubscribeRequest,
   type StreamingServiceSubscribeResponse,
   SubscriptionType,
   ChangeType,
@@ -36,9 +34,6 @@ import {
   ApplicationServiceListRequestSchema,
   ApplicationServiceListStateRequestSchema,
   ApplicationServiceListResourceRequestSchema,
-  type ApplicationServiceListResponse,
-  type ApplicationServiceListStateResponse,
-  type ApplicationServiceListResourceResponse,
   type Application,
   ApplicationSchema,
   type ApplicationState,
@@ -50,28 +45,26 @@ import {
 import {
   LabelService,
   LabelServiceListRequestSchema,
-  type LabelServiceListResponse,
   type Label,
   LabelSchema,
 } from '../../gen/aquarium/v2/label_pb';
 import {
   NodeService,
   NodeServiceListRequestSchema,
-  type NodeServiceListResponse,
+  NodeServiceGetThisRequestSchema,
+  NodeServiceSetMaintenanceRequestSchema,
   type Node,
   NodeSchema,
 } from '../../gen/aquarium/v2/node_pb';
 import {
   UserService,
   UserServiceListRequestSchema,
-  type UserServiceListResponse,
   type User,
   UserSchema,
 } from '../../gen/aquarium/v2/user_pb';
 import {
   RoleService,
   RoleServiceListRequestSchema,
-  type RoleServiceListResponse,
   type Role,
   RoleSchema,
 } from '../../gen/aquarium/v2/role_pb';
@@ -91,7 +84,7 @@ const transport = createGrpcWebTransport({
   interceptors: [
     (next) => async (req) => {
       // Add auth header if available
-      let tokens = tokenStorage.getTokens();
+      const tokens = tokenStorage.getTokens();
       if (tokens && tokens.accessToken) {
         req.header.set('authorization', `Bearer ${tokens.accessToken}`);
       }
@@ -192,6 +185,9 @@ interface StreamingContextType {
   fetchRoles: () => Promise<void>;
   fetchApplicationStates: () => Promise<void>;
   fetchApplicationResources: () => Promise<void>;
+  // Node service functions
+  getThisNode: () => Promise<Node | null>;
+  setNodeMaintenance: (maintenance?: boolean, shutdown?: boolean, shutdownDelay?: string) => Promise<boolean>;
   // Utility functions
   resetFetchedDataTypes: () => void;
 }
@@ -560,6 +556,64 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
       addNotification('error', 'Failed to fetch application resources', String(err));
     }
   }, [isAuthenticated, hasPermission, notifySubscribers, addNotification, fetchedDataTypes]);
+
+  // Node service functions
+  const getThisNode = useCallback(async (): Promise<Node | null> => {
+    if (!isAuthenticated) return null;
+
+    const canGetThisNode = hasPermission(PermService.Node, PermNode.GetThis);
+    if (!canGetThisNode) {
+      logger.info('User does not have permission to get this node');
+      return null;
+    }
+
+    try {
+      logger.info('Fetching current node...');
+      const response = await nodeClient.getThis(create(NodeServiceGetThisRequestSchema));
+      const node = response.data || null;
+      logger.info('Current node fetched:', node?.name);
+      return node;
+    } catch (err) {
+      logger.error('Failed to fetch current node:', err);
+      addNotification('error', 'Failed to fetch current node', String(err));
+      return null;
+    }
+  }, [isAuthenticated, hasPermission, addNotification]);
+
+  const setNodeMaintenance = useCallback(async (maintenance?: boolean, shutdown?: boolean, shutdownDelay?: string): Promise<boolean> => {
+    if (!isAuthenticated) return false;
+
+    const canSetMaintenance = hasPermission(PermService.Node, PermNode.SetMaintenance);
+    if (!canSetMaintenance) {
+      logger.info('User does not have permission to set node maintenance');
+      addNotification('error', 'Permission denied', 'You do not have permission to set node maintenance');
+      return false;
+    }
+
+    try {
+      logger.info('Setting node maintenance:', { maintenance, shutdown, shutdownDelay });
+      const response = await nodeClient.setMaintenance(create(NodeServiceSetMaintenanceRequestSchema, {
+        maintenance,
+        shutdown,
+        shutdownDelay,
+      }));
+      const success = response.status;
+
+      if (success) {
+        const action = shutdown ? 'shutdown' : (maintenance ? 'maintenance mode enabled' : 'maintenance mode disabled');
+        addNotification('info', `Node ${action} successfully`);
+      } else {
+        addNotification('error', 'Failed to set node maintenance', 'The operation was not successful');
+      }
+
+      logger.info('Node maintenance set:', success);
+      return success;
+    } catch (err) {
+      logger.error('Failed to set node maintenance:', err);
+      addNotification('error', 'Failed to set node maintenance', String(err));
+      return false;
+    }
+  }, [isAuthenticated, hasPermission, addNotification]);
 
   // Utility function to reset fetched data types (useful for manual refresh)
   const resetFetchedDataTypes = useCallback(() => {
@@ -940,6 +994,8 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
     fetchRoles,
     fetchApplicationStates,
     fetchApplicationResources,
+    getThisNode,
+    setNodeMaintenance,
     resetFetchedDataTypes,
   };
 

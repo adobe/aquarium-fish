@@ -18,7 +18,6 @@ import { ProtectedRoute } from '../components/ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
 import { useStreaming } from '../contexts/StreamingContext';
 import { StreamingList, type ListColumn, type ListItemAction } from '../components/StreamingList';
-import { nodeServiceHelpers } from '../lib/services';
 import type { Node } from '../../gen/aquarium/v2/node_pb';
 import { PermService, PermNode } from '../../gen/permissions/permissions_grpc';
 
@@ -31,7 +30,7 @@ export function meta() {
 
 export default function Status() {
   const { user, hasPermission } = useAuth();
-  const { data, fetchNodes } = useStreaming();
+  const { data, fetchNodes, getThisNode, setNodeMaintenance } = useStreaming();
   const [thisNode, setThisNode] = useState<Node | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +50,7 @@ export default function Status() {
       const canGetThisNode = hasPermission(PermService.Node, PermNode.GetThis);
 
       if (canGetThisNode) {
-        const currentNode = await nodeServiceHelpers.getThis();
+        const currentNode = await getThisNode();
         setThisNode(currentNode);
       }
 
@@ -86,7 +85,7 @@ export default function Status() {
   const handleMaintenanceToggle = async (enable: boolean) => {
     try {
       setMaintenanceLoading(true);
-      await nodeServiceHelpers.setMaintenance(enable);
+      await setNodeMaintenance(enable);
       setShowMaintenanceModal(false);
       await fetchThisNode(); // Refresh current node data
     } catch (err) {
@@ -99,7 +98,7 @@ export default function Status() {
   const handleShutdown = async () => {
     try {
       setMaintenanceLoading(true);
-      await nodeServiceHelpers.setMaintenance(undefined, true, shutdownDelay);
+      await setNodeMaintenance(undefined, true, shutdownDelay);
       setShowShutdownModal(false);
       await fetchThisNode(); // Refresh current node data
     } catch (err) {
