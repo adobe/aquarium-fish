@@ -139,6 +139,9 @@ func (*Driver) getContainerName(hwaddr string) string {
 func (d *Driver) loadImages(cName string, opts *Options) (string, error) {
 	logger := log.WithFunc("docker", "loadImages").With("provider.name", d.name, "cont_name", cName)
 
+	var existingImagesMu sync.Mutex
+	var existingImages []string
+
 	// Download the images and unpack them
 	var wg sync.WaitGroup
 	for _, image := range opts.Images {
@@ -149,6 +152,21 @@ func (d *Driver) loadImages(cName string, opts *Options) (string, error) {
 		wg.Add(1)
 		go func(image provider.Image) {
 			defer wg.Done()
+			imageID, _, err := util.RunAndLog("docker", 5*time.Second, nil, d.cfg.DockerPath, "image", "ls", "-q",
+				fmt.Sprintf("%s:%s", image.Name, image.Version),
+			)
+			if err != nil {
+				logger.Error("Unable to check image in the local registry", "image_name", image.Name, "image_version", image.Version, "err", err)
+			}
+			imageID = strings.TrimSpace(imageID)
+			if imageID != "" {
+				logger.Debug("Found image in the local docker registry", "image_name", image.Name, "image_version", image.Version, "image_id", imageID)
+				existingImagesMu.Lock()
+				existingImages = append(existingImages, image.Name+":"+image.Version)
+				existingImagesMu.Unlock()
+				return
+			}
+
 			if err := image.DownloadUnpack(d.cfg.ImagesPath, d.cfg.DownloadUser, d.cfg.DownloadPassword); err != nil {
 				logger.Error("Unable to download and unpack the image", "image_name", image.Name, "image_url", image.URL, "err", err)
 			}
@@ -157,6 +175,13 @@ func (d *Driver) loadImages(cName string, opts *Options) (string, error) {
 
 	logger.Debug("Wait for all the background image processes to be done")
 	wg.Wait()
+
+	// Check if all the images are already in place - no need to unpack them
+	if len(existingImages) == len(opts.Images) {
+		// Just return the last image name/version
+		lastImg := opts.Images[len(opts.Images)-1]
+		return lastImg.Name + ":" + lastImg.Version, nil
+	}
 
 	// Loading the image layers tar archive into the local docker registry
 	// They needed to be processed sequentially because the childs does not
@@ -351,7 +376,8 @@ func (d *Driver) disksCreate(cName string, runArgs *[]string, disks map[string]t
 			default:
 				diskType = "ExFAT"
 			}
-			args := []string{"create", dmgPath,
+			args := []string{
+				"create", dmgPath,
 				"-fs", diskType,
 				"-layout", "NONE",
 				"-volname", label,

@@ -239,7 +239,8 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 	}
 
 	// Set the arguments to run the container
-	runArgs := []string{"run", "--detach",
+	runArgs := []string{
+		"run", "--detach",
 		"--name", cName,
 		"--mac-address", cHwaddr,
 		"--network", "aquarium-" + cNetwork,
@@ -372,11 +373,12 @@ func (d *Driver) Deallocate(res typesv2.ApplicationResource) error {
 		return fmt.Errorf("DOCKER: %s: Unable to list the mount points for container %q: %v", d.name, cName, err)
 	}
 	for _, volPath := range cVolumes {
-		if strings.Contains(mounts, volPath) {
-			if _, _, err := util.RunAndLog("docker", 5*time.Second, nil, "/usr/bin/hdiutil", "detach", volPath); err != nil {
-				logger.Error("Unable to detach container volume disk", "volume_path", volPath, "err", err)
-				return fmt.Errorf("DOCKER: %s: Unable to detach container %q volume disk %q: %v", d.name, cName, volPath, err)
-			}
+		if volPath == "" || !strings.Contains(mounts, volPath) {
+			continue
+		}
+		if _, _, err := util.RunAndLog("docker", 5*time.Second, nil, "/usr/bin/hdiutil", "detach", volPath); err != nil {
+			logger.Error("Unable to detach container volume disk", "volume_path", volPath, "err", err)
+			return fmt.Errorf("DOCKER: %s: Unable to detach container %q volume disk %q: %v", d.name, cName, volPath, err)
 		}
 	}
 

@@ -26,7 +26,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/log"
 )
 
-// Runs & logs the executable command
+// RunAndLog Runs & logs the executable command
 func RunAndLog(section string, timeout time.Duration, stdin io.Reader, path string, arg ...string) (string, string, error) {
 	var stdout, stderr bytes.Buffer
 
@@ -61,10 +61,10 @@ func RunAndLog(section string, timeout time.Duration, stdin io.Reader, path stri
 	}
 
 	if len(stdoutString) > 0 {
-		logger.Debug("stdout:", "stdout", stdoutString)
+		logger.Debug("stdout", "stdout", stdoutString)
 	}
 	if len(stderrString) > 0 {
-		logger.Debug("stderr: %s", "stderr", stderrString)
+		logger.Debug("stderr", "stderr", stderrString)
 	}
 
 	// Replace these for Windows, we only want to deal with Unix style line endings.
