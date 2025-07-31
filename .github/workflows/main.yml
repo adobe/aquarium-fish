@@ -76,6 +76,36 @@ jobs:
           name: binaries
           path: aquarium-fish*.tar.xz
 
+  Build-java:
+    name: Create release java artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # To get all the tags for versioning
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          java-version: '11'
+          distribution: zulu
+
+      - name: Set version from the closest git tag
+        run: |
+          cd java
+          mvn --batch-mode versions:set -DnewVersion="$(git describe --always --tags --match 'v*' | sed 's/^v//')$([ "$(git diff)" = '' ] || echo '-dirty')"
+
+      - name: Build
+        run: |
+          cd java
+          mvn --batch-mode --update-snapshots package
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries
+          path: java/target/aquarium-fish-java-*
+
   Tests:
     runs-on: ubuntu-latest
     steps:

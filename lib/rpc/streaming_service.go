@@ -331,6 +331,16 @@ func (s *StreamingService) Connect(ctx context.Context, stream *connect.BidiStre
 		}
 	}()
 
+	logger.Debug("Sending confirmation keep-alive ping to client")
+	keepAliveResp := &aquariumv2.StreamingServiceConnectResponse{
+		RequestId:    "keep-alive",
+		ResponseType: "KeepAliveResponse",
+	}
+	if err := conn.safeSend(keepAliveResp); err != nil {
+		logger.Error("Error sending confirmation keep-alive", "err", err)
+		return connect.NewError(connect.CodeInternal, fmt.Errorf("failed to send confirmation keep-alive: %w", err))
+	}
+
 	// Create keep-alive ticker to prevent connection timeouts
 	keepAliveTicker := time.NewTicker(30 * time.Second)
 	defer keepAliveTicker.Stop()
