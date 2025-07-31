@@ -27,6 +27,10 @@ cd "${root_dir}"
 # which will help to not relay on glibc on linux and be truely independend from OS
 export CGO_ENABLED=0
 
+# Ensure lib/web/dist is not empty
+mkdir -p lib/web/dist
+touch lib/web/dist/.empty
+
 if [ "x$ONLYBUILD" = 'x' ]; then
     ./prepare.sh
 fi

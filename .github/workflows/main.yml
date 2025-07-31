@@ -77,7 +77,6 @@ jobs:
           path: aquarium-fish*.tar.xz
 
   Build-java:
-    name: Create release java artifacts
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -103,7 +102,7 @@ jobs:
       - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
-          name: binaries
+          name: binaries-java
           path: java/target/aquarium-fish-java-*
 
   Tests:
