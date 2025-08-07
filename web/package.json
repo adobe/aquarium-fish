@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "react-router build --mode dev",
+    "build": "react-router build",
     "build:debug": "react-router build --mode development",
     "typecheck": "react-router typegen && tsc"
   },

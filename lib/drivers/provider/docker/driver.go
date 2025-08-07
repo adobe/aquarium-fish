@@ -91,6 +91,12 @@ func (d *Driver) Prepare(config []byte) error {
 		return err
 	}
 
+	// Fill up the available tasks to execute
+	d.tasksList = append(d.tasksList,
+		&TaskSnapshot{driver: d},
+		&TaskImage{driver: d},
+	)
+
 	// Getting info about the docker system - will return "<ncpu>,<mem_bytes>"
 	stdout, _, err := util.RunAndLog("docker", 5*time.Second, nil, d.cfg.DockerPath,
 		"system", "info", "--format", "{{ .NCPU }},{{ .MemTotal }}",
@@ -330,7 +336,7 @@ func (d *Driver) Deallocate(res typesv2.ApplicationResource) error {
 	logger := log.WithFunc("docker", "Deallocate").With("provider.name", d.name, "cont_name", cName)
 	cID := d.getAllocatedContainerID(cName)
 	if len(cID) == 0 {
-		logger.Error("Unable to find container with identifier", "container_name", cName)
+		logger.Error("Unable to find container with identifier")
 		return fmt.Errorf("DOCKER: %s: Unable to find container with identifier: %s", d.name, res.Identifier)
 	}
 
