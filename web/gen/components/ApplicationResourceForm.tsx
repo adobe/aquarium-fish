@@ -96,7 +96,7 @@ export const ApplicationResourceForm: React.FC<ApplicationResourceFormProps> = (
         hwAddr: initialData.hwAddr || '',
         metadata: initialData.metadata || {},
         timeout: initialData.timeout ? new Date(Number(initialData.timeout.seconds) * 1000).toISOString().slice(0, 16) : '',
-        authentication: initialData.authentication ?? undefined,
+        authentication: initialData.authentication && typeof initialData.authentication === 'object' ? initialData.authentication : undefined,
       };
       setFormData(newFormData);
 
@@ -106,6 +106,38 @@ export const ApplicationResourceForm: React.FC<ApplicationResourceFormProps> = (
       setStructFieldText(newStructText);
     }
   }, [initialData]);
+
+  // Auto-save form data when nested and form data changes
+  useEffect(() => {
+    if (nested && onSubmit && formData !== defaultApplicationResourceState) {
+      // Debounce the auto-save to avoid too many calls
+      const timeoutId = setTimeout(() => {
+        try {
+          // Convert form data to protobuf message
+          const data = create(ApplicationResourceSchema, {
+            uid: formData.uid,
+            createdAt: formData.createdAt ? { seconds: BigInt(Math.floor(new Date(formData.createdAt).getTime() / 1000)) } : undefined,
+            updatedAt: formData.updatedAt ? { seconds: BigInt(Math.floor(new Date(formData.updatedAt).getTime() / 1000)) } : undefined,
+            applicationUid: formData.applicationUid,
+            nodeUid: formData.nodeUid,
+            labelUid: formData.labelUid,
+            definitionIndex: formData.definitionIndex,
+            identifier: formData.identifier,
+            ipAddr: formData.ipAddr,
+            hwAddr: formData.hwAddr,
+            metadata: formData.metadata,
+            timeout: formData.timeout ? { seconds: BigInt(Math.floor(new Date(formData.timeout).getTime() / 1000)) } : undefined,
+            authentication: formData.authentication || undefined,
+          });
+          onSubmit(data);
+        } catch (error) {
+          // Silently ignore errors during auto-save
+        }
+      }, 500); // 500ms debounce
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [formData, nested, onSubmit]);
 
 
   // Load from YAML

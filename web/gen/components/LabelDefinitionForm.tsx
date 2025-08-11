@@ -68,8 +68,8 @@ export const LabelDefinitionForm: React.FC<LabelDefinitionFormProps> = ({
       const newFormData: LabelDefinitionFormState = {
         driver: initialData.driver || '',
         options: initialData.options || {},
-        resources: initialData.resources || null,
-        authentication: initialData.authentication ?? undefined,
+        resources: initialData.resources && typeof initialData.resources === 'object' ? initialData.resources : null,
+        authentication: initialData.authentication && typeof initialData.authentication === 'object' ? initialData.authentication : undefined,
       };
       setFormData(newFormData);
 
@@ -79,6 +79,29 @@ export const LabelDefinitionForm: React.FC<LabelDefinitionFormProps> = ({
       setStructFieldText(newStructText);
     }
   }, [initialData]);
+
+  // Auto-save form data when nested and form data changes
+  useEffect(() => {
+    if (nested && onSubmit && formData !== defaultLabelDefinitionState) {
+      // Debounce the auto-save to avoid too many calls
+      const timeoutId = setTimeout(() => {
+        try {
+          // Convert form data to protobuf message
+          const data = create(LabelDefinitionSchema, {
+            driver: formData.driver,
+            options: formData.options,
+            resources: formData.resources,
+            authentication: formData.authentication || undefined,
+          });
+          onSubmit(data);
+        } catch (error) {
+          // Silently ignore errors during auto-save
+        }
+      }, 500); // 500ms debounce
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [formData, nested, onSubmit]);
 
 
   // Load from YAML

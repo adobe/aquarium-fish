@@ -672,13 +672,13 @@ var File_aquarium_v2_role_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_role_proto_rawDesc = "" +
 	"\n" +
-	"\x16aquarium/v2/role.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a#aquarium/v2/options_streaming.proto\x1a\x1caquarium/v2/options_ui.proto\"\xe7\x01\n" +
+	"\x16aquarium/v2/role.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a#aquarium/v2/options_streaming.proto\x1a\x1caquarium/v2/options_ui.proto\"\xfb\x01\n" +
 	"\x04Role\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x129\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12C\n" +
 	"\n" +
-	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\b\x9a\xb5\x18\x04\b\x01\x10\x01R\tcreatedAt\x12C\n" +
 	"\n" +
-	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x129\n" +
+	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\b\x9a\xb5\x18\x04\b\x01\x10\x01R\tupdatedAt\x129\n" +
 	"\vpermissions\x18\x04 \x03(\v2\x17.aquarium.v2.PermissionR\vpermissions:\x1a\x8a\xb5\x18\x10\n" +
 	"\x0eRoleServiceGet\x92\xb5\x18\x02\b\x01\"H\n" +
 	"\n" +

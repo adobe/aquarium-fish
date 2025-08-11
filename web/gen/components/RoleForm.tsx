@@ -79,6 +79,29 @@ export const RoleForm: React.FC<RoleFormProps> = ({
     }
   }, [initialData]);
 
+  // Auto-save form data when nested and form data changes
+  useEffect(() => {
+    if (nested && onSubmit && formData !== defaultRoleState) {
+      // Debounce the auto-save to avoid too many calls
+      const timeoutId = setTimeout(() => {
+        try {
+          // Convert form data to protobuf message
+          const data = create(RoleSchema, {
+            name: formData.name,
+            createdAt: formData.createdAt ? { seconds: BigInt(Math.floor(new Date(formData.createdAt).getTime() / 1000)) } : undefined,
+            updatedAt: formData.updatedAt ? { seconds: BigInt(Math.floor(new Date(formData.updatedAt).getTime() / 1000)) } : undefined,
+            permissions: formData.permissions,
+          });
+          onSubmit(data);
+        } catch (error) {
+          // Silently ignore errors during auto-save
+        }
+      }, 500); // 500ms debounce
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [formData, nested, onSubmit]);
+
 
   // Load from YAML
 const handleYamlLoad = () => {
@@ -123,10 +146,10 @@ const validateForm = (): boolean => {
   if (!formData.name) {
     errors.name = 'Name is required';
   }
-  if (!formData.createdAt) {
+  if (mode !== 'create' && (!formData.createdAt)) {
     errors.createdAt = 'Created At is required';
   }
-  if (!formData.updatedAt) {
+  if (mode !== 'create' && (!formData.updatedAt)) {
     errors.updatedAt = 'Updated At is required';
   }
   if (!formData.permissions || formData.permissions.length === 0) {
@@ -329,9 +352,10 @@ const isSimpleField = (field: any) => {
 </div>
 
   </div>{/* Created At field */}
-  <div>
-    {/* Complex field - traditional layout */}
-    <div className="space-y-2">
+  {!(mode === 'create' && true) && (
+    <div>
+      {/* Complex field - traditional layout */}
+      <div className="space-y-2">
 <div className="flex items-center space-x-2">
   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
     Created At *
@@ -342,7 +366,7 @@ const isSimpleField = (field: any) => {
   type="datetime-local"
   value={formData.createdAt}
   onChange={(e) => handleFieldChange('createdAt', e.target.value)}
-  disabled={isReadOnly || (mode === 'edit' && false)}
+  disabled={isReadOnly || (mode === 'edit' && true)}
   className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
 />
 
@@ -352,11 +376,13 @@ const isSimpleField = (field: any) => {
   </div>
 )}
 
+      </div>
     </div>
-  </div>{/* Updated At field */}
-  <div>
-    {/* Complex field - traditional layout */}
-    <div className="space-y-2">
+  )}{/* Updated At field */}
+  {!(mode === 'create' && true) && (
+    <div>
+      {/* Complex field - traditional layout */}
+      <div className="space-y-2">
 <div className="flex items-center space-x-2">
   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
     Updated At *
@@ -367,7 +393,7 @@ const isSimpleField = (field: any) => {
   type="datetime-local"
   value={formData.updatedAt}
   onChange={(e) => handleFieldChange('updatedAt', e.target.value)}
-  disabled={isReadOnly || (mode === 'edit' && false)}
+  disabled={isReadOnly || (mode === 'edit' && true)}
   className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
 />
 
@@ -377,8 +403,9 @@ const isSimpleField = (field: any) => {
   </div>
 )}
 
+      </div>
     </div>
-  </div>{/* Permissions field */}
+  )}{/* Permissions field */}
   <div>
     {/* Complex field - traditional layout */}
     <div className="space-y-2">

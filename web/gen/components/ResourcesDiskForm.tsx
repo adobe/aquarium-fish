@@ -82,6 +82,30 @@ export const ResourcesDiskForm: React.FC<ResourcesDiskFormProps> = ({
     }
   }, [initialData]);
 
+  // Auto-save form data when nested and form data changes
+  useEffect(() => {
+    if (nested && onSubmit && formData !== defaultResourcesDiskState) {
+      // Debounce the auto-save to avoid too many calls
+      const timeoutId = setTimeout(() => {
+        try {
+          // Convert form data to protobuf message
+          const data = create(ResourcesDiskSchema, {
+            type: formData.type,
+            label: formData.label,
+            size: formData.size,
+            reuse: formData.reuse,
+            clone: formData.clone,
+          });
+          onSubmit(data);
+        } catch (error) {
+          // Silently ignore errors during auto-save
+        }
+      }, 500); // 500ms debounce
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [formData, nested, onSubmit]);
+
 
   // Load from YAML
 const handleYamlLoad = () => {

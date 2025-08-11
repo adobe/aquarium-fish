@@ -12,6 +12,7 @@
 
 // Author: Sergei Parshev (@sparshev)
 
+// Package rpc is a gRPC API interface of the Fish node
 package rpc
 
 import (

@@ -82,19 +82,8 @@ func (s *RoleService) Create(ctx context.Context, req *connect.Request[aquariumv
 		}), connect.NewError(connect.CodeAlreadyExists, nil)
 	}
 
-	role := &typesv2.Role{
-		Name:        msgRole.GetName(),
-		Permissions: make([]typesv2.Permission, len(msgRole.GetPermissions())),
-	}
-
-	for i, p := range msgRole.GetPermissions() {
-		role.Permissions[i] = typesv2.Permission{
-			Resource: p.GetResource(),
-			Action:   p.GetAction(),
-		}
-	}
-
-	if err := s.fish.DB().RoleCreate(ctx, role); err != nil {
+	role := typesv2.FromRole(msgRole)
+	if err := s.fish.DB().RoleCreate(ctx, &role); err != nil {
 		return connect.NewResponse(&aquariumv2.RoleServiceCreateResponse{
 			Status: false, Message: "Failed to create role: " + err.Error(),
 		}), connect.NewError(connect.CodeInternal, err)

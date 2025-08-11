@@ -77,7 +77,7 @@ export const UserForm: React.FC<UserFormProps> = ({
         updatedAt: initialData.updatedAt ? new Date(Number(initialData.updatedAt.seconds) * 1000).toISOString().slice(0, 16) : '',
         hash: initialData.hash || {},
         password: initialData.password ?? undefined,
-        config: initialData.config ?? undefined,
+        config: initialData.config && typeof initialData.config === 'object' ? initialData.config : undefined,
         roles: initialData.roles || [],
       };
       setFormData(newFormData);
@@ -88,6 +88,32 @@ export const UserForm: React.FC<UserFormProps> = ({
       setStructFieldText(newStructText);
     }
   }, [initialData]);
+
+  // Auto-save form data when nested and form data changes
+  useEffect(() => {
+    if (nested && onSubmit && formData !== defaultUserState) {
+      // Debounce the auto-save to avoid too many calls
+      const timeoutId = setTimeout(() => {
+        try {
+          // Convert form data to protobuf message
+          const data = create(UserSchema, {
+            name: formData.name,
+            createdAt: formData.createdAt ? { seconds: BigInt(Math.floor(new Date(formData.createdAt).getTime() / 1000)) } : undefined,
+            updatedAt: formData.updatedAt ? { seconds: BigInt(Math.floor(new Date(formData.updatedAt).getTime() / 1000)) } : undefined,
+            hash: formData.hash,
+            password: formData.password || undefined,
+            config: formData.config || undefined,
+            roles: formData.roles,
+          });
+          onSubmit(data);
+        } catch (error) {
+          // Silently ignore errors during auto-save
+        }
+      }, 500); // 500ms debounce
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [formData, nested, onSubmit]);
 
 
   // Load from YAML

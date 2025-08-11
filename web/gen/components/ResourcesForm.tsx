@@ -81,7 +81,7 @@ export const ResourcesForm: React.FC<ResourcesFormProps> = ({
         slots: initialData.slots ?? undefined,
         cpu: initialData.cpu || 0,
         ram: initialData.ram || 0,
-        disks: initialData.disks || {},
+        disks: initialData.disks && typeof initialData.disks === 'object' ? initialData.disks : {},
         network: initialData.network || '',
         nodeFilter: initialData.nodeFilter || [],
         multitenancy: initialData.multitenancy || false,
@@ -96,6 +96,35 @@ export const ResourcesForm: React.FC<ResourcesFormProps> = ({
       setStructFieldText(newStructText);
     }
   }, [initialData]);
+
+  // Auto-save form data when nested and form data changes
+  useEffect(() => {
+    if (nested && onSubmit && formData !== defaultResourcesState) {
+      // Debounce the auto-save to avoid too many calls
+      const timeoutId = setTimeout(() => {
+        try {
+          // Convert form data to protobuf message
+          const data = create(ResourcesSchema, {
+            slots: formData.slots || undefined,
+            cpu: formData.cpu,
+            ram: formData.ram,
+            disks: formData.disks,
+            network: formData.network,
+            nodeFilter: formData.nodeFilter,
+            multitenancy: formData.multitenancy,
+            cpuOverbook: formData.cpuOverbook,
+            ramOverbook: formData.ramOverbook,
+            lifetime: formData.lifetime,
+          });
+          onSubmit(data);
+        } catch (error) {
+          // Silently ignore errors during auto-save
+        }
+      }, 500); // 500ms debounce
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [formData, nested, onSubmit]);
 
 
   // Load from YAML

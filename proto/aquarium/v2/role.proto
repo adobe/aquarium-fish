@@ -47,8 +47,8 @@ message Role {
 
   // Unique name of the role
   string name = 1;
-  google.protobuf.Timestamp created_at = 2;
-  google.protobuf.Timestamp updated_at = 3;
+  google.protobuf.Timestamp created_at = 2 [(field_ui_config) = { nocreate: true, noedit: true }];
+  google.protobuf.Timestamp updated_at = 3 [(field_ui_config) = { nocreate: true, noedit: true }];
   // List of permissions granted to this role
   repeated Permission permissions = 4;
 }

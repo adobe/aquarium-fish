@@ -73,6 +73,27 @@ export const PermissionForm: React.FC<PermissionFormProps> = ({
     }
   }, [initialData]);
 
+  // Auto-save form data when nested and form data changes
+  useEffect(() => {
+    if (nested && onSubmit && formData !== defaultPermissionState) {
+      // Debounce the auto-save to avoid too many calls
+      const timeoutId = setTimeout(() => {
+        try {
+          // Convert form data to protobuf message
+          const data = create(PermissionSchema, {
+            resource: formData.resource,
+            action: formData.action,
+          });
+          onSubmit(data);
+        } catch (error) {
+          // Silently ignore errors during auto-save
+        }
+      }, 500); // 500ms debounce
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [formData, nested, onSubmit]);
+
 
   // Load from YAML
 const handleYamlLoad = () => {

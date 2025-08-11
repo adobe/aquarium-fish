@@ -79,6 +79,29 @@ export const AuthenticationForm: React.FC<AuthenticationFormProps> = ({
     }
   }, [initialData]);
 
+  // Auto-save form data when nested and form data changes
+  useEffect(() => {
+    if (nested && onSubmit && formData !== defaultAuthenticationState) {
+      // Debounce the auto-save to avoid too many calls
+      const timeoutId = setTimeout(() => {
+        try {
+          // Convert form data to protobuf message
+          const data = create(AuthenticationSchema, {
+            username: formData.username,
+            password: formData.password,
+            key: formData.key,
+            port: formData.port,
+          });
+          onSubmit(data);
+        } catch (error) {
+          // Silently ignore errors during auto-save
+        }
+      }, 500); // 500ms debounce
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [formData, nested, onSubmit]);
+
 
   // Load from YAML
 const handleYamlLoad = () => {
