@@ -124,10 +124,10 @@ drivers:
 		resp, err := appClient.CreateTask(
 			context.Background(),
 			connect.NewRequest(&aquariumv2.ApplicationServiceCreateTaskRequest{
-				ApplicationUid: appUID,
 				Task: &aquariumv2.ApplicationTask{
-					Task: "NOTEXISTING_TASK",
-					When: aquariumv2.ApplicationState_ALLOCATED,
+					ApplicationUid: appUID,
+					Task:           "NOTEXISTING_TASK",
+					When:           aquariumv2.ApplicationState_ALLOCATED,
 				},
 			}),
 		)

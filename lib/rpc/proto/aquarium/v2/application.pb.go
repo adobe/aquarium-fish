@@ -1360,11 +1360,10 @@ func (x *ApplicationServiceListTaskResponse) GetData() []*ApplicationTask {
 }
 
 type ApplicationServiceCreateTaskRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	ApplicationUid string                 `protobuf:"bytes,1,opt,name=application_uid,json=applicationUid,proto3" json:"application_uid,omitempty"`
-	Task           *ApplicationTask       `protobuf:"bytes,2,opt,name=task,proto3" json:"task,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Task          *ApplicationTask       `protobuf:"bytes,1,opt,name=task,proto3" json:"task,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ApplicationServiceCreateTaskRequest) Reset() {
@@ -1395,13 +1394,6 @@ func (x *ApplicationServiceCreateTaskRequest) ProtoReflect() protoreflect.Messag
 // Deprecated: Use ApplicationServiceCreateTaskRequest.ProtoReflect.Descriptor instead.
 func (*ApplicationServiceCreateTaskRequest) Descriptor() ([]byte, []int) {
 	return file_aquarium_v2_application_proto_rawDescGZIP(), []int{20}
-}
-
-func (x *ApplicationServiceCreateTaskRequest) GetApplicationUid() string {
-	if x != nil {
-		return x.ApplicationUid
-	}
-	return ""
 }
 
 func (x *ApplicationServiceCreateTaskRequest) GetTask() *ApplicationTask {
@@ -1782,10 +1774,9 @@ const file_aquarium_v2_application_proto_rawDesc = "" +
 	"\"ApplicationServiceListTaskResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x120\n" +
-	"\x04data\x18\x03 \x03(\v2\x1c.aquarium.v2.ApplicationTaskR\x04data\"\x80\x01\n" +
-	"#ApplicationServiceCreateTaskRequest\x12'\n" +
-	"\x0fapplication_uid\x18\x01 \x01(\tR\x0eapplicationUid\x120\n" +
-	"\x04task\x18\x02 \x01(\v2\x1c.aquarium.v2.ApplicationTaskR\x04task\"\x8a\x01\n" +
+	"\x04data\x18\x03 \x03(\v2\x1c.aquarium.v2.ApplicationTaskR\x04data\"W\n" +
+	"#ApplicationServiceCreateTaskRequest\x120\n" +
+	"\x04task\x18\x01 \x01(\v2\x1c.aquarium.v2.ApplicationTaskR\x04task\"\x8a\x01\n" +
 	"$ApplicationServiceCreateTaskResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x120\n" +

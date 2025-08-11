@@ -306,8 +306,7 @@ message ApplicationServiceListTaskResponse {
 }
 
 message ApplicationServiceCreateTaskRequest {
-  string application_uid = 1;
-  ApplicationTask task = 2;
+  ApplicationTask task = 1;
 }
 
 message ApplicationServiceCreateTaskResponse {

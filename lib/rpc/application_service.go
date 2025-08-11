@@ -379,13 +379,20 @@ func (s *ApplicationService) ListTask(ctx context.Context, req *connect.Request[
 
 // CreateTask creates a new task for an application
 func (s *ApplicationService) CreateTask(ctx context.Context, req *connect.Request[aquariumv2.ApplicationServiceCreateTaskRequest]) (*connect.Response[aquariumv2.ApplicationServiceCreateTaskResponse], error) {
-	ctx, span := rpcTracer.Start(ctx, "rpc.ApplicationService.CreateTask",
-		trace.WithAttributes(
-			attribute.String("application.uid", req.Msg.GetApplicationUid()),
-		))
+	ctx, span := rpcTracer.Start(ctx, "rpc.ApplicationService.CreateTask")
 	defer span.End()
 
-	app, err := s.getApplicationIfUserIsOwnerOrHasAccess(ctx, req.Msg.GetApplicationUid(), auth.ApplicationServiceCreateTaskAll)
+	if req.Msg.Task == nil {
+		return connect.NewResponse(&aquariumv2.ApplicationServiceCreateTaskResponse{
+			Status: false, Message: "No task in request",
+		}), connect.NewError(connect.CodeNotFound, nil)
+	}
+
+	appUID := req.Msg.GetTask().GetApplicationUid()
+
+	span.SetAttributes(attribute.String("application.uid", appUID))
+
+	app, err := s.getApplicationIfUserIsOwnerOrHasAccess(ctx, appUID, auth.ApplicationServiceCreateTaskAll)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())

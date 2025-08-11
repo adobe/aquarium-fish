@@ -140,11 +140,11 @@ drivers:
 		resp, err := appClient.CreateTask(
 			context.Background(),
 			connect.NewRequest(&aquariumv2.ApplicationServiceCreateTaskRequest{
-				ApplicationUid: appUID,
 				Task: &aquariumv2.ApplicationTask{
-					Task:    "image",
-					When:    aquariumv2.ApplicationState_ALLOCATED,
-					Options: taskMd,
+					ApplicationUid: appUID,
+					Task:           "image",
+					When:           aquariumv2.ApplicationState_ALLOCATED,
+					Options:        taskMd,
 				},
 			}),
 		)

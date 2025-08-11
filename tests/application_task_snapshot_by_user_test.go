@@ -236,10 +236,10 @@ drivers:
 		_, err := userAppClient.CreateTask(
 			context.Background(),
 			connect.NewRequest(&aquariumv2.ApplicationServiceCreateTaskRequest{
-				ApplicationUid: appUID,
 				Task: &aquariumv2.ApplicationTask{
-					Task: "snapshot",
-					When: aquariumv2.ApplicationState_ALLOCATED,
+					ApplicationUid: appUID,
+					Task:           "snapshot",
+					When:           aquariumv2.ApplicationState_ALLOCATED,
 				},
 			}),
 		)
@@ -268,10 +268,10 @@ drivers:
 		resp, err := userAppClient.CreateTask(
 			context.Background(),
 			connect.NewRequest(&aquariumv2.ApplicationServiceCreateTaskRequest{
-				ApplicationUid: appUID,
 				Task: &aquariumv2.ApplicationTask{
-					Task: "snapshot",
-					When: aquariumv2.ApplicationState_ALLOCATED,
+					ApplicationUid: appUID,
+					Task:           "snapshot",
+					When:           aquariumv2.ApplicationState_ALLOCATED,
 				},
 			}),
 		)
