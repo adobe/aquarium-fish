@@ -12,6 +12,7 @@
 
 // Author: Sergei Parshev (@sparshev)
 
+// Package auth responsible for authentification and authorization of users
 package auth
 
 const (

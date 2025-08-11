@@ -15,14 +15,18 @@
 package auth
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"sync"
 
+	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/casbin/casbin/v2"
 	"github.com/casbin/casbin/v2/model"
 	"github.com/casbin/casbin/v2/persist"
+
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 )
 
 //go:embed model.conf
@@ -33,6 +37,11 @@ type Enforcer struct {
 	enforcer *casbin.Enforcer
 	adapter  persist.Adapter
 	mu       sync.RWMutex
+
+	running       context.Context //nolint:containedctx // Is used for sending stop for goroutines
+	runningCancel context.CancelFunc
+
+	roleUpdateChannel chan database.RoleSubscriptionEvent
 }
 
 var (
@@ -87,12 +96,55 @@ func NewEnforcer() (*Enforcer, error) {
 		mu:       sync.RWMutex{},
 	}
 
+	e.running, e.runningCancel = context.WithCancel(context.Background())
+
 	// Set as global enforcer if not already set
 	if globalEnforcer == nil {
 		SetEnforcer(e)
 	}
 
 	return e, nil
+}
+
+func (e *Enforcer) SetUpdateChannel(ch chan database.RoleSubscriptionEvent) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	previouslyStarted := e.roleUpdateChannel != nil
+	e.roleUpdateChannel = ch
+
+	// Running background process
+	if !previouslyStarted && e.roleUpdateChannel != nil {
+		log.WithFunc("auth", "SetUpdateChannel").Debug("Enforcer started background update process")
+		go e.roleUpdatedProcess()
+	}
+}
+
+// roleUpdatedProcess is listening on the update channel and makes modifications to enforcer permissions
+func (e *Enforcer) roleUpdatedProcess() {
+	logger := log.WithFunc("auth", "roleUpdatedProcess")
+	for {
+		select {
+		case <-e.running.Done():
+			return
+		case roleEvent := <-e.roleUpdateChannel:
+			r := roleEvent.Object
+			switch roleEvent.ChangeType {
+			case aquariumv2.ChangeType_CHANGE_TYPE_CREATED, aquariumv2.ChangeType_CHANGE_TYPE_UPDATED:
+				for _, p := range r.Permissions {
+					if err := e.AddPolicy(r.Name, p.Resource, p.Action); err != nil {
+						logger.Error("Failed to set role permission", "role", r.Name, "permission", p, "err", err)
+					}
+				}
+			case aquariumv2.ChangeType_CHANGE_TYPE_REMOVED:
+				for _, p := range r.Permissions {
+					if err := e.RemovePolicy(r.Name, p.Resource, p.Action); err != nil {
+						logger.Error("Failed to remove role permission", "role", r.Name, "permission", p, "err", err)
+					}
+				}
+			}
+		}
+	}
 }
 
 // CheckPermission checks if the roles has permission to perform the action on the object
@@ -195,10 +247,7 @@ func (e *Enforcer) GetResourcesForUser(user string) ([]string, error) {
 	return resources, nil
 }
 
-// SavePolicy saves all policy rules to storage
-func (e *Enforcer) SavePolicy() error {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	return e.enforcer.SavePolicy()
+// Shutdown stops enforcer background processes
+func (e *Enforcer) Shutdown() {
+	e.runningCancel()
 }

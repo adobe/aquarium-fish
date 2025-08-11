@@ -286,7 +286,6 @@ func (f *Fish) Init() error {
 func (f *Fish) initDefaultRoles(ctx context.Context) error {
 	logger := log.WithFunc("fish", "initDefaultRoles")
 
-	// TODO: Implement enforcer update on role change
 	// Create enforcer first since we'll need it for setting up permissions
 	enforcer, err := auth.NewEnforcer()
 	if err != nil {
@@ -296,16 +295,14 @@ func (f *Fish) initDefaultRoles(ctx context.Context) error {
 
 	// Create all roles described in the proto specs
 	for role, perms := range auth.GetRolePermissions() {
-		newRole := typesv2.Role{
-			Name:        role,
-			Permissions: perms,
-		}
-
-		r, err := f.db.RoleGet(ctx, role)
+		_, err := f.db.RoleGet(ctx, role)
 		if err == database.ErrObjectNotFound {
 			logger.Debug("Create role and assigning permissions", "role", role)
-			r = &newRole
-			if err := f.db.RoleCreate(ctx, r); err != nil {
+			newRole := typesv2.Role{
+				Name:        role,
+				Permissions: perms,
+			}
+			if err := f.db.RoleCreate(ctx, &newRole); err != nil {
 				logger.Error("Failed to create role", "role", role, "err", err)
 				return fmt.Errorf("Fish: Failed to create %q role: %v", role, err)
 			}
@@ -313,12 +310,24 @@ func (f *Fish) initDefaultRoles(ctx context.Context) error {
 			logger.Error("Unable to get role", "role", role, "err", err)
 			return fmt.Errorf("Fish: Unable to get %q role: %v", role, err)
 		}
+	}
 
-		// Add role permissions to the enforcer
+	// Subscribe enforcer to role updates when they are created
+	enforcerChannel := make(chan database.RoleSubscriptionEvent, 100)
+	f.db.SubscribeRole(ctx, enforcerChannel)
+	enforcer.SetUpdateChannel(enforcerChannel)
+
+	// Init the existing DB role permissions to the enforcer
+	roles, err := f.db.RoleList(ctx)
+	if err != nil {
+		logger.Error("Failed to list existing roles", "err", err)
+		return fmt.Errorf("Fish: Failed to list existing roles: %v", err)
+	}
+	for _, r := range roles {
 		for _, p := range r.Permissions {
 			if err := enforcer.AddPolicy(r.Name, p.Resource, p.Action); err != nil {
-				logger.Error("Failed to add role permission", "role", role, "permission", p, "err", err)
-				return fmt.Errorf("Fish: Failed to add %q role permission %v: %v", role, p, err)
+				logger.Error("Failed to add role permission", "role", r.Name, "permission", p, "err", err)
+				return fmt.Errorf("Fish: Failed to add %q role permission %v: %v", r, p, err)
 			}
 		}
 	}
@@ -341,6 +350,12 @@ func (f *Fish) Close(ctx context.Context) {
 	logger.Debug("Waiting for background routines to shutdown")
 	f.routines.Wait()
 	logger.Debug("All the background routines are stopped")
+
+	logger.Debug("Stopping the enforcer")
+	enforcer := auth.GetEnforcer()
+	if enforcer != nil {
+		enforcer.Shutdown()
+	}
 
 	logger.Debug("Closing the DB")
 	f.db.Shutdown(ctx)
