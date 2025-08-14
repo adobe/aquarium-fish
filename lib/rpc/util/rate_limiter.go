@@ -186,16 +186,16 @@ func (h *UserRateLimitHandler) Handler(next http.Handler) http.Handler {
 		// Check if limit exceeded
 		if currentCount > userLimit {
 			logger.Debug("User rate limit exceeded", "user", userName, "count", currentCount, "limit", userLimit)
-			w.Header().Set("X-RateLimit-Limit", fmt.Sprintf("%d", userLimit))
-			w.Header().Set("X-RateLimit-Remaining", "0")
-			w.Header().Set("X-RateLimit-Reset", fmt.Sprintf("%d", entry.firstTime.Add(h.window).Unix()))
+			w.Header().Set("X-Ratelimit-Limit", fmt.Sprintf("%d", userLimit))
+			w.Header().Set("X-Ratelimit-Remaining", "0")
+			w.Header().Set("X-Ratelimit-Reset", fmt.Sprintf("%d", entry.firstTime.Add(h.window).Unix()))
 			http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
 			return
 		}
 
-		w.Header().Set("X-RateLimit-Limit", fmt.Sprintf("%d", userLimit))
-		w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", userLimit-currentCount))
-		w.Header().Set("X-RateLimit-Reset", fmt.Sprintf("%d", entry.firstTime.Add(h.window).Unix()))
+		w.Header().Set("X-Ratelimit-Limit", fmt.Sprintf("%d", userLimit))
+		w.Header().Set("X-Ratelimit-Remaining", fmt.Sprintf("%d", userLimit-currentCount))
+		w.Header().Set("X-Ratelimit-Reset", fmt.Sprintf("%d", entry.firstTime.Add(h.window).Unix()))
 
 		next.ServeHTTP(w, r)
 	})
@@ -268,7 +268,7 @@ func (h *IPRateLimitHandler) cleanupExpiredEntries() {
 }
 
 // getClientIP extracts the client IP from the request
-func (h *IPRateLimitHandler) getClientIP(r *http.Request) string {
+func (*IPRateLimitHandler) getClientIP(r *http.Request) string {
 	// Check X-Forwarded-For header first (for proxies)
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		// Take the first IP from the list
@@ -327,16 +327,16 @@ func (h *IPRateLimitHandler) Handler(next http.Handler) http.Handler {
 		// Check if limit exceeded
 		if currentCount > h.limit {
 			logger.Debug("IP rate limit exceeded", "ip", clientIP, "count", currentCount, "limit", h.limit)
-			w.Header().Set("X-RateLimit-Limit", fmt.Sprintf("%d", h.limit))
-			w.Header().Set("X-RateLimit-Remaining", "0")
-			w.Header().Set("X-RateLimit-Reset", fmt.Sprintf("%d", entry.firstTime.Add(h.window).Unix()))
+			w.Header().Set("X-Ratelimit-Limit", fmt.Sprintf("%d", h.limit))
+			w.Header().Set("X-Ratelimit-Remaining", "0")
+			w.Header().Set("X-Ratelimit-Reset", fmt.Sprintf("%d", entry.firstTime.Add(h.window).Unix()))
 			http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
 			return
 		}
 
-		w.Header().Set("X-RateLimit-Limit", fmt.Sprintf("%d", h.limit))
-		w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", h.limit-currentCount))
-		w.Header().Set("X-RateLimit-Reset", fmt.Sprintf("%d", entry.firstTime.Add(h.window).Unix()))
+		w.Header().Set("X-Ratelimit-Limit", fmt.Sprintf("%d", h.limit))
+		w.Header().Set("X-Ratelimit-Remaining", fmt.Sprintf("%d", h.limit-currentCount))
+		w.Header().Set("X-Ratelimit-Reset", fmt.Sprintf("%d", entry.firstTime.Add(h.window).Unix()))
 
 		next.ServeHTTP(w, r)
 	})

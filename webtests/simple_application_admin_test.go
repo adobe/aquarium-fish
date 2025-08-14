@@ -52,18 +52,18 @@ drivers:
 
 	afp.Run(t, "Login as admin user", func(t *testing.T) {
 		// Login as admin using correct admin token
-		hp.LoginUser(t, page, afp, afi, "admin", afi.AdminToken())
+		hp.LoginUser(t, page, "admin", afi.AdminToken())
 	})
 
 	var labelUID string
 	afp.Run(t, "Create test label", func(t *testing.T) {
 		// First create a label that applications can use
-		labelUID = hp.CreateLabel(t, page, afp, testLabel)
+		labelUID = hp.CreateLabel(t, page, testLabel)
 	})
 
 	afp.Run(t, "Create application", func(t *testing.T) {
 		// Create application using form interface
-		hp.CreateApplication(t, page, afp, labelUID, map[string]string{
+		hp.CreateApplication(t, page, labelUID, map[string]string{
 			"TEST_VAR":    "test-value",
 			"DESCRIPTION": "Test application created by admin",
 		})

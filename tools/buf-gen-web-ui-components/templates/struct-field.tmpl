@@ -1,22 +1,22 @@
 {{define "struct-field" -}}
 <div className="border border-gray-300 rounded-md p-3 dark:border-gray-600 space-y-2">
   <textarea
-    value={structFieldText.{{.JsonName}} || ''}
-    onChange={(e) => setStructFieldText(prev => ({ ...prev, {{.JsonName}}: e.target.value }))}
-    onBlur={() => parseStructField('{{.JsonName}}', structFieldText.{{.JsonName}} || '')}
+    value={structFieldText.{{.JSONName}} || ''}
+    onChange={(e) => setStructFieldText(prev => ({ ...prev, {{.JSONName}}: e.target.value }))}
+    onBlur={() => parseStructField('{{.JSONName}}', structFieldText.{{.JSONName}} || '')}
     disabled={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
     className="w-full h-32 px-3 py-2 border-0 font-mono text-sm dark:bg-gray-700 dark:text-white resize-none"
     placeholder="Enter YAML or JSON object..."
   />
-  {structFieldErrors.{{.JsonName}} && (
+  {structFieldErrors.{{.JSONName}} && (
     <div className="text-sm text-red-600 dark:text-red-400">
-      {structFieldErrors.{{.JsonName}}}
+      {structFieldErrors.{{.JSONName}}}
     </div>
   )}
   {!isReadOnly && !(mode === 'edit' && {{.NoEdit}}) && (
     <button
       type="button"
-      onClick={() => parseStructField('{{.JsonName}}', structFieldText.{{.JsonName}} || '')}
+      onClick={() => parseStructField('{{.JSONName}}', structFieldText.{{.JSONName}} || '')}
       className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded-md hover:bg-blue-200"
     >
       Parse & Update

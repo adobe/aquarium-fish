@@ -11,21 +11,21 @@ const handleYamlLoad = () => {
     const newFormData: {{.Name}}FormState = { ...default{{.Name}}State };
 
 {{- range .Fields }}
-    if (parsedData.{{.JsonName}} !== undefined) {
+    if (parsedData.{{.JSONName}} !== undefined) {
 {{- if .IsTimestamp }}
-      if (typeof parsedData.{{.JsonName}} === 'string') {
-        newFormData.{{.JsonName}} = new Date(parsedData.{{.JsonName}}).toISOString().slice(0, 16);
+      if (typeof parsedData.{{.JSONName}} === 'string') {
+        newFormData.{{.JSONName}} = new Date(parsedData.{{.JSONName}}).toISOString().slice(0, 16);
       }
 {{- else if .IsRepeated }}
-      if (Array.isArray(parsedData.{{.JsonName}})) {
-        newFormData.{{.JsonName}} = parsedData.{{.JsonName}};
+      if (Array.isArray(parsedData.{{.JSONName}})) {
+        newFormData.{{.JSONName}} = parsedData.{{.JSONName}};
       }
 {{- else if .IsStruct }}
-      if (typeof parsedData.{{.JsonName}} === 'object') {
-        newFormData.{{.JsonName}} = parsedData.{{.JsonName}};
+      if (typeof parsedData.{{.JSONName}} === 'object') {
+        newFormData.{{.JSONName}} = parsedData.{{.JSONName}};
       }
 {{- else }}
-      newFormData.{{.JsonName}} = parsedData.{{.JsonName}};
+      newFormData.{{.JSONName}} = parsedData.{{.JSONName}};
 {{- end }}
     }
 {{- end }}
@@ -44,12 +44,12 @@ const validateForm = (): boolean => {
 {{- range .Fields }}
 {{- if not .IsOptional }}
   {{- if .NoEdit }}
-  if (mode !== 'create' && (!formData.{{.JsonName}}{{if .IsRepeated}} || formData.{{.JsonName}}.length === 0{{end}})) {
-    errors.{{.JsonName}} = '{{.DisplayName}} is required';
+  if (mode !== 'create' && (!formData.{{.JSONName}}{{if .IsRepeated}} || formData.{{.JSONName}}.length === 0{{end}})) {
+    errors.{{.JSONName}} = '{{.DisplayName}} is required';
   }
   {{- else }}
-  if (!formData.{{.JsonName}}{{if .IsRepeated}} || formData.{{.JsonName}}.length === 0{{end}}) {
-    errors.{{.JsonName}} = '{{.DisplayName}} is required';
+  if (!formData.{{.JSONName}}{{if .IsRepeated}} || formData.{{.JSONName}}.length === 0{{end}}) {
+    errors.{{.JSONName}} = '{{.DisplayName}} is required';
   }
   {{- end }}
 {{- end }}
@@ -70,13 +70,13 @@ const handleSubmit = () => {
     const data = create({{.TypeName}}Schema, {
 {{- range .Fields }}
 {{- if .IsTimestamp }}
-      {{.JsonName}}: formData.{{.JsonName}} ? { seconds: BigInt(Math.floor(new Date(formData.{{.JsonName}}).getTime() / 1000)) } : undefined,
+      {{.JSONName}}: formData.{{.JSONName}} ? { seconds: BigInt(Math.floor(new Date(formData.{{.JSONName}}).getTime() / 1000)) } : undefined,
 {{- else if .IsStruct }}
-      {{.JsonName}}: formData.{{.JsonName}},
+      {{.JSONName}}: formData.{{.JSONName}},
 {{- else if .IsOptional }}
-      {{.JsonName}}: formData.{{.JsonName}} || undefined,
+      {{.JSONName}}: formData.{{.JSONName}} || undefined,
 {{- else }}
-      {{.JsonName}}: formData.{{.JsonName}},
+      {{.JSONName}}: formData.{{.JSONName}},
 {{- end }}
 {{- end }}
     });

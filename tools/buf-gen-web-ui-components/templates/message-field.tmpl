@@ -5,7 +5,7 @@
 
   {{- if .IsOptional }}
   // Optional message field - show Add/Remove buttons
-  if (!formData.{{.JsonName}}) {
+  if (!formData.{{.JSONName}}) {
     return (
       <div className="border border-dashed border-gray-300 rounded-md p-6 text-center dark:border-gray-600">
         <div className="text-sm text-gray-500 dark:text-gray-400 mb-3">
@@ -14,7 +14,7 @@
         {!isReadOnly && !(mode === 'edit' && {{.NoEdit}}) && (
           <button
             type="button"
-            onClick={() => handleFieldChange('{{.JsonName}}', {})}
+            onClick={() => handleFieldChange('{{.JSONName}}', {})}
             className="px-4 py-2 text-sm bg-blue-100 text-blue-800 rounded-md hover:bg-blue-200"
           >
             Add {{.DisplayName}}
@@ -36,7 +36,7 @@
           {!isReadOnly && !(mode === 'edit' && {{.NoEdit}}) && (
             <button
               type="button"
-              onClick={() => handleFieldChange('{{.JsonName}}', null)}
+              onClick={() => handleFieldChange('{{.JSONName}}', null)}
               className="flex items-center justify-center w-6 h-6 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors"
               title="Remove {{.DisplayName}}"
             >
@@ -50,8 +50,8 @@
         <div className="pl-2">
           <NestedComponent
             mode={mode}
-            initialData={formData.{{.JsonName}}}
-            onSubmit={(data: any) => handleFieldChange('{{.JsonName}}', data)}
+            initialData={formData.{{.JSONName}}}
+            onSubmit={(data: any) => handleFieldChange('{{.JSONName}}', data)}
             onCancel={() => {}}
             title={'{{.DisplayName}}'}
             readonly={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
@@ -73,7 +73,7 @@
         {!isReadOnly && !(mode === 'edit' && {{.NoEdit}}) && (
           <button
             type="button"
-            onClick={() => handleFieldChange('{{.JsonName}}', null)}
+            onClick={() => handleFieldChange('{{.JSONName}}', null)}
             className="flex items-center justify-center w-6 h-6 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors"
             title="Remove {{.DisplayName}}"
           >
@@ -89,11 +89,11 @@
       </div>
       {{- end }}
       <textarea
-        value={JSON.stringify(formData.{{.JsonName}}, null, 2)}
+        value={JSON.stringify(formData.{{.JSONName}}, null, 2)}
         onChange={(e) => {
           try {
             const parsed = JSON.parse(e.target.value);
-            handleFieldChange('{{.JsonName}}', parsed);
+            handleFieldChange('{{.JSONName}}', parsed);
           } catch (error) {
             // Invalid JSON, keep the text value for user to fix
           }

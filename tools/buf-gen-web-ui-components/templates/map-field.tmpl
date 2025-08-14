@@ -6,18 +6,18 @@
   {{- if .IsMessage }}
   {/* Map with message values - render nested components */}
   <div className="space-y-3">
-    {Object.entries(formData.{{.JsonName}} || {}).map(([key, value]) => (
+    {Object.entries(formData.{{.JSONName}} || {}).map(([key, value]) => (
       <div key={key} className="relative border border-gray-300 rounded-lg p-3 bg-gray-50 dark:bg-gray-700 dark:border-gray-600">
         <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200 dark:border-gray-600">
           <input
             type="text"
             value={key}
             onChange={(e) => {
-              const newMap = { ...formData.{{.JsonName}} };
+              const newMap = { ...formData.{{.JSONName}} };
               if (e.target.value !== key) {
                 delete newMap[key];
                 newMap[e.target.value] = value;
-                handleFieldChange('{{.JsonName}}', newMap);
+                handleFieldChange('{{.JSONName}}', newMap);
               }
             }}
             disabled={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
@@ -28,9 +28,9 @@
             <button
               type="button"
               onClick={() => {
-                const newMap = { ...formData.{{.JsonName}} };
+                const newMap = { ...formData.{{.JSONName}} };
                 delete newMap[key];
-                handleFieldChange('{{.JsonName}}', newMap);
+                handleFieldChange('{{.JSONName}}', newMap);
               }}
               className="flex items-center justify-center w-6 h-6 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors ml-2"
               title="Remove entry"
@@ -52,9 +52,9 @@
                   mode={mode}
                   initialData={value}
                   onSubmit={(data: any) => {
-                    const newMap = { ...formData.{{.JsonName}} };
+                    const newMap = { ...formData.{{.JSONName}} };
                     newMap[key] = data;
-                    handleFieldChange('{{.JsonName}}', newMap);
+                    handleFieldChange('{{.JSONName}}', newMap);
                   }}
                   onCancel={() => {}}
                   title={key}
@@ -75,9 +75,9 @@
                   onChange={(e) => {
                     try {
                       const parsed = JSON.parse(e.target.value);
-                      const newMap = { ...formData.{{.JsonName}} };
+                      const newMap = { ...formData.{{.JSONName}} };
                       newMap[key] = parsed;
-                      handleFieldChange('{{.JsonName}}', newMap);
+                      handleFieldChange('{{.JSONName}}', newMap);
                     } catch (error) {
                       // Invalid JSON, keep the text value for user to fix
                     }
@@ -97,9 +97,9 @@
         type="button"
         onClick={() => {
           const newKey = 'new_key_' + Date.now();
-          const newMap = { ...formData.{{.JsonName}} };
+          const newMap = { ...formData.{{.JSONName}} };
           newMap[newKey] = {};
-          handleFieldChange('{{.JsonName}}', newMap);
+          handleFieldChange('{{.JSONName}}', newMap);
         }}
         className="w-full px-3 py-2 text-sm border-2 border-dashed border-gray-300 text-gray-600 rounded-md hover:border-green-400 hover:text-green-600 transition-colors"
       >
@@ -110,11 +110,11 @@
   {{- else }}
   {/* Map with primitive values - use JSON editor */}
   <textarea
-    value={JSON.stringify(formData.{{.JsonName}}, null, 2)}
+    value={JSON.stringify(formData.{{.JSONName}}, null, 2)}
     onChange={(e) => {
       try {
         const parsed = JSON.parse(e.target.value);
-        handleFieldChange('{{.JsonName}}', parsed);
+        handleFieldChange('{{.JSONName}}', parsed);
       } catch (error) {
         // Invalid JSON, keep the text value for user to fix
       }

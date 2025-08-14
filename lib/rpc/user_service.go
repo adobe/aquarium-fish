@@ -127,7 +127,7 @@ func (s *UserService) Create(ctx context.Context, req *connect.Request[aquariumv
 	}
 
 	// Assigning config
-	if msgUser.Config != nil {
+	if msgUser.GetConfig() != nil {
 		uc := typesv2.FromUserConfig(msgUser.GetConfig())
 		user.Config = &uc
 	}

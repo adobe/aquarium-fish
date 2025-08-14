@@ -15,9 +15,9 @@
 {{end}}
 
 {{define "validation-error" -}}
-{validationErrors.{{.JsonName}} && (
+{validationErrors.{{.JSONName}} && (
   <div className="text-sm text-red-600 dark:text-red-400 mt-1">
-    {validationErrors.{{.JsonName}}}
+    {validationErrors.{{.JSONName}}}
   </div>
 )}
 {{end}}

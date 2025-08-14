@@ -1,6 +1,6 @@
 {{define "array-field" -}}
 <div className="space-y-3">
-  {formData.{{.JsonName}}.map((item, index) => (
+  {formData.{{.JSONName}}.map((item, index) => (
     <div key={index} className="relative border-2 border-gray-200 rounded-lg p-3 dark:border-gray-600 bg-gray-50 dark:bg-gray-800">
       {{- if .IsMessage }}
       {/* Nested component header */}
@@ -11,7 +11,7 @@
         {!isReadOnly && !(mode === 'edit' && {{.NoEdit}}) && (
           <button
             type="button"
-            onClick={() => removeArrayItem('{{.JsonName}}', index)}
+            onClick={() => removeArrayItem('{{.JSONName}}', index)}
             className="flex items-center justify-center w-6 h-6 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors"
             title="Remove {{.DisplayName}}"
           >
@@ -32,7 +32,7 @@
                 mode={mode}
                 initialData={item}
                 onSubmit={(data: any) => {
-                  handleArrayChange('{{.JsonName}}', index, data);
+                  handleArrayChange('{{.JSONName}}', index, data);
                 }}
                 onCancel={() => {}}
                 title={'{{.DisplayName}} ' + (index + 1)}
@@ -54,7 +54,7 @@
               onChange={(e) => {
                 try {
                   const parsed = JSON.parse(e.target.value);
-                  handleArrayChange('{{.JsonName}}', index, parsed);
+                  handleArrayChange('{{.JSONName}}', index, parsed);
                 } catch (error) {
                   // Invalid JSON, keep the text value for user to fix
                 }
@@ -71,14 +71,14 @@
         <input
           type="{{if eq .TypeScript "string"}}text{{else if eq .TypeScript "number"}}number{{else}}text{{end}}"
           value={item}
-          onChange={(e) => handleArrayChange('{{.JsonName}}', index, {{if eq .TypeScript "number"}}parseInt(e.target.value) || 0{{else}}e.target.value{{end}})}
+          onChange={(e) => handleArrayChange('{{.JSONName}}', index, {{if eq .TypeScript "number"}}parseInt(e.target.value) || 0{{else}}e.target.value{{end}})}
           disabled={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
           className="flex-1 mr-3 px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
         />
         {!isReadOnly && !(mode === 'edit' && {{.NoEdit}}) && (
           <button
             type="button"
-            onClick={() => removeArrayItem('{{.JsonName}}', index)}
+            onClick={() => removeArrayItem('{{.JSONName}}', index)}
             className="flex items-center justify-center w-6 h-6 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors"
             title="Remove item"
           >
@@ -93,7 +93,7 @@
   ))}
   {!isReadOnly && !(mode === 'edit' && {{.NoEdit}}) && (
     <button
-      onClick={() => addArrayItem('{{.JsonName}}', {{if .IsMessage}}{}{{else if eq .TypeScript "string"}}''{{else if eq .TypeScript "number"}}0{{else}}''{{end}})}
+      onClick={() => addArrayItem('{{.JSONName}}', {{if .IsMessage}}{}{{else if eq .TypeScript "string"}}''{{else if eq .TypeScript "number"}}0{{else}}''{{end}})}
       className="w-full px-3 py-2 text-sm border-2 border-dashed border-gray-300 text-gray-600 rounded-md hover:border-green-400 hover:text-green-600 transition-colors"
     >
       + Add {{.DisplayName}}

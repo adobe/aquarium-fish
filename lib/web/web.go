@@ -40,7 +40,7 @@ func Handler() http.Handler {
 	if err != nil {
 		logger.Error("Failed to create sub filesystem for dist", "err", err)
 		// Return a handler that serves a simple error page
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			http.Error(w, "Web dashboard not available", http.StatusServiceUnavailable)
 		})
 	}
@@ -48,7 +48,7 @@ func Handler() http.Handler {
 	// Check if index.html exists (indicating web assets are built)
 	if _, err := distFS.Open("index.html"); err != nil {
 		logger.Warn("Web dashboard assets not built - index.html not found", "err", err)
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "text/html")
 			w.WriteHeader(http.StatusServiceUnavailable)
 			w.Write([]byte(`<!DOCTYPE html>
@@ -98,17 +98,17 @@ func Handler() http.Handler {
 		// Check if file exists
 		if _, err := distFS.Open(urlPath); err != nil {
 			// For SPA routes, serve index.html
-			if !strings.Contains(urlPath, ".") {
-				logger.Debug("Serving SPA route with index.html")
-				urlPath = "index.html"
-
-				// Set appropriate headers for SPA
-				w.Header().Set("Cache-Control", "no-cache")
-			} else {
+			if strings.Contains(urlPath, ".") {
 				logger.Debug("File not found", "err", err)
 				http.NotFound(w, r)
 				return
 			}
+
+			logger.Debug("Serving SPA route with index.html")
+			urlPath = "index.html"
+
+			// Set appropriate headers for SPA
+			w.Header().Set("Cache-Control", "no-cache")
 		}
 
 		// Set security headers

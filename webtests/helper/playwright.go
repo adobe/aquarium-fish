@@ -47,14 +47,9 @@ type AFPlaywright struct {
 	step   int
 }
 
-// Default context options for most tests
-var DEFAULT_CONTEXT_OPTIONS = playwright.BrowserNewContextOptions{
-	AcceptDownloads: playwright.Bool(true),
-	HasTouch:        playwright.Bool(true),
-}
-
 // NewPlaywright initializes Playwright context helper
 func NewPlaywright(tb testing.TB, workspace string, options playwright.BrowserNewContextOptions) (*AFPlaywright, playwright.Page) {
+	tb.Helper()
 	var err error
 	afp := &AFPlaywright{
 		captureDir:  filepath.Join(workspace, "playwright"),
@@ -124,6 +119,7 @@ func (afp *AFPlaywright) Run(t *testing.T, name string, fn func(t *testing.T)) {
 
 // Screenshot takes a screenshot with automatic naming
 func (afp *AFPlaywright) Screenshot(t *testing.T, phase string) {
+	t.Helper()
 	afp.stepMu.Lock()
 	defer afp.stepMu.Unlock()
 
@@ -143,6 +139,7 @@ func (afp *AFPlaywright) Screenshot(t *testing.T, phase string) {
 }
 
 func (afp *AFPlaywright) newPage(tb testing.TB) playwright.Page {
+	tb.Helper()
 	page, err := afp.context.NewPage()
 	if err != nil {
 		tb.Fatalf("ERROR: Could not create page: %v", err)
@@ -151,8 +148,8 @@ func (afp *AFPlaywright) newPage(tb testing.TB) playwright.Page {
 }
 
 // CaptureDir returns dir where to store all the test data
-func (afp *AFPlaywright) CaptureDir(path ...string) string {
-	paths := append([]string{afp.captureDir}, path...)
+func (afp *AFPlaywright) CaptureDir(subpath ...string) string {
+	paths := append([]string{afp.captureDir}, subpath...)
 	out := filepath.Join(paths...)
 	os.MkdirAll(filepath.Dir(out), 0755)
 	return out

@@ -19,12 +19,11 @@ import (
 	"testing"
 	"time"
 
-	h "github.com/adobe/aquarium-fish/tests/helper"
 	pw "github.com/playwright-community/playwright-go"
 )
 
 // LoginUser is a helper function to login with given credentials
-func LoginUser(t *testing.T, page pw.Page, afp *AFPlaywright, afi *h.AFInstance, username, password string) {
+func LoginUser(t *testing.T, page pw.Page, username, password string) {
 	t.Helper()
 
 	// Fill login form
@@ -57,7 +56,7 @@ func LoginUser(t *testing.T, page pw.Page, afp *AFPlaywright, afi *h.AFInstance,
 }
 
 // LogoutUser attempts to logout the current user
-func LogoutUser(t *testing.T, page pw.Page, afp *AFPlaywright, afi *h.AFInstance) {
+func LogoutUser(t *testing.T, page pw.Page) {
 	t.Helper()
 
 	// Look for user menu button and click logout
@@ -110,7 +109,7 @@ func NavigateToPage(t *testing.T, page pw.Page, pageName string) {
 
 // CreateLabel creates a label with the given name and UID
 // Returns: LabelUID
-func CreateLabel(t *testing.T, page pw.Page, afp *AFPlaywright, labelName string) string {
+func CreateLabel(t *testing.T, page pw.Page, labelName string) string {
 	t.Helper()
 
 	// Navigate to page
@@ -243,7 +242,7 @@ definitions:
 }
 
 // CreateApplication creates a new application
-func CreateApplication(t *testing.T, page pw.Page, afp *AFPlaywright, labelUID string, metadata map[string]string) {
+func CreateApplication(t *testing.T, page pw.Page, labelUID string, metadata map[string]string) {
 	t.Helper()
 
 	// Navigate to page
@@ -349,7 +348,7 @@ func DeallocateApplication(t *testing.T, page pw.Page, labelName string) {
 }
 
 // CreateUser creates a new user with the given parameters
-func CreateUser(t *testing.T, page pw.Page, afp *AFPlaywright, username, password string, roles []string) {
+func CreateUser(t *testing.T, page pw.Page, username, password string, roles []string) {
 	t.Helper()
 
 	// Navigate to manage page
@@ -514,6 +513,7 @@ func VerifyApplicationInList(t *testing.T, page pw.Page, labelName, owner, statu
 
 // CloseAllNotifications checks here is no error notifications and closes to clear the view
 func CloseAllNotifications(t *testing.T, page pw.Page) {
+	t.Helper()
 	notificationsElement := page.Locator("#notifications")
 
 	// Check there is no error notifications

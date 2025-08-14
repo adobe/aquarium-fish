@@ -56,7 +56,7 @@ type TypeInfo struct {
 // FieldInfo represents information about a protobuf field
 type FieldInfo struct {
 	Name         string
-	JsonName     string
+	JSONName     string
 	TypeName     string
 	TypeScript   string
 	IsOptional   bool
@@ -142,6 +142,8 @@ func getTypeScriptType(field *protogen.Field) string {
 		return "any" // For other message types
 	case protoreflect.EnumKind:
 		return "number"
+	case protoreflect.GroupKind:
+		return "any"
 	default:
 		return "any"
 	}
@@ -180,6 +182,8 @@ func getDefaultValue(field *protogen.Field) string {
 		return "null"
 	case protoreflect.EnumKind:
 		return "0"
+	case protoreflect.GroupKind:
+		return "null"
 	default:
 		return "null"
 	}
@@ -219,7 +223,7 @@ func camelToTitle(s string) string {
 // processMessage processes a protobuf message and returns TypeInfo
 func processMessage(msg *protogen.Message) *TypeInfo {
 	// Get the proto file name without extension for the import path
-	protoFileName := string(msg.Desc.ParentFile().Path())
+	protoFileName := msg.Desc.ParentFile().Path()
 	// Extract just the filename without the path
 	if slashIndex := strings.LastIndex(protoFileName, "/"); slashIndex != -1 {
 		protoFileName = protoFileName[slashIndex+1:]
@@ -238,7 +242,7 @@ func processMessage(msg *protogen.Message) *TypeInfo {
 	for _, field := range msg.Fields {
 		fieldInfo := FieldInfo{
 			Name:         camelToTitle(field.GoName),
-			JsonName:     field.Desc.JSONName(),
+			JSONName:     field.Desc.JSONName(),
 			TypeName:     string(field.Desc.Name()),
 			TypeScript:   getTypeScriptType(field),
 			IsOptional:   field.Desc.HasOptionalKeyword(),
@@ -249,21 +253,21 @@ func processMessage(msg *protogen.Message) *TypeInfo {
 		}
 
 		// Check for UI options
-		fieldOptions := field.Desc.Options().(*descriptorpb.FieldOptions)
-		if fieldOptions != nil {
-			if fieldUiConfig := proto.GetExtension(fieldOptions, aquariumv2.E_FieldUiConfig); fieldUiConfig != nil {
-				if config, ok := fieldUiConfig.(*aquariumv2.FieldUiConfig); ok && config != nil {
-					if config.Nocreate != nil && *config.Nocreate {
+		fieldOptions, ok := field.Desc.Options().(*descriptorpb.FieldOptions)
+		if ok && fieldOptions != nil {
+			if fieldUIConfig := proto.GetExtension(fieldOptions, aquariumv2.E_FieldUiConfig); fieldUIConfig != nil {
+				if config, ok := fieldUIConfig.(*aquariumv2.FieldUiConfig); ok && config != nil {
+					if config.Nocreate != nil && config.GetNocreate() {
 						fieldInfo.NoCreate = true
 					}
-					if config.Noedit != nil && *config.Noedit {
+					if config.Noedit != nil && config.GetNoedit() {
 						fieldInfo.NoEdit = true
 					}
-					if config.Name != nil && *config.Name != "" {
-						fieldInfo.DisplayName = *config.Name
+					if config.Name != nil && config.GetName() != "" {
+						fieldInfo.DisplayName = config.GetName()
 					}
-					if config.Autofill != nil && *config.Autofill != "" {
-						fieldInfo.AutofillType = *config.Autofill
+					if config.Autofill != nil && config.GetAutofill() != "" {
+						fieldInfo.AutofillType = config.GetAutofill()
 					}
 				}
 			}
@@ -298,8 +302,12 @@ func processMessage(msg *protogen.Message) *TypeInfo {
 			switch mapKey.Kind() {
 			case protoreflect.StringKind:
 				fieldInfo.MapKeyType = "string"
-			case protoreflect.Int32Kind, protoreflect.Int64Kind:
+			case protoreflect.Int32Kind, protoreflect.Int64Kind, protoreflect.Sint32Kind, protoreflect.Uint32Kind,
+				protoreflect.Sint64Kind, protoreflect.Uint64Kind, protoreflect.Sfixed32Kind, protoreflect.Fixed32Kind,
+				protoreflect.FloatKind, protoreflect.Sfixed64Kind, protoreflect.Fixed64Kind, protoreflect.DoubleKind:
 				fieldInfo.MapKeyType = "number"
+			case protoreflect.BoolKind, protoreflect.EnumKind, protoreflect.BytesKind, protoreflect.MessageKind, protoreflect.GroupKind:
+				fieldInfo.MapKeyType = "string"
 			default:
 				fieldInfo.MapKeyType = "string"
 			}
@@ -318,6 +326,8 @@ func processMessage(msg *protogen.Message) *TypeInfo {
 					fieldInfo.MapValueType = "number"
 				case protoreflect.BoolKind:
 					fieldInfo.MapValueType = "boolean"
+				case protoreflect.EnumKind, protoreflect.BytesKind, protoreflect.MessageKind, protoreflect.GroupKind:
+					fieldInfo.MapValueType = "any"
 				default:
 					fieldInfo.MapValueType = "any"
 				}
@@ -333,11 +343,11 @@ func processMessage(msg *protogen.Message) *TypeInfo {
 // shouldGenerateComponent determines if we should generate a component for this message
 func shouldGenerateComponent(msg *protogen.Message) bool {
 	// Check if message has UI options
-	msgOptions := msg.Desc.Options().(*descriptorpb.MessageOptions)
-	if msgOptions != nil {
+	msgOptions, ok := msg.Desc.Options().(*descriptorpb.MessageOptions)
+	if ok && msgOptions != nil {
 		if uiConfig := proto.GetExtension(msgOptions, aquariumv2.E_UiConfig); uiConfig != nil {
 			if config, ok := uiConfig.(*aquariumv2.UiConfig); ok && config != nil {
-				if config.GenerateUi != nil && *config.GenerateUi {
+				if config.GenerateUi != nil && config.GetGenerateUi() {
 					return true
 				}
 			}
@@ -346,10 +356,10 @@ func shouldGenerateComponent(msg *protogen.Message) bool {
 
 	// Also check if any field has UI options
 	for _, field := range msg.Fields {
-		fieldOptions := field.Desc.Options().(*descriptorpb.FieldOptions)
-		if fieldOptions != nil {
-			if fieldUiConfig := proto.GetExtension(fieldOptions, aquariumv2.E_FieldUiConfig); fieldUiConfig != nil {
-				if config, ok := fieldUiConfig.(*aquariumv2.FieldUiConfig); ok && config != nil {
+		fieldOptions, ok := field.Desc.Options().(*descriptorpb.FieldOptions)
+		if ok && fieldOptions != nil {
+			if fieldUIConfig := proto.GetExtension(fieldOptions, aquariumv2.E_FieldUiConfig); fieldUIConfig != nil {
+				if config, ok := fieldUIConfig.(*aquariumv2.FieldUiConfig); ok && config != nil {
 					return true
 				}
 			}
@@ -429,7 +439,7 @@ func main() {
 			}
 
 			var buf bytes.Buffer
-			err = tmpl.ExecuteTemplate(&buf, "index-template", map[string]interface{}{
+			err = tmpl.ExecuteTemplate(&buf, "index-template", map[string]any{
 				"Components": components,
 			})
 			if err != nil {

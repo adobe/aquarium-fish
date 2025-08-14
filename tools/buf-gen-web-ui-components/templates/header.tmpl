@@ -32,7 +32,7 @@ interface {{.Name}}FormProps {
 
 interface {{.Name}}FormState {
 {{- range .Fields }}
-  {{.JsonName}}: {{.TypeScript}};
+  {{.JSONName}}: {{.TypeScript}};
 {{- end }}
 }
 {{end}}

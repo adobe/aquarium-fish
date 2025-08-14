@@ -58,8 +58,8 @@ type JWTClaims struct {
 	jwt.RegisteredClaims
 }
 
-// getJWTSecret returns the JWT secret, generating it if necessary
-func getJWTSecret() []byte {
+// GetJWTSecret returns the JWT secret, generating it if necessary
+func GetJWTSecret() []byte {
 	jwtSecretOnce.Do(func() {
 		// TODO: Store jwt secret somewhere or use priv/pub key
 		jwtSecret = make([]byte, 32)
@@ -72,8 +72,8 @@ func getJWTSecret() []byte {
 
 // ParseJWTToken parses a JWT token and returns the claims
 func ParseJWTToken(tokenString string) (*JWTClaims, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return getJWTSecret(), nil
+	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(_ /*token*/ *jwt.Token) (any, error) {
+		return GetJWTSecret(), nil
 	})
 
 	if err != nil || !token.Valid {
@@ -86,11 +86,6 @@ func ParseJWTToken(tokenString string) (*JWTClaims, error) {
 	}
 
 	return claims, nil
-}
-
-// GetJWTSecret returns the JWT secret for use by other packages
-func GetJWTSecret() []byte {
-	return getJWTSecret()
 }
 
 // AuthHandler is a HTTP middleware that handles authentication
@@ -185,7 +180,7 @@ func (h *AuthHandler) Handler(next http.Handler) http.Handler {
 
 				// Create a dummy handler that just sets success
 				rateLimitPassed := false
-				dummyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				dummyHandler := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 					rateLimitPassed = true
 				})
 

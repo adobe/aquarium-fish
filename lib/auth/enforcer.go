@@ -142,6 +142,8 @@ func (e *Enforcer) roleUpdatedProcess() {
 						logger.Error("Failed to remove role permission", "role", r.Name, "permission", p, "err", err)
 					}
 				}
+			case aquariumv2.ChangeType_CHANGE_TYPE_UNSPECIFIED:
+				// Pass, nothing to do here
 			}
 		}
 	}

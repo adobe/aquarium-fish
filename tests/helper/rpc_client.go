@@ -54,6 +54,7 @@ func NewRPCClient(username, password string, clientType RPCClientType, caPool *x
 		// Create HTTP/2 transport over TLS with streaming-friendly settings
 		tr := &http2.Transport{
 			TLSClientConfig: &tls.Config{
+				MinVersion: tls.VersionTLS12,
 				NextProtos: []string{"h2", "http/1.1"}, // Prefer HTTP/2
 			},
 			// Streaming-friendly HTTP/2 settings

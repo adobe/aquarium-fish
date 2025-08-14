@@ -132,11 +132,11 @@ monitoring:
 
 // GetCA will return the node CA pool for secure communication
 func (afi *AFInstance) GetCA(tb testing.TB) *x509.CertPool {
+	tb.Helper()
 	afi.configMu.RLock()
 	caPool := afi.caPool
 	afi.configMu.RUnlock()
 	if caPool == nil {
-
 		ca, err := os.ReadFile(filepath.Join(afi.workspace, "fish_data", "ca.crt"))
 		if err != nil {
 			tb.Errorf("Unable to read Fish node CA: %v", err)

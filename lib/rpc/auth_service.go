@@ -74,12 +74,12 @@ func NewAuthService(f *fish.Fish) *AuthService {
 // Login authenticates a user and returns a JWT token
 func (s *AuthService) Login(ctx context.Context, req *connect.Request[aquariumv2.AuthServiceLoginRequest]) (*connect.Response[aquariumv2.AuthServiceLoginResponse], error) {
 	logger := log.WithFunc("rpc", "AuthService.Login")
-	logger.Debug("Login attempt", "username", req.Msg.Username)
+	logger.Debug("Login attempt", "username", req.Msg.GetUsername())
 
 	// Authenticate user
-	user := s.fish.DB().UserAuth(ctx, req.Msg.Username, req.Msg.Password)
+	user := s.fish.DB().UserAuth(ctx, req.Msg.GetUsername(), req.Msg.GetPassword())
 	if user == nil {
-		logger.Debug("Authentication failed", "username", req.Msg.Username)
+		logger.Debug("Authentication failed", "username", req.Msg.GetUsername())
 		return connect.NewResponse(&aquariumv2.AuthServiceLoginResponse{
 			Status:  false,
 			Message: "Authentication failed",
@@ -106,7 +106,7 @@ func (s *AuthService) Login(ctx context.Context, req *connect.Request[aquariumv2
 		}), nil
 	}
 
-	logger.Debug("Login successful", "username", req.Msg.Username)
+	logger.Debug("Login successful", "username", req.Msg.GetUsername())
 	return connect.NewResponse(&aquariumv2.AuthServiceLoginResponse{
 		Status:  true,
 		Message: "Login successful",
@@ -120,7 +120,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, req *connect.Request[aqu
 	logger := log.WithFunc("rpc", "AuthService.RefreshToken")
 
 	// Validate refresh token
-	token, err := jwt.ParseWithClaims(req.Msg.RefreshToken, &RefreshTokenClaims{}, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(req.Msg.GetRefreshToken(), &RefreshTokenClaims{}, func(_ /*token*/ *jwt.Token) (any, error) {
 		return s.refreshSecret, nil
 	})
 
@@ -170,7 +170,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, req *connect.Request[aqu
 }
 
 // GetPermissions returns the current user's permissions
-func (s *AuthService) GetPermissions(ctx context.Context, req *connect.Request[aquariumv2.AuthServiceGetPermissionsRequest]) (*connect.Response[aquariumv2.AuthServiceGetPermissionsResponse], error) {
+func (s *AuthService) GetPermissions(ctx context.Context, _ /*req*/ *connect.Request[aquariumv2.AuthServiceGetPermissionsRequest]) (*connect.Response[aquariumv2.AuthServiceGetPermissionsResponse], error) {
 	logger := log.WithFunc("rpc", "AuthService.GetPermissions")
 
 	// Get user from context (should be set by auth middleware)
@@ -206,7 +206,7 @@ func (s *AuthService) ValidateToken(ctx context.Context, req *connect.Request[aq
 	logger := log.WithFunc("rpc", "AuthService.ValidateToken")
 
 	// Parse and validate token
-	token, err := jwt.ParseWithClaims(req.Msg.Token, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(req.Msg.GetToken(), &JWTClaims{}, func(_ /*token*/ *jwt.Token) (any, error) {
 		return s.jwtSecret, nil
 	})
 
@@ -352,7 +352,7 @@ func (s *AuthService) buildUserSession(ctx context.Context, user *typesv2.User) 
 
 // ParseJWTToken parses a JWT token and returns the claims
 func (s *AuthService) ParseJWTToken(tokenString string) (*JWTClaims, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(_ /*token*/ *jwt.Token) (any, error) {
 		return s.jwtSecret, nil
 	})
 

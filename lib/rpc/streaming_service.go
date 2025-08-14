@@ -698,25 +698,25 @@ func (s *StreamingService) shouldSendApplicationResourceObject(sub *subscription
 }
 
 // shouldSendRoleObject returns true since subscribers already have required permission
-func (s *StreamingService) shouldSendRoleObject(_ *subscription, _ *typesv2.Role, _ /*method*/ string) bool {
+func (*StreamingService) shouldSendRoleObject(_ *subscription, _ *typesv2.Role, _ /*method*/ string) bool {
 	// We checking role get access during subscription, so if user has one - no need to filter out anything
 	return true
 }
 
 // shouldSendLabelObject returns true since subscribers already have required permission
-func (s *StreamingService) shouldSendLabelObject(_ *subscription, _ *typesv2.Label, _ /*method*/ string) bool {
+func (*StreamingService) shouldSendLabelObject(_ *subscription, _ *typesv2.Label, _ /*method*/ string) bool {
 	// Labels generally available for everyone, so no need in additional checks since user already has label get permission
 	return true
 }
 
 // shouldSendUserObject returns true since subscribers already have required permission
-func (s *StreamingService) shouldSendUserObject(_ *subscription, _ *typesv2.User, _ /*method*/ string) bool {
+func (*StreamingService) shouldSendUserObject(_ *subscription, _ *typesv2.User, _ /*method*/ string) bool {
 	// We checking user get access during subscription, so if user has one - no need to filter out anything
 	return true
 }
 
 // shouldSendNodeObject returns true since subscribers already have required permission
-func (s *StreamingService) shouldSendNodeObject(_ *subscription, _ *typesv2.Node, _ /*method*/ string) bool {
+func (*StreamingService) shouldSendNodeObject(_ *subscription, _ *typesv2.Node, _ /*method*/ string) bool {
 	// We checking node get access during subscription, so if user has one - no need to filter out anything
 	return true
 }

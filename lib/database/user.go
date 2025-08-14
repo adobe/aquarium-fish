@@ -129,7 +129,7 @@ func (d *Database) userAuthImpl(ctx context.Context, name string, password strin
 }
 
 // userNewImpl makes new User with defined or generated password
-func (d *Database) userNewImpl(ctx context.Context, name string, password string) (string, *typesv2.User, error) {
+func (*Database) userNewImpl(ctx context.Context, name string, password string) (string, *typesv2.User, error) {
 	if password == "" {
 		password = crypt.RandString(64)
 	}

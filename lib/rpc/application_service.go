@@ -180,7 +180,7 @@ func (s *ApplicationService) Create(ctx context.Context, req *connect.Request[aq
 }
 
 // ListState returns a list of applications
-func (s *ApplicationService) ListState(ctx context.Context, req *connect.Request[aquariumv2.ApplicationServiceListStateRequest]) (*connect.Response[aquariumv2.ApplicationServiceListStateResponse], error) {
+func (s *ApplicationService) ListState(ctx context.Context, _ *connect.Request[aquariumv2.ApplicationServiceListStateRequest]) (*connect.Response[aquariumv2.ApplicationServiceListStateResponse], error) {
 	ctx, span := rpcTracer.Start(ctx, "rpc.ApplicationService.ListState")
 	defer span.End()
 
@@ -260,7 +260,7 @@ func (s *ApplicationService) GetState(ctx context.Context, req *connect.Request[
 }
 
 // ListResource returns a list of applications
-func (s *ApplicationService) ListResource(ctx context.Context, req *connect.Request[aquariumv2.ApplicationServiceListResourceRequest]) (*connect.Response[aquariumv2.ApplicationServiceListResourceResponse], error) {
+func (s *ApplicationService) ListResource(ctx context.Context, _ *connect.Request[aquariumv2.ApplicationServiceListResourceRequest]) (*connect.Response[aquariumv2.ApplicationServiceListResourceResponse], error) {
 	ctx, span := rpcTracer.Start(ctx, "rpc.ApplicationService.ListResource")
 	defer span.End()
 
@@ -382,7 +382,7 @@ func (s *ApplicationService) CreateTask(ctx context.Context, req *connect.Reques
 	ctx, span := rpcTracer.Start(ctx, "rpc.ApplicationService.CreateTask")
 	defer span.End()
 
-	if req.Msg.Task == nil {
+	if req.Msg.GetTask() == nil {
 		return connect.NewResponse(&aquariumv2.ApplicationServiceCreateTaskResponse{
 			Status: false, Message: "No task in request",
 		}), connect.NewError(connect.CodeNotFound, nil)

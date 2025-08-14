@@ -53,7 +53,7 @@ drivers:
 
 	afp.Run(t, "Login as admin user", func(t *testing.T) {
 		// Login as admin using correct admin token
-		hp.LoginUser(t, page, afp, afi, "admin", afi.AdminToken())
+		hp.LoginUser(t, page, "admin", afi.AdminToken())
 	})
 
 	afp.Run(t, "Create test role with permissions", func(t *testing.T) {

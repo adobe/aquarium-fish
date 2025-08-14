@@ -24,17 +24,17 @@ export const {{.Name}}Form: React.FC<{{.Name -}}FormProps> = ({
       const newFormData: {{.Name}}FormState = {
 {{- range .Fields }}
 {{- if .IsTimestamp }}
-        {{.JsonName}}: initialData.{{.JsonName}} ? new Date(Number(initialData.{{.JsonName}}.seconds) * 1000).toISOString().slice(0, 16) : '',
+        {{.JSONName}}: initialData.{{.JSONName}} ? new Date(Number(initialData.{{.JSONName}}.seconds) * 1000).toISOString().slice(0, 16) : '',
 {{- else if .IsRepeated }}
-        {{.JsonName}}: initialData.{{.JsonName}} || [],
+        {{.JSONName}}: initialData.{{.JSONName}} || [],
 {{- else if .IsStruct }}
-        {{.JsonName}}: initialData.{{.JsonName}} || {},
+        {{.JSONName}}: initialData.{{.JSONName}} || {},
 {{- else if .IsMessage }}
-        {{.JsonName}}: initialData.{{.JsonName}} && typeof initialData.{{.JsonName}} === 'object' ? initialData.{{.JsonName}} : {{.DefaultValue}},
+        {{.JSONName}}: initialData.{{.JSONName}} && typeof initialData.{{.JSONName}} === 'object' ? initialData.{{.JSONName}} : {{.DefaultValue}},
 {{- else if .IsOptional }}
-        {{.JsonName}}: initialData.{{.JsonName}} ?? {{.DefaultValue}},
+        {{.JSONName}}: initialData.{{.JSONName}} ?? {{.DefaultValue}},
 {{- else }}
-        {{.JsonName}}: initialData.{{.JsonName}} || {{.DefaultValue}},
+        {{.JSONName}}: initialData.{{.JSONName}} || {{.DefaultValue}},
 {{- end }}
 {{- end }}
       };
@@ -44,7 +44,7 @@ export const {{.Name}}Form: React.FC<{{.Name -}}FormProps> = ({
       const newStructText: Record<string, string> = {};
 {{- range .Fields }}
 {{- if .IsStruct }}
-      newStructText['{{.JsonName}}'] = initialData.{{.JsonName}} ? yaml.dump(initialData.{{.JsonName}}) : '';
+      newStructText['{{.JSONName}}'] = initialData.{{.JSONName}} ? yaml.dump(initialData.{{.JSONName}}) : '';
 {{- end }}
 {{- end }}
       setStructFieldText(newStructText);
@@ -61,13 +61,13 @@ export const {{.Name}}Form: React.FC<{{.Name -}}FormProps> = ({
           const data = create({{.TypeName}}Schema, {
 {{- range .Fields }}
 {{- if .IsTimestamp }}
-            {{.JsonName}}: formData.{{.JsonName}} ? { seconds: BigInt(Math.floor(new Date(formData.{{.JsonName}}).getTime() / 1000)) } : undefined,
+            {{.JSONName}}: formData.{{.JSONName}} ? { seconds: BigInt(Math.floor(new Date(formData.{{.JSONName}}).getTime() / 1000)) } : undefined,
 {{- else if .IsStruct }}
-            {{.JsonName}}: formData.{{.JsonName}},
+            {{.JSONName}}: formData.{{.JSONName}},
 {{- else if .IsOptional }}
-            {{.JsonName}}: formData.{{.JsonName}} || undefined,
+            {{.JSONName}}: formData.{{.JSONName}} || undefined,
 {{- else }}
-            {{.JsonName}}: formData.{{.JsonName}},
+            {{.JSONName}}: formData.{{.JSONName}},
 {{- end }}
 {{- end }}
           });

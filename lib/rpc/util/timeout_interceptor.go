@@ -63,13 +63,13 @@ func (i *TimeoutInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc
 }
 
 // WrapStreamingClient is not implemented as we only want to timeout unary operations
-func (i *TimeoutInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
+func (*TimeoutInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
 	// Pass through without modification for streaming operations
 	return next
 }
 
 // WrapStreamingHandler is not implemented as we only want to timeout unary operations
-func (i *TimeoutInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
+func (*TimeoutInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
 	// Pass through without modification for streaming operations
 	return next
 }
