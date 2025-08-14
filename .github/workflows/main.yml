@@ -67,6 +67,7 @@ jobs:
           if [ "x$(git status -s)" != 'x' ]; then
             echo 'Build modified the workspace, please fix or add to gitignore list:'
             git status
+            git diff
             exit 1
           fi
 
