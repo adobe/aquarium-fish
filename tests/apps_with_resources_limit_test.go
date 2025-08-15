@@ -198,7 +198,7 @@ drivers:
 	})
 
 	t.Run("3rd Application should get DEALLOCATED in 10 sec", func(t *testing.T) {
-		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
+		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 5 * time.Second}, t, func(r *h.R) {
 			resp, err := appClient.GetState(
 				context.Background(),
 				connect.NewRequest(&aquariumv2.ApplicationServiceGetStateRequest{
@@ -327,7 +327,7 @@ drivers:
 	var appStates []*aquariumv2.ApplicationState
 	var notAllocated []*aquariumv2.Application
 	t.Run("1 of 4 Applications should get ALLOCATED in 10 sec", func(t *testing.T) {
-		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
+		h.Retry(&h.Timer{Timeout: 10 * time.Second, Wait: 5 * time.Second}, t, func(r *h.R) {
 			notAllocated = []*aquariumv2.Application{}
 			appStates = []*aquariumv2.ApplicationState{}
 			for i := range apps {
@@ -387,7 +387,7 @@ drivers:
 	})
 
 	t.Run("Another Application should get ALLOCATED in 30 sec", func(t *testing.T) {
-		h.Retry(&h.Timer{Timeout: 30 * time.Second, Wait: 1 * time.Second}, t, func(r *h.R) {
+		h.Retry(&h.Timer{Timeout: 30 * time.Second, Wait: 5 * time.Second}, t, func(r *h.R) {
 			notAllocated = []*aquariumv2.Application{}
 			appStates = []*aquariumv2.ApplicationState{}
 			for i := range apps {
