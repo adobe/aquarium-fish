@@ -154,6 +154,11 @@ func (f *Fish) Init() error {
 
 		// Assigning admin role
 		adminUser.Roles = []string{auth.AdminRoleName}
+		// Setting unlimited rate to allow admin user to properly test the system
+		var rateLimit int32 = -1
+		adminUser.Config = &typesv2.UserConfig{
+			RateLimit: &rateLimit,
+		}
 		if err := f.db.UserCreate(ctx, adminUser); err != nil {
 			logger.Error("Failed to create the admin user", "err", err)
 			return fmt.Errorf("Fish: Failed to create the admin user: %v", err)

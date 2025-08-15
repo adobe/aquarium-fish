@@ -156,6 +156,12 @@ func (h *UserRateLimitHandler) Handler(next http.Handler) http.Handler {
 		userName := user.Name
 		userLimit := h.getUserRateLimit(r.Context(), userName)
 
+		// Checking if user's limit is set to -1 which means no limit
+		if userLimit == -1 {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		// Get or create entry for user
 		h.mutex.RLock()
 		entry, exists := h.entries[userName]
