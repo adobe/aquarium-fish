@@ -32,15 +32,18 @@ fi
 # Building for host os to generate & build web
 [ "x$NOBUILD" != 'x' ] || SKIPCHECK=1 ./build.sh
 
-docker run -v $PWD:/ws -v $HOME/go/pkg:/go/pkg -w /ws --rm -it aquarium-fish-webtests-playwright sh -exc "
+[ "x$CI" != x ] || opts=-it
+
+docker run -v $PWD:/ws -v $HOME/go/pkg:/go/pkg -w /ws --rm $opts aquarium-fish-webtests-playwright sh -exc "
 [ 'x$NOBUILD' != 'x' ] || ONLYBUILD=1 NO_WEB=1 ./build.sh
 
 echo '--- RUNNING WEBTESTS $TEST ---'
 go test -json -v -parallel 4 -count=1 -race $TEST | \
     tee webtests_full.log | \
-    go run ./tools/go-test-formatter/go-test-formatter.go -stdout_timestamp test -stdout_color -stdout_filter failed || \
-    if [ "$!" != 0 ]; then
-        ([ "x$CI" != "x" ] || bash)
-        exit 1
-    fi
+    go run ./tools/go-test-formatter/go-test-formatter.go -stdout_timestamp test -stdout_color -stdout_filter failed
+
+if [ x\$? != x0 ]; then
+    ([ 'x$CI' != x ] || bash)
+    exit 1
+fi
 "
