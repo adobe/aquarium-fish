@@ -21,7 +21,7 @@ echo '---------------------- Custom Checks ----------------------'
 echo
 
 # Checking only added/modified files since main
-for f in $(git diff --name-only main); do
+for f in $(git diff --name-only origin/main); do
     # Check text files
     if file "$f" | grep -q 'text$'; then
         # Ends with newline as POSIX requires
