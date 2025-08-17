@@ -343,7 +343,7 @@ drivers:
 
 		user1OwnNotifs := countNotifications("user1", user1AppUID)
 		if user1OwnNotifs != 4 {
-			t.Errorf("ERROR: User1 should receive notifications for its own application: %#v", notifications)
+			t.Errorf("ERROR: User1 should receive notifications for its own application: (%d) %#v", user1OwnNotifs, notifications)
 		}
 	})
 
@@ -378,7 +378,7 @@ drivers:
 
 		user2OwnNotifs := countNotifications("user2", user2AppUID)
 		if user2OwnNotifs != 4 {
-			t.Errorf("ERROR: User2 should receive notifications for its own application: %#v", notifications)
+			t.Errorf("ERROR: User2 should receive notifications for its own application: (%d) %#v", user2OwnNotifs, notifications)
 		}
 	})
 
@@ -413,7 +413,7 @@ drivers:
 
 		adminOwnNotifs := countNotifications("admin", adminAppUID)
 		if adminOwnNotifs != 4 {
-			t.Errorf("ERROR: Admin should receive notifications for its own application: %#v", notifications)
+			t.Errorf("ERROR: Admin should receive notifications for its own application: (%d) %#v", adminOwnNotifs, notifications)
 		}
 	})
 

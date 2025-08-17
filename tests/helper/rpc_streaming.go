@@ -62,7 +62,7 @@ func (nb *NotificationBuffer) FindMatching(filter func(*aquariumv2.StreamingServ
 	defer nb.mutex.RUnlock()
 
 	// Search from newest to oldest
-	for i := 0; i < nb.size; i++ {
+	for i := range nb.size {
 		idx := (nb.index - 1 - i + nb.size) % nb.size
 		notification := nb.notifications[idx]
 		if notification != nil && filter(notification) {
@@ -99,20 +99,25 @@ type StreamingClient struct {
 	// Notification buffers for each subscription type
 	bufferMutex sync.RWMutex
 	buffers     map[aquariumv2.SubscriptionType]*NotificationBuffer
+
+	// Passthrough channels for direct notification access (used by tests)
+	passthroughMutex    sync.RWMutex
+	passthroughChannels map[aquariumv2.SubscriptionType]chan *aquariumv2.StreamingServiceSubscribeResponse
 }
 
 // NewStreamingClient creates a new streaming client with clean abstractions
 func NewStreamingClient(ctx context.Context, t *testing.T, name string, client aquariumv2connect.StreamingServiceClient) *StreamingClient {
 	t.Helper()
 	return &StreamingClient{
-		t:               t,
-		name:            name,
-		ctx:             ctx,
-		streamingClient: client,
-		responses:       make(map[string]*aquariumv2.StreamingServiceConnectResponse),
-		subscriptions:   make(map[aquariumv2.SubscriptionType]chan *aquariumv2.StreamingServiceSubscribeResponse),
-		waitFilters:     make(map[string]chan *aquariumv2.StreamingServiceSubscribeResponse),
-		buffers:         make(map[aquariumv2.SubscriptionType]*NotificationBuffer),
+		t:                   t,
+		name:                name,
+		ctx:                 ctx,
+		streamingClient:     client,
+		responses:           make(map[string]*aquariumv2.StreamingServiceConnectResponse),
+		subscriptions:       make(map[aquariumv2.SubscriptionType]chan *aquariumv2.StreamingServiceSubscribeResponse),
+		waitFilters:         make(map[string]chan *aquariumv2.StreamingServiceSubscribeResponse),
+		buffers:             make(map[aquariumv2.SubscriptionType]*NotificationBuffer),
+		passthroughChannels: make(map[aquariumv2.SubscriptionType]chan *aquariumv2.StreamingServiceSubscribeResponse),
 	}
 }
 
@@ -186,6 +191,7 @@ func (sc *StreamingClient) EstablishSubscriptionStreaming(subscriptionTypes []aq
 	for _, subType := range subscriptionTypes {
 		sc.subscriptions[subType] = make(chan *aquariumv2.StreamingServiceSubscribeResponse, 100)
 		sc.buffers[subType] = NewNotificationBuffer(100) // Store last 100 notifications
+		sc.passthroughChannels[subType] = make(chan *aquariumv2.StreamingServiceSubscribeResponse, 100)
 	}
 
 	// Establish subscription
@@ -303,6 +309,19 @@ func (sc *StreamingClient) EstablishSubscriptionStreaming(subscriptionTypes []aq
 						sc.logf("Added notification to buffer for %s: type=%s, change=%s", st, msg.GetObjectType(), msg.GetChangeType())
 					}
 					sc.bufferMutex.RUnlock()
+
+					// Send to passthrough channel for direct access (used by tests)
+					sc.passthroughMutex.RLock()
+					if passthroughCh, exists := sc.passthroughChannels[st]; exists {
+						select {
+						case passthroughCh <- msg:
+							// Successfully sent to passthrough channel
+						default:
+							// Passthrough channel full, skip to avoid blocking
+							sc.logf("WARNING: Passthrough channel full for %s - dropping notification", st)
+						}
+					}
+					sc.passthroughMutex.RUnlock()
 
 					// Check if any wait filters are interested in this message
 					sc.filterMutex.RLock()
@@ -575,7 +594,9 @@ func (sc *StreamingClient) WaitForApplicationTask(timeout time.Duration) (*aquar
 
 // GetStateNotifications returns the channel for application state notifications
 func (sc *StreamingClient) GetStateNotifications() <-chan *aquariumv2.StreamingServiceSubscribeResponse {
-	if channel, exists := sc.subscriptions[aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE]; exists {
+	sc.passthroughMutex.RLock()
+	defer sc.passthroughMutex.RUnlock()
+	if channel, exists := sc.passthroughChannels[aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE]; exists {
 		return channel
 	}
 	// Return empty channel if not subscribed
@@ -586,7 +607,9 @@ func (sc *StreamingClient) GetStateNotifications() <-chan *aquariumv2.StreamingS
 
 // GetResourceNotifications returns the channel for application resource notifications
 func (sc *StreamingClient) GetResourceNotifications() <-chan *aquariumv2.StreamingServiceSubscribeResponse {
-	if channel, exists := sc.subscriptions[aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE]; exists {
+	sc.passthroughMutex.RLock()
+	defer sc.passthroughMutex.RUnlock()
+	if channel, exists := sc.passthroughChannels[aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE]; exists {
 		return channel
 	}
 	// Return empty channel if not subscribed
@@ -597,7 +620,9 @@ func (sc *StreamingClient) GetResourceNotifications() <-chan *aquariumv2.Streami
 
 // GetTaskNotifications returns the channel for application task notifications
 func (sc *StreamingClient) GetTaskNotifications() <-chan *aquariumv2.StreamingServiceSubscribeResponse {
-	if channel, exists := sc.subscriptions[aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK]; exists {
+	sc.passthroughMutex.RLock()
+	defer sc.passthroughMutex.RUnlock()
+	if channel, exists := sc.passthroughChannels[aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK]; exists {
 		return channel
 	}
 	// Return empty channel if not subscribed
@@ -641,6 +666,14 @@ func (sc *StreamingClient) Close() {
 	for _, ch := range sc.subscriptions {
 		close(ch)
 	}
+
+	// Close passthrough channels
+	sc.passthroughMutex.Lock()
+	for _, ch := range sc.passthroughChannels {
+		close(ch)
+	}
+	sc.passthroughChannels = make(map[aquariumv2.SubscriptionType]chan *aquariumv2.StreamingServiceSubscribeResponse)
+	sc.passthroughMutex.Unlock()
 
 	// Close wait filter channels
 	sc.filterMutex.Lock()
