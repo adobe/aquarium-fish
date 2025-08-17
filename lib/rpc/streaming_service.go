@@ -162,66 +162,9 @@ type subscription struct {
 	cancel        context.CancelFunc
 	channels      *subChannels
 
-	// Buffer overflow protection
-	overflowMutex    sync.RWMutex
-	overflowCount    int  // Count of consecutive buffer overflows
-	isOverflowing    bool // Flag to indicate client is struggling
-	lastOverflowTime time.Time
-
 	// Goroutine coordination
 	relayWg          sync.WaitGroup // WaitGroup to coordinate relay goroutine shutdown
 	listenChannelsWg sync.WaitGroup // WaitGroup to coordinate listenChannels goroutine shutdown
-}
-
-// Buffer overflow protection constants
-const (
-	maxOverflowCount  = 5                      // Max consecutive overflows before disconnection
-	overflowTimeout   = 100 * time.Millisecond // Max time to wait for channel send
-	overflowResetTime = 30 * time.Second       // Time after which overflow count resets
-)
-
-// recordOverflow tracks buffer overflow events for this subscription
-func (sub *subscription) recordOverflow() bool {
-	sub.overflowMutex.Lock()
-	defer sub.overflowMutex.Unlock()
-
-	now := time.Now()
-
-	// Reset overflow count if enough time has passed since last overflow
-	if now.Sub(sub.lastOverflowTime) > overflowResetTime {
-		sub.overflowCount = 0
-		sub.isOverflowing = false
-	}
-
-	sub.overflowCount++
-	sub.lastOverflowTime = now
-
-	// Mark as overflowing if we hit the threshold
-	if sub.overflowCount >= maxOverflowCount {
-		sub.isOverflowing = true
-		return true // Signal that client should be disconnected
-	}
-
-	return false
-}
-
-// resetOverflow resets the overflow tracking (called on successful sends)
-func (sub *subscription) resetOverflow() {
-	sub.overflowMutex.Lock()
-	defer sub.overflowMutex.Unlock()
-
-	// Only reset if we had recent overflow issues
-	if time.Since(sub.lastOverflowTime) < overflowResetTime {
-		sub.overflowCount = 0
-		sub.isOverflowing = false
-	}
-}
-
-// isClientOverflowing checks if client is currently struggling with buffer overflow
-func (sub *subscription) isClientOverflowing() bool {
-	sub.overflowMutex.RLock()
-	defer sub.overflowMutex.RUnlock()
-	return sub.isOverflowing
 }
 
 // bidirectionalConnection represents an active bidirectional streaming connection
@@ -596,21 +539,9 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 		case <-subCtx.Done():
 			logger.Debug("Cancelled")
 
-			// Check if cancellation was due to buffer overflow
-			if sub.isClientOverflowing() {
-				logger.Warn("Client disconnected due to buffer overflow")
-				// Send buffer overflow error notification
-				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED, aquariumv2.ChangeType_CHANGE_TYPE_UNSPECIFIED, nil); err != nil {
-					logger.Debug("Failed to send buffer overflow notification", "err", err)
-				}
-				// Return error to signal client disconnect due to overflow
-				return connect.NewError(connect.CodeResourceExhausted,
-					fmt.Errorf("client disconnected due to buffer overflow - unable to keep up with notification rate"))
-			} else {
-				// Normal shutdown notification
-				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED, aquariumv2.ChangeType_CHANGE_TYPE_REMOVED, nil); err != nil {
-					logger.Debug("Failed to send subscription shutdown notification", "err", err)
-				}
+			// Normal shutdown notification
+			if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED, aquariumv2.ChangeType_CHANGE_TYPE_REMOVED, nil); err != nil {
+				logger.Debug("Failed to send subscription shutdown notification", "err", err)
 			}
 			return nil
 

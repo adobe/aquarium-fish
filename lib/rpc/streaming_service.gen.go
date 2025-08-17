@@ -486,7 +486,7 @@ func (s *StreamingService) routeRequest(ctx context.Context, requestType string,
 }
 
 // Subscription-related helper methods
-// relayApplicationNotifications safely relays application notifications with buffer overflow protection
+// relayApplicationNotifications relays application notifications with immediate disconnect on overflow
 func (s *StreamingService) relayApplicationNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.ApplicationSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
@@ -509,15 +509,12 @@ func (s *StreamingService) relayApplicationNotifications(ctx context.Context, su
 				return
 			}
 
-			// Check if client is already overflowing - skip notification to prevent further overflow
-			if sub.isClientOverflowing() {
-				logger.Debug("Skipping application notification due to client overflow")
-				continue
-			}
-
-			// Try to send safely - if this returns true, client should be disconnected
-			if shouldDisconnect := !sub.safeSendToApplicationChannel(event); shouldDisconnect {
-				logger.Error("Disconnecting client due to excessive buffer overflow")
+			// Try to send with a short timeout - disconnect if client can't keep up
+			select {
+			case sub.channels.applicationChannel <- event:
+				// Successfully sent notification
+			case <-time.After(200 * time.Millisecond):
+				logger.Error("Application channel send timeout - client cannot keep up, disconnecting")
 				sub.cancel() // This will cause the main subscription loop to exit
 				return
 			}
@@ -525,7 +522,7 @@ func (s *StreamingService) relayApplicationNotifications(ctx context.Context, su
 	}
 }
 
-// relayApplicationStateNotifications safely relays applicationState notifications with buffer overflow protection
+// relayApplicationStateNotifications relays applicationState notifications with immediate disconnect on overflow
 func (s *StreamingService) relayApplicationStateNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.ApplicationStateSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
@@ -548,15 +545,12 @@ func (s *StreamingService) relayApplicationStateNotifications(ctx context.Contex
 				return
 			}
 
-			// Check if client is already overflowing - skip notification to prevent further overflow
-			if sub.isClientOverflowing() {
-				logger.Debug("Skipping applicationState notification due to client overflow")
-				continue
-			}
-
-			// Try to send safely - if this returns true, client should be disconnected
-			if shouldDisconnect := !sub.safeSendToApplicationStateChannel(event); shouldDisconnect {
-				logger.Error("Disconnecting client due to excessive buffer overflow")
+			// Try to send with a short timeout - disconnect if client can't keep up
+			select {
+			case sub.channels.applicationStateChannel <- event:
+				// Successfully sent notification
+			case <-time.After(200 * time.Millisecond):
+				logger.Error("ApplicationState channel send timeout - client cannot keep up, disconnecting")
 				sub.cancel() // This will cause the main subscription loop to exit
 				return
 			}
@@ -564,7 +558,7 @@ func (s *StreamingService) relayApplicationStateNotifications(ctx context.Contex
 	}
 }
 
-// relayApplicationResourceNotifications safely relays applicationResource notifications with buffer overflow protection
+// relayApplicationResourceNotifications relays applicationResource notifications with immediate disconnect on overflow
 func (s *StreamingService) relayApplicationResourceNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.ApplicationResourceSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
@@ -587,15 +581,12 @@ func (s *StreamingService) relayApplicationResourceNotifications(ctx context.Con
 				return
 			}
 
-			// Check if client is already overflowing - skip notification to prevent further overflow
-			if sub.isClientOverflowing() {
-				logger.Debug("Skipping applicationResource notification due to client overflow")
-				continue
-			}
-
-			// Try to send safely - if this returns true, client should be disconnected
-			if shouldDisconnect := !sub.safeSendToApplicationResourceChannel(event); shouldDisconnect {
-				logger.Error("Disconnecting client due to excessive buffer overflow")
+			// Try to send with a short timeout - disconnect if client can't keep up
+			select {
+			case sub.channels.applicationResourceChannel <- event:
+				// Successfully sent notification
+			case <-time.After(200 * time.Millisecond):
+				logger.Error("ApplicationResource channel send timeout - client cannot keep up, disconnecting")
 				sub.cancel() // This will cause the main subscription loop to exit
 				return
 			}
@@ -603,7 +594,7 @@ func (s *StreamingService) relayApplicationResourceNotifications(ctx context.Con
 	}
 }
 
-// relayApplicationTaskNotifications safely relays applicationTask notifications with buffer overflow protection
+// relayApplicationTaskNotifications relays applicationTask notifications with immediate disconnect on overflow
 func (s *StreamingService) relayApplicationTaskNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.ApplicationTaskSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
@@ -626,15 +617,12 @@ func (s *StreamingService) relayApplicationTaskNotifications(ctx context.Context
 				return
 			}
 
-			// Check if client is already overflowing - skip notification to prevent further overflow
-			if sub.isClientOverflowing() {
-				logger.Debug("Skipping applicationTask notification due to client overflow")
-				continue
-			}
-
-			// Try to send safely - if this returns true, client should be disconnected
-			if shouldDisconnect := !sub.safeSendToApplicationTaskChannel(event); shouldDisconnect {
-				logger.Error("Disconnecting client due to excessive buffer overflow")
+			// Try to send with a short timeout - disconnect if client can't keep up
+			select {
+			case sub.channels.applicationTaskChannel <- event:
+				// Successfully sent notification
+			case <-time.After(200 * time.Millisecond):
+				logger.Error("ApplicationTask channel send timeout - client cannot keep up, disconnecting")
 				sub.cancel() // This will cause the main subscription loop to exit
 				return
 			}
@@ -642,7 +630,7 @@ func (s *StreamingService) relayApplicationTaskNotifications(ctx context.Context
 	}
 }
 
-// relayRoleNotifications safely relays role notifications with buffer overflow protection
+// relayRoleNotifications relays role notifications with immediate disconnect on overflow
 func (s *StreamingService) relayRoleNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.RoleSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
@@ -665,15 +653,12 @@ func (s *StreamingService) relayRoleNotifications(ctx context.Context, subscript
 				return
 			}
 
-			// Check if client is already overflowing - skip notification to prevent further overflow
-			if sub.isClientOverflowing() {
-				logger.Debug("Skipping role notification due to client overflow")
-				continue
-			}
-
-			// Try to send safely - if this returns true, client should be disconnected
-			if shouldDisconnect := !sub.safeSendToRoleChannel(event); shouldDisconnect {
-				logger.Error("Disconnecting client due to excessive buffer overflow")
+			// Try to send with a short timeout - disconnect if client can't keep up
+			select {
+			case sub.channels.roleChannel <- event:
+				// Successfully sent notification
+			case <-time.After(200 * time.Millisecond):
+				logger.Error("Role channel send timeout - client cannot keep up, disconnecting")
 				sub.cancel() // This will cause the main subscription loop to exit
 				return
 			}
@@ -681,7 +666,7 @@ func (s *StreamingService) relayRoleNotifications(ctx context.Context, subscript
 	}
 }
 
-// relayLabelNotifications safely relays label notifications with buffer overflow protection
+// relayLabelNotifications relays label notifications with immediate disconnect on overflow
 func (s *StreamingService) relayLabelNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.LabelSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
@@ -704,15 +689,12 @@ func (s *StreamingService) relayLabelNotifications(ctx context.Context, subscrip
 				return
 			}
 
-			// Check if client is already overflowing - skip notification to prevent further overflow
-			if sub.isClientOverflowing() {
-				logger.Debug("Skipping label notification due to client overflow")
-				continue
-			}
-
-			// Try to send safely - if this returns true, client should be disconnected
-			if shouldDisconnect := !sub.safeSendToLabelChannel(event); shouldDisconnect {
-				logger.Error("Disconnecting client due to excessive buffer overflow")
+			// Try to send with a short timeout - disconnect if client can't keep up
+			select {
+			case sub.channels.labelChannel <- event:
+				// Successfully sent notification
+			case <-time.After(200 * time.Millisecond):
+				logger.Error("Label channel send timeout - client cannot keep up, disconnecting")
 				sub.cancel() // This will cause the main subscription loop to exit
 				return
 			}
@@ -720,7 +702,7 @@ func (s *StreamingService) relayLabelNotifications(ctx context.Context, subscrip
 	}
 }
 
-// relayNodeNotifications safely relays node notifications with buffer overflow protection
+// relayNodeNotifications relays node notifications with immediate disconnect on overflow
 func (s *StreamingService) relayNodeNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.NodeSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
@@ -743,15 +725,12 @@ func (s *StreamingService) relayNodeNotifications(ctx context.Context, subscript
 				return
 			}
 
-			// Check if client is already overflowing - skip notification to prevent further overflow
-			if sub.isClientOverflowing() {
-				logger.Debug("Skipping node notification due to client overflow")
-				continue
-			}
-
-			// Try to send safely - if this returns true, client should be disconnected
-			if shouldDisconnect := !sub.safeSendToNodeChannel(event); shouldDisconnect {
-				logger.Error("Disconnecting client due to excessive buffer overflow")
+			// Try to send with a short timeout - disconnect if client can't keep up
+			select {
+			case sub.channels.nodeChannel <- event:
+				// Successfully sent notification
+			case <-time.After(200 * time.Millisecond):
+				logger.Error("Node channel send timeout - client cannot keep up, disconnecting")
 				sub.cancel() // This will cause the main subscription loop to exit
 				return
 			}
@@ -759,7 +738,7 @@ func (s *StreamingService) relayNodeNotifications(ctx context.Context, subscript
 	}
 }
 
-// relayUserNotifications safely relays user notifications with buffer overflow protection
+// relayUserNotifications relays user notifications with immediate disconnect on overflow
 func (s *StreamingService) relayUserNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.UserSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
@@ -782,15 +761,12 @@ func (s *StreamingService) relayUserNotifications(ctx context.Context, subscript
 				return
 			}
 
-			// Check if client is already overflowing - skip notification to prevent further overflow
-			if sub.isClientOverflowing() {
-				logger.Debug("Skipping user notification due to client overflow")
-				continue
-			}
-
-			// Try to send safely - if this returns true, client should be disconnected
-			if shouldDisconnect := !sub.safeSendToUserChannel(event); shouldDisconnect {
-				logger.Error("Disconnecting client due to excessive buffer overflow")
+			// Try to send with a short timeout - disconnect if client can't keep up
+			select {
+			case sub.channels.userChannel <- event:
+				// Successfully sent notification
+			case <-time.After(200 * time.Millisecond):
+				logger.Error("User channel send timeout - client cannot keep up, disconnecting")
 				sub.cancel() // This will cause the main subscription loop to exit
 				return
 			}
@@ -843,12 +819,12 @@ func (s *StreamingService) listenChannels(sub *subscription, ctx, subCtx context
 			}
 		case event := <-sub.channels.applicationStateChannel:
 			if s.shouldSendObject(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE, event.Object) {
-				logger.Debug("Sending ApplicationState notification", "change_type", event.ChangeType, "uid", event.Object.Uid)
+				logger.Debug("Sending ApplicationState notification", "change_type", event.ChangeType, "uid", event.Object.Uid, "app_uid", event.Object.ApplicationUid, "app_status", event.Object.Status)
 				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE, event.ChangeType, event.Object.ToApplicationState()); err != nil {
 					logger.Error("Error sending ApplicationState update", "err", err)
 				}
 			} else {
-				logger.Debug("Skipping ApplicationState notification for user", "user", sub.userName)
+				logger.Debug("Skipping ApplicationState notification for user", "user", sub.userName, "app_uid", event.Object.ApplicationUid, "app_status", event.Object.Status)
 			}
 		case event := <-sub.channels.applicationResourceChannel:
 			if s.shouldSendObject(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE, event.Object) {
@@ -1140,134 +1116,6 @@ func (s *StreamingService) shouldSendUser(sub *subscription) bool {
 		}
 	}
 	return false
-}
-
-// safeSendToApplicationChannel attempts to send to state channel with overflow detection
-func (sub *subscription) safeSendToApplicationChannel(event database.ApplicationSubscriptionEvent) bool {
-	logger := log.WithFunc("rpc", "safeSendToApplicationChannel").With("subs_uid", sub.id, "sub_user", sub.userName)
-	select {
-	case sub.channels.applicationChannel <- event:
-		sub.resetOverflow()
-		return true
-	case <-time.After(overflowTimeout):
-		logger.Warn("Application channel send timeout (buffer overflow)")
-		return sub.recordOverflow()
-	default:
-		logger.Warn("Application channel full (buffer overflow)")
-		return sub.recordOverflow()
-	}
-}
-
-// safeSendToApplicationStateChannel attempts to send to state channel with overflow detection
-func (sub *subscription) safeSendToApplicationStateChannel(event database.ApplicationStateSubscriptionEvent) bool {
-	logger := log.WithFunc("rpc", "safeSendToApplicationStateChannel").With("subs_uid", sub.id, "sub_user", sub.userName)
-	select {
-	case sub.channels.applicationStateChannel <- event:
-		sub.resetOverflow()
-		return true
-	case <-time.After(overflowTimeout):
-		logger.Warn("ApplicationState channel send timeout (buffer overflow)")
-		return sub.recordOverflow()
-	default:
-		logger.Warn("ApplicationState channel full (buffer overflow)")
-		return sub.recordOverflow()
-	}
-}
-
-// safeSendToApplicationResourceChannel attempts to send to state channel with overflow detection
-func (sub *subscription) safeSendToApplicationResourceChannel(event database.ApplicationResourceSubscriptionEvent) bool {
-	logger := log.WithFunc("rpc", "safeSendToApplicationResourceChannel").With("subs_uid", sub.id, "sub_user", sub.userName)
-	select {
-	case sub.channels.applicationResourceChannel <- event:
-		sub.resetOverflow()
-		return true
-	case <-time.After(overflowTimeout):
-		logger.Warn("ApplicationResource channel send timeout (buffer overflow)")
-		return sub.recordOverflow()
-	default:
-		logger.Warn("ApplicationResource channel full (buffer overflow)")
-		return sub.recordOverflow()
-	}
-}
-
-// safeSendToApplicationTaskChannel attempts to send to state channel with overflow detection
-func (sub *subscription) safeSendToApplicationTaskChannel(event database.ApplicationTaskSubscriptionEvent) bool {
-	logger := log.WithFunc("rpc", "safeSendToApplicationTaskChannel").With("subs_uid", sub.id, "sub_user", sub.userName)
-	select {
-	case sub.channels.applicationTaskChannel <- event:
-		sub.resetOverflow()
-		return true
-	case <-time.After(overflowTimeout):
-		logger.Warn("ApplicationTask channel send timeout (buffer overflow)")
-		return sub.recordOverflow()
-	default:
-		logger.Warn("ApplicationTask channel full (buffer overflow)")
-		return sub.recordOverflow()
-	}
-}
-
-// safeSendToRoleChannel attempts to send to state channel with overflow detection
-func (sub *subscription) safeSendToRoleChannel(event database.RoleSubscriptionEvent) bool {
-	logger := log.WithFunc("rpc", "safeSendToRoleChannel").With("subs_uid", sub.id, "sub_user", sub.userName)
-	select {
-	case sub.channels.roleChannel <- event:
-		sub.resetOverflow()
-		return true
-	case <-time.After(overflowTimeout):
-		logger.Warn("Role channel send timeout (buffer overflow)")
-		return sub.recordOverflow()
-	default:
-		logger.Warn("Role channel full (buffer overflow)")
-		return sub.recordOverflow()
-	}
-}
-
-// safeSendToLabelChannel attempts to send to state channel with overflow detection
-func (sub *subscription) safeSendToLabelChannel(event database.LabelSubscriptionEvent) bool {
-	logger := log.WithFunc("rpc", "safeSendToLabelChannel").With("subs_uid", sub.id, "sub_user", sub.userName)
-	select {
-	case sub.channels.labelChannel <- event:
-		sub.resetOverflow()
-		return true
-	case <-time.After(overflowTimeout):
-		logger.Warn("Label channel send timeout (buffer overflow)")
-		return sub.recordOverflow()
-	default:
-		logger.Warn("Label channel full (buffer overflow)")
-		return sub.recordOverflow()
-	}
-}
-
-// safeSendToNodeChannel attempts to send to state channel with overflow detection
-func (sub *subscription) safeSendToNodeChannel(event database.NodeSubscriptionEvent) bool {
-	logger := log.WithFunc("rpc", "safeSendToNodeChannel").With("subs_uid", sub.id, "sub_user", sub.userName)
-	select {
-	case sub.channels.nodeChannel <- event:
-		sub.resetOverflow()
-		return true
-	case <-time.After(overflowTimeout):
-		logger.Warn("Node channel send timeout (buffer overflow)")
-		return sub.recordOverflow()
-	default:
-		logger.Warn("Node channel full (buffer overflow)")
-		return sub.recordOverflow()
-	}
-}
-
-// safeSendToUserChannel attempts to send to state channel with overflow detection
-func (sub *subscription) safeSendToUserChannel(event database.UserSubscriptionEvent) bool {
-	logger := log.WithFunc("rpc", "safeSendToUserChannel").With("subs_uid", sub.id, "sub_user", sub.userName)
-	select {
-	case sub.channels.userChannel <- event:
-		sub.resetOverflow()
-		return true
-	case <-time.After(overflowTimeout):
-		logger.Warn("User channel send timeout (buffer overflow)")
-		return sub.recordOverflow()
-	default:
-		logger.Warn("User channel full (buffer overflow)")
-		return sub.recordOverflow()
-	}
 }
 
 // getSubscriptionPermissionMethod returns the RBAC permission method for a subscription type

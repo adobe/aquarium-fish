@@ -39,5 +39,8 @@ echo '--- RUNNING WEBTESTS $TEST ---'
 go test -json -v -parallel 4 -count=1 -race $TEST | \
     tee webtests_full.log | \
     go run ./tools/go-test-formatter/go-test-formatter.go -stdout_timestamp test -stdout_color -stdout_filter failed || \
-    ([ "x$CI" != "x" ] || bash)
+    if [ "$!" != 0 ]; then
+        ([ "x$CI" != "x" ] || bash)
+        exit 1
+    fi
 "

@@ -35,7 +35,7 @@ import (
 // 1. Multiple streaming workers can create/monitor/deallocate applications continuously
 // 2. Real-time subscription monitoring works under load
 // 3. Database cleanup and compaction function properly with streaming operations
-// 4. Final database state contains exactly 6 keys after compaction
+// 4. Final database state contains exactly 6 keys (+users) after compaction
 func Test_compactdb_check(t *testing.T) {
 	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
@@ -84,11 +84,10 @@ drivers:
 	subscriptionTypes := []aquariumv2.SubscriptionType{
 		aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE,
 		aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE,
-		aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK,
 	}
 
 	if err := adminStreamingHelper.SetupFullStreaming(subscriptionTypes); err != nil {
-		t.Fatalf("Failed to setup admin streaming: %v", err)
+		t.Fatalf("ERROR: Failed to setup admin streaming: %v", err)
 	}
 
 	var labelUID string
@@ -131,12 +130,31 @@ drivers:
 
 	// Streaming worker function that uses real-time subscriptions instead of polling
 	workerFunc := func(t *testing.T, wg *sync.WaitGroup, id int) {
-		t.Logf("Worker %d: Started", id)
-		defer t.Logf("Worker %d: Ended", id)
+		workerName := fmt.Sprintf("worker-%d", id)
+		t.Logf("%s: Started", workerName)
+		defer t.Logf("%s: Ended", workerName)
 		defer wg.Done()
 
-		// Create streaming client for this worker
-		workerCli, workerOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientGRPC, afi.GetCA(t))
+		// Create test user for operations
+		userPassword := workerName + "-password"
+		workerUser := aquariumv2.User{
+			Name:     workerName + "-user",
+			Password: &userPassword,
+			Roles:    []string{"User"},
+		}
+		userReq := &aquariumv2.UserServiceCreateRequest{User: &workerUser}
+		_, err := adminStreamingHelper.SendRequestAndExpectSuccess(
+			fmt.Sprintf("create-user-%s", workerUser.Name),
+			"UserServiceCreateRequest",
+			userReq,
+			"UserServiceCreateResponse",
+		)
+		if err != nil {
+			t.Errorf("ERROR: %s: Failed to create user %s: %v", workerName, workerUser.Name, err)
+		}
+
+		// Create operational client using worker's own credentials for sending requests
+		workerCli, workerOpts := h.NewRPCClient(workerUser.Name, userPassword, h.RPCClientGRPC, afi.GetCA(t))
 		workerStreamingClient := aquariumv2connect.NewStreamingServiceClient(
 			workerCli,
 			afi.APIAddress("grpc"),
@@ -147,13 +165,19 @@ drivers:
 		workerCtx, workerCancel := context.WithTimeout(context.Background(), 300*time.Second)
 		defer workerCancel()
 
-		// Setup streaming helper for this worker
-		workerStreamingHelper := h.NewStreamingTestHelper(workerCtx, t, fmt.Sprintf("worker%d", id), workerStreamingClient)
+		// Setup operational streaming helper for this worker (for sending requests)
+		workerStreamingHelper := h.NewStreamingTestHelper(workerCtx, t, workerName, workerStreamingClient)
 		defer workerStreamingHelper.Close()
 
-		// Setup streaming for this worker
-		if err := workerStreamingHelper.SetupFullStreaming(subscriptionTypes); err != nil {
-			t.Errorf("Worker %d: Failed to setup streaming: %v", id, err)
+		// Setup bidirectional streaming for operations (using worker's credentials)
+		if err := workerStreamingHelper.GetStreamingClient().EstablishBidirectionalStreaming(); err != nil {
+			t.Errorf("ERROR: %s: Failed to setup operational streaming: %v", workerName, err)
+			return
+		}
+
+		// Setup subscription streaming for monitoring
+		if err := workerStreamingHelper.GetStreamingClient().EstablishSubscriptionStreaming(subscriptionTypes); err != nil {
+			t.Errorf("ERROR: %s: Failed to setup monitoring streaming: %v", workerName, err)
 			return
 		}
 
@@ -161,8 +185,8 @@ drivers:
 		for atomic.LoadInt32(&completed) == 0 {
 			counter += 1
 			// Create new application using streaming helper
-			t.Logf("Worker %d: Starting new application", id)
-			md, _ := structpb.NewStruct(map[string]any{"worker": fmt.Sprintf("worker-%d", id)})
+			t.Logf("%s: Starting new application", workerName)
+			md, _ := structpb.NewStruct(map[string]any{"worker": workerName})
 			appCreateReq := &aquariumv2.ApplicationServiceCreateRequest{
 				Application: &aquariumv2.Application{
 					LabelUid: labelUID,
@@ -177,41 +201,40 @@ drivers:
 				"ApplicationServiceCreateResponse",
 			)
 			if err != nil {
-				t.Errorf("Worker %d: Failed to create application: %v", id, err)
+				t.Errorf("ERROR: %s: Failed to create application: %v", workerName, err)
 				return
 			}
 
 			var appResp aquariumv2.ApplicationServiceCreateResponse
 			if err := resp.ResponseData.UnmarshalTo(&appResp); err != nil {
-				t.Errorf("Worker %d: Failed to unmarshal application response: %v", id, err)
+				t.Errorf("ERROR: %s: Failed to unmarshal application response: %v", workerName, err)
 				return
 			}
 
 			appUID := appResp.Data.Uid
 			if appUID == "" {
-				t.Errorf("Worker %d: Application UID is empty", id)
+				t.Errorf("ERROR: %s: Application UID is empty", workerName)
 				return
 			}
-			t.Logf("Worker %d: Created application %s", id, appUID)
+			t.Logf("%s: Created application %s", workerName, appUID)
 
-			// Wait for ALLOCATED state using real-time subscription (no polling!)
+			// Wait for ALLOCATED state
 			_, err = workerStreamingHelper.GetStreamingClient().WaitForApplicationState(
 				appUID,
 				aquariumv2.ApplicationState_ALLOCATED,
 				15*time.Second,
 			)
 			if err != nil {
-				t.Errorf("Worker %d: Failed to wait for ALLOCATED state of Application %s: %v", id, appUID, err)
+				t.Errorf("ERROR: %s: Failed to wait for ALLOCATED state of Application %s: %v", workerName, appUID, err)
 				return
 			}
-			t.Logf("Worker %d: Application allocated %s", id, appUID)
+			t.Logf("%s: Application allocated %s", workerName, appUID)
 
 			// Deallocate the application
-			t.Logf("Worker %d: Deallocating application %s", id, appUID)
+			t.Logf("%s: Deallocating application %s", workerName, appUID)
 			deallocateReq := &aquariumv2.ApplicationServiceDeallocateRequest{
 				ApplicationUid: appUID,
 			}
-
 			_, err = workerStreamingHelper.SendRequestAndExpectSuccess(
 				fmt.Sprintf("deallocate-app-%04d", counter),
 				"ApplicationServiceDeallocateRequest",
@@ -219,20 +242,20 @@ drivers:
 				"ApplicationServiceDeallocateResponse",
 			)
 			if err != nil {
-				t.Errorf("Worker %d: Failed to deallocate application: %v", id, err)
+				t.Errorf("ERROR: %s: Failed to deallocate application: %v", workerName, err)
 				return
 			}
-			t.Logf("Worker %d: Deallocation of application completed %s", id, appUID)
+			t.Logf("%s: Deallocation of application completed %s", workerName, appUID)
 
-			// Optional: Wait for DEALLOCATED state to ensure complete cleanup
+			// Wait for DEALLOCATED state
 			_, err = workerStreamingHelper.GetStreamingClient().WaitForApplicationState(
 				appUID,
 				aquariumv2.ApplicationState_DEALLOCATED,
 				10*time.Second,
 			)
 			if err != nil {
-				t.Logf("Worker %d: Warning - failed to wait for DEALLOCATED state: %v", id, err)
-				// Don't return here, as deallocation might complete without this state change
+				t.Errorf("ERROR: %s: failed to wait for DEALLOCATED state: %v", workerName, err)
+				return
 			}
 
 			time.Sleep(500 * time.Millisecond)
@@ -241,10 +264,12 @@ drivers:
 
 	// Run multiple streaming worker routines to keep DB busy during the processes
 	wg := &sync.WaitGroup{}
+	usersAmount := 0
 	for id := range 10 {
 		wg.Add(1)
 		go workerFunc(t, wg, id)
 		time.Sleep(123 * time.Millisecond)
+		usersAmount += 1
 	}
 
 	t.Run("Applications should be cleaned from DB and compacted", func(t *testing.T) {
@@ -279,11 +304,11 @@ drivers:
 			"ApplicationServiceListResponse",
 		)
 		if err != nil {
-			t.Errorf("Failed to request list of applications: %v", err)
+			t.Errorf("ERROR: Failed to request list of applications: %v", err)
 		} else {
 			var appListResp aquariumv2.ApplicationServiceListResponse
 			if err := listResp.ResponseData.UnmarshalTo(&appListResp); err != nil {
-				t.Errorf("Failed to unmarshal application list response: %v", err)
+				t.Errorf("ERROR: Failed to unmarshal application list response: %v", err)
 			} else if len(appListResp.Data) > 0 {
 				for _, app := range appListResp.Data {
 					t.Logf("Found residue application: %s", app.String())
@@ -292,6 +317,7 @@ drivers:
 		}
 
 		compacted := make(chan error)
+		itemsShouldLeft := fmt.Sprintf("%d", 6+usersAmount)
 		afi.WaitForLog(` database.compactdb=after`, func(substring, line string) bool {
 			t.Logf("Found compact db result: %s", line)
 			// Check the Keys get back to normal
@@ -302,14 +328,14 @@ drivers:
 				}
 				spl = strings.Split(val, "=")
 				// Database should have just 6 keys left: user/admin, label/UID and node/node-1,
-				// role/Administrator, role/User, role/Power
-				if spl[1] != "6" {
-					t.Errorf("Wrong amount of keys left in the database: %s != 6", spl[1])
+				// role/Administrator, role/User, role/Power + amount of users created for workers
+				if spl[1] != itemsShouldLeft {
+					t.Errorf("ERROR: Wrong amount of keys left in the database: %s != %s", spl[1], itemsShouldLeft)
 				}
 				break
 			}
 			if spl[0] != "database.keys" {
-				t.Errorf("Unable to locate database compaction result for database.keys: %s", spl[0])
+				t.Errorf("ERROR: Unable to locate database compaction result for database.keys: %s", spl[0])
 			}
 			compacted <- nil
 			return true

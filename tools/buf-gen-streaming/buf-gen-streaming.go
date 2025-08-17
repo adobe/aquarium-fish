@@ -185,7 +185,7 @@ func (s *StreamingService) routeRequest(ctx context.Context, requestType string,
 
 // Subscription-related helper methods
 {{- range .Subscriptions }}
-// {{ .RelayMethodName }} safely relays {{ .MessageType | toLower }} notifications with buffer overflow protection
+// {{ .RelayMethodName }} relays {{ .MessageType | toLower }} notifications with immediate disconnect on overflow
 func (s *StreamingService) {{ .RelayMethodName }}(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.{{ .MessageType }}SubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
@@ -208,15 +208,12 @@ func (s *StreamingService) {{ .RelayMethodName }}(ctx context.Context, subscript
 				return
 			}
 
-			// Check if client is already overflowing - skip notification to prevent further overflow
-			if sub.isClientOverflowing() {
-				logger.Debug("Skipping {{ .MessageType | toLower }} notification due to client overflow")
-				continue
-			}
-
-			// Try to send safely - if this returns true, client should be disconnected
-			if shouldDisconnect := !sub.{{ .SafeSendMethod }}(event); shouldDisconnect {
-				logger.Error("Disconnecting client due to excessive buffer overflow")
+			// Try to send with a short timeout - disconnect if client can't keep up
+			select {
+			case sub.channels.{{ .ChannelFieldName }} <- event:
+				// Successfully sent notification
+			case <-time.After(200 * time.Millisecond):
+				logger.Error("{{ .MessageType }} channel send timeout - client cannot keep up, disconnecting")
 				sub.cancel() // This will cause the main subscription loop to exit
 				return
 			}
@@ -259,12 +256,12 @@ func (s *StreamingService) listenChannels(sub *subscription, ctx, subCtx context
 {{- range .Subscriptions }}
 		case event := <-sub.channels.{{ .ChannelFieldName }}:
 			if s.shouldSendObject(sub, aquariumv2.{{ .SubscriptionType }}, event.Object) {
-				logger.Debug("Sending {{ .MessageType }} notification", "change_type", event.ChangeType{{ if ne .PrimaryIDField "" }}, "{{ .PrimaryIDField }}", event.Object.{{ toCamelCase .PrimaryIDField }}{{ end }})
+				logger.Debug("Sending {{ .MessageType }} notification", "change_type", event.ChangeType{{ if ne .PrimaryIDField "" }}, "{{ .PrimaryIDField }}", event.Object.{{ toCamelCase .PrimaryIDField }}{{ end }}{{ if eq .MessageType "ApplicationState" }}, "app_uid", event.Object.ApplicationUid, "app_status", event.Object.Status{{ end }})
 				if err := s.sendSubscriptionResponse(sub, aquariumv2.{{ .SubscriptionType }}, event.ChangeType, event.Object.{{ .ConversionMethod }}()); err != nil {
 					logger.Error("Error sending {{ .MessageType }} update", "err", err)
 				}
 			} else {
-				logger.Debug("Skipping {{ .MessageType }} notification for user", "user", sub.userName)
+				logger.Debug("Skipping {{ .MessageType }} notification for user", "user", sub.userName{{ if eq .MessageType "ApplicationState" }}, "app_uid", event.Object.ApplicationUid, "app_status", event.Object.Status{{ end }})
 			}
 {{- end }}
 		}
@@ -340,24 +337,7 @@ func (s *StreamingService) shouldSend{{ .MessageType }}(sub *subscription) bool 
 
 {{- end }}
 
-{{- range .Subscriptions }}
-// safeSendTo{{ .MessageType }}Channel attempts to send to state channel with overflow detection
-func (sub *subscription) safeSendTo{{ .MessageType }}Channel(event database.{{ .MessageType }}SubscriptionEvent) bool {
-	logger := log.WithFunc("rpc", "safeSendTo{{ .MessageType }}Channel").With("subs_uid", sub.id, "sub_user", sub.userName)
-	select {
-	case sub.channels.{{ .ChannelFieldName }} <- event:
-		sub.resetOverflow()
-		return true
-	case <-time.After(overflowTimeout):
-		logger.Warn("{{ .MessageType }} channel send timeout (buffer overflow)")
-		return sub.recordOverflow()
-	default:
-		logger.Warn("{{ .MessageType }} channel full (buffer overflow)")
-		return sub.recordOverflow()
-	}
-}
 
-{{- end }}
 
 // getSubscriptionPermissionMethod returns the RBAC permission method for a subscription type
 func (s *StreamingService) getSubscriptionPermissionMethod(subscriptionType aquariumv2.SubscriptionType) string {
