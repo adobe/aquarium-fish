@@ -29,7 +29,7 @@ curr_version="$(echo "$curr_label" | grep -o '"version": *[0-9]\+' | tr -dc '0-9
 echo "Current label '$label:$curr_version': $curr_label"
 
 [ "x$curr_version" != "x" ] || curr_version=0
-new_version=$(($curr_version+1))
+new_version=$(($curr_version + 1))
 
 echo
 echo "Create the new version of Label '$label:$new_version' ?"
@@ -38,26 +38,25 @@ read w1
 
 label_id=$(curl -s -u "admin:$token" -k -X POST -H 'Content-Type: application/yaml' -d '---
 label:
-  label:
-    name: "'$label'"
-    version: '$new_version'
-    definitions:
-      - driver: aws
-        options:
-          image: ami-0aab355e1bfa1e72e
-          instance_type: c6a.4xlarge
-          security_group: test-sec-group
-          userdata_format: env
-        resources:
-          cpu: 16
-          ram: 32
-          disks:
-            /dev/sdc:
-              label: Name:workspace_lin
-              size: 10
-          network: Name:test-vpc
-    metadata:
-      JENKINS_AGENT_WORKSPACE: /mnt/ws
+  name: "'$label'"
+  version: '$new_version'
+  definitions:
+    - driver: aws
+      options:
+        image: ami-0aab355e1bfa1e72e
+        instance_type: c6a.4xlarge
+        security_group: test-sec-group
+        userdata_format: env
+      resources:
+        cpu: 16
+        ram: 32
+        disks:
+          /dev/sdc:
+            label: Name:workspace_lin
+            size: 10
+        network: Name:test-vpc
+  metadata:
+    JENKINS_AGENT_WORKSPACE: /mnt/ws
 ' "https://$hostport/grpc/aquarium.v2.LabelService/Create" | grep -o '"uid": *"[^"]\+"' | cut -d':' -f 2 | tr -d ' "')
 
 echo "Created Label ID: ${label_id}"
