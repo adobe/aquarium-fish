@@ -1,0 +1,128 @@
+{{define "map-field" -}}
+<div className="border border-gray-300 rounded-md p-3 dark:border-gray-600 space-y-4">
+  <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+    {{.DisplayName}} ({{.MapKeyType}} → {{.MapValueType}})
+  </div>
+  {{- if .IsMessage }}
+  {/* Map with message values - render nested components */}
+  <div className="space-y-3">
+    {Object.entries(formData.{{.JSONName}} || {}).map(([key, value]) => (
+      <div key={key} className="relative border border-gray-300 rounded-lg p-3 bg-gray-50 dark:bg-gray-700 dark:border-gray-600">
+        <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200 dark:border-gray-600">
+          <input
+            type="text"
+            value={key}
+            onChange={(e) => {
+              const newMap = { ...formData.{{.JSONName}} };
+              if (e.target.value !== key) {
+                delete newMap[key];
+                newMap[e.target.value] = value;
+                handleFieldChange('{{.JSONName}}', newMap);
+              }
+            }}
+            disabled={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
+            className="flex-1 max-w-xs px-2 py-1 text-sm border border-gray-300 rounded dark:bg-gray-600 dark:border-gray-500"
+            placeholder="Key"
+          />
+          {!isReadOnly && !(mode === 'edit' && {{.NoEdit}}) && (
+            <button
+              type="button"
+              onClick={() => {
+                const newMap = { ...formData.{{.JSONName}} };
+                delete newMap[key];
+                handleFieldChange('{{.JSONName}}', newMap);
+              }}
+              className="flex items-center justify-center w-6 h-6 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors ml-2"
+              title="Remove entry"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+        <div className="pl-2">
+          {(() => {
+            const ComponentName = '{{.MapValueType}}Form';
+            const NestedComponent = (Components as any)[ComponentName];
+
+            if (NestedComponent) {
+              return (
+                <NestedComponent
+                  mode={mode}
+                  initialData={value}
+                  onSubmit={(data: any) => {
+                    const newMap = { ...formData.{{.JSONName}} };
+                    newMap[key] = data;
+                    handleFieldChange('{{.JSONName}}', newMap);
+                  }}
+                  onCancel={() => {}}
+                  title={key}
+                  readonly={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
+                  nested={true}
+                />
+              );
+            }
+
+            // Fallback to JSON editor
+            return (
+              <div className="space-y-2">
+                <div className="text-xs text-gray-500">
+                  {{.MapValueType}} (Component not available)
+                </div>
+                <textarea
+                  value={JSON.stringify(value, null, 2)}
+                  onChange={(e) => {
+                    try {
+                      const parsed = JSON.parse(e.target.value);
+                      const newMap = { ...formData.{{.JSONName}} };
+                      newMap[key] = parsed;
+                      handleFieldChange('{{.JSONName}}', newMap);
+                    } catch (error) {
+                      // Invalid JSON, keep the text value for user to fix
+                    }
+                  }}
+                  disabled={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
+                  className="w-full h-20 px-2 py-1 text-sm border border-gray-300 rounded font-mono dark:bg-gray-600 dark:border-gray-500 dark:text-white"
+                  placeholder="Enter JSON object..."
+                />
+              </div>
+            );
+          })()}
+        </div>
+      </div>
+    ))}
+    {!isReadOnly && !(mode === 'edit' && {{.NoEdit}}) && (
+      <button
+        type="button"
+        onClick={() => {
+          const newKey = 'new_key_' + Date.now();
+          const newMap = { ...formData.{{.JSONName}} };
+          newMap[newKey] = {};
+          handleFieldChange('{{.JSONName}}', newMap);
+        }}
+        className="w-full px-3 py-2 text-sm border-2 border-dashed border-gray-300 text-gray-600 rounded-md hover:border-green-400 hover:text-green-600 transition-colors"
+      >
+        + Add {{.MapValueType}}
+      </button>
+    )}
+  </div>
+  {{- else }}
+  {/* Map with primitive values - use JSON editor */}
+  <textarea
+    value={JSON.stringify(formData.{{.JSONName}}, null, 2)}
+    onChange={(e) => {
+      try {
+        const parsed = JSON.parse(e.target.value);
+        handleFieldChange('{{.JSONName}}', parsed);
+      } catch (error) {
+        // Invalid JSON, keep the text value for user to fix
+      }
+    }}
+    disabled={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
+    className="w-full h-32 px-3 py-2 border-0 font-mono text-sm dark:bg-gray-700 dark:text-white resize-none"
+    placeholder="Enter JSON object..."
+  />
+  {{- end }}
+</div>
+{{end}}

@@ -75,12 +75,11 @@ func (t *TaskImage) Execute() (result []byte, err error) {
 		return []byte(`{"error":"internal: invalid resource"}`), fmt.Errorf("AWS: %s: Invalid resource: %#v", t.driver.name, t.ApplicationResource)
 	}
 	logger = logger.With("task_uid", t.ApplicationTask.Uid, "inst_id", t.ApplicationResource.Identifier, "app_uid", t.ApplicationTask.ApplicationUid)
-	logger.Info("Creating image for Application", "app_uid", t.ApplicationTask.ApplicationUid)
+	logger.Info("Creating image for Application")
 	conn := t.driver.newEC2Conn()
 
 	var opts Options
 	if err := opts.Apply(t.LabelDefinition.Options); err != nil {
-		logger.Error("Unable to apply options", "err", err)
 		logger.Error("Unable to apply label definition options", "err", err)
 		return []byte(`{"error":"internal: unable to apply label definition options"}`), fmt.Errorf("AWS: %s: Unable to apply label definition options: %v", t.driver.name, err)
 	}
@@ -158,12 +157,12 @@ func (t *TaskImage) Execute() (result []byte, err error) {
 				volInfo := volResp.Volumes[0]
 				mapping.Ebs = &ec2types.EbsBlockDevice{
 					DeleteOnTermination: dev.Ebs.DeleteOnTermination,
-					//Encrypted:  vol_info.Encrypted,
-					//Iops:       vol_info.Iops,
-					//KmsKeyId:   vol_info.KmsKeyId,
-					//OutpostArn: vol_info.OutpostArn,
-					//SnapshotId: vol_info.SnapshotId,
-					//Throughput: vol_info.Throughput,
+					// Encrypted:  vol_info.Encrypted,
+					// Iops:       vol_info.Iops,
+					// KmsKeyId:   vol_info.KmsKeyId,
+					// OutpostArn: vol_info.OutpostArn,
+					// SnapshotId: vol_info.SnapshotId,
+					// Throughput: vol_info.Throughput,
 					VolumeSize: volInfo.Size,
 					VolumeType: volInfo.VolumeType,
 				}

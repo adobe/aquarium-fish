@@ -15,7 +15,7 @@ syntax = "proto3";
 package aquarium.v2;
 
 import "google/protobuf/timestamp.proto";
-import "aquarium/v2/rbac.proto";
+import "aquarium/v2/options_rbac.proto";
 
 option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2";
 
@@ -23,10 +23,10 @@ option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aq
 service GateProxySSHService {
   // GetResourceAccess returns credentials to access the ApplicationResource
   rpc GetResourceAccess(GateProxySSHServiceGetResourceAccessRequest) returns (GateProxySSHServiceGetResourceAccessResponse) {
-   option (access_control) = {
-     allowed_roles: ["Power"],
-     additional_actions: ["GetResourceAccessAll"],
-   };
+    option (access_control) = {
+      allowed_roles: ["Power"],
+      additional_actions: ["GetResourceAccessAll"],
+    };
   }
 }
 

@@ -1,0 +1,7 @@
+{{define "default-state" -}}
+const default{{.Name}}State: {{.Name -}}FormState = {
+{{- range .Fields }}
+  {{.JSONName}}: {{.DefaultValue}},
+{{- end }}
+};
+{{end}}

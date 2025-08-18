@@ -41,10 +41,6 @@ drivers:
   providers:
     test:`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in f", r)
@@ -52,7 +48,7 @@ drivers:
 	}()
 
 	// Create admin client
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
 
 	// Create service clients
 	labelClient := aquariumv2connect.NewLabelServiceClient(
@@ -128,10 +124,10 @@ drivers:
 		resp, err := appClient.CreateTask(
 			context.Background(),
 			connect.NewRequest(&aquariumv2.ApplicationServiceCreateTaskRequest{
-				ApplicationUid: appUID,
 				Task: &aquariumv2.ApplicationTask{
-					Task: "NOTEXISTING_TASK",
-					When: aquariumv2.ApplicationState_ALLOCATED,
+					ApplicationUid: appUID,
+					Task:           "NOTEXISTING_TASK",
+					When:           aquariumv2.ApplicationState_ALLOCATED,
 				},
 			}),
 		)

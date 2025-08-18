@@ -54,8 +54,8 @@ const (
 	UserServiceCreateProcedure = "/aquarium.v2.UserService/Create"
 	// UserServiceUpdateProcedure is the fully-qualified name of the UserService's Update RPC.
 	UserServiceUpdateProcedure = "/aquarium.v2.UserService/Update"
-	// UserServiceDeleteProcedure is the fully-qualified name of the UserService's Delete RPC.
-	UserServiceDeleteProcedure = "/aquarium.v2.UserService/Delete"
+	// UserServiceRemoveProcedure is the fully-qualified name of the UserService's Remove RPC.
+	UserServiceRemoveProcedure = "/aquarium.v2.UserService/Remove"
 )
 
 // UserServiceClient is a client for the aquarium.v2.UserService service.
@@ -70,8 +70,8 @@ type UserServiceClient interface {
 	Create(context.Context, *connect.Request[v2.UserServiceCreateRequest]) (*connect.Response[v2.UserServiceCreateResponse], error)
 	// Update existing user
 	Update(context.Context, *connect.Request[v2.UserServiceUpdateRequest]) (*connect.Response[v2.UserServiceUpdateResponse], error)
-	// Delete user
-	Delete(context.Context, *connect.Request[v2.UserServiceDeleteRequest]) (*connect.Response[v2.UserServiceDeleteResponse], error)
+	// Remove user
+	Remove(context.Context, *connect.Request[v2.UserServiceRemoveRequest]) (*connect.Response[v2.UserServiceRemoveResponse], error)
 }
 
 // NewUserServiceClient constructs a client for the aquarium.v2.UserService service. By default, it
@@ -115,10 +115,10 @@ func NewUserServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(userServiceMethods.ByName("Update")),
 			connect.WithClientOptions(opts...),
 		),
-		delete: connect.NewClient[v2.UserServiceDeleteRequest, v2.UserServiceDeleteResponse](
+		remove: connect.NewClient[v2.UserServiceRemoveRequest, v2.UserServiceRemoveResponse](
 			httpClient,
-			baseURL+UserServiceDeleteProcedure,
-			connect.WithSchema(userServiceMethods.ByName("Delete")),
+			baseURL+UserServiceRemoveProcedure,
+			connect.WithSchema(userServiceMethods.ByName("Remove")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -131,7 +131,7 @@ type userServiceClient struct {
 	get    *connect.Client[v2.UserServiceGetRequest, v2.UserServiceGetResponse]
 	create *connect.Client[v2.UserServiceCreateRequest, v2.UserServiceCreateResponse]
 	update *connect.Client[v2.UserServiceUpdateRequest, v2.UserServiceUpdateResponse]
-	delete *connect.Client[v2.UserServiceDeleteRequest, v2.UserServiceDeleteResponse]
+	remove *connect.Client[v2.UserServiceRemoveRequest, v2.UserServiceRemoveResponse]
 }
 
 // GetMe calls aquarium.v2.UserService.GetMe.
@@ -159,9 +159,9 @@ func (c *userServiceClient) Update(ctx context.Context, req *connect.Request[v2.
 	return c.update.CallUnary(ctx, req)
 }
 
-// Delete calls aquarium.v2.UserService.Delete.
-func (c *userServiceClient) Delete(ctx context.Context, req *connect.Request[v2.UserServiceDeleteRequest]) (*connect.Response[v2.UserServiceDeleteResponse], error) {
-	return c.delete.CallUnary(ctx, req)
+// Remove calls aquarium.v2.UserService.Remove.
+func (c *userServiceClient) Remove(ctx context.Context, req *connect.Request[v2.UserServiceRemoveRequest]) (*connect.Response[v2.UserServiceRemoveResponse], error) {
+	return c.remove.CallUnary(ctx, req)
 }
 
 // UserServiceHandler is an implementation of the aquarium.v2.UserService service.
@@ -176,8 +176,8 @@ type UserServiceHandler interface {
 	Create(context.Context, *connect.Request[v2.UserServiceCreateRequest]) (*connect.Response[v2.UserServiceCreateResponse], error)
 	// Update existing user
 	Update(context.Context, *connect.Request[v2.UserServiceUpdateRequest]) (*connect.Response[v2.UserServiceUpdateResponse], error)
-	// Delete user
-	Delete(context.Context, *connect.Request[v2.UserServiceDeleteRequest]) (*connect.Response[v2.UserServiceDeleteResponse], error)
+	// Remove user
+	Remove(context.Context, *connect.Request[v2.UserServiceRemoveRequest]) (*connect.Response[v2.UserServiceRemoveResponse], error)
 }
 
 // NewUserServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -217,10 +217,10 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(userServiceMethods.ByName("Update")),
 		connect.WithHandlerOptions(opts...),
 	)
-	userServiceDeleteHandler := connect.NewUnaryHandler(
-		UserServiceDeleteProcedure,
-		svc.Delete,
-		connect.WithSchema(userServiceMethods.ByName("Delete")),
+	userServiceRemoveHandler := connect.NewUnaryHandler(
+		UserServiceRemoveProcedure,
+		svc.Remove,
+		connect.WithSchema(userServiceMethods.ByName("Remove")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/aquarium.v2.UserService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -235,8 +235,8 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 			userServiceCreateHandler.ServeHTTP(w, r)
 		case UserServiceUpdateProcedure:
 			userServiceUpdateHandler.ServeHTTP(w, r)
-		case UserServiceDeleteProcedure:
-			userServiceDeleteHandler.ServeHTTP(w, r)
+		case UserServiceRemoveProcedure:
+			userServiceRemoveHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -266,6 +266,6 @@ func (UnimplementedUserServiceHandler) Update(context.Context, *connect.Request[
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.UserService.Update is not implemented"))
 }
 
-func (UnimplementedUserServiceHandler) Delete(context.Context, *connect.Request[v2.UserServiceDeleteRequest]) (*connect.Response[v2.UserServiceDeleteResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.UserService.Delete is not implemented"))
+func (UnimplementedUserServiceHandler) Remove(context.Context, *connect.Request[v2.UserServiceRemoveRequest]) (*connect.Response[v2.UserServiceRemoveResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.UserService.Remove is not implemented"))
 }

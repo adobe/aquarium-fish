@@ -27,6 +27,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/adobe/aquarium-fish/lib/auth"
+	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/log"
 	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	rpcutil "github.com/adobe/aquarium-fish/lib/rpc/util"
@@ -35,9 +36,14 @@ import (
 
 // subChannels is used to store channels for subscriptions communications
 type subChannels struct {
-	applicationStateChannel    chan *typesv2.ApplicationState
-	applicationResourceChannel chan *typesv2.ApplicationResource
-	applicationTaskChannel     chan *typesv2.ApplicationTask
+	applicationChannel         chan database.ApplicationSubscriptionEvent
+	applicationStateChannel    chan database.ApplicationStateSubscriptionEvent
+	applicationResourceChannel chan database.ApplicationResourceSubscriptionEvent
+	applicationTaskChannel     chan database.ApplicationTaskSubscriptionEvent
+	roleChannel                chan database.RoleSubscriptionEvent
+	labelChannel               chan database.LabelSubscriptionEvent
+	nodeChannel                chan database.NodeSubscriptionEvent
+	userChannel                chan database.UserSubscriptionEvent
 }
 
 // requestTypeMapping maps request types to service and method names for RBAC
@@ -47,33 +53,36 @@ type serviceMethodInfo struct {
 }
 
 var requestTypeMapping = map[string]serviceMethodInfo{
-	"ApplicationServiceCreateRequest":      {auth.ApplicationService, auth.ApplicationServiceCreate},
-	"ApplicationServiceCreateTaskRequest":  {auth.ApplicationService, auth.ApplicationServiceCreateTask},
-	"ApplicationServiceDeallocateRequest":  {auth.ApplicationService, auth.ApplicationServiceDeallocate},
-	"ApplicationServiceGetRequest":         {auth.ApplicationService, auth.ApplicationServiceGet},
-	"ApplicationServiceGetResourceRequest": {auth.ApplicationService, auth.ApplicationServiceGetResource},
-	"ApplicationServiceGetStateRequest":    {auth.ApplicationService, auth.ApplicationServiceGetState},
-	"ApplicationServiceGetTaskRequest":     {auth.ApplicationService, auth.ApplicationServiceGetTask},
-	"ApplicationServiceListRequest":        {auth.ApplicationService, auth.ApplicationServiceList},
-	"ApplicationServiceListTaskRequest":    {auth.ApplicationService, auth.ApplicationServiceListTask},
-	"LabelServiceCreateRequest":            {auth.LabelService, auth.LabelServiceCreate},
-	"LabelServiceDeleteRequest":            {auth.LabelService, auth.LabelServiceDelete},
-	"LabelServiceGetRequest":               {auth.LabelService, auth.LabelServiceGet},
-	"LabelServiceListRequest":              {auth.LabelService, auth.LabelServiceList},
-	"NodeServiceGetThisRequest":            {auth.NodeService, auth.NodeServiceGetThis},
-	"NodeServiceListRequest":               {auth.NodeService, auth.NodeServiceList},
-	"NodeServiceSetMaintenanceRequest":     {auth.NodeService, auth.NodeServiceSetMaintenance},
-	"RoleServiceCreateRequest":             {auth.RoleService, auth.RoleServiceCreate},
-	"RoleServiceDeleteRequest":             {auth.RoleService, auth.RoleServiceDelete},
-	"RoleServiceGetRequest":                {auth.RoleService, auth.RoleServiceGet},
-	"RoleServiceListRequest":               {auth.RoleService, auth.RoleServiceList},
-	"RoleServiceUpdateRequest":             {auth.RoleService, auth.RoleServiceUpdate},
-	"UserServiceCreateRequest":             {auth.UserService, auth.UserServiceCreate},
-	"UserServiceDeleteRequest":             {auth.UserService, auth.UserServiceDelete},
-	"UserServiceGetRequest":                {auth.UserService, auth.UserServiceGet},
-	"UserServiceGetMeRequest":              {auth.UserService, auth.UserServiceGetMe},
-	"UserServiceListRequest":               {auth.UserService, auth.UserServiceList},
-	"UserServiceUpdateRequest":             {auth.UserService, auth.UserServiceUpdate},
+	"ApplicationServiceCreateRequest":       {auth.ApplicationService, auth.ApplicationServiceCreate},
+	"ApplicationServiceCreateTaskRequest":   {auth.ApplicationService, auth.ApplicationServiceCreateTask},
+	"ApplicationServiceDeallocateRequest":   {auth.ApplicationService, auth.ApplicationServiceDeallocate},
+	"ApplicationServiceGetRequest":          {auth.ApplicationService, auth.ApplicationServiceGet},
+	"ApplicationServiceGetResourceRequest":  {auth.ApplicationService, auth.ApplicationServiceGetResource},
+	"ApplicationServiceGetStateRequest":     {auth.ApplicationService, auth.ApplicationServiceGetState},
+	"ApplicationServiceGetTaskRequest":      {auth.ApplicationService, auth.ApplicationServiceGetTask},
+	"ApplicationServiceListRequest":         {auth.ApplicationService, auth.ApplicationServiceList},
+	"ApplicationServiceListResourceRequest": {auth.ApplicationService, auth.ApplicationServiceListResource},
+	"ApplicationServiceListStateRequest":    {auth.ApplicationService, auth.ApplicationServiceListState},
+	"ApplicationServiceListTaskRequest":     {auth.ApplicationService, auth.ApplicationServiceListTask},
+	"LabelServiceCreateRequest":             {auth.LabelService, auth.LabelServiceCreate},
+	"LabelServiceGetRequest":                {auth.LabelService, auth.LabelServiceGet},
+	"LabelServiceListRequest":               {auth.LabelService, auth.LabelServiceList},
+	"LabelServiceRemoveRequest":             {auth.LabelService, auth.LabelServiceRemove},
+	"NodeServiceGetRequest":                 {auth.NodeService, auth.NodeServiceGet},
+	"NodeServiceGetThisRequest":             {auth.NodeService, auth.NodeServiceGetThis},
+	"NodeServiceListRequest":                {auth.NodeService, auth.NodeServiceList},
+	"NodeServiceSetMaintenanceRequest":      {auth.NodeService, auth.NodeServiceSetMaintenance},
+	"RoleServiceCreateRequest":              {auth.RoleService, auth.RoleServiceCreate},
+	"RoleServiceGetRequest":                 {auth.RoleService, auth.RoleServiceGet},
+	"RoleServiceListRequest":                {auth.RoleService, auth.RoleServiceList},
+	"RoleServiceRemoveRequest":              {auth.RoleService, auth.RoleServiceRemove},
+	"RoleServiceUpdateRequest":              {auth.RoleService, auth.RoleServiceUpdate},
+	"UserServiceCreateRequest":              {auth.UserService, auth.UserServiceCreate},
+	"UserServiceGetRequest":                 {auth.UserService, auth.UserServiceGet},
+	"UserServiceGetMeRequest":               {auth.UserService, auth.UserServiceGetMe},
+	"UserServiceListRequest":                {auth.UserService, auth.UserServiceList},
+	"UserServiceRemoveRequest":              {auth.UserService, auth.UserServiceRemove},
+	"UserServiceUpdateRequest":              {auth.UserService, auth.UserServiceUpdate},
 }
 
 // routeApplicationServiceRequest routes applicationService service requests
@@ -175,6 +184,28 @@ func (s *StreamingService) routeApplicationServiceRequest(ctx context.Context, r
 		}
 
 		return anypb.New(resp.Msg)
+	case "ApplicationServiceListResourceRequest":
+		var req aquariumv2.ApplicationServiceListResourceRequest
+		if err := requestData.UnmarshalTo(&req); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		resp, err := s.applicationService.ListResource(ctx, connect.NewRequest(&req))
+		if err != nil {
+			return nil, err
+		}
+
+		return anypb.New(resp.Msg)
+	case "ApplicationServiceListStateRequest":
+		var req aquariumv2.ApplicationServiceListStateRequest
+		if err := requestData.UnmarshalTo(&req); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		resp, err := s.applicationService.ListState(ctx, connect.NewRequest(&req))
+		if err != nil {
+			return nil, err
+		}
+
+		return anypb.New(resp.Msg)
 	case "ApplicationServiceListTaskRequest":
 		var req aquariumv2.ApplicationServiceListTaskRequest
 		if err := requestData.UnmarshalTo(&req); err != nil {
@@ -205,17 +236,6 @@ func (s *StreamingService) routeLabelServiceRequest(ctx context.Context, request
 		}
 
 		return anypb.New(resp.Msg)
-	case "LabelServiceDeleteRequest":
-		var req aquariumv2.LabelServiceDeleteRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.labelService.Delete(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-
-		return anypb.New(resp.Msg)
 	case "LabelServiceGetRequest":
 		var req aquariumv2.LabelServiceGetRequest
 		if err := requestData.UnmarshalTo(&req); err != nil {
@@ -238,6 +258,17 @@ func (s *StreamingService) routeLabelServiceRequest(ctx context.Context, request
 		}
 
 		return anypb.New(resp.Msg)
+	case "LabelServiceRemoveRequest":
+		var req aquariumv2.LabelServiceRemoveRequest
+		if err := requestData.UnmarshalTo(&req); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		resp, err := s.labelService.Remove(ctx, connect.NewRequest(&req))
+		if err != nil {
+			return nil, err
+		}
+
+		return anypb.New(resp.Msg)
 	default:
 		return nil, connect.NewError(connect.CodeUnimplemented, fmt.Errorf("unsupported labelService request type: %s", requestType))
 	}
@@ -246,6 +277,17 @@ func (s *StreamingService) routeLabelServiceRequest(ctx context.Context, request
 // routeNodeServiceRequest routes nodeService service requests
 func (s *StreamingService) routeNodeServiceRequest(ctx context.Context, requestType string, requestData *anypb.Any) (*anypb.Any, error) {
 	switch requestType {
+	case "NodeServiceGetRequest":
+		var req aquariumv2.NodeServiceGetRequest
+		if err := requestData.UnmarshalTo(&req); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		resp, err := s.nodeService.Get(ctx, connect.NewRequest(&req))
+		if err != nil {
+			return nil, err
+		}
+
+		return anypb.New(resp.Msg)
 	case "NodeServiceGetThisRequest":
 		var req aquariumv2.NodeServiceGetThisRequest
 		if err := requestData.UnmarshalTo(&req); err != nil {
@@ -298,17 +340,6 @@ func (s *StreamingService) routeRoleServiceRequest(ctx context.Context, requestT
 		}
 
 		return anypb.New(resp.Msg)
-	case "RoleServiceDeleteRequest":
-		var req aquariumv2.RoleServiceDeleteRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.roleService.Delete(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-
-		return anypb.New(resp.Msg)
 	case "RoleServiceGetRequest":
 		var req aquariumv2.RoleServiceGetRequest
 		if err := requestData.UnmarshalTo(&req); err != nil {
@@ -326,6 +357,17 @@ func (s *StreamingService) routeRoleServiceRequest(ctx context.Context, requestT
 			return nil, connect.NewError(connect.CodeInvalidArgument, err)
 		}
 		resp, err := s.roleService.List(ctx, connect.NewRequest(&req))
+		if err != nil {
+			return nil, err
+		}
+
+		return anypb.New(resp.Msg)
+	case "RoleServiceRemoveRequest":
+		var req aquariumv2.RoleServiceRemoveRequest
+		if err := requestData.UnmarshalTo(&req); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		resp, err := s.roleService.Remove(ctx, connect.NewRequest(&req))
 		if err != nil {
 			return nil, err
 		}
@@ -361,17 +403,6 @@ func (s *StreamingService) routeUserServiceRequest(ctx context.Context, requestT
 		}
 
 		return anypb.New(resp.Msg)
-	case "UserServiceDeleteRequest":
-		var req aquariumv2.UserServiceDeleteRequest
-		if err := requestData.UnmarshalTo(&req); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		resp, err := s.userService.Delete(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return nil, err
-		}
-
-		return anypb.New(resp.Msg)
 	case "UserServiceGetRequest":
 		var req aquariumv2.UserServiceGetRequest
 		if err := requestData.UnmarshalTo(&req); err != nil {
@@ -400,6 +431,17 @@ func (s *StreamingService) routeUserServiceRequest(ctx context.Context, requestT
 			return nil, connect.NewError(connect.CodeInvalidArgument, err)
 		}
 		resp, err := s.userService.List(ctx, connect.NewRequest(&req))
+		if err != nil {
+			return nil, err
+		}
+
+		return anypb.New(resp.Msg)
+	case "UserServiceRemoveRequest":
+		var req aquariumv2.UserServiceRemoveRequest
+		if err := requestData.UnmarshalTo(&req); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		resp, err := s.userService.Remove(ctx, connect.NewRequest(&req))
 		if err != nil {
 			return nil, err
 		}
@@ -444,8 +486,44 @@ func (s *StreamingService) routeRequest(ctx context.Context, requestType string,
 }
 
 // Subscription-related helper methods
-// relayApplicationStateNotifications safely relays applicationState notifications with buffer overflow protection
-func (s *StreamingService) relayApplicationStateNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan *typesv2.ApplicationState) {
+// relayApplicationNotifications relays application notifications with immediate disconnect on overflow
+func (s *StreamingService) relayApplicationNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.ApplicationSubscriptionEvent) {
+	// Signal completion when this goroutine exits
+	defer sub.relayWg.Done()
+	logger := log.WithFunc("rpc", "relayApplicationNotifications").With("subs_uid", subscriptionID)
+
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("Application relay goroutine panic", "panic", r)
+		}
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Debug("Application relay stopping due to context cancellation")
+			return
+		case event, ok := <-dbChannel:
+			if !ok {
+				logger.Debug("Application relay stopping due to closed database channel")
+				return
+			}
+
+			// Try to send with a short timeout - disconnect if client can't keep up
+			select {
+			case sub.channels.applicationChannel <- event:
+				// Successfully sent notification
+			case <-time.After(200 * time.Millisecond):
+				logger.Error("Application channel send timeout - client cannot keep up, disconnecting")
+				sub.cancel() // This will cause the main subscription loop to exit
+				return
+			}
+		}
+	}
+}
+
+// relayApplicationStateNotifications relays applicationState notifications with immediate disconnect on overflow
+func (s *StreamingService) relayApplicationStateNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.ApplicationStateSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
 	logger := log.WithFunc("rpc", "relayApplicationStateNotifications").With("subs_uid", subscriptionID)
@@ -461,21 +539,18 @@ func (s *StreamingService) relayApplicationStateNotifications(ctx context.Contex
 		case <-ctx.Done():
 			logger.Debug("ApplicationState relay stopping due to context cancellation")
 			return
-		case obj, ok := <-dbChannel:
+		case event, ok := <-dbChannel:
 			if !ok {
 				logger.Debug("ApplicationState relay stopping due to closed database channel")
 				return
 			}
 
-			// Check if client is already overflowing - skip notification to prevent further overflow
-			if sub.isClientOverflowing() {
-				logger.Debug("Skipping applicationState notification due to client overflow")
-				continue
-			}
-
-			// Try to send safely - if this returns true, client should be disconnected
-			if shouldDisconnect := !sub.safeSendToApplicationStateChannel(obj); shouldDisconnect {
-				logger.Error("Disconnecting client due to excessive buffer overflow")
+			// Try to send with a short timeout - disconnect if client can't keep up
+			select {
+			case sub.channels.applicationStateChannel <- event:
+				// Successfully sent notification
+			case <-time.After(200 * time.Millisecond):
+				logger.Error("ApplicationState channel send timeout - client cannot keep up, disconnecting")
 				sub.cancel() // This will cause the main subscription loop to exit
 				return
 			}
@@ -483,8 +558,8 @@ func (s *StreamingService) relayApplicationStateNotifications(ctx context.Contex
 	}
 }
 
-// relayApplicationResourceNotifications safely relays applicationResource notifications with buffer overflow protection
-func (s *StreamingService) relayApplicationResourceNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan *typesv2.ApplicationResource) {
+// relayApplicationResourceNotifications relays applicationResource notifications with immediate disconnect on overflow
+func (s *StreamingService) relayApplicationResourceNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.ApplicationResourceSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
 	logger := log.WithFunc("rpc", "relayApplicationResourceNotifications").With("subs_uid", subscriptionID)
@@ -500,21 +575,18 @@ func (s *StreamingService) relayApplicationResourceNotifications(ctx context.Con
 		case <-ctx.Done():
 			logger.Debug("ApplicationResource relay stopping due to context cancellation")
 			return
-		case obj, ok := <-dbChannel:
+		case event, ok := <-dbChannel:
 			if !ok {
 				logger.Debug("ApplicationResource relay stopping due to closed database channel")
 				return
 			}
 
-			// Check if client is already overflowing - skip notification to prevent further overflow
-			if sub.isClientOverflowing() {
-				logger.Debug("Skipping applicationResource notification due to client overflow")
-				continue
-			}
-
-			// Try to send safely - if this returns true, client should be disconnected
-			if shouldDisconnect := !sub.safeSendToApplicationResourceChannel(obj); shouldDisconnect {
-				logger.Error("Disconnecting client due to excessive buffer overflow")
+			// Try to send with a short timeout - disconnect if client can't keep up
+			select {
+			case sub.channels.applicationResourceChannel <- event:
+				// Successfully sent notification
+			case <-time.After(200 * time.Millisecond):
+				logger.Error("ApplicationResource channel send timeout - client cannot keep up, disconnecting")
 				sub.cancel() // This will cause the main subscription loop to exit
 				return
 			}
@@ -522,8 +594,8 @@ func (s *StreamingService) relayApplicationResourceNotifications(ctx context.Con
 	}
 }
 
-// relayApplicationTaskNotifications safely relays applicationTask notifications with buffer overflow protection
-func (s *StreamingService) relayApplicationTaskNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan *typesv2.ApplicationTask) {
+// relayApplicationTaskNotifications relays applicationTask notifications with immediate disconnect on overflow
+func (s *StreamingService) relayApplicationTaskNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.ApplicationTaskSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
 	logger := log.WithFunc("rpc", "relayApplicationTaskNotifications").With("subs_uid", subscriptionID)
@@ -539,21 +611,162 @@ func (s *StreamingService) relayApplicationTaskNotifications(ctx context.Context
 		case <-ctx.Done():
 			logger.Debug("ApplicationTask relay stopping due to context cancellation")
 			return
-		case obj, ok := <-dbChannel:
+		case event, ok := <-dbChannel:
 			if !ok {
 				logger.Debug("ApplicationTask relay stopping due to closed database channel")
 				return
 			}
 
-			// Check if client is already overflowing - skip notification to prevent further overflow
-			if sub.isClientOverflowing() {
-				logger.Debug("Skipping applicationTask notification due to client overflow")
-				continue
+			// Try to send with a short timeout - disconnect if client can't keep up
+			select {
+			case sub.channels.applicationTaskChannel <- event:
+				// Successfully sent notification
+			case <-time.After(200 * time.Millisecond):
+				logger.Error("ApplicationTask channel send timeout - client cannot keep up, disconnecting")
+				sub.cancel() // This will cause the main subscription loop to exit
+				return
+			}
+		}
+	}
+}
+
+// relayRoleNotifications relays role notifications with immediate disconnect on overflow
+func (s *StreamingService) relayRoleNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.RoleSubscriptionEvent) {
+	// Signal completion when this goroutine exits
+	defer sub.relayWg.Done()
+	logger := log.WithFunc("rpc", "relayRoleNotifications").With("subs_uid", subscriptionID)
+
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("Role relay goroutine panic", "panic", r)
+		}
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Debug("Role relay stopping due to context cancellation")
+			return
+		case event, ok := <-dbChannel:
+			if !ok {
+				logger.Debug("Role relay stopping due to closed database channel")
+				return
 			}
 
-			// Try to send safely - if this returns true, client should be disconnected
-			if shouldDisconnect := !sub.safeSendToApplicationTaskChannel(obj); shouldDisconnect {
-				logger.Error("Disconnecting client due to excessive buffer overflow")
+			// Try to send with a short timeout - disconnect if client can't keep up
+			select {
+			case sub.channels.roleChannel <- event:
+				// Successfully sent notification
+			case <-time.After(200 * time.Millisecond):
+				logger.Error("Role channel send timeout - client cannot keep up, disconnecting")
+				sub.cancel() // This will cause the main subscription loop to exit
+				return
+			}
+		}
+	}
+}
+
+// relayLabelNotifications relays label notifications with immediate disconnect on overflow
+func (s *StreamingService) relayLabelNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.LabelSubscriptionEvent) {
+	// Signal completion when this goroutine exits
+	defer sub.relayWg.Done()
+	logger := log.WithFunc("rpc", "relayLabelNotifications").With("subs_uid", subscriptionID)
+
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("Label relay goroutine panic", "panic", r)
+		}
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Debug("Label relay stopping due to context cancellation")
+			return
+		case event, ok := <-dbChannel:
+			if !ok {
+				logger.Debug("Label relay stopping due to closed database channel")
+				return
+			}
+
+			// Try to send with a short timeout - disconnect if client can't keep up
+			select {
+			case sub.channels.labelChannel <- event:
+				// Successfully sent notification
+			case <-time.After(200 * time.Millisecond):
+				logger.Error("Label channel send timeout - client cannot keep up, disconnecting")
+				sub.cancel() // This will cause the main subscription loop to exit
+				return
+			}
+		}
+	}
+}
+
+// relayNodeNotifications relays node notifications with immediate disconnect on overflow
+func (s *StreamingService) relayNodeNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.NodeSubscriptionEvent) {
+	// Signal completion when this goroutine exits
+	defer sub.relayWg.Done()
+	logger := log.WithFunc("rpc", "relayNodeNotifications").With("subs_uid", subscriptionID)
+
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("Node relay goroutine panic", "panic", r)
+		}
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Debug("Node relay stopping due to context cancellation")
+			return
+		case event, ok := <-dbChannel:
+			if !ok {
+				logger.Debug("Node relay stopping due to closed database channel")
+				return
+			}
+
+			// Try to send with a short timeout - disconnect if client can't keep up
+			select {
+			case sub.channels.nodeChannel <- event:
+				// Successfully sent notification
+			case <-time.After(200 * time.Millisecond):
+				logger.Error("Node channel send timeout - client cannot keep up, disconnecting")
+				sub.cancel() // This will cause the main subscription loop to exit
+				return
+			}
+		}
+	}
+}
+
+// relayUserNotifications relays user notifications with immediate disconnect on overflow
+func (s *StreamingService) relayUserNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.UserSubscriptionEvent) {
+	// Signal completion when this goroutine exits
+	defer sub.relayWg.Done()
+	logger := log.WithFunc("rpc", "relayUserNotifications").With("subs_uid", subscriptionID)
+
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("User relay goroutine panic", "panic", r)
+		}
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Debug("User relay stopping due to context cancellation")
+			return
+		case event, ok := <-dbChannel:
+			if !ok {
+				logger.Debug("User relay stopping due to closed database channel")
+				return
+			}
+
+			// Try to send with a short timeout - disconnect if client can't keep up
+			select {
+			case sub.channels.userChannel <- event:
+				// Successfully sent notification
+			case <-time.After(200 * time.Millisecond):
+				logger.Error("User channel send timeout - client cannot keep up, disconnecting")
 				sub.cancel() // This will cause the main subscription loop to exit
 				return
 			}
@@ -564,9 +777,14 @@ func (s *StreamingService) relayApplicationTaskNotifications(ctx context.Context
 // setupChannels sets the channels for the database changes
 func (s *StreamingService) setupChannels() *subChannels {
 	return &subChannels{
-		applicationStateChannel:    make(chan *typesv2.ApplicationState, 100),
-		applicationResourceChannel: make(chan *typesv2.ApplicationResource, 100),
-		applicationTaskChannel:     make(chan *typesv2.ApplicationTask, 100),
+		applicationChannel:         make(chan database.ApplicationSubscriptionEvent, 100),
+		applicationStateChannel:    make(chan database.ApplicationStateSubscriptionEvent, 100),
+		applicationResourceChannel: make(chan database.ApplicationResourceSubscriptionEvent, 100),
+		applicationTaskChannel:     make(chan database.ApplicationTaskSubscriptionEvent, 100),
+		roleChannel:                make(chan database.RoleSubscriptionEvent, 100),
+		labelChannel:               make(chan database.LabelSubscriptionEvent, 100),
+		nodeChannel:                make(chan database.NodeSubscriptionEvent, 100),
+		userChannel:                make(chan database.UserSubscriptionEvent, 100),
 	}
 }
 
@@ -590,32 +808,77 @@ func (s *StreamingService) listenChannels(sub *subscription, ctx, subCtx context
 		case <-ctx.Done():
 			logger.Debug("stopping due to request context cancellation", "subs_uid", sub.id)
 			return
-		case msg := <-sub.channels.applicationStateChannel:
-			if s.shouldSendObject(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE, msg) {
-				logger.Debug("Sending ApplicationState notification for Application UID", "app_uid", msg.ApplicationUid)
-				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE, aquariumv2.ChangeType_CHANGE_TYPE_CREATED, msg.ToApplicationState()); err != nil {
+		case event := <-sub.channels.applicationChannel:
+			if s.shouldSendObject(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION, event.Object) {
+				logger.Debug("Sending Application notification", "change_type", event.ChangeType, "uid", event.Object.Uid)
+				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION, event.ChangeType, event.Object.ToApplication()); err != nil {
+					logger.Error("Error sending Application update", "err", err)
+				}
+			} else {
+				logger.Debug("Skipping Application notification for user", "user", sub.userName)
+			}
+		case event := <-sub.channels.applicationStateChannel:
+			if s.shouldSendObject(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE, event.Object) {
+				logger.Debug("Sending ApplicationState notification", "change_type", event.ChangeType, "uid", event.Object.Uid, "app_uid", event.Object.ApplicationUid, "app_status", event.Object.Status)
+				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE, event.ChangeType, event.Object.ToApplicationState()); err != nil {
 					logger.Error("Error sending ApplicationState update", "err", err)
 				}
 			} else {
-				logger.Debug("Skipping ApplicationState notification for user", "user", sub.userName)
+				logger.Debug("Skipping ApplicationState notification for user", "user", sub.userName, "app_uid", event.Object.ApplicationUid, "app_status", event.Object.Status)
 			}
-		case msg := <-sub.channels.applicationResourceChannel:
-			if s.shouldSendObject(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE, msg) {
-				logger.Debug("Sending ApplicationResource notification for Application UID", "app_uid", msg.ApplicationUid)
-				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE, aquariumv2.ChangeType_CHANGE_TYPE_CREATED, msg.ToApplicationResource()); err != nil {
+		case event := <-sub.channels.applicationResourceChannel:
+			if s.shouldSendObject(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE, event.Object) {
+				logger.Debug("Sending ApplicationResource notification", "change_type", event.ChangeType, "uid", event.Object.Uid)
+				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE, event.ChangeType, event.Object.ToApplicationResource()); err != nil {
 					logger.Error("Error sending ApplicationResource update", "err", err)
 				}
 			} else {
 				logger.Debug("Skipping ApplicationResource notification for user", "user", sub.userName)
 			}
-		case msg := <-sub.channels.applicationTaskChannel:
-			if s.shouldSendObject(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK, msg) {
-				logger.Debug("Sending ApplicationTask notification for Application UID", "app_uid", msg.ApplicationUid)
-				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK, aquariumv2.ChangeType_CHANGE_TYPE_CREATED, msg.ToApplicationTask()); err != nil {
+		case event := <-sub.channels.applicationTaskChannel:
+			if s.shouldSendObject(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK, event.Object) {
+				logger.Debug("Sending ApplicationTask notification", "change_type", event.ChangeType, "uid", event.Object.Uid)
+				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK, event.ChangeType, event.Object.ToApplicationTask()); err != nil {
 					logger.Error("Error sending ApplicationTask update", "err", err)
 				}
 			} else {
 				logger.Debug("Skipping ApplicationTask notification for user", "user", sub.userName)
+			}
+		case event := <-sub.channels.roleChannel:
+			if s.shouldSendObject(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_ROLE, event.Object) {
+				logger.Debug("Sending Role notification", "change_type", event.ChangeType, "name", event.Object.Name)
+				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_ROLE, event.ChangeType, event.Object.ToRole()); err != nil {
+					logger.Error("Error sending Role update", "err", err)
+				}
+			} else {
+				logger.Debug("Skipping Role notification for user", "user", sub.userName)
+			}
+		case event := <-sub.channels.labelChannel:
+			if s.shouldSendObject(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_LABEL, event.Object) {
+				logger.Debug("Sending Label notification", "change_type", event.ChangeType, "uid", event.Object.Uid)
+				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_LABEL, event.ChangeType, event.Object.ToLabel()); err != nil {
+					logger.Error("Error sending Label update", "err", err)
+				}
+			} else {
+				logger.Debug("Skipping Label notification for user", "user", sub.userName)
+			}
+		case event := <-sub.channels.nodeChannel:
+			if s.shouldSendObject(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_NODE, event.Object) {
+				logger.Debug("Sending Node notification", "change_type", event.ChangeType, "uid", event.Object.Uid)
+				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_NODE, event.ChangeType, event.Object.ToNode()); err != nil {
+					logger.Error("Error sending Node update", "err", err)
+				}
+			} else {
+				logger.Debug("Skipping Node notification for user", "user", sub.userName)
+			}
+		case event := <-sub.channels.userChannel:
+			if s.shouldSendObject(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_USER, event.Object) {
+				logger.Debug("Sending User notification", "change_type", event.ChangeType, "name", event.Object.Name)
+				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_USER, event.ChangeType, event.Object.ToUser()); err != nil {
+					logger.Error("Error sending User update", "err", err)
+				}
+			} else {
+				logger.Debug("Skipping User notification for user", "user", sub.userName)
 			}
 		}
 	}
@@ -623,9 +886,14 @@ func (s *StreamingService) listenChannels(sub *subscription, ctx, subCtx context
 
 // Close will close all the channels
 func (s *subChannels) Close() {
+	close(s.applicationChannel)
 	close(s.applicationStateChannel)
 	close(s.applicationResourceChannel)
 	close(s.applicationTaskChannel)
+	close(s.roleChannel)
+	close(s.labelChannel)
+	close(s.nodeChannel)
+	close(s.userChannel)
 }
 
 // setupSubscriptions sets up database subscriptions and relay goroutines
@@ -633,9 +901,19 @@ func (s *StreamingService) setupSubscriptions(subCtx context.Context, subscripti
 	logger := log.WithFunc("rpc", "setupSubscriptions").With("subs_uid", sub.id)
 	for _, subType := range subscriptionTypes {
 		switch subType {
+		case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION:
+			// Create a safe wrapper channel for database notifications
+			dbChannel := make(chan database.ApplicationSubscriptionEvent, 100)
+			s.fish.DB().SubscribeApplication(subCtx, dbChannel)
+			logger.Debug("Subscribed to Application changes")
+
+			// Add to WaitGroup before starting goroutine
+			sub.relayWg.Add(1)
+			// Start goroutine to safely relay notifications to subscription
+			go s.relayApplicationNotifications(subCtx, subscriptionID, sub, dbChannel)
 		case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE:
 			// Create a safe wrapper channel for database notifications
-			dbChannel := make(chan *typesv2.ApplicationState, 100)
+			dbChannel := make(chan database.ApplicationStateSubscriptionEvent, 100)
 			s.fish.DB().SubscribeApplicationState(subCtx, dbChannel)
 			logger.Debug("Subscribed to ApplicationState changes")
 
@@ -645,7 +923,7 @@ func (s *StreamingService) setupSubscriptions(subCtx context.Context, subscripti
 			go s.relayApplicationStateNotifications(subCtx, subscriptionID, sub, dbChannel)
 		case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE:
 			// Create a safe wrapper channel for database notifications
-			dbChannel := make(chan *typesv2.ApplicationResource, 100)
+			dbChannel := make(chan database.ApplicationResourceSubscriptionEvent, 100)
 			s.fish.DB().SubscribeApplicationResource(subCtx, dbChannel)
 			logger.Debug("Subscribed to ApplicationResource changes")
 
@@ -655,7 +933,7 @@ func (s *StreamingService) setupSubscriptions(subCtx context.Context, subscripti
 			go s.relayApplicationResourceNotifications(subCtx, subscriptionID, sub, dbChannel)
 		case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK:
 			// Create a safe wrapper channel for database notifications
-			dbChannel := make(chan *typesv2.ApplicationTask, 100)
+			dbChannel := make(chan database.ApplicationTaskSubscriptionEvent, 100)
 			s.fish.DB().SubscribeApplicationTask(subCtx, dbChannel)
 			logger.Debug("Subscribed to ApplicationTask changes")
 
@@ -663,6 +941,46 @@ func (s *StreamingService) setupSubscriptions(subCtx context.Context, subscripti
 			sub.relayWg.Add(1)
 			// Start goroutine to safely relay notifications to subscription
 			go s.relayApplicationTaskNotifications(subCtx, subscriptionID, sub, dbChannel)
+		case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_ROLE:
+			// Create a safe wrapper channel for database notifications
+			dbChannel := make(chan database.RoleSubscriptionEvent, 100)
+			s.fish.DB().SubscribeRole(subCtx, dbChannel)
+			logger.Debug("Subscribed to Role changes")
+
+			// Add to WaitGroup before starting goroutine
+			sub.relayWg.Add(1)
+			// Start goroutine to safely relay notifications to subscription
+			go s.relayRoleNotifications(subCtx, subscriptionID, sub, dbChannel)
+		case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_LABEL:
+			// Create a safe wrapper channel for database notifications
+			dbChannel := make(chan database.LabelSubscriptionEvent, 100)
+			s.fish.DB().SubscribeLabel(subCtx, dbChannel)
+			logger.Debug("Subscribed to Label changes")
+
+			// Add to WaitGroup before starting goroutine
+			sub.relayWg.Add(1)
+			// Start goroutine to safely relay notifications to subscription
+			go s.relayLabelNotifications(subCtx, subscriptionID, sub, dbChannel)
+		case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_NODE:
+			// Create a safe wrapper channel for database notifications
+			dbChannel := make(chan database.NodeSubscriptionEvent, 100)
+			s.fish.DB().SubscribeNode(subCtx, dbChannel)
+			logger.Debug("Subscribed to Node changes")
+
+			// Add to WaitGroup before starting goroutine
+			sub.relayWg.Add(1)
+			// Start goroutine to safely relay notifications to subscription
+			go s.relayNodeNotifications(subCtx, subscriptionID, sub, dbChannel)
+		case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_USER:
+			// Create a safe wrapper channel for database notifications
+			dbChannel := make(chan database.UserSubscriptionEvent, 100)
+			s.fish.DB().SubscribeUser(subCtx, dbChannel)
+			logger.Debug("Subscribed to User changes")
+
+			// Add to WaitGroup before starting goroutine
+			sub.relayWg.Add(1)
+			// Start goroutine to safely relay notifications to subscription
+			go s.relayUserNotifications(subCtx, subscriptionID, sub, dbChannel)
 		}
 	}
 }
@@ -683,21 +1001,51 @@ func (s *StreamingService) shouldSendObject(sub *subscription, objectType aquari
 
 	// Apply filters based on object type
 	switch objectType {
+	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION:
+		if typedObj, ok := obj.(*typesv2.Application); ok {
+			return s.shouldSendApplicationObject(sub, typedObj, auth.ApplicationServiceGet)
+		}
 	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE:
 		if typedObj, ok := obj.(*typesv2.ApplicationState); ok {
-			return s.shouldSendApplicationObject(sub, typedObj.ApplicationUid, objectType)
+			return s.shouldSendApplicationStateObject(sub, typedObj, auth.ApplicationServiceGetState)
 		}
 	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE:
 		if typedObj, ok := obj.(*typesv2.ApplicationResource); ok {
-			return s.shouldSendApplicationObject(sub, typedObj.ApplicationUid, objectType)
+			return s.shouldSendApplicationResourceObject(sub, typedObj, auth.ApplicationServiceGetResource)
 		}
 	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK:
 		if typedObj, ok := obj.(*typesv2.ApplicationTask); ok {
-			return s.shouldSendApplicationObject(sub, typedObj.ApplicationUid, objectType)
+			return s.shouldSendApplicationTaskObject(sub, typedObj, auth.ApplicationServiceGetTask)
+		}
+	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_ROLE:
+		if typedObj, ok := obj.(*typesv2.Role); ok {
+			return s.shouldSendRoleObject(sub, typedObj, auth.RoleServiceGet)
+		}
+	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_LABEL:
+		if typedObj, ok := obj.(*typesv2.Label); ok {
+			return s.shouldSendLabelObject(sub, typedObj, auth.LabelServiceGet)
+		}
+	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_NODE:
+		if typedObj, ok := obj.(*typesv2.Node); ok {
+			return s.shouldSendNodeObject(sub, typedObj, auth.NodeServiceGet)
+		}
+	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_USER:
+		if typedObj, ok := obj.(*typesv2.User); ok {
+			return s.shouldSendUserObject(sub, typedObj, auth.UserServiceGet)
 		}
 	}
 
 	return true
+}
+
+// shouldSendApplication checks if application should be sent to subscriber
+func (s *StreamingService) shouldSendApplication(sub *subscription) bool {
+	for _, subType := range sub.subscriptions {
+		if subType == aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION {
+			return true
+		}
+	}
+	return false
 }
 
 // shouldSendApplicationState checks if applicationState should be sent to subscriber
@@ -730,63 +1078,65 @@ func (s *StreamingService) shouldSendApplicationTask(sub *subscription) bool {
 	return false
 }
 
-// safeSendToApplicationStateChannel attempts to send to state channel with overflow detection
-func (sub *subscription) safeSendToApplicationStateChannel(msg *typesv2.ApplicationState) bool {
-	logger := log.WithFunc("rpc", "safeSendToApplicationStateChannel").With("subs_uid", sub.id, "sub_user", sub.userName)
-	select {
-	case sub.channels.applicationStateChannel <- msg:
-		sub.resetOverflow()
-		return true
-	case <-time.After(overflowTimeout):
-		logger.Warn("ApplicationState channel send timeout (buffer overflow)")
-		return sub.recordOverflow()
-	default:
-		logger.Warn("ApplicationState channel full (buffer overflow)")
-		return sub.recordOverflow()
+// shouldSendRole checks if role should be sent to subscriber
+func (s *StreamingService) shouldSendRole(sub *subscription) bool {
+	for _, subType := range sub.subscriptions {
+		if subType == aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_ROLE {
+			return true
+		}
 	}
+	return false
 }
 
-// safeSendToApplicationResourceChannel attempts to send to state channel with overflow detection
-func (sub *subscription) safeSendToApplicationResourceChannel(msg *typesv2.ApplicationResource) bool {
-	logger := log.WithFunc("rpc", "safeSendToApplicationResourceChannel").With("subs_uid", sub.id, "sub_user", sub.userName)
-	select {
-	case sub.channels.applicationResourceChannel <- msg:
-		sub.resetOverflow()
-		return true
-	case <-time.After(overflowTimeout):
-		logger.Warn("ApplicationResource channel send timeout (buffer overflow)")
-		return sub.recordOverflow()
-	default:
-		logger.Warn("ApplicationResource channel full (buffer overflow)")
-		return sub.recordOverflow()
+// shouldSendLabel checks if label should be sent to subscriber
+func (s *StreamingService) shouldSendLabel(sub *subscription) bool {
+	for _, subType := range sub.subscriptions {
+		if subType == aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_LABEL {
+			return true
+		}
 	}
+	return false
 }
 
-// safeSendToApplicationTaskChannel attempts to send to state channel with overflow detection
-func (sub *subscription) safeSendToApplicationTaskChannel(msg *typesv2.ApplicationTask) bool {
-	logger := log.WithFunc("rpc", "safeSendToApplicationTaskChannel").With("subs_uid", sub.id, "sub_user", sub.userName)
-	select {
-	case sub.channels.applicationTaskChannel <- msg:
-		sub.resetOverflow()
-		return true
-	case <-time.After(overflowTimeout):
-		logger.Warn("ApplicationTask channel send timeout (buffer overflow)")
-		return sub.recordOverflow()
-	default:
-		logger.Warn("ApplicationTask channel full (buffer overflow)")
-		return sub.recordOverflow()
+// shouldSendNode checks if node should be sent to subscriber
+func (s *StreamingService) shouldSendNode(sub *subscription) bool {
+	for _, subType := range sub.subscriptions {
+		if subType == aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_NODE {
+			return true
+		}
 	}
+	return false
+}
+
+// shouldSendUser checks if user should be sent to subscriber
+func (s *StreamingService) shouldSendUser(sub *subscription) bool {
+	for _, subType := range sub.subscriptions {
+		if subType == aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_USER {
+			return true
+		}
+	}
+	return false
 }
 
 // getSubscriptionPermissionMethod returns the RBAC permission method for a subscription type
 func (s *StreamingService) getSubscriptionPermissionMethod(subscriptionType aquariumv2.SubscriptionType) string {
 	switch subscriptionType {
+	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION:
+		return auth.ApplicationServiceGet
 	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE:
-		return auth.ApplicationServiceGetStateAll
+		return auth.ApplicationServiceGetState
 	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE:
-		return auth.ApplicationServiceGetResourceAll
+		return auth.ApplicationServiceGetResource
 	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK:
-		return auth.ApplicationServiceListTaskAll
+		return auth.ApplicationServiceGetTask
+	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_ROLE:
+		return auth.RoleServiceGet
+	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_LABEL:
+		return auth.LabelServiceGet
+	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_NODE:
+		return auth.NodeServiceGet
+	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_USER:
+		return auth.UserServiceGet
 	default:
 		return ""
 	}

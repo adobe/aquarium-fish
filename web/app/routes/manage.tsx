@@ -1,0 +1,400 @@
+/**
+ * Copyright 2025 Adobe. All rights reserved.
+ * This file is licensed to you under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License. You may obtain a copy
+ * of the License at http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under
+ * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR REPRESENTATIONS
+ * OF ANY KIND, either express or implied. See the License for the specific language
+ * governing permissions and limitations under the License.
+ */
+
+// Author: Sergei Parshev (@sparshev)
+
+import React, { useState, useEffect } from 'react';
+import { DashboardLayout } from '../components/DashboardLayout';
+import { ProtectedRoute } from '../components/ProtectedRoute';
+import { useAuth } from '../contexts/AuthContext';
+import { useStreaming } from '../contexts/StreamingContext';
+import { StreamingList, type ListColumn, type ListItemAction } from '../components/StreamingList';
+
+import { create } from '@bufbuild/protobuf';
+import { UserServiceCreateRequestSchema, UserServiceUpdateRequestSchema, UserServiceRemoveRequestSchema } from '../../gen/aquarium/v2/user_pb';
+import type { User } from '../../gen/aquarium/v2/user_pb';
+import { RoleServiceCreateRequestSchema, RoleServiceUpdateRequestSchema, RoleServiceRemoveRequestSchema } from '../../gen/aquarium/v2/role_pb';
+import type { Role } from '../../gen/aquarium/v2/role_pb';
+import { UserForm, RoleForm } from '../../gen/components';
+import { PermService, PermUser, PermRole } from '../../gen/permissions/permissions_grpc';
+
+export function meta() {
+  return [
+    { title: 'Management - Aquarium Fish' },
+    { name: 'description', content: 'Manage users and roles' },
+  ];
+}
+
+export default function Manage() {
+  const { user, hasPermission } = useAuth();
+  const { sendRequest, fetchUsers, fetchRoles } = useStreaming();
+  const [activeTab, setActiveTab] = useState<'users' | 'roles'>('users');
+
+  // Users state
+  const [showCreateUserModal, setShowCreateUserModal] = useState(false);
+  const [showUserDetailsModal, setShowUserDetailsModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
+  // Roles state
+  const [showCreateRoleModal, setShowCreateRoleModal] = useState(false);
+  const [showRoleDetailsModal, setShowRoleDetailsModal] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+
+  // Fetch data when component mounts
+  useEffect(() => {
+    fetchUsers();
+    fetchRoles();
+  }, []);
+
+  // Format timestamp
+  const formatTimestamp = (timestamp: any) => {
+    if (!timestamp) return 'Unknown';
+    const date = new Date(Number(timestamp.seconds) * 1000);
+    return date.toLocaleString();
+  };
+
+  // Role operations
+  const handleCreateRole = async (roleData: Role) => {
+    try {
+      const createRequest = create(RoleServiceCreateRequestSchema, {
+        role: roleData,
+      });
+      await sendRequest(createRequest, 'RoleServiceCreateRequest');
+      setShowCreateRoleModal(false);
+    } catch (error) {
+      console.error(`Failed to create role: ${error}`);
+    }
+  };
+
+  const handleUpdateRole = async (roleData: Role) => {
+    if (!selectedRole) return;
+
+    try {
+      const updateRequest = create(RoleServiceUpdateRequestSchema, {
+        role: roleData,
+      });
+      await sendRequest(updateRequest, 'RoleServiceUpdateRequest');
+      setShowRoleDetailsModal(false);
+      setSelectedRole(null);
+    } catch (error) {
+      console.error(`Failed to update role: ${error}`);
+    }
+  };
+
+  const handleRemoveRole = async (role: Role) => {
+    if (!confirm('Are you sure you want to delete this role?')) return;
+
+    try {
+      const removeRequest = create(RoleServiceRemoveRequestSchema, {
+        roleName: role.name,
+      });
+      await sendRequest(removeRequest, 'RoleServiceRemoveRequest');
+    } catch (error) {
+      console.error(`Failed to delete role: ${error}`);
+    }
+  };
+
+  // User operations
+  const handleCreateUser = async (userData: User) => {
+    try {
+      const createRequest = create(UserServiceCreateRequestSchema, {
+        user: userData,
+      });
+      await sendRequest(createRequest, 'UserServiceCreateRequest');
+      setShowCreateUserModal(false);
+    } catch (error) {
+      console.error(`Failed to create user: ${error}`);
+    }
+  };
+
+  const handleUpdateUser = async (userData: User) => {
+    if (!selectedUser) return;
+
+    try {
+      const updateRequest = create(UserServiceUpdateRequestSchema, {
+        user: userData,
+      });
+      await sendRequest(updateRequest, 'UserServiceUpdateRequest');
+      setShowUserDetailsModal(false);
+      setSelectedUser(null);
+    } catch (error) {
+      console.error(`Failed to update user: ${error}`);
+    }
+  };
+
+  const handleRemoveUser = async (user: User) => {
+    if (!confirm('Are you sure you want to delete this user?')) return;
+
+    try {
+      const removeRequest = create(UserServiceRemoveRequestSchema, {
+        userName: user.name,
+      });
+      await sendRequest(removeRequest, 'UserServiceRemoveRequest');
+    } catch (error) {
+      console.error(`Failed to delete user: ${error}`);
+    }
+  };
+
+  // Define columns for users list
+  const userColumns: ListColumn[] = [
+    {
+      key: 'name',
+      label: 'User',
+      filterable: true,
+      render: (user: User) => (
+        <div>
+          <div className="text-sm font-medium text-gray-900 dark:text-white">
+            {user.name}
+          </div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            Roles: {(user.roles || []).join(', ') || 'None'}
+          </div>
+        </div>
+      ),
+    },
+  ];
+
+  // Define actions for users
+  const userActions: ListItemAction[] = [
+    {
+      label: 'Edit',
+      onClick: (user: User) => {
+        setSelectedUser(user);
+        setShowUserDetailsModal(true);
+      },
+      className: 'px-3 py-1 text-sm bg-green-100 text-green-800 rounded-md hover:bg-green-200',
+      permission: { resource: PermService.User, action: PermUser.Update },
+    },
+    {
+      label: 'Remove',
+      onClick: handleRemoveUser,
+      className: 'px-3 py-1 text-sm bg-red-100 text-red-800 rounded-md hover:bg-red-200',
+      condition: (user: User) => user.name !== 'admin',
+      permission: { resource: PermService.User, action: PermUser.Remove },
+    },
+  ];
+
+  // Define columns for roles list
+  const roleColumns: ListColumn[] = [
+    {
+      key: 'name',
+      label: 'Role',
+      filterable: true,
+      render: (role: Role) => (
+        <div>
+          <div className="text-sm font-medium text-gray-900 dark:text-white">
+            {role.name}
+          </div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            Permissions: {role.permissions?.length || 0}
+          </div>
+        </div>
+      ),
+    },
+  ];
+
+  // Define actions for roles
+  const roleActions: ListItemAction[] = [
+    {
+      label: 'Edit',
+      onClick: (role: Role) => {
+        setSelectedRole(role);
+        setShowRoleDetailsModal(true);
+      },
+      className: 'px-3 py-1 text-sm bg-green-100 text-green-800 rounded-md hover:bg-green-200',
+      permission: { resource: PermService.Role, action: PermRole.Update },
+    },
+    {
+      label: 'Remove',
+      onClick: handleRemoveRole,
+      className: 'px-3 py-1 text-sm bg-red-100 text-red-800 rounded-md hover:bg-red-200',
+      condition: (role: Role) => role.name !== 'admin',
+      permission: { resource: PermService.Role, action: PermRole.Remove },
+    },
+  ];
+
+  // Permissions
+  const canCreateUser = hasPermission(PermService.User, PermUser.Create);
+  const canCreateRole = hasPermission(PermService.Role, PermRole.Create);
+
+  return (
+    <ProtectedRoute>
+      <DashboardLayout>
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+                Management
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400">
+                Manage labels and users
+              </p>
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div className="border-b border-gray-200 dark:border-gray-700">
+            <nav className="flex space-x-8">
+              <button
+                onClick={() => setActiveTab('users')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'users'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Users
+              </button>
+              <button
+                onClick={() => setActiveTab('roles')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'roles'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Roles
+              </button>
+            </nav>
+          </div>
+
+          {/* Users Tab */}
+          {activeTab === 'users' && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                    User Management
+                  </h2>
+                </div>
+                {canCreateUser && (
+                  <button
+                    onClick={() => setShowCreateUserModal(true)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  >
+                    Create User
+                  </button>
+                )}
+              </div>
+
+              <StreamingList
+                objectType="users"
+                columns={userColumns}
+                actions={userActions}
+                filterBy={['name']}
+                itemKey={(user: User) => user.name}
+                permissions={{ list: { resource: PermService.User, action: PermUser.List } }}
+                emptyMessage="No users found"
+              />
+            </div>
+          )}
+
+          {/* Roles Tab */}
+          {activeTab === 'roles' && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                    Role Management
+                  </h2>
+                </div>
+                {canCreateRole && (
+                  <button
+                    onClick={() => setShowCreateRoleModal(true)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  >
+                    Create Role
+                  </button>
+                )}
+              </div>
+
+              <StreamingList
+                objectType="roles"
+                columns={roleColumns}
+                actions={roleActions}
+                filterBy={['name']}
+                itemKey={(role: Role) => role.name}
+                permissions={{ list: { resource: PermService.Role, action: PermRole.List } }}
+                emptyMessage="No roles found"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Create Role Modal */}
+        {showCreateRoleModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <RoleForm
+                mode="create"
+                onSubmit={handleCreateRole}
+                onCancel={() => setShowCreateRoleModal(false)}
+                title="Create Role"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Edit Role Modal */}
+        {showRoleDetailsModal && selectedRole && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <RoleForm
+                mode="edit"
+                initialData={selectedRole}
+                onSubmit={handleUpdateRole}
+                onCancel={() => {
+                  setShowRoleDetailsModal(false);
+                  setSelectedRole(null);
+                }}
+                title={`Edit Role: ${selectedRole.name}`}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Create User Modal */}
+        {showCreateUserModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <UserForm
+                mode="create"
+                onSubmit={handleCreateUser}
+                onCancel={() => setShowCreateUserModal(false)}
+                title="Create User"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Edit User Modal */}
+        {showUserDetailsModal && selectedUser && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <UserForm
+                mode="edit"
+                initialData={selectedUser}
+                onSubmit={handleUpdateUser}
+                onCancel={() => {
+                  setShowUserDetailsModal(false);
+                  setSelectedUser(null);
+                }}
+                title={`Edit User: ${selectedUser.name}`}
+              />
+            </div>
+          </div>
+        )}
+      </DashboardLayout>
+    </ProtectedRoute>
+  );
+}

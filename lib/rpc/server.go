@@ -12,6 +12,7 @@
 
 // Author: Sergei Parshev (@sparshev)
 
+// Package rpc is a gRPC API interface of the Fish node
 package rpc
 
 import (
@@ -37,6 +38,8 @@ type Server struct {
 	fish             *fish.Fish
 	mux              *http.ServeMux
 	streamingService *StreamingService
+	ipRateLimiter    *rpcutil.IPRateLimitHandler
+	userRateLimiter  *rpcutil.UserRateLimitHandler
 }
 
 // NewServer creates a new Connect server
@@ -45,23 +48,36 @@ func NewServer(f *fish.Fish, additionalServices []gate.RPCService) *Server {
 	s := &Server{
 		fish: f,
 		mux:  http.NewServeMux(),
+
+		// Create rate limiters
+		ipRateLimiter:   rpcutil.NewIPRateLimitHandler(10, time.Minute),           // 10 requests per minute for IPs
+		userRateLimiter: rpcutil.NewUserRateLimitHandler(f.DB(), 60, time.Minute), // 60 requests per minute for users
 	}
 
 	// Create OpenTelemetry interceptor for tracing and metrics
-	otelInterceptor, err := otelconnect.NewInterceptor(
-		otelconnect.WithTrustRemote(), // Trust remote tracing information for internal microservices
-	)
+	// We don't need to trust remote right now because all the incoming requests are from clients
+	// otelconnect.WithTrustRemote(), // Trust remote tracing information for internal microservices
+	otelInterceptor, err := otelconnect.NewInterceptor()
 	if err != nil {
 		logger.Error("Failed to create OpenTelemetry interceptor", "err", err)
 		// Continue without instrumentation if OTEL fails
 		otelInterceptor = nil
 	}
 
+	// Create timeout interceptor for unary operations (10 seconds default)
+	timeoutInterceptor := rpcutil.NewTimeoutInterceptor(10 * time.Second)
+
 	// Create interceptor options
-	var interceptorOpts []connect.HandlerOption
+	var interceptors []connect.Interceptor
 	if otelInterceptor != nil {
-		interceptorOpts = append(interceptorOpts, connect.WithInterceptors(otelInterceptor))
+		interceptors = append(interceptors, otelInterceptor)
 		logger.Debug("OpenTelemetry interceptor enabled")
+	}
+	interceptors = append(interceptors, timeoutInterceptor)
+	logger.Debug("Timeout interceptor enabled", "timeout", 30*time.Second)
+
+	interceptorOpts := []connect.HandlerOption{
+		connect.WithInterceptors(interceptors...),
 	}
 
 	// Register services WITH OpenTelemetry interceptors
@@ -91,6 +107,11 @@ func NewServer(f *fish.Fish, additionalServices []gate.RPCService) *Server {
 		interceptorOpts...,
 	))
 
+	s.mux.Handle(aquariumv2connect.NewAuthServiceHandler(
+		NewAuthService(f),
+		interceptorOpts...,
+	))
+
 	// Create and store streaming service
 	streamingService := NewStreamingService(f)
 	s.streamingService = streamingService
@@ -111,15 +132,18 @@ func NewServer(f *fish.Fish, additionalServices []gate.RPCService) *Server {
 // Handler returns the server's HTTP handler
 func (s *Server) Handler() http.Handler {
 	// Create auth and RBAC handlers
-	authHandler := rpcutil.NewAuthHandler(s.fish.DB())
+	// Auth handler now includes IP rate limiting for unauthenticated requests
+	authHandler := rpcutil.NewAuthHandler(s.fish.DB(), s.ipRateLimiter)
 	rbacHandler := rpcutil.NewRBACHandler(auth.GetEnforcer())
 
-	// Build middleware chain: Auth -> RBAC -> YAML -> Connect RPC
+	// Build middleware chain: Auth (with IP limiting for unauth) -> User Rate Limit -> RBAC -> YAML -> Connect RPC
 	// I found that ConnectRPC interceptors are not very good for auth needs,
 	// so moved those to the handlers even before it gets to the RPC side
 	handler := authHandler.Handler(
-		rbacHandler.Handler(
-			rpcutil.YAMLToJSONHandler(s.mux),
+		s.userRateLimiter.Handler(
+			rbacHandler.Handler(
+				rpcutil.YAMLToJSONHandler(s.mux),
+			),
 		),
 	)
 
@@ -169,6 +193,15 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		defer cancel()
 
 		s.streamingService.GracefulShutdown(streamingCtx)
+	}
+
+	// Shutdown rate limiters
+	logger.Info("Shutting down rate limiters...")
+	if s.ipRateLimiter != nil {
+		s.ipRateLimiter.Shutdown()
+	}
+	if s.userRateLimiter != nil {
+		s.userRateLimiter.Shutdown()
 	}
 
 	logger.Info("Server shutdown completed")

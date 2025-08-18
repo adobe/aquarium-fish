@@ -16,7 +16,7 @@ package aquarium.v2;
 
 import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
-import "aquarium/v2/rbac.proto";
+import "aquarium/v2/options_rbac.proto";
 
 option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2";
 
@@ -84,7 +84,7 @@ message StreamingServiceSubscribeResponse {
   // Type of the database object that changed
   SubscriptionType object_type = 1;
 
-  // Type of change (CREATED, UPDATED, DELETED)
+  // Type of change (CREATED, UPDATED, REMOVED)
   ChangeType change_type = 2;
 
   // Timestamp when the change occurred
@@ -118,5 +118,5 @@ enum ChangeType {
   CHANGE_TYPE_UNSPECIFIED = 0;
   CHANGE_TYPE_CREATED = 1;
   CHANGE_TYPE_UPDATED = 2;
-  CHANGE_TYPE_DELETED = 3;
+  CHANGE_TYPE_REMOVED = 3;
 }

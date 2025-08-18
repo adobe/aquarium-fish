@@ -1,0 +1,170 @@
+{{define "helper-functions"}}  // Load from YAML
+const handleYamlLoad = () => {
+  try {
+    setYamlError(null);
+    const parsedData = yaml.load(yamlText) as any;
+
+    if (!parsedData || typeof parsedData !== 'object') {
+      throw new Error('Invalid YAML format');
+    }
+
+    const newFormData: {{.Name}}FormState = { ...default{{.Name}}State };
+
+{{- range .Fields }}
+    if (parsedData.{{.JSONName}} !== undefined) {
+{{- if .IsTimestamp }}
+      if (typeof parsedData.{{.JSONName}} === 'string') {
+        newFormData.{{.JSONName}} = new Date(parsedData.{{.JSONName}}).toISOString().slice(0, 16);
+      }
+{{- else if .IsRepeated }}
+      if (Array.isArray(parsedData.{{.JSONName}})) {
+        newFormData.{{.JSONName}} = parsedData.{{.JSONName}};
+      }
+{{- else if .IsStruct }}
+      if (typeof parsedData.{{.JSONName}} === 'object') {
+        newFormData.{{.JSONName}} = parsedData.{{.JSONName}};
+      }
+{{- else }}
+      newFormData.{{.JSONName}} = parsedData.{{.JSONName}};
+{{- end }}
+    }
+{{- end }}
+
+    setFormData(newFormData);
+    setShowYamlInput(false);
+  } catch (error) {
+    setYamlError('YAML parsing error: ' + error);
+  }
+};
+
+// Validate form data
+const validateForm = (): boolean => {
+  const errors: Record<string, string> = {};
+
+{{- range .Fields }}
+{{- if not .IsOptional }}
+  {{- if .NoEdit }}
+  if (mode !== 'create' && (!formData.{{.JSONName}}{{if .IsRepeated}} || formData.{{.JSONName}}.length === 0{{end}})) {
+    errors.{{.JSONName}} = '{{.DisplayName}} is required';
+  }
+  {{- else }}
+  if (!formData.{{.JSONName}}{{if .IsRepeated}} || formData.{{.JSONName}}.length === 0{{end}}) {
+    errors.{{.JSONName}} = '{{.DisplayName}} is required';
+  }
+  {{- end }}
+{{- end }}
+{{- end }}
+
+  setValidationErrors(errors);
+  return Object.keys(errors).length === 0;
+};
+
+// Handle form submission
+const handleSubmit = () => {
+  if (!validateForm()) {
+    return;
+  }
+
+  try {
+    // Convert form data to protobuf message
+    const data = create({{.TypeName}}Schema, {
+{{- range .Fields }}
+{{- if .IsTimestamp }}
+      {{.JSONName}}: formData.{{.JSONName}} ? { seconds: BigInt(Math.floor(new Date(formData.{{.JSONName}}).getTime() / 1000)) } : undefined,
+{{- else if .IsStruct }}
+      {{.JSONName}}: formData.{{.JSONName}},
+{{- else if .IsOptional }}
+      {{.JSONName}}: formData.{{.JSONName}} || undefined,
+{{- else }}
+      {{.JSONName}}: formData.{{.JSONName}},
+{{- end }}
+{{- end }}
+    });
+
+    onSubmit(data);
+  } catch (error) {
+    setYamlError('Failed to create {{.Name}}: ' + error);
+  }
+};
+
+// Handle field changes
+const handleFieldChange = (field: string, value: any) => {
+  setFormData(prev => ({
+    ...prev,
+    [field]: value
+  }));
+
+  // Clear validation error for this field
+  if (validationErrors[field]) {
+    setValidationErrors(prev => ({
+      ...prev,
+      [field]: ''
+    }));
+  }
+};
+
+// Handle array field changes
+const handleArrayChange = (field: string, index: number, value: any) => {
+  setFormData(prev => ({
+    ...prev,
+    [field]: prev[field as keyof {{.Name}}FormState].map((item: any, i: number) =>
+      i === index ? value : item
+    )
+  }));
+};
+
+// Add array item
+const addArrayItem = (field: string, defaultValue: any) => {
+  setFormData(prev => ({
+    ...prev,
+    [field]: [...(prev[field as keyof {{.Name}}FormState] as any[]), defaultValue]
+  }));
+};
+
+// Remove array item
+const removeArrayItem = (field: string, index: number) => {
+  setFormData(prev => ({
+    ...prev,
+    [field]: (prev[field as keyof {{.Name}}FormState] as any[]).filter((_, i) => i !== index)
+  }));
+};
+
+const isReadOnly = readonly || mode === 'view';
+const formTitle = title || (mode === 'create' ? 'Create {{.Name}}' : mode === 'edit' ? 'Edit {{.Name}}' : 'View {{.Name}}');
+
+// Helper function to get autofill options
+const getAutofillOptions = (type: string) => {
+  switch (type.toLowerCase()) {
+    case 'label':
+      return data.labels || [];
+    case 'user':
+      return data.users || [];
+    case 'role':
+      return data.roles || [];
+    case 'node':
+      return data.nodes || [];
+    default:
+      return [];
+  }
+};
+
+// Helper function to parse struct field
+const parseStructField = (fieldName: string, text: string) => {
+  try {
+    const parsed = yaml.load(text);
+    if (parsed && typeof parsed === 'object') {
+      handleFieldChange(fieldName, parsed);
+      setStructFieldErrors(prev => ({ ...prev, [fieldName]: '' }));
+    } else {
+      setStructFieldErrors(prev => ({ ...prev, [fieldName]: 'Invalid YAML/JSON format' }));
+    }
+  } catch (error) {
+    setStructFieldErrors(prev => ({ ...prev, [fieldName]: 'Parse error: ' + error }));
+  }
+};
+
+// Helper function to determine if field is simple (can be inline)
+const isSimpleField = (field: any) => {
+  return !field.IsRepeated && !field.IsMap && !field.IsMessage && !field.IsStruct && !field.IsTimestamp && !field.AutofillType;
+};
+{{end}}

@@ -1,0 +1,12 @@
+{{define "basic-input-field" -}}
+<input
+  type="{{if eq .TypeScript "string"}}text{{else if eq .TypeScript "number"}}number{{else if eq .TypeScript "boolean"}}checkbox{{else}}text{{end}}"
+  value={formData.{{.JSONName}}}
+  {{- if eq .TypeScript "boolean" }}
+  checked={formData.{{.JSONName}}}
+  {{- end }}
+  onChange={(e) => handleFieldChange('{{.JSONName}}', {{if eq .TypeScript "boolean"}}e.target.checked{{else if eq .TypeScript "number"}}parseInt(e.target.value) || 0{{else}}e.target.value{{end}})}
+  disabled={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
+  className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+/>
+{{end}}

@@ -74,47 +74,49 @@ func (d *Database) applicationResourceCreateImpl(_ context.Context, r *typesv2.A
 	r.UpdatedAt = r.CreatedAt
 	err := d.be.Collection(ObjectApplicationResource).Add(r.Uid.String(), r)
 
-	// Notifying the subscribers on change, doing that in goroutine to not block execution
-	go func(appResource *typesv2.ApplicationResource) {
-		d.subsMu.RLock()
-		channels := make([]chan *typesv2.ApplicationResource, len(d.subsApplicationResource))
-		copy(channels, d.subsApplicationResource)
-		d.subsMu.RUnlock()
-
-		for _, ch := range channels {
-			// Use select with default to prevent panic if channel is closed
-			select {
-			case ch <- appResource:
-				// Successfully sent notification
-			default:
-				// Channel is closed or full, skip this subscriber
-				log.WithFunc("database", "applicationResourceCreateImpl").Debug("Failed to send ApplicationResource notification, channel closed or full")
-			}
-		}
-	}(r)
+	// Notify subscribers about the new ApplicationResource
+	notifySubscribersHelper(d, &d.subsApplicationResource, NewCreateEvent(r), ObjectApplicationResource)
 
 	return err
 }
 
 // applicationResourceDeleteImpl removes Resource
-func (d *Database) applicationResourceDeleteImpl(_ context.Context, uid typesv2.ApplicationResourceUID) error {
+func (d *Database) applicationResourceDeleteImpl(ctx context.Context, uid typesv2.ApplicationResourceUID) error {
+	// Get the object before deleting it for notification
+	res, getErr := d.ApplicationResourceGet(ctx, uid)
+	if getErr != nil {
+		return getErr
+	}
+
 	// First delete any references to this resource. We don't care about the error if it's happened.
 	_ = d.GateProxySSHAccessDeleteByResource(uid)
 
 	d.beMu.RLock()
-	defer d.beMu.RUnlock()
+	err := d.be.Collection(ObjectApplicationResource).Delete(uid.String())
+	d.beMu.RUnlock()
 
-	// Now purge the resource.
-	return d.be.Collection(ObjectApplicationResource).Delete(uid.String())
+	if err == nil && res != nil {
+		// Notify subscribers about the removed ApplicationResource
+		notifySubscribersHelper(d, &d.subsApplicationResource, NewRemoveEvent(res), ObjectApplicationResource)
+	}
+
+	return err
 }
 
 // applicationResourceSaveImpl stores ApplicationResource
 func (d *Database) applicationResourceSaveImpl(_ context.Context, res *typesv2.ApplicationResource) error {
-	d.beMu.RLock()
-	defer d.beMu.RUnlock()
-
 	res.UpdatedAt = time.Now()
-	return d.be.Collection(ObjectApplicationResource).Add(res.Uid.String(), res)
+
+	d.beMu.RLock()
+	err := d.be.Collection(ObjectApplicationResource).Add(res.Uid.String(), res)
+	d.beMu.RUnlock()
+
+	if err == nil {
+		// Notify subscribers about the updated ApplicationResource
+		notifySubscribersHelper(d, &d.subsApplicationResource, NewUpdateEvent(res), ObjectApplicationResource)
+	}
+
+	return err
 }
 
 // applicationResourceGetImpl returns Resource by it's UID
@@ -251,21 +253,11 @@ func (d *Database) applicationResourceGetByApplicationImpl(ctx context.Context, 
 }
 
 // subscribeApplicationResourceImpl adds a channel to the subscription list
-func (d *Database) subscribeApplicationResourceImpl(_ context.Context, ch chan *typesv2.ApplicationResource) {
-	d.subsMu.Lock()
-	defer d.subsMu.Unlock()
-	d.subsApplicationResource = append(d.subsApplicationResource, ch)
+func (d *Database) subscribeApplicationResourceImpl(_ context.Context, ch chan ApplicationResourceSubscriptionEvent) {
+	subscribeHelper(d, &d.subsApplicationResource, ch)
 }
 
 // unsubscribeApplicationResourceImpl removes a channel from the subscription list
-func (d *Database) unsubscribeApplicationResourceImpl(_ context.Context, ch chan *typesv2.ApplicationResource) {
-	d.subsMu.Lock()
-	defer d.subsMu.Unlock()
-	for i, existing := range d.subsApplicationResource {
-		if existing == ch {
-			// Remove channel from slice
-			d.subsApplicationResource = append(d.subsApplicationResource[:i], d.subsApplicationResource[i+1:]...)
-			break
-		}
-	}
+func (d *Database) unsubscribeApplicationResourceImpl(_ context.Context, ch chan ApplicationResourceSubscriptionEvent) {
+	unsubscribeHelper(d, &d.subsApplicationResource, ch)
 }

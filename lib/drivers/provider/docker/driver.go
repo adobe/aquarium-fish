@@ -91,6 +91,12 @@ func (d *Driver) Prepare(config []byte) error {
 		return err
 	}
 
+	// Fill up the available tasks to execute
+	d.tasksList = append(d.tasksList,
+		&TaskSnapshot{driver: d},
+		&TaskImage{driver: d},
+	)
+
 	// Getting info about the docker system - will return "<ncpu>,<mem_bytes>"
 	stdout, _, err := util.RunAndLog("docker", 5*time.Second, nil, d.cfg.DockerPath,
 		"system", "info", "--format", "{{ .NCPU }},{{ .MemTotal }}",
@@ -239,7 +245,8 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 	}
 
 	// Set the arguments to run the container
-	runArgs := []string{"run", "--detach",
+	runArgs := []string{
+		"run", "--detach",
 		"--name", cName,
 		"--mac-address", cHwaddr,
 		"--network", "aquarium-" + cNetwork,
@@ -329,7 +336,7 @@ func (d *Driver) Deallocate(res typesv2.ApplicationResource) error {
 	logger := log.WithFunc("docker", "Deallocate").With("provider.name", d.name, "cont_name", cName)
 	cID := d.getAllocatedContainerID(cName)
 	if len(cID) == 0 {
-		logger.Error("Unable to find container with identifier", "container_name", cName)
+		logger.Error("Unable to find container with identifier")
 		return fmt.Errorf("DOCKER: %s: Unable to find container with identifier: %s", d.name, res.Identifier)
 	}
 
@@ -372,11 +379,12 @@ func (d *Driver) Deallocate(res typesv2.ApplicationResource) error {
 		return fmt.Errorf("DOCKER: %s: Unable to list the mount points for container %q: %v", d.name, cName, err)
 	}
 	for _, volPath := range cVolumes {
-		if strings.Contains(mounts, volPath) {
-			if _, _, err := util.RunAndLog("docker", 5*time.Second, nil, "/usr/bin/hdiutil", "detach", volPath); err != nil {
-				logger.Error("Unable to detach container volume disk", "volume_path", volPath, "err", err)
-				return fmt.Errorf("DOCKER: %s: Unable to detach container %q volume disk %q: %v", d.name, cName, volPath, err)
-			}
+		if volPath == "" || !strings.Contains(mounts, volPath) {
+			continue
+		}
+		if _, _, err := util.RunAndLog("docker", 5*time.Second, nil, "/usr/bin/hdiutil", "detach", volPath); err != nil {
+			logger.Error("Unable to detach container volume disk", "volume_path", volPath, "err", err)
+			return fmt.Errorf("DOCKER: %s: Unable to detach container %q volume disk %q: %v", d.name, cName, volPath, err)
 		}
 	}
 

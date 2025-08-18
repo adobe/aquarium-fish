@@ -95,6 +95,7 @@ func {{if .IsMethod}}({{.RecvName}} {{.RecvType}}) {{end}}{{title (trimSuffix .N
 }
 {{end}}
 `
+
 const debugWrapperTemplate = `/**
  * Copyright 2025 Adobe. All rights reserved.
  * This file is licensed to you under the Apache License, Version 2.0 (the "License");
@@ -266,6 +267,9 @@ func analyzeFunctionDecl(fn *ast.FuncDecl, packageName, filePath string) *Functi
 			funcInfo.RecvName = recv.Names[0].Name
 		} else {
 			funcInfo.RecvName = strings.ToLower(funcInfo.RecvType[:1])
+			if funcInfo.RecvName == "*" {
+				funcInfo.RecvName = strings.ToLower(funcInfo.RecvType[1:2])
+			}
 		}
 	}
 

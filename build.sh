@@ -11,10 +11,15 @@
 
 # Author: Sergei Parshev (@sparshev)
 
+# Main build script to build Aquarium-Fish with all the features
+
 MAXJOBS=$1
 [ "x$MAXJOBS" != 'x' ] || MAXJOBS=4
 
-root_dir=$(cd "$(dirname "$0")"; echo "$PWD")
+root_dir=$(
+    cd "$(dirname "$0")"
+    echo "$PWD"
+)
 echo "ROOT DIR: ${root_dir}"
 cd "${root_dir}"
 
@@ -22,40 +27,29 @@ cd "${root_dir}"
 # which will help to not relay on glibc on linux and be truely independend from OS
 export CGO_ENABLED=0
 
-echo "--- GENERATE CODE FOR AQUARIUM-FISH ---"
+# Ensure lib/web/dist is not empty
+mkdir -p lib/web/dist
+touch lib/web/dist/.empty
 
-# Install required tools if not available
-gopath=$(go env GOPATH)
-export PATH="$PATH:$gopath/bin"
-
-# Install buf for protobuf management if not available
-if ! command -v buf >/dev/null 2>&1; then
-    go install github.com/bufbuild/buf/cmd/buf@v1.54.0
+if [ "x$ONLYBUILD" = 'x' ]; then
+    ./prepare.sh
 fi
 
-if ! command -v protoc-gen-go >/dev/null 2>&1; then
-    # Version is from go.mod
-    go install google.golang.org/protobuf/cmd/protoc-gen-go
-fi
-
-if ! command -v protoc-gen-connect-go >/dev/null 2>&1; then
-    # Version is from go.mod
-    go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.18.1
-fi
-
-# Run code generation
-go generate -v .
-
-# If ONLYGEN is specified - skip the build
 [ -z "$ONLYGEN" ] || exit 0
 
-# Doing check after generation because generated sources requires additional modules
-[ "$SKIPCHECK" ] || ./check.sh
-
 echo
-echo "--- RUN UNIT TESTS ---"
-# Unit tests should not consume more then 5 sec per run - for that we have integration tests
-go test -v -failfast -count=1 -timeout=5s -v ./lib/...
+echo "--- BUILD WEB DASHBOARD ---"
+# Build the web dashboard
+if [ "x${NO_WEB}" = x ]; then
+    cd web
+    ONLYBUILD=1 ./build.sh
+    cd ..
+
+    rm -rf lib/web/dist
+    cp -a web/build/client lib/web/dist
+else
+    echo "Skipping. Reusing existing web dashboard build"
+fi
 
 echo
 echo "--- BUILD ${BINARY_NAME} ($MAXJOBS in parallel) ---"
@@ -75,9 +69,12 @@ else
     arch_list="$(go env GOARCH)"
     # Building with race detectors to capture them during integration testing
     build_command="go build -race -tags debug"
-    # Unsetting cgo to allow -race to work propely
-    unset CGO_ENABLED
+    # Setting cgo to allow -race to work propely
+    export CGO_ENABLED=1
 fi
+
+[ "x$TARGET_OS" = 'x' ] || os_list="$TARGET_OS"
+[ "x$TARGET_ARCH" = 'x' ] || arch_list="$TARGET_ARCH"
 
 # Prepare version number as overrides during link
 mod_name=$(grep '^module' "${root_dir}/go.mod" | cut -d' ' -f 2)
@@ -90,16 +87,16 @@ pwait() {
     # Note: Dash really don't like jobs to be executed in a pipe or in other shell, soooo...
     # Using "jobs -p" to show only PIDs (because it could be multiline)
     # Unfortunately "jobs -r" is not supported in dash, not a big problem with sleep for 1 sec
-    while jobs -p > /tmp/jobs_list.tmp; do
+    while jobs -p >/tmp/jobs_list.tmp; do
         # Cleanup jobs list, otherwise "jobs -p" will stay the same forever
-        jobs > /dev/null 2>&1
+        jobs >/dev/null 2>&1
         [ $(cat /tmp/jobs_list.tmp | wc -l) -ge "$MAXJOBS" ] || break
         sleep 1
     done
 }
 
 # If use it directly - it causes "go tool dist: signal: broken pipe"
-go tool dist list > /tmp/go_tool_dist_list.txt
+go tool dist list >/tmp/go_tool_dist_list.txt
 
 for GOOS in $os_list; do
     for GOARCH in $arch_list; do
@@ -115,7 +112,7 @@ for GOOS in $os_list; do
             echo "WARNING: It's DEBUG binary with instrumentation"
         fi
         rm -f "$name" "$name.log" "$name.zip" "$name.tar.xz"
-        GOOS=$GOOS GOARCH=$GOARCH $build_command -ldflags="$ld_opts $version_flags" -o "$name" . > "$name.log" 2>&1 &
+        GOOS=$GOOS GOARCH=$GOARCH $build_command -ldflags="$ld_opts $version_flags" -o "$name" . >"$name.log" 2>&1 &
         pwait $MAXJOBS
     done
 done
@@ -134,7 +131,7 @@ for GOOS in $os_list; do
             echo
             echo "--- ERROR: $name ---"
             cat "$name.log"
-            errorcount=$(($errorcount+1))
+            errorcount=$(($errorcount + 1))
         elif [ -s "$name.log" ]; then
             echo
             echo "--- WARNING: $name ---"

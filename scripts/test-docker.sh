@@ -9,36 +9,31 @@
 # OF ANY KIND, either express or implied. See the License for the specific language
 # governing permissions and limitations under the License.
 
+# Simple script to run integration tests in docker
 # Please set NOBUILD=1 if want to skip build of binary for linux
 # Use first argument to specify the test or skip that and it will run all the tests
 
 # Author: Sergei Parshev (@sparshev)
 
 TEST="$@"
+# If no args was specified - run all the tests
+[ "x$TEST" != x ] || TEST='./tests/...'
 
-if [ "$(echo "x$TEST" | cut -c-2)" = 'x-' ]; then
-    test_cmd="$TEST"
-elif [ "x$TEST" != 'x' ]; then
-    test_cmd="-run '^$TEST\$'"
-else
-    test_cmd="-skip '_stress\$'"
+# Building for host os to generate & build web
+[ "x$NOBUILD" != 'x' ] || SKIPCHECK=1 ./build.sh
+
+[ "x$CI" != x ] || opts=-it
+
+docker run --cpus 4 -v $PWD:/ws -v $HOME/go/pkg:/go/pkg -w /ws --rm $opts golang:1.23.1 sh -exc "
+[ 'x$NOBUILD' != 'x' ] || ONLYBUILD=1 NO_WEB=1 ./build.sh
+
+echo '--- RUNNING TESTS $TEST ---'
+go test -json -v -parallel 4 -count=1 -race $TEST | \
+    tee tests_full.log | \
+    go run ./tools/go-test-formatter/go-test-formatter.go -stdout_timestamp test -stdout_color -stdout_filter failed
+
+if [ x\$? != x0 ]; then
+    ([ 'x$CI' != x ] || bash)
+    exit 1
 fi
-
-docker run -v $PWD:/ws -w /ws --rm -it golang:1.23.1 sh -exc "
-[ 'x$NOBUILD' != 'x' ] || SKIPCHECK=1 ./build.sh
-
-counter=0
-
-while true
-do
-    go test -v -failfast -parallel 1 -count=1 $test_cmd ./tests || sh
-
-    counter=\$((\$counter+1))
-    if [ \$counter -ge 50 ]; then
-        break
-    fi
-    sleep 1
-done
-
-echo \$counter
 "

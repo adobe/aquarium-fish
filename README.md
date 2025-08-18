@@ -281,11 +281,15 @@ The election process:
          * If Vote round delay is passed
             * Increment Vote round and vote again on the current Node status
 
-## UI
+## Web UI Dashboard
 
-**TODO**
+Aquarium-Fish now have a nice Web-UI which allows users to quickly spin-up new environment and even
+connect to it using ProxySSH. It's static single-page application (SPA) based on React-Router v7
+which heavily utilizes server streaming to quickly share the latest DB updates and to reduce load
+on the server side.
 
-Simplify the cluster management, for example adding Labels or check the status [#8](https://github.com/adobe/aquarium-fish/issues/8).
+Web Dashboard could be visited on primary endpoint of the Fish right after start: https://localhost:8001/
+and will allow all the users to login with their user/password.
 
 ## Development
 
@@ -320,6 +324,21 @@ The integration tests needs aquarium-fish* binary, so prior to execution please 
    ```sh
    $ FISH_MONITORING=localhost go test -json -v -parallel 1 -count=1 -skip '_stress$' -race ./tests/...
    ```
+   ```
+
+#### Docker & WEB UI testing
+
+There are a couple of helpers to run specific tests:
+* Mac->Lin build & integration tests runner: `./scripts/test-docker.sh`
+* Web UI integration tests runner: `./scripts/webtest-docker.sh`
+
+Both of them will build the linux binary for testing and you can disable that by `NOBUILD=1` env var,
+also any argument given to those scripts will be passed to go test. By default the scripts will use
+`./tests/...` and `./webtests/...` respectively.
+
+In order to create tests - you can run local Fish node and use chromium "playwright-crx" extension to
+figure out what kind of locators to use. It's mostly for js/python but allows to find the right
+functions to look in the https://pkg.go.dev/github.com/playwright-community/playwright-go after that.
 
 ### Benchmarks
 

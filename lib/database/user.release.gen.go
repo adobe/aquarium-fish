@@ -22,6 +22,14 @@ import (
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
+func (d *Database) SubscribeUser(ctx context.Context, ch chan UserSubscriptionEvent) {
+	d.subscribeUserImpl(ctx, ch)
+}
+
+func (d *Database) UnsubscribeUser(ctx context.Context, ch chan UserSubscriptionEvent) {
+	d.unsubscribeUserImpl(ctx, ch)
+}
+
 func (d *Database) UserList(ctx context.Context) ([]typesv2.User, error) {
 	return d.userListImpl(ctx)
 }

@@ -36,6 +36,9 @@ import (
 //	    sum: sha256:1234567890abcdef1234567890abcdef3
 type Options struct {
 	Images []provider.Image `json:"images"` // List of image dependencies, last one is running one
+
+	// TaskImage options
+	TaskImageName string `json:"task_image_name"` // Create new image with defined name and "image-DATE.TIME" version
 }
 
 // Apply takes json and applies it to the options structure

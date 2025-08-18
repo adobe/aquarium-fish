@@ -67,6 +67,7 @@ jobs:
           if [ "x$(git status -s)" != 'x' ]; then
             echo 'Build modified the workspace, please fix or add to gitignore list:'
             git status
+            git diff
             exit 1
           fi
 
@@ -75,6 +76,35 @@ jobs:
         with:
           name: binaries
           path: aquarium-fish*.tar.xz
+
+  Build-java:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # To get all the tags for versioning
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          java-version: '11'
+          distribution: zulu
+
+      - name: Set version from the closest git tag
+        run: |
+          cd java
+          mvn --batch-mode versions:set -DnewVersion="$(git describe --always --tags --match 'v*' | sed 's/^v//')$([ "$(git diff)" = '' ] || echo '-dirty')"
+
+      - name: Build
+        run: |
+          cd java
+          mvn --batch-mode --update-snapshots package
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-java
+          path: java/target/aquarium-fish-java-*
 
   Tests:
     runs-on: ubuntu-latest
@@ -99,6 +129,9 @@ jobs:
             go run ./tools/go-test-formatter/go-test-formatter.go -stdout_timestamp test -stdout_color \
               -stdout_filter failed -junit integration_tests_report.xml -junit_truncate 4000 \
               -junit_filter failed -junit_timestamp test
+
+      - name: Web Integration Tests
+        run: ./scripts/webtest-docker.sh
 
       - name: Pack failed tests workspaces
         if: failure()
@@ -137,6 +170,7 @@ jobs:
             /tmp/gobenchdata/*
             integration_tests_ws.tar.gz
             integration_tests_report.full.log
+            webtests_full.log
             integration_tests_report.xml
 
       - name: Test Summary

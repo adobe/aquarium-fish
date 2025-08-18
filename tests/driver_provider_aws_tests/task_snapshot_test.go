@@ -48,12 +48,8 @@ drivers:
       instance_key: generate
       base_url: `+mockServer.GetURL())
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	// Create RPC clients
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
 
 	labelClient := aquariumv2connect.NewLabelServiceClient(adminCli, afi.APIAddress("grpc"), adminOpts...)
 	appClient := aquariumv2connect.NewApplicationServiceClient(adminCli, afi.APIAddress("grpc"), adminOpts...)
@@ -142,11 +138,11 @@ drivers:
 		resp, err := appClient.CreateTask(
 			context.Background(),
 			connect.NewRequest(&aquariumv2.ApplicationServiceCreateTaskRequest{
-				ApplicationUid: appUID,
 				Task: &aquariumv2.ApplicationTask{
-					Task:    "snapshot",
-					When:    aquariumv2.ApplicationState_ALLOCATED,
-					Options: taskMd,
+					ApplicationUid: appUID,
+					Task:           "snapshot",
+					When:           aquariumv2.ApplicationState_ALLOCATED,
+					Options:        taskMd,
 				},
 			}),
 		)

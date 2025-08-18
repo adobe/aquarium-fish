@@ -30,3 +30,15 @@ plugins:
       - run
       - ./tools/buf-gen-streaming/buf-gen-streaming.go
     out: lib/rpc
+  - local:
+      - go
+      - run
+      - ./tools/buf-gen-web-ui-components/buf-gen-web-ui-components.go
+    out: web/gen
+  - local:
+      - go
+      - run
+      - ./tools/buf-gen-permissions/buf-gen-permissions.go
+    out: web/gen/permissions
+    opt:
+      - target=ts

@@ -26,6 +26,22 @@ import (
 
 var debugTracerDatabaseNode = otel.Tracer("aquarium-fish/database")
 
+func (d *Database) SubscribeNode(ctx context.Context, ch chan NodeSubscriptionEvent) {
+	ctx, span := debugTracerDatabaseNode.Start(ctx, "database.Database.subscribeNodeImpl")
+	defer span.End()
+
+	d.subscribeNodeImpl(ctx, ch)
+
+}
+
+func (d *Database) UnsubscribeNode(ctx context.Context, ch chan NodeSubscriptionEvent) {
+	ctx, span := debugTracerDatabaseNode.Start(ctx, "database.Database.unsubscribeNodeImpl")
+	defer span.End()
+
+	d.unsubscribeNodeImpl(ctx, ch)
+
+}
+
 func (d *Database) NodeList(ctx context.Context) ([]typesv2.Node, error) {
 	ctx, span := debugTracerDatabaseNode.Start(ctx, "database.Database.nodeListImpl")
 	defer span.End()
@@ -101,11 +117,11 @@ func (d *Database) NodeSave(ctx context.Context, node *typesv2.Node) error {
 
 }
 
-func (d *Database) NodePing(ctx context.Context, node *typesv2.Node) error {
+func (d *Database) NodePing(ctx context.Context) error {
 	ctx, span := debugTracerDatabaseNode.Start(ctx, "database.Database.nodePingImpl")
 	defer span.End()
 
-	err0 := d.nodePingImpl(ctx, node)
+	err0 := d.nodePingImpl(ctx)
 
 	if err0 != nil {
 		span.RecordError(err0)

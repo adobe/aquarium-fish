@@ -17,6 +17,7 @@ package helper
 import (
 	"bufio"
 	"context"
+	"crypto/x509"
 	"fmt"
 	"net/netip"
 	"os"
@@ -32,80 +33,6 @@ import (
 	"github.com/shirou/gopsutil/v4/process"
 )
 
-// detectProjectRoot finds the project root directory by walking up from the current file
-func detectProjectRoot() (string, error) {
-	_, currentFile, _, ok := runtime.Caller(0)
-	if !ok {
-		return "", fmt.Errorf("unable to get current file path")
-	}
-
-	// Walk up from tests/helper/fish.go to find the project root
-	dir := filepath.Dir(filepath.Dir(filepath.Dir(currentFile)))
-
-	// Verify this is the project root by checking for go.mod
-	if _, err := os.Stat(filepath.Join(dir, "go.mod")); err != nil {
-		return "", fmt.Errorf("could not find project root (no go.mod found)")
-	}
-
-	return dir, nil
-}
-
-// findLatestAquariumFishBinary finds the most recent aquarium-fish binary in the project root
-func findLatestAquariumFishBinary() (string, error) {
-	projectRoot, err := detectProjectRoot()
-	if err != nil {
-		return "", fmt.Errorf("failed to detect project root: %w", err)
-	}
-
-	// Pattern: aquarium-fish-*.<GOOS>_<GOARCH>
-	pattern := fmt.Sprintf("aquarium-fish-*.%s_%s", runtime.GOOS, runtime.GOARCH)
-
-	matches, err := filepath.Glob(filepath.Join(projectRoot, pattern))
-	if err != nil {
-		return "", fmt.Errorf("failed to search for binaries: %w", err)
-	}
-
-	if len(matches) == 0 {
-		return "", fmt.Errorf("no aquarium-fish binaries found matching pattern: %s", pattern)
-	}
-
-	// Sort by modification time (newest first)
-	result := ""
-	var resultModTime *time.Time
-	for _, match := range matches {
-		stat, err := os.Stat(match)
-		if err != nil {
-			continue
-		}
-		modTime := stat.ModTime()
-		if resultModTime == nil || modTime.After(*resultModTime) {
-			result = match
-			resultModTime = &modTime
-		}
-	}
-
-	return result, nil
-}
-
-// initFishPath initializes the fish binary path, either from FISH_PATH env var or by auto-detection
-func initFishPath(tb testing.TB) string {
-	tb.Helper()
-	// First, try environment variable
-	if envPath := os.Getenv("FISH_PATH"); envPath != "" {
-		tb.Logf("Using aquarium-fish binary from FISH_PATH: %s", envPath)
-		return envPath
-	}
-
-	// Auto-detect the binary
-	detectedPath, err := findLatestAquariumFishBinary()
-	if err != nil || detectedPath == "" {
-		tb.Logf("Failed to auto-detect aquarium-fish binary: %v", err)
-	}
-
-	tb.Logf("Auto-detected aquarium-fish binary: %s", detectedPath)
-	return detectedPath
-}
-
 // AFInstance saves state of the running Aquarium Fish for particular test
 type AFInstance struct {
 	workspace string
@@ -115,6 +42,7 @@ type AFInstance struct {
 
 	nodeName   string
 	adminToken string
+	caPool     *x509.CertPool
 
 	apiEndpoint string
 
@@ -166,6 +94,11 @@ func NewAfInstance(tb testing.TB, name, cfg string) *AFInstance {
 	}
 	tb.Log("INFO: Created workspace:", afi.nodeName, afi.workspace)
 
+	// Automatically cleaning up the workspace after the test is complete
+	tb.Cleanup(func() {
+		afi.Cleanup(tb)
+	})
+
 	// Enabling monitoring if env variable FISH_MONITORING is set
 	if envAddr, ok := os.LookupEnv("FISH_MONITORING"); ok {
 		if strings.Contains(cfg, "monitoring:") {
@@ -195,6 +128,31 @@ monitoring:
 	tb.Log("INFO: Stored config:", cfg)
 
 	return afi
+}
+
+// GetCA will return the node CA pool for secure communication
+func (afi *AFInstance) GetCA(tb testing.TB) *x509.CertPool {
+	tb.Helper()
+	afi.configMu.RLock()
+	caPool := afi.caPool
+	afi.configMu.RUnlock()
+	if caPool == nil {
+		ca, err := os.ReadFile(filepath.Join(afi.workspace, "fish_data", "ca.crt"))
+		if err != nil {
+			tb.Errorf("Unable to read Fish node CA: %v", err)
+			return nil
+		}
+		caPool = x509.NewCertPool()
+		if ok := caPool.AppendCertsFromPEM(ca); !ok {
+			tb.Errorf("Unable to add Fish node CA to pool: %v", err)
+			return nil
+		}
+
+		afi.configMu.Lock()
+		afi.caPool = caPool
+		afi.configMu.Unlock()
+	}
+	return caPool
 }
 
 // NewClusterNode starts another node of cluster
@@ -265,6 +223,7 @@ func (afi *AFInstance) Restart(tb testing.TB, args ...string) {
 }
 
 // Cleanup after the test execution
+// You don't need to call it if you use NewAfInstance(), NewAquariumFish() or NewStoppedAquariumFish()
 func (afi *AFInstance) Cleanup(tb testing.TB) {
 	tb.Helper()
 	tb.Log("INFO: Cleaning up:", afi.nodeName, afi.workspace)
@@ -294,6 +253,7 @@ func (afi *AFInstance) Stop(tb testing.TB) {
 	defer func() {
 		// Not cleaning adminToken, because it's created just one time for DB
 		afi.apiEndpoint = ""
+		afi.caPool = nil
 	}()
 
 	// Send interrupt signal
@@ -556,4 +516,78 @@ func (afi *AFInstance) Start(tb testing.TB, args ...string) {
 		failed := <-initDone
 		fmt.Println(failed)
 	}()
+}
+
+// detectProjectRoot finds the project root directory by walking up from the current file
+func detectProjectRoot() (string, error) {
+	_, currentFile, _, ok := runtime.Caller(0)
+	if !ok {
+		return "", fmt.Errorf("unable to get current file path")
+	}
+
+	// Walk up from tests/helper/fish.go to find the project root
+	dir := filepath.Dir(filepath.Dir(filepath.Dir(currentFile)))
+
+	// Verify this is the project root by checking for go.mod
+	if _, err := os.Stat(filepath.Join(dir, "go.mod")); err != nil {
+		return "", fmt.Errorf("could not find project root (no go.mod found)")
+	}
+
+	return dir, nil
+}
+
+// findLatestAquariumFishBinary finds the most recent aquarium-fish binary in the project root
+func findLatestAquariumFishBinary() (string, error) {
+	projectRoot, err := detectProjectRoot()
+	if err != nil {
+		return "", fmt.Errorf("failed to detect project root: %w", err)
+	}
+
+	// Pattern: aquarium-fish-*.<GOOS>_<GOARCH>
+	pattern := fmt.Sprintf("aquarium-fish-*.%s_%s", runtime.GOOS, runtime.GOARCH)
+
+	matches, err := filepath.Glob(filepath.Join(projectRoot, pattern))
+	if err != nil {
+		return "", fmt.Errorf("failed to search for binaries: %w", err)
+	}
+
+	if len(matches) == 0 {
+		return "", fmt.Errorf("no aquarium-fish binaries found matching pattern: %s", pattern)
+	}
+
+	// Sort by modification time (newest first)
+	result := ""
+	var resultModTime *time.Time
+	for _, match := range matches {
+		stat, err := os.Stat(match)
+		if err != nil {
+			continue
+		}
+		modTime := stat.ModTime()
+		if resultModTime == nil || modTime.After(*resultModTime) {
+			result = match
+			resultModTime = &modTime
+		}
+	}
+
+	return result, nil
+}
+
+// initFishPath initializes the fish binary path, either from FISH_PATH env var or by auto-detection
+func initFishPath(tb testing.TB) string {
+	tb.Helper()
+	// First, try environment variable
+	if envPath := os.Getenv("FISH_PATH"); envPath != "" {
+		tb.Logf("Using aquarium-fish binary from FISH_PATH: %s", envPath)
+		return envPath
+	}
+
+	// Auto-detect the binary
+	detectedPath, err := findLatestAquariumFishBinary()
+	if err != nil || detectedPath == "" {
+		tb.Logf("Failed to auto-detect aquarium-fish binary: %v", err)
+	}
+
+	tb.Logf("Auto-detected aquarium-fish binary: %s", detectedPath)
+	return detectedPath
 }

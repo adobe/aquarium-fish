@@ -1,0 +1,83 @@
+{{define "component-start" -}}
+export const {{.Name}}Form: React.FC<{{.Name -}}FormProps> = ({
+  initialData,
+  onSubmit,
+  onCancel,
+  mode,
+  title,
+  readonly,
+  nested = false
+}) => {
+  const [formData, setFormData] = useState<{{.Name}}FormState>(default{{.Name}}State);
+  const [yamlText, setYamlText] = useState('');
+  const [showYamlInput, setShowYamlInput] = useState(false);
+  const [yamlError, setYamlError] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [autofillMode, setAutofillMode] = useState<Record<string, 'dropdown' | 'text'>>({});
+  const [structFieldText, setStructFieldText] = useState<Record<string, string>>({});
+  const [structFieldErrors, setStructFieldErrors] = useState<Record<string, string>>({});
+  const { data } = useStreaming();
+
+  // Initialize form data from initialData
+  useEffect(() => {
+    if (initialData) {
+      const newFormData: {{.Name}}FormState = {
+{{- range .Fields }}
+{{- if .IsTimestamp }}
+        {{.JSONName}}: initialData.{{.JSONName}} ? new Date(Number(initialData.{{.JSONName}}.seconds) * 1000).toISOString().slice(0, 16) : '',
+{{- else if .IsRepeated }}
+        {{.JSONName}}: initialData.{{.JSONName}} || [],
+{{- else if .IsStruct }}
+        {{.JSONName}}: initialData.{{.JSONName}} || {},
+{{- else if .IsMessage }}
+        {{.JSONName}}: initialData.{{.JSONName}} && typeof initialData.{{.JSONName}} === 'object' ? initialData.{{.JSONName}} : {{.DefaultValue}},
+{{- else if .IsOptional }}
+        {{.JSONName}}: initialData.{{.JSONName}} ?? {{.DefaultValue}},
+{{- else }}
+        {{.JSONName}}: initialData.{{.JSONName}} || {{.DefaultValue}},
+{{- end }}
+{{- end }}
+      };
+      setFormData(newFormData);
+
+      // Initialize struct field text
+      const newStructText: Record<string, string> = {};
+{{- range .Fields }}
+{{- if .IsStruct }}
+      newStructText['{{.JSONName}}'] = initialData.{{.JSONName}} ? yaml.dump(initialData.{{.JSONName}}) : '';
+{{- end }}
+{{- end }}
+      setStructFieldText(newStructText);
+    }
+  }, [initialData]);
+
+  // Auto-save form data when nested and form data changes
+  useEffect(() => {
+    if (nested && onSubmit && formData !== default{{.Name}}State) {
+      // Debounce the auto-save to avoid too many calls
+      const timeoutId = setTimeout(() => {
+        try {
+          // Convert form data to protobuf message
+          const data = create({{.TypeName}}Schema, {
+{{- range .Fields }}
+{{- if .IsTimestamp }}
+            {{.JSONName}}: formData.{{.JSONName}} ? { seconds: BigInt(Math.floor(new Date(formData.{{.JSONName}}).getTime() / 1000)) } : undefined,
+{{- else if .IsStruct }}
+            {{.JSONName}}: formData.{{.JSONName}},
+{{- else if .IsOptional }}
+            {{.JSONName}}: formData.{{.JSONName}} || undefined,
+{{- else }}
+            {{.JSONName}}: formData.{{.JSONName}},
+{{- end }}
+{{- end }}
+          });
+          onSubmit(data);
+        } catch (error) {
+          // Silently ignore errors during auto-save
+        }
+      }, 500); // 500ms debounce
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [formData, nested, onSubmit]);
+{{end}}

@@ -158,3 +158,5 @@ linters-settings:
         disabled: true
       - name: use-errors-new
         disabled: true
+      - name: max-public-structs
+        arguments: [20]  # 5 by default is not much helping

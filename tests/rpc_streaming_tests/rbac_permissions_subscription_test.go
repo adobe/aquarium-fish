@@ -46,10 +46,6 @@ drivers:
   providers:
     test:`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	// Create test users
 	user1Pass := "user1-pass"
 	user2Pass := "user2-pass"
@@ -69,10 +65,10 @@ drivers:
 	}
 
 	// Create clients for different users
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientGRPC)
-	user1Cli, user1Opts := h.NewRPCClient(user1.Name, user1Pass, h.RPCClientGRPC)
-	user2Cli, user2Opts := h.NewRPCClient(user2.Name, user2Pass, h.RPCClientGRPC)
-	adminUserCli, adminUserOpts := h.NewRPCClient(adminUser.Name, adminUserPass, h.RPCClientGRPC)
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientGRPC, afi.GetCA(t))
+	user1Cli, user1Opts := h.NewRPCClient(user1.Name, user1Pass, h.RPCClientGRPC, afi.GetCA(t))
+	user2Cli, user2Opts := h.NewRPCClient(user2.Name, user2Pass, h.RPCClientGRPC, afi.GetCA(t))
+	adminUserCli, adminUserOpts := h.NewRPCClient(adminUser.Name, adminUserPass, h.RPCClientGRPC, afi.GetCA(t))
 
 	// Create streaming service clients
 	adminStreamingClient := aquariumv2connect.NewStreamingServiceClient(
@@ -116,7 +112,6 @@ drivers:
 	subscriptionTypes := []aquariumv2.SubscriptionType{
 		aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE,
 		aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE,
-		aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK,
 	}
 
 	if err := adminHelper.SetupFullStreaming(subscriptionTypes); err != nil {
@@ -247,77 +242,45 @@ drivers:
 	collectNotifications := func(userName string, helper *h.StreamingTestHelper, collectCtx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
-		ticker := time.NewTicker(100 * time.Millisecond)
-		defer ticker.Stop()
-
 		for {
 			select {
 			case <-collectCtx.Done():
 				t.Logf("Notification collection timeout for user %s", userName)
 				return
-			case <-ticker.C:
-				// Try to get a state notification (non-blocking)
-				select {
-				case stateNotification := <-helper.GetStreamingClient().GetStateNotifications():
-					// Parse the state notification to get the application UID
-					var appState aquariumv2.ApplicationState
-					if err := stateNotification.ObjectData.UnmarshalTo(&appState); err != nil {
-						t.Logf("Failed to unmarshal state notification: %v", err)
-						continue
-					}
 
-					mu.Lock()
-					notifications = append(notifications, NotificationRecord{
-						UserName: userName,
-						AppUID:   appState.ApplicationUid,
-						Type:     "STATE",
-					})
-					mu.Unlock()
-					t.Logf("User %s received STATE notification for app %s", userName, appState.ApplicationUid)
-				default:
+			case stateNotification := <-helper.GetStreamingClient().GetStateNotifications():
+				// Parse the state notification to get the application UID
+				var appState aquariumv2.ApplicationState
+				if err := stateNotification.ObjectData.UnmarshalTo(&appState); err != nil {
+					t.Logf("Failed to unmarshal state notification: %v", err)
+					continue
 				}
 
-				// Try to get a resource notification (non-blocking)
-				select {
-				case resourceNotification := <-helper.GetStreamingClient().GetResourceNotifications():
-					// Parse the resource notification to get the application UID
-					var appResource aquariumv2.ApplicationResource
-					if err := resourceNotification.ObjectData.UnmarshalTo(&appResource); err != nil {
-						t.Logf("Failed to unmarshal resource notification: %v", err)
-						continue
-					}
+				mu.Lock()
+				notifications = append(notifications, NotificationRecord{
+					UserName: userName,
+					AppUID:   appState.ApplicationUid,
+					Type:     "STATE",
+				})
+				mu.Unlock()
+				t.Logf("User %s received STATE notification for app %s", userName, appState.ApplicationUid)
 
-					mu.Lock()
-					notifications = append(notifications, NotificationRecord{
-						UserName: userName,
-						AppUID:   appResource.ApplicationUid,
-						Type:     "RESOURCE",
-					})
-					mu.Unlock()
-					t.Logf("User %s received RESOURCE notification for app %s", userName, appResource.ApplicationUid)
-				default:
+			case resourceNotification := <-helper.GetStreamingClient().GetResourceNotifications():
+				// Parse the resource notification to get the application UID
+				var appResource aquariumv2.ApplicationResource
+				if err := resourceNotification.ObjectData.UnmarshalTo(&appResource); err != nil {
+					t.Logf("Failed to unmarshal resource notification: %v", err)
+					continue
 				}
 
-				// Try to get a task notification (non-blocking)
-				select {
-				case taskNotification := <-helper.GetStreamingClient().GetTaskNotifications():
-					// Parse the task notification to get the application UID
-					var appTask aquariumv2.ApplicationTask
-					if err := taskNotification.ObjectData.UnmarshalTo(&appTask); err != nil {
-						t.Logf("Failed to unmarshal task notification: %v", err)
-						continue
-					}
-
-					mu.Lock()
-					notifications = append(notifications, NotificationRecord{
-						UserName: userName,
-						AppUID:   appTask.ApplicationUid,
-						Type:     "TASK",
-					})
-					mu.Unlock()
-					t.Logf("User %s received TASK notification for app %s", userName, appTask.ApplicationUid)
-				default:
-				}
+				mu.Lock()
+				notifications = append(notifications, NotificationRecord{
+					UserName: userName,
+					AppUID:   appResource.ApplicationUid,
+					Type:     "RESOURCE",
+				})
+				mu.Unlock()
+				t.Logf("User %s received RESOURCE notification for app %s", userName, appResource.ApplicationUid)
 			}
 		}
 	}
@@ -334,9 +297,22 @@ drivers:
 	go collectNotifications("user2", user2Helper, notificationCtx, &wg)
 	go collectNotifications("adminUser", adminUserHelper, notificationCtx, &wg)
 
+	// Helper functions to count notifications
+	countNotifications := func(userName, appUID string) int {
+		count := 0
+		mu.Lock()
+		defer mu.Unlock()
+		for _, notif := range notifications {
+			if notif.UserName == userName && notif.AppUID == appUID {
+				count++
+			}
+		}
+		return count
+	}
+
 	var user1AppUID, user2AppUID, adminAppUID string
 
-	t.Run("Create applications as different users", func(t *testing.T) {
+	t.Run("Create application as user1", func(t *testing.T) {
 		// User1 creates an application
 		md1, _ := structpb.NewStruct(map[string]any{"owner": "user1"})
 		user1AppReq := &aquariumv2.ApplicationServiceCreateRequest{
@@ -365,6 +341,13 @@ drivers:
 		// Wait a bit for notifications to propagate
 		time.Sleep(2 * time.Second)
 
+		user1OwnNotifs := countNotifications("user1", user1AppUID)
+		if user1OwnNotifs != 4 {
+			t.Errorf("ERROR: User1 should receive notifications for its own application: (%d) %#v", user1OwnNotifs, notifications)
+		}
+	})
+
+	t.Run("Create application as user2", func(t *testing.T) {
 		// User2 creates an application
 		md2, _ := structpb.NewStruct(map[string]any{"owner": "user2"})
 		user2AppReq := &aquariumv2.ApplicationServiceCreateRequest{
@@ -373,7 +356,7 @@ drivers:
 				Metadata: md2,
 			},
 		}
-		resp, err = user2Helper.SendRequestAndExpectSuccess(
+		resp, err := user2Helper.SendRequestAndExpectSuccess(
 			"create-user2-app",
 			"ApplicationServiceCreateRequest",
 			user2AppReq,
@@ -383,6 +366,7 @@ drivers:
 			t.Fatal("Failed to create user2 application:", err)
 		}
 
+		var appResp aquariumv2.ApplicationServiceCreateResponse
 		if err := resp.ResponseData.UnmarshalTo(&appResp); err != nil {
 			t.Fatal("Failed to unmarshal user2 app response:", err)
 		}
@@ -392,6 +376,13 @@ drivers:
 		// Wait a bit for notifications to propagate
 		time.Sleep(2 * time.Second)
 
+		user2OwnNotifs := countNotifications("user2", user2AppUID)
+		if user2OwnNotifs != 4 {
+			t.Errorf("ERROR: User2 should receive notifications for its own application: (%d) %#v", user2OwnNotifs, notifications)
+		}
+	})
+
+	t.Run("Create application as admin", func(t *testing.T) {
 		// Admin creates an application
 		mdAdmin, _ := structpb.NewStruct(map[string]any{"owner": "admin"})
 		adminAppReq := &aquariumv2.ApplicationServiceCreateRequest{
@@ -400,7 +391,7 @@ drivers:
 				Metadata: mdAdmin,
 			},
 		}
-		resp, err = adminHelper.SendRequestAndExpectSuccess(
+		resp, err := adminHelper.SendRequestAndExpectSuccess(
 			"create-admin-app",
 			"ApplicationServiceCreateRequest",
 			adminAppReq,
@@ -410,6 +401,7 @@ drivers:
 			t.Fatal("Failed to create admin application:", err)
 		}
 
+		var appResp aquariumv2.ApplicationServiceCreateResponse
 		if err := resp.ResponseData.UnmarshalTo(&appResp); err != nil {
 			t.Fatal("Failed to unmarshal admin app response:", err)
 		}
@@ -418,30 +410,21 @@ drivers:
 
 		// Wait for notifications to complete
 		time.Sleep(5 * time.Second)
+
+		adminOwnNotifs := countNotifications("admin", adminAppUID)
+		if adminOwnNotifs != 4 {
+			t.Errorf("ERROR: Admin should receive notifications for its own application: (%d) %#v", adminOwnNotifs, notifications)
+		}
 	})
 
 	// Stop notification collection
 	notificationCancel()
 	wg.Wait()
 
-	t.Run("Verify RBAC subscription filtering", func(t *testing.T) {
+	t.Run("Verify overall RBAC subscription filtering", func(t *testing.T) {
 		mu.Lock()
-		allNotifications := make([]NotificationRecord, len(notifications))
-		copy(allNotifications, notifications)
+		t.Logf("Total notifications received: %d", len(notifications))
 		mu.Unlock()
-
-		t.Logf("Total notifications received: %d", len(allNotifications))
-
-		// Helper functions to count notifications
-		countNotifications := func(userName, appUID string) int {
-			count := 0
-			for _, notif := range allNotifications {
-				if notif.UserName == userName && notif.AppUID == appUID {
-					count++
-				}
-			}
-			return count
-		}
 
 		// Verify user1 only receives notifications for their own application
 		user1OwnNotifs := countNotifications("user1", user1AppUID)

@@ -1,0 +1,21 @@
+{{define "enum-field" -}}
+<select
+  value={formData.{{.JSONName}}}
+  onChange={(e) => handleFieldChange('{{.JSONName}}', parseInt(e.target.value))}
+  disabled={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
+  className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+>
+  <option value="">Select...</option>
+  {/* Add enum options here */}
+</select>
+{{end}}
+
+{{define "timestamp-field" -}}
+<input
+  type="datetime-local"
+  value={formData.{{.JSONName}}}
+  onChange={(e) => handleFieldChange('{{.JSONName}}', e.target.value)}
+  disabled={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
+  className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+/>
+{{end}}

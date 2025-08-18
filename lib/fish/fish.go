@@ -32,6 +32,7 @@ import (
 	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/monitoring"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
@@ -87,8 +88,8 @@ type Fish struct {
 	applicationsTimeoutsUpdated chan struct{} // Notifies about the earlier timeout then exists
 
 	// When Application changes - fish figures that out through those channels
-	applicationStateChannel chan *typesv2.ApplicationState
-	applicationTaskChannel  chan *typesv2.ApplicationTask
+	applicationStateChannel chan database.ApplicationStateSubscriptionEvent
+	applicationTaskChannel  chan database.ApplicationTaskSubscriptionEvent
 
 	// Stores the current usage of the node resources
 	nodeUsageMutex sync.Mutex // Is needed to protect node resources from concurrent allocations
@@ -116,11 +117,11 @@ func (f *Fish) Init() error {
 	signal.Notify(f.Quit, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 
 	// Init channel for ApplicationState changes
-	f.applicationStateChannel = make(chan *typesv2.ApplicationState, 100)
+	f.applicationStateChannel = make(chan database.ApplicationStateSubscriptionEvent, 100)
 	f.db.SubscribeApplicationState(ctx, f.applicationStateChannel)
 
 	// Init channel for ApplicationTask changes
-	f.applicationTaskChannel = make(chan *typesv2.ApplicationTask, 100)
+	f.applicationTaskChannel = make(chan database.ApplicationTaskSubscriptionEvent, 100)
 	f.db.SubscribeApplicationTask(ctx, f.applicationTaskChannel)
 
 	// Init variables
@@ -153,9 +154,14 @@ func (f *Fish) Init() error {
 
 		// Assigning admin role
 		adminUser.Roles = []string{auth.AdminRoleName}
-		if err := f.db.UserSave(ctx, adminUser); err != nil {
-			logger.Error("Failed to assign Administrator Role to admin user", "err", err)
-			return fmt.Errorf("Fish: Failed to assign Administrator Role to admin user: %v", err)
+		// Setting unlimited rate to allow admin user to properly test the system
+		var rateLimit int32 = -1
+		adminUser.Config = &typesv2.UserConfig{
+			RateLimit: &rateLimit,
+		}
+		if err := f.db.UserCreate(ctx, adminUser); err != nil {
+			logger.Error("Failed to create the admin user", "err", err)
+			return fmt.Errorf("Fish: Failed to create the admin user: %v", err)
 		}
 	} else if err != nil {
 		logger.Error("Unable to create admin", "err", err)
@@ -185,14 +191,14 @@ func (f *Fish) Init() error {
 		return fmt.Errorf("Fish: Unable to init node: %v", err)
 	}
 
-	f.db.SetNode(*node)
+	f.db.SetNode(node)
 
 	if createNode {
-		if err = f.db.NodeCreate(ctx, f.db.GetNode()); err != nil {
+		if err = f.db.NodeCreate(ctx, node); err != nil {
 			return fmt.Errorf("Fish: Unable to create node: %v", err)
 		}
 	} else {
-		if err = f.db.NodeSave(ctx, f.db.GetNode()); err != nil {
+		if err = f.db.NodeSave(ctx, node); err != nil {
 			return fmt.Errorf("Fish: Unable to save node: %v", err)
 		}
 	}
@@ -285,7 +291,6 @@ func (f *Fish) Init() error {
 func (f *Fish) initDefaultRoles(ctx context.Context) error {
 	logger := log.WithFunc("fish", "initDefaultRoles")
 
-	// TODO: Implement enforcer update on role change
 	// Create enforcer first since we'll need it for setting up permissions
 	enforcer, err := auth.NewEnforcer()
 	if err != nil {
@@ -295,16 +300,14 @@ func (f *Fish) initDefaultRoles(ctx context.Context) error {
 
 	// Create all roles described in the proto specs
 	for role, perms := range auth.GetRolePermissions() {
-		newRole := typesv2.Role{
-			Name:        role,
-			Permissions: perms,
-		}
-
-		r, err := f.db.RoleGet(ctx, role)
+		_, err := f.db.RoleGet(ctx, role)
 		if err == database.ErrObjectNotFound {
 			logger.Debug("Create role and assigning permissions", "role", role)
-			r = &newRole
-			if err := f.db.RoleCreate(ctx, r); err != nil {
+			newRole := typesv2.Role{
+				Name:        role,
+				Permissions: perms,
+			}
+			if err := f.db.RoleCreate(ctx, &newRole); err != nil {
 				logger.Error("Failed to create role", "role", role, "err", err)
 				return fmt.Errorf("Fish: Failed to create %q role: %v", role, err)
 			}
@@ -312,12 +315,24 @@ func (f *Fish) initDefaultRoles(ctx context.Context) error {
 			logger.Error("Unable to get role", "role", role, "err", err)
 			return fmt.Errorf("Fish: Unable to get %q role: %v", role, err)
 		}
+	}
 
-		// Add role permissions to the enforcer
+	// Subscribe enforcer to role updates when they are created
+	enforcerChannel := make(chan database.RoleSubscriptionEvent, 100)
+	f.db.SubscribeRole(ctx, enforcerChannel)
+	enforcer.SetUpdateChannel(enforcerChannel)
+
+	// Init the existing DB role permissions to the enforcer
+	roles, err := f.db.RoleList(ctx)
+	if err != nil {
+		logger.Error("Failed to list existing roles", "err", err)
+		return fmt.Errorf("Fish: Failed to list existing roles: %v", err)
+	}
+	for _, r := range roles {
 		for _, p := range r.Permissions {
 			if err := enforcer.AddPolicy(r.Name, p.Resource, p.Action); err != nil {
-				logger.Error("Failed to add role permission", "role", role, "permission", p, "err", err)
-				return fmt.Errorf("Fish: Failed to add %q role permission %v: %v", role, p, err)
+				logger.Error("Failed to add role permission", "role", r.Name, "permission", p, "err", err)
+				return fmt.Errorf("Fish: Failed to add %q role permission %v: %v", r, p, err)
 			}
 		}
 	}
@@ -340,6 +355,12 @@ func (f *Fish) Close(ctx context.Context) {
 	logger.Debug("Waiting for background routines to shutdown")
 	f.routines.Wait()
 	logger.Debug("All the background routines are stopped")
+
+	logger.Debug("Stopping the enforcer")
+	enforcer := auth.GetEnforcer()
+	if enforcer != nil {
+		enforcer.Shutdown()
+	}
 
 	logger.Debug("Closing the DB")
 	f.db.Shutdown(ctx)
@@ -373,7 +394,7 @@ func (f *Fish) pingProcess(ctx context.Context) {
 			return
 		case <-pingTicker.C:
 			logger.Debug("Fish Node: ping")
-			f.db.NodePing(ctx, f.db.GetNode())
+			f.db.NodePing(ctx)
 		}
 	}
 }
@@ -393,7 +414,12 @@ func (f *Fish) applicationProcess() {
 		select {
 		case <-f.running.Done():
 			return
-		case appState := <-f.applicationStateChannel:
+		case appStateEvent := <-f.applicationStateChannel:
+			// Only process CREATED events for application states (new state changes)
+			if appStateEvent.ChangeType != aquariumv2.ChangeType_CHANGE_TYPE_CREATED {
+				continue
+			}
+			appState := appStateEvent.Object
 			switch appState.Status {
 			case typesv2.ApplicationState_UNSPECIFIED:
 				logger.Error("Application has unspecified state", "app_uid", appState.ApplicationUid, "app_status", appState.Status)
@@ -412,10 +438,15 @@ func (f *Fish) applicationProcess() {
 			case typesv2.ApplicationState_DEALLOCATED, typesv2.ApplicationState_ERROR:
 				// Not much to do here, but maybe later in the future?
 				// In this state the Application has no Resource to deal with, so no tasks for now
-				//f.maybeRunApplicationTask(appState.ApplicationUid, nil)
+				// f.maybeRunApplicationTask(appState.ApplicationUid, nil)
 				logger.Debug("Application reached end state", "app_uid", appState.ApplicationUid, "app_status", appState.Status)
 			}
-		case appTask := <-f.applicationTaskChannel:
+		case appTaskEvent := <-f.applicationTaskChannel:
+			// Only process CREATED events for application tasks (new tasks) or UPDATED events
+			if appTaskEvent.ChangeType != aquariumv2.ChangeType_CHANGE_TYPE_CREATED && appTaskEvent.ChangeType != aquariumv2.ChangeType_CHANGE_TYPE_UPDATED {
+				continue
+			}
+			appTask := appTaskEvent.Object
 			// Runs check for Application state and decides if need to execute or drop
 			// If the Application state doesn't fit the task - then it will be skipped to be
 			// started later by the ApplicationState change event

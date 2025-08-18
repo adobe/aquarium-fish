@@ -804,27 +804,27 @@ func (x *LabelServiceCreateResponse) GetData() *Label {
 	return nil
 }
 
-type LabelServiceDeleteRequest struct {
+type LabelServiceRemoveRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	LabelUid      string                 `protobuf:"bytes,1,opt,name=label_uid,json=labelUid,proto3" json:"label_uid,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *LabelServiceDeleteRequest) Reset() {
-	*x = LabelServiceDeleteRequest{}
+func (x *LabelServiceRemoveRequest) Reset() {
+	*x = LabelServiceRemoveRequest{}
 	mi := &file_aquarium_v2_label_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *LabelServiceDeleteRequest) String() string {
+func (x *LabelServiceRemoveRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*LabelServiceDeleteRequest) ProtoMessage() {}
+func (*LabelServiceRemoveRequest) ProtoMessage() {}
 
-func (x *LabelServiceDeleteRequest) ProtoReflect() protoreflect.Message {
+func (x *LabelServiceRemoveRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_aquarium_v2_label_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -836,19 +836,19 @@ func (x *LabelServiceDeleteRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use LabelServiceDeleteRequest.ProtoReflect.Descriptor instead.
-func (*LabelServiceDeleteRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use LabelServiceRemoveRequest.ProtoReflect.Descriptor instead.
+func (*LabelServiceRemoveRequest) Descriptor() ([]byte, []int) {
 	return file_aquarium_v2_label_proto_rawDescGZIP(), []int{10}
 }
 
-func (x *LabelServiceDeleteRequest) GetLabelUid() string {
+func (x *LabelServiceRemoveRequest) GetLabelUid() string {
 	if x != nil {
 		return x.LabelUid
 	}
 	return ""
 }
 
-type LabelServiceDeleteResponse struct {
+type LabelServiceRemoveResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Status        bool                   `protobuf:"varint,1,opt,name=status,proto3" json:"status,omitempty"`
 	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
@@ -856,20 +856,20 @@ type LabelServiceDeleteResponse struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *LabelServiceDeleteResponse) Reset() {
-	*x = LabelServiceDeleteResponse{}
+func (x *LabelServiceRemoveResponse) Reset() {
+	*x = LabelServiceRemoveResponse{}
 	mi := &file_aquarium_v2_label_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *LabelServiceDeleteResponse) String() string {
+func (x *LabelServiceRemoveResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*LabelServiceDeleteResponse) ProtoMessage() {}
+func (*LabelServiceRemoveResponse) ProtoMessage() {}
 
-func (x *LabelServiceDeleteResponse) ProtoReflect() protoreflect.Message {
+func (x *LabelServiceRemoveResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_aquarium_v2_label_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -881,19 +881,19 @@ func (x *LabelServiceDeleteResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use LabelServiceDeleteResponse.ProtoReflect.Descriptor instead.
-func (*LabelServiceDeleteResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use LabelServiceRemoveResponse.ProtoReflect.Descriptor instead.
+func (*LabelServiceRemoveResponse) Descriptor() ([]byte, []int) {
 	return file_aquarium_v2_label_proto_rawDescGZIP(), []int{11}
 }
 
-func (x *LabelServiceDeleteResponse) GetStatus() bool {
+func (x *LabelServiceRemoveResponse) GetStatus() bool {
 	if x != nil {
 		return x.Status
 	}
 	return false
 }
 
-func (x *LabelServiceDeleteResponse) GetMessage() string {
+func (x *LabelServiceRemoveResponse) GetMessage() string {
 	if x != nil {
 		return x.Message
 	}
@@ -904,21 +904,22 @@ var File_aquarium_v2_label_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_label_proto_rawDesc = "" +
 	"\n" +
-	"\x17aquarium/v2/label.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x18aquarium/v2/common.proto\x1a\x16aquarium/v2/rbac.proto\"\xf7\x01\n" +
-	"\x05Label\x12\x10\n" +
-	"\x03uid\x18\x01 \x01(\tR\x03uid\x129\n" +
+	"\x17aquarium/v2/label.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x18aquarium/v2/common.proto\x1a\x1eaquarium/v2/options_rbac.proto\x1a#aquarium/v2/options_streaming.proto\x1a\x1caquarium/v2/options_ui.proto\"\xa8\x02\n" +
+	"\x05Label\x12\x1a\n" +
+	"\x03uid\x18\x01 \x01(\tB\b\x9a\xb5\x18\x04\b\x01\x10\x01R\x03uid\x12C\n" +
 	"\n" +
-	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x12\n" +
+	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\b\x9a\xb5\x18\x04\b\x01\x10\x01R\tcreatedAt\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x18\n" +
 	"\aversion\x18\x04 \x01(\x05R\aversion\x12>\n" +
 	"\vdefinitions\x18\x05 \x03(\v2\x1c.aquarium.v2.LabelDefinitionR\vdefinitions\x123\n" +
-	"\bmetadata\x18\x06 \x01(\v2\x17.google.protobuf.StructR\bmetadata\"\xef\x01\n" +
+	"\bmetadata\x18\x06 \x01(\v2\x17.google.protobuf.StructR\bmetadata:\x1b\x8a\xb5\x18\x11\n" +
+	"\x0fLabelServiceGet\x92\xb5\x18\x02\b\x01\"\xf7\x01\n" +
 	"\x0fLabelDefinition\x12\x16\n" +
 	"\x06driver\x18\x01 \x01(\tR\x06driver\x121\n" +
 	"\aoptions\x18\x02 \x01(\v2\x17.google.protobuf.StructR\aoptions\x124\n" +
 	"\tresources\x18\x03 \x01(\v2\x16.aquarium.v2.ResourcesR\tresources\x12H\n" +
-	"\x0eauthentication\x18\x04 \x01(\v2\x1b.aquarium.v2.AuthenticationH\x00R\x0eauthentication\x88\x01\x01B\x11\n" +
-	"\x0f_authentication\"\xa4\x03\n" +
+	"\x0eauthentication\x18\x04 \x01(\v2\x1b.aquarium.v2.AuthenticationH\x00R\x0eauthentication\x88\x01\x01:\x06\x92\xb5\x18\x02\b\x01B\x11\n" +
+	"\x0f_authentication\"\xac\x03\n" +
 	"\tResources\x12\x19\n" +
 	"\x05slots\x18\x01 \x01(\rH\x00R\x05slots\x88\x01\x01\x12\x10\n" +
 	"\x03cpu\x18\x02 \x01(\rR\x03cpu\x12\x10\n" +
@@ -935,14 +936,14 @@ const file_aquarium_v2_label_proto_rawDesc = "" +
 	"\n" +
 	"DisksEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x120\n" +
-	"\x05value\x18\x02 \x01(\v2\x1a.aquarium.v2.ResourcesDiskR\x05value:\x028\x01B\b\n" +
-	"\x06_slots\"y\n" +
+	"\x05value\x18\x02 \x01(\v2\x1a.aquarium.v2.ResourcesDiskR\x05value:\x028\x01:\x06\x92\xb5\x18\x02\b\x01B\b\n" +
+	"\x06_slots\"\x81\x01\n" +
 	"\rResourcesDisk\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12\x12\n" +
 	"\x04size\x18\x03 \x01(\rR\x04size\x12\x14\n" +
 	"\x05reuse\x18\x04 \x01(\bR\x05reuse\x12\x14\n" +
-	"\x05clone\x18\x05 \x01(\tR\x05clone\"f\n" +
+	"\x05clone\x18\x05 \x01(\tR\x05clone:\x06\x92\xb5\x18\x02\b\x01\"f\n" +
 	"\x17LabelServiceListRequest\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tH\x00R\x04name\x88\x01\x01\x12\x1d\n" +
 	"\aversion\x18\x02 \x01(\tH\x01R\aversion\x88\x01\x01B\a\n" +
@@ -965,9 +966,9 @@ const file_aquarium_v2_label_proto_rawDesc = "" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12&\n" +
 	"\x04data\x18\x03 \x01(\v2\x12.aquarium.v2.LabelR\x04data\"8\n" +
-	"\x19LabelServiceDeleteRequest\x12\x1b\n" +
+	"\x19LabelServiceRemoveRequest\x12\x1b\n" +
 	"\tlabel_uid\x18\x01 \x01(\tR\blabelUid\"N\n" +
-	"\x1aLabelServiceDeleteResponse\x12\x16\n" +
+	"\x1aLabelServiceRemoveResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage2\xfd\x02\n" +
 	"\fLabelService\x12_\n" +
@@ -975,7 +976,7 @@ const file_aquarium_v2_label_proto_rawDesc = "" +
 	"\x82\xb5\x18\x06\x1a\x04User\x12R\n" +
 	"\x03Get\x12#.aquarium.v2.LabelServiceGetRequest\x1a$.aquarium.v2.LabelServiceGetResponse\"\x00\x12[\n" +
 	"\x06Create\x12&.aquarium.v2.LabelServiceCreateRequest\x1a'.aquarium.v2.LabelServiceCreateResponse\"\x00\x12[\n" +
-	"\x06Delete\x12&.aquarium.v2.LabelServiceDeleteRequest\x1a'.aquarium.v2.LabelServiceDeleteResponse\"\x00BEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"
+	"\x06Remove\x12&.aquarium.v2.LabelServiceRemoveRequest\x1a'.aquarium.v2.LabelServiceRemoveResponse\"\x00BEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"
 
 var (
 	file_aquarium_v2_label_proto_rawDescOnce sync.Once
@@ -1001,8 +1002,8 @@ var file_aquarium_v2_label_proto_goTypes = []any{
 	(*LabelServiceGetResponse)(nil),    // 7: aquarium.v2.LabelServiceGetResponse
 	(*LabelServiceCreateRequest)(nil),  // 8: aquarium.v2.LabelServiceCreateRequest
 	(*LabelServiceCreateResponse)(nil), // 9: aquarium.v2.LabelServiceCreateResponse
-	(*LabelServiceDeleteRequest)(nil),  // 10: aquarium.v2.LabelServiceDeleteRequest
-	(*LabelServiceDeleteResponse)(nil), // 11: aquarium.v2.LabelServiceDeleteResponse
+	(*LabelServiceRemoveRequest)(nil),  // 10: aquarium.v2.LabelServiceRemoveRequest
+	(*LabelServiceRemoveResponse)(nil), // 11: aquarium.v2.LabelServiceRemoveResponse
 	nil,                                // 12: aquarium.v2.Resources.DisksEntry
 	(*timestamppb.Timestamp)(nil),      // 13: google.protobuf.Timestamp
 	(*structpb.Struct)(nil),            // 14: google.protobuf.Struct
@@ -1024,11 +1025,11 @@ var file_aquarium_v2_label_proto_depIdxs = []int32{
 	4,  // 12: aquarium.v2.LabelService.List:input_type -> aquarium.v2.LabelServiceListRequest
 	6,  // 13: aquarium.v2.LabelService.Get:input_type -> aquarium.v2.LabelServiceGetRequest
 	8,  // 14: aquarium.v2.LabelService.Create:input_type -> aquarium.v2.LabelServiceCreateRequest
-	10, // 15: aquarium.v2.LabelService.Delete:input_type -> aquarium.v2.LabelServiceDeleteRequest
+	10, // 15: aquarium.v2.LabelService.Remove:input_type -> aquarium.v2.LabelServiceRemoveRequest
 	5,  // 16: aquarium.v2.LabelService.List:output_type -> aquarium.v2.LabelServiceListResponse
 	7,  // 17: aquarium.v2.LabelService.Get:output_type -> aquarium.v2.LabelServiceGetResponse
 	9,  // 18: aquarium.v2.LabelService.Create:output_type -> aquarium.v2.LabelServiceCreateResponse
-	11, // 19: aquarium.v2.LabelService.Delete:output_type -> aquarium.v2.LabelServiceDeleteResponse
+	11, // 19: aquarium.v2.LabelService.Remove:output_type -> aquarium.v2.LabelServiceRemoveResponse
 	16, // [16:20] is the sub-list for method output_type
 	12, // [12:16] is the sub-list for method input_type
 	12, // [12:12] is the sub-list for extension type_name
@@ -1042,7 +1043,9 @@ func file_aquarium_v2_label_proto_init() {
 		return
 	}
 	file_aquarium_v2_common_proto_init()
-	file_aquarium_v2_rbac_proto_init()
+	file_aquarium_v2_options_rbac_proto_init()
+	file_aquarium_v2_options_streaming_proto_init()
+	file_aquarium_v2_options_ui_proto_init()
 	file_aquarium_v2_label_proto_msgTypes[1].OneofWrappers = []any{}
 	file_aquarium_v2_label_proto_msgTypes[2].OneofWrappers = []any{}
 	file_aquarium_v2_label_proto_msgTypes[4].OneofWrappers = []any{}

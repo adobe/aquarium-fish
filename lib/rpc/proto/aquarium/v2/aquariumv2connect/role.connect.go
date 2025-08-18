@@ -52,8 +52,8 @@ const (
 	RoleServiceCreateProcedure = "/aquarium.v2.RoleService/Create"
 	// RoleServiceUpdateProcedure is the fully-qualified name of the RoleService's Update RPC.
 	RoleServiceUpdateProcedure = "/aquarium.v2.RoleService/Update"
-	// RoleServiceDeleteProcedure is the fully-qualified name of the RoleService's Delete RPC.
-	RoleServiceDeleteProcedure = "/aquarium.v2.RoleService/Delete"
+	// RoleServiceRemoveProcedure is the fully-qualified name of the RoleService's Remove RPC.
+	RoleServiceRemoveProcedure = "/aquarium.v2.RoleService/Remove"
 )
 
 // RoleServiceClient is a client for the aquarium.v2.RoleService service.
@@ -66,8 +66,8 @@ type RoleServiceClient interface {
 	Create(context.Context, *connect.Request[v2.RoleServiceCreateRequest]) (*connect.Response[v2.RoleServiceCreateResponse], error)
 	// Update existing role
 	Update(context.Context, *connect.Request[v2.RoleServiceUpdateRequest]) (*connect.Response[v2.RoleServiceUpdateResponse], error)
-	// Delete role
-	Delete(context.Context, *connect.Request[v2.RoleServiceDeleteRequest]) (*connect.Response[v2.RoleServiceDeleteResponse], error)
+	// Remove role
+	Remove(context.Context, *connect.Request[v2.RoleServiceRemoveRequest]) (*connect.Response[v2.RoleServiceRemoveResponse], error)
 }
 
 // NewRoleServiceClient constructs a client for the aquarium.v2.RoleService service. By default, it
@@ -105,10 +105,10 @@ func NewRoleServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(roleServiceMethods.ByName("Update")),
 			connect.WithClientOptions(opts...),
 		),
-		delete: connect.NewClient[v2.RoleServiceDeleteRequest, v2.RoleServiceDeleteResponse](
+		remove: connect.NewClient[v2.RoleServiceRemoveRequest, v2.RoleServiceRemoveResponse](
 			httpClient,
-			baseURL+RoleServiceDeleteProcedure,
-			connect.WithSchema(roleServiceMethods.ByName("Delete")),
+			baseURL+RoleServiceRemoveProcedure,
+			connect.WithSchema(roleServiceMethods.ByName("Remove")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -120,7 +120,7 @@ type roleServiceClient struct {
 	get    *connect.Client[v2.RoleServiceGetRequest, v2.RoleServiceGetResponse]
 	create *connect.Client[v2.RoleServiceCreateRequest, v2.RoleServiceCreateResponse]
 	update *connect.Client[v2.RoleServiceUpdateRequest, v2.RoleServiceUpdateResponse]
-	delete *connect.Client[v2.RoleServiceDeleteRequest, v2.RoleServiceDeleteResponse]
+	remove *connect.Client[v2.RoleServiceRemoveRequest, v2.RoleServiceRemoveResponse]
 }
 
 // List calls aquarium.v2.RoleService.List.
@@ -143,9 +143,9 @@ func (c *roleServiceClient) Update(ctx context.Context, req *connect.Request[v2.
 	return c.update.CallUnary(ctx, req)
 }
 
-// Delete calls aquarium.v2.RoleService.Delete.
-func (c *roleServiceClient) Delete(ctx context.Context, req *connect.Request[v2.RoleServiceDeleteRequest]) (*connect.Response[v2.RoleServiceDeleteResponse], error) {
-	return c.delete.CallUnary(ctx, req)
+// Remove calls aquarium.v2.RoleService.Remove.
+func (c *roleServiceClient) Remove(ctx context.Context, req *connect.Request[v2.RoleServiceRemoveRequest]) (*connect.Response[v2.RoleServiceRemoveResponse], error) {
+	return c.remove.CallUnary(ctx, req)
 }
 
 // RoleServiceHandler is an implementation of the aquarium.v2.RoleService service.
@@ -158,8 +158,8 @@ type RoleServiceHandler interface {
 	Create(context.Context, *connect.Request[v2.RoleServiceCreateRequest]) (*connect.Response[v2.RoleServiceCreateResponse], error)
 	// Update existing role
 	Update(context.Context, *connect.Request[v2.RoleServiceUpdateRequest]) (*connect.Response[v2.RoleServiceUpdateResponse], error)
-	// Delete role
-	Delete(context.Context, *connect.Request[v2.RoleServiceDeleteRequest]) (*connect.Response[v2.RoleServiceDeleteResponse], error)
+	// Remove role
+	Remove(context.Context, *connect.Request[v2.RoleServiceRemoveRequest]) (*connect.Response[v2.RoleServiceRemoveResponse], error)
 }
 
 // NewRoleServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -193,10 +193,10 @@ func NewRoleServiceHandler(svc RoleServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(roleServiceMethods.ByName("Update")),
 		connect.WithHandlerOptions(opts...),
 	)
-	roleServiceDeleteHandler := connect.NewUnaryHandler(
-		RoleServiceDeleteProcedure,
-		svc.Delete,
-		connect.WithSchema(roleServiceMethods.ByName("Delete")),
+	roleServiceRemoveHandler := connect.NewUnaryHandler(
+		RoleServiceRemoveProcedure,
+		svc.Remove,
+		connect.WithSchema(roleServiceMethods.ByName("Remove")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/aquarium.v2.RoleService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -209,8 +209,8 @@ func NewRoleServiceHandler(svc RoleServiceHandler, opts ...connect.HandlerOption
 			roleServiceCreateHandler.ServeHTTP(w, r)
 		case RoleServiceUpdateProcedure:
 			roleServiceUpdateHandler.ServeHTTP(w, r)
-		case RoleServiceDeleteProcedure:
-			roleServiceDeleteHandler.ServeHTTP(w, r)
+		case RoleServiceRemoveProcedure:
+			roleServiceRemoveHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -236,6 +236,6 @@ func (UnimplementedRoleServiceHandler) Update(context.Context, *connect.Request[
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.RoleService.Update is not implemented"))
 }
 
-func (UnimplementedRoleServiceHandler) Delete(context.Context, *connect.Request[v2.RoleServiceDeleteRequest]) (*connect.Response[v2.RoleServiceDeleteResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.RoleService.Delete is not implemented"))
+func (UnimplementedRoleServiceHandler) Remove(context.Context, *connect.Request[v2.RoleServiceRemoveRequest]) (*connect.Response[v2.RoleServiceRemoveResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.RoleService.Remove is not implemented"))
 }

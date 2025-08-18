@@ -179,6 +179,52 @@ func (s *ApplicationService) Create(ctx context.Context, req *connect.Request[aq
 	}), nil
 }
 
+// ListState returns a list of applications
+func (s *ApplicationService) ListState(ctx context.Context, _ *connect.Request[aquariumv2.ApplicationServiceListStateRequest]) (*connect.Response[aquariumv2.ApplicationServiceListStateResponse], error) {
+	ctx, span := rpcTracer.Start(ctx, "rpc.ApplicationService.ListState")
+	defer span.End()
+
+	out, err := s.fish.DB().ApplicationStateListLatest(ctx)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return connect.NewResponse(&aquariumv2.ApplicationServiceListStateResponse{
+			Status: false, Message: "Unable to get the application states list: " + err.Error(),
+		}), connect.NewError(connect.CodeInternal, err)
+	}
+
+	span.SetAttributes(attribute.Int("application_states.total_count", len(out)))
+
+	// Filter the output by owner unless user has permission to list all application states
+	if !rpcutil.CheckUserPermission(ctx, auth.ApplicationServiceListStateAll) {
+		userName := rpcutil.GetUserName(ctx)
+		span.SetAttributes(attribute.String("user.name", userName))
+		var ownerOut []typesv2.ApplicationState
+		for _, appState := range out {
+			app, err := s.getApplicationIfUserIsOwnerOrHasAccess(ctx, appState.ApplicationUid.String(), auth.ApplicationServiceListStateAll)
+			if err == nil && app.OwnerName == userName {
+				ownerOut = append(ownerOut, appState)
+			}
+		}
+		out = ownerOut
+		span.SetAttributes(attribute.Bool("application_states.filtered_by_owner", true))
+	}
+
+	span.SetAttributes(attribute.Int("application_states.returned_count", len(out)))
+
+	// Convert to proto response
+	resp := &aquariumv2.ApplicationServiceListStateResponse{
+		Status: true, Message: "Application States listed successfully",
+		Data: make([]*aquariumv2.ApplicationState, len(out)),
+	}
+
+	for i, appState := range out {
+		resp.Data[i] = appState.ToApplicationState()
+	}
+
+	return connect.NewResponse(resp), nil
+}
+
 // GetState returns the state of an application
 func (s *ApplicationService) GetState(ctx context.Context, req *connect.Request[aquariumv2.ApplicationServiceGetStateRequest]) (*connect.Response[aquariumv2.ApplicationServiceGetStateResponse], error) {
 	ctx, span := rpcTracer.Start(ctx, "rpc.ApplicationService.GetState",
@@ -211,6 +257,52 @@ func (s *ApplicationService) GetState(ctx context.Context, req *connect.Request[
 		Status: true, Message: "Application state retrieved successfully",
 		Data: state.ToApplicationState(),
 	}), nil
+}
+
+// ListResource returns a list of applications
+func (s *ApplicationService) ListResource(ctx context.Context, _ *connect.Request[aquariumv2.ApplicationServiceListResourceRequest]) (*connect.Response[aquariumv2.ApplicationServiceListResourceResponse], error) {
+	ctx, span := rpcTracer.Start(ctx, "rpc.ApplicationService.ListResource")
+	defer span.End()
+
+	out, err := s.fish.DB().ApplicationResourceList(ctx)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return connect.NewResponse(&aquariumv2.ApplicationServiceListResourceResponse{
+			Status: false, Message: "Unable to get the application resources list: " + err.Error(),
+		}), connect.NewError(connect.CodeInternal, err)
+	}
+
+	span.SetAttributes(attribute.Int("application_resources.total_count", len(out)))
+
+	// Filter the output by owner unless user has permission to list all application resources
+	if !rpcutil.CheckUserPermission(ctx, auth.ApplicationServiceListResourceAll) {
+		userName := rpcutil.GetUserName(ctx)
+		span.SetAttributes(attribute.String("user.name", userName))
+		var ownerOut []typesv2.ApplicationResource
+		for _, appRes := range out {
+			app, err := s.getApplicationIfUserIsOwnerOrHasAccess(ctx, appRes.ApplicationUid.String(), auth.ApplicationServiceListResourceAll)
+			if err == nil && app.OwnerName == userName {
+				ownerOut = append(ownerOut, appRes)
+			}
+		}
+		out = ownerOut
+		span.SetAttributes(attribute.Bool("application_resources.filtered_by_owner", true))
+	}
+
+	span.SetAttributes(attribute.Int("application_resources.returned_count", len(out)))
+
+	// Convert to proto response
+	resp := &aquariumv2.ApplicationServiceListResourceResponse{
+		Status: true, Message: "Application Resources listed successfully",
+		Data: make([]*aquariumv2.ApplicationResource, len(out)),
+	}
+
+	for i, appResource := range out {
+		resp.Data[i] = appResource.ToApplicationResource()
+	}
+
+	return connect.NewResponse(resp), nil
 }
 
 // GetResource returns the resource of an application
@@ -287,13 +379,20 @@ func (s *ApplicationService) ListTask(ctx context.Context, req *connect.Request[
 
 // CreateTask creates a new task for an application
 func (s *ApplicationService) CreateTask(ctx context.Context, req *connect.Request[aquariumv2.ApplicationServiceCreateTaskRequest]) (*connect.Response[aquariumv2.ApplicationServiceCreateTaskResponse], error) {
-	ctx, span := rpcTracer.Start(ctx, "rpc.ApplicationService.CreateTask",
-		trace.WithAttributes(
-			attribute.String("application.uid", req.Msg.GetApplicationUid()),
-		))
+	ctx, span := rpcTracer.Start(ctx, "rpc.ApplicationService.CreateTask")
 	defer span.End()
 
-	app, err := s.getApplicationIfUserIsOwnerOrHasAccess(ctx, req.Msg.GetApplicationUid(), auth.ApplicationServiceCreateTaskAll)
+	if req.Msg.GetTask() == nil {
+		return connect.NewResponse(&aquariumv2.ApplicationServiceCreateTaskResponse{
+			Status: false, Message: "No task in request",
+		}), connect.NewError(connect.CodeNotFound, nil)
+	}
+
+	appUID := req.Msg.GetTask().GetApplicationUid()
+
+	span.SetAttributes(attribute.String("application.uid", appUID))
+
+	app, err := s.getApplicationIfUserIsOwnerOrHasAccess(ctx, appUID, auth.ApplicationServiceCreateTaskAll)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())

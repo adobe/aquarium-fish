@@ -45,10 +45,6 @@ drivers:
   providers:
     test:`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	// Create test users
 	regularUserPass := "regular-pass"
 	powerUserPass := "power-pass"
@@ -62,9 +58,9 @@ drivers:
 	}
 
 	// Create clients for different users
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
-	regularCli, regularOpts := h.NewRPCClient(regularUser.Name, regularUserPass, h.RPCClientREST)
-	powerCli, powerOpts := h.NewRPCClient(powerUser.Name, powerUserPass, h.RPCClientREST)
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
+	regularCli, regularOpts := h.NewRPCClient(regularUser.Name, regularUserPass, h.RPCClientREST, afi.GetCA(t))
+	powerCli, powerOpts := h.NewRPCClient(powerUser.Name, powerUserPass, h.RPCClientREST, afi.GetCA(t))
 
 	// Create service clients for admin
 	adminUserClient := aquariumv2connect.NewUserServiceClient(

@@ -31,7 +31,7 @@ import (
 
 // Benchmark to find the max amount of requests per second
 func Test_max_requests_stress(t *testing.T) {
-	//t.Parallel()  - nope just one at a time
+	// t.Parallel()  - nope just one at a time
 	afi := h.NewAquariumFish(t, "node-1", `---
 node_location: test_loc
 cpu_limit: 2
@@ -46,10 +46,6 @@ drivers:
       cpu_limit: 1
       ram_limit: 2`)
 
-	t.Cleanup(func() {
-		afi.Cleanup(t)
-	})
-
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in f", r)
@@ -57,7 +53,7 @@ drivers:
 	}()
 
 	// Create admin client
-	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
 
 	// Create service clients
 	labelClient := aquariumv2connect.NewLabelServiceClient(
@@ -137,7 +133,7 @@ drivers:
 		defer wg.Done()
 
 		// Create individual client for each goroutine
-		cli, opts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST)
+		cli, opts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
 		appClient := aquariumv2connect.NewApplicationServiceClient(
 			cli,
 			afi.APIAddress("grpc"),

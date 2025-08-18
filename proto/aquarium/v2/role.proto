@@ -15,6 +15,8 @@ syntax = "proto3";
 package aquarium.v2;
 
 import "google/protobuf/timestamp.proto";
+import "aquarium/v2/options_streaming.proto";
+import "aquarium/v2/options_ui.proto";
 
 option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2";
 
@@ -32,18 +34,21 @@ service RoleService {
   // Update existing role
   rpc Update(RoleServiceUpdateRequest) returns (RoleServiceUpdateResponse) {}
 
-  // Delete role
-  rpc Delete(RoleServiceDeleteRequest) returns (RoleServiceDeleteResponse) {}
+  // Remove role
+  rpc Remove(RoleServiceRemoveRequest) returns (RoleServiceRemoveResponse) {}
 }
 
 // Role represents a role in the RBAC system
 //
 // Defines a role in the RBAC system with associated permissions.
 message Role {
+  option (ui_config) = { generate_ui: true };
+  option (subscribe_config) = { permission_check: "RoleServiceGet" };
+
   // Unique name of the role
   string name = 1;
-  google.protobuf.Timestamp created_at = 2;
-  google.protobuf.Timestamp updated_at = 3;
+  google.protobuf.Timestamp created_at = 2 [(field_ui_config) = { nocreate: true, noedit: true }];
+  google.protobuf.Timestamp updated_at = 3 [(field_ui_config) = { nocreate: true, noedit: true }];
   // List of permissions granted to this role
   repeated Permission permissions = 4;
 }
@@ -52,9 +57,11 @@ message Role {
 //
 // Defines a permission that can be granted to roles.
 message Permission {
+  option (ui_config) = { generate_ui: true };
+
   // Resource type or specific resource ID this permission applies to
   string resource = 1;
-  // Action allowed on the resource (e.g., read, write, delete)
+  // Action allowed on the resource (e.g., read, write, remove)
   string action = 2;
 }
 
@@ -96,11 +103,11 @@ message RoleServiceUpdateResponse {
   Role data = 3;
 }
 
-message RoleServiceDeleteRequest {
+message RoleServiceRemoveRequest {
   string role_name = 1;
 }
 
-message RoleServiceDeleteResponse {
+message RoleServiceRemoveResponse {
   bool status = 1;
   string message = 2;
 }

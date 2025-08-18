@@ -54,8 +54,9 @@ type MethodInfo struct {
 // SubscriptionInfo represents a subscribable message type
 type SubscriptionInfo struct {
 	MessageType      string // Message name (e.g., "ApplicationState")
+	PrimaryIDField   string // First field that represent ID of the object
 	SubscriptionType string // Subscription type enum (e.g., "SUBSCRIPTION_TYPE_APPLICATION_STATE")
-	PermissionMethod string // RBAC permission method (e.g., "ApplicationServiceGetStateAll")
+	PermissionMethod string // RBAC permission method (e.g., "ApplicationServiceGetState")
 	CustomHandler    string // Custom handler method if any
 
 	// Additional fields for code generation
@@ -102,6 +103,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/adobe/aquarium-fish/lib/auth"
+	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/log"
 	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	rpcutil "github.com/adobe/aquarium-fish/lib/rpc/util"
@@ -111,7 +113,7 @@ import (
 // subChannels is used to store channels for subscriptions communications
 type subChannels struct {
 {{- range .Subscriptions }}
-	{{ .ChannelFieldName }} chan {{ .TypesPackageType }}
+	{{ .ChannelFieldName }} chan database.{{ .MessageType }}SubscriptionEvent
 {{- end }}
 }
 
@@ -183,8 +185,8 @@ func (s *StreamingService) routeRequest(ctx context.Context, requestType string,
 
 // Subscription-related helper methods
 {{- range .Subscriptions }}
-// {{ .RelayMethodName }} safely relays {{ .MessageType | toLower }} notifications with buffer overflow protection
-func (s *StreamingService) {{ .RelayMethodName }}(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan {{ .TypesPackageType }}) {
+// {{ .RelayMethodName }} relays {{ .MessageType | toLower }} notifications with immediate disconnect on overflow
+func (s *StreamingService) {{ .RelayMethodName }}(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.{{ .MessageType }}SubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
 	logger := log.WithFunc("rpc", "{{ .RelayMethodName }}").With("subs_uid", subscriptionID)
@@ -200,21 +202,18 @@ func (s *StreamingService) {{ .RelayMethodName }}(ctx context.Context, subscript
 		case <-ctx.Done():
 			logger.Debug("{{ .MessageType }} relay stopping due to context cancellation")
 			return
-		case obj, ok := <-dbChannel:
+		case event, ok := <-dbChannel:
 			if !ok {
 				logger.Debug("{{ .MessageType }} relay stopping due to closed database channel")
 				return
 			}
 
-			// Check if client is already overflowing - skip notification to prevent further overflow
-			if sub.isClientOverflowing() {
-				logger.Debug("Skipping {{ .MessageType | toLower }} notification due to client overflow")
-				continue
-			}
-
-			// Try to send safely - if this returns true, client should be disconnected
-			if shouldDisconnect := !sub.{{ .SafeSendMethod }}(obj); shouldDisconnect {
-				logger.Error("Disconnecting client due to excessive buffer overflow")
+			// Try to send with a short timeout - disconnect if client can't keep up
+			select {
+			case sub.channels.{{ .ChannelFieldName }} <- event:
+				// Successfully sent notification
+			case <-time.After(200 * time.Millisecond):
+				logger.Error("{{ .MessageType }} channel send timeout - client cannot keep up, disconnecting")
 				sub.cancel() // This will cause the main subscription loop to exit
 				return
 			}
@@ -228,7 +227,7 @@ func (s *StreamingService) {{ .RelayMethodName }}(ctx context.Context, subscript
 func (s *StreamingService) setupChannels() *subChannels {
 	return &subChannels{
 {{- range .Subscriptions }}
-		{{ .ChannelFieldName }}: make(chan {{ .TypesPackageType }}, 100),
+		{{ .ChannelFieldName }}: make(chan database.{{ .MessageType }}SubscriptionEvent, 100),
 {{- end }}
 	}
 }
@@ -255,14 +254,14 @@ func (s *StreamingService) listenChannels(sub *subscription, ctx, subCtx context
 			return
 
 {{- range .Subscriptions }}
-		case msg := <-sub.channels.{{ .ChannelFieldName }}:
-			if s.shouldSendObject(sub, aquariumv2.{{ .SubscriptionType }}, msg) {
-				logger.Debug("Sending {{ .MessageType }} notification for Application UID", "app_uid", msg.ApplicationUid)
-				if err := s.sendSubscriptionResponse(sub, aquariumv2.{{ .SubscriptionType }}, aquariumv2.ChangeType_CHANGE_TYPE_CREATED, msg.{{ .ConversionMethod }}()); err != nil {
+		case event := <-sub.channels.{{ .ChannelFieldName }}:
+			if s.shouldSendObject(sub, aquariumv2.{{ .SubscriptionType }}, event.Object) {
+				logger.Debug("Sending {{ .MessageType }} notification", "change_type", event.ChangeType{{ if ne .PrimaryIDField "" }}, "{{ .PrimaryIDField }}", event.Object.{{ toCamelCase .PrimaryIDField }}{{ end }}{{ if eq .MessageType "ApplicationState" }}, "app_uid", event.Object.ApplicationUid, "app_status", event.Object.Status{{ end }})
+				if err := s.sendSubscriptionResponse(sub, aquariumv2.{{ .SubscriptionType }}, event.ChangeType, event.Object.{{ .ConversionMethod }}()); err != nil {
 					logger.Error("Error sending {{ .MessageType }} update", "err", err)
 				}
 			} else {
-				logger.Debug("Skipping {{ .MessageType }} notification for user", "user", sub.userName)
+				logger.Debug("Skipping {{ .MessageType }} notification for user", "user", sub.userName{{ if eq .MessageType "ApplicationState" }}, "app_uid", event.Object.ApplicationUid, "app_status", event.Object.Status{{ end }})
 			}
 {{- end }}
 		}
@@ -284,7 +283,7 @@ func (s *StreamingService) setupSubscriptions(subCtx context.Context, subscripti
 {{- range .Subscriptions }}
 		case aquariumv2.{{ .SubscriptionType }}:
 			// Create a safe wrapper channel for database notifications
-			dbChannel := make(chan {{ .TypesPackageType }}, 100)
+			dbChannel := make(chan database.{{ .MessageType }}SubscriptionEvent, 100)
 			s.fish.DB().{{ .DatabaseMethod }}(subCtx, dbChannel)
 			logger.Debug("Subscribed to {{ .MessageType }} changes")
 
@@ -317,7 +316,7 @@ func (s *StreamingService) shouldSendObject(sub *subscription, objectType aquari
 {{- range .Subscriptions }}
 	case aquariumv2.{{ .SubscriptionType }}:
 		if typedObj, ok := obj.({{ .TypesPackageType }}); ok {
-			return s.shouldSendApplicationObject(sub, typedObj.ApplicationUid, objectType)
+			return s.shouldSend{{ .MessageType }}Object(sub, typedObj, auth.{{ .PermissionMethod }})
 		}
 {{- end }}
 	}
@@ -338,24 +337,7 @@ func (s *StreamingService) shouldSend{{ .MessageType }}(sub *subscription) bool 
 
 {{- end }}
 
-{{- range .Subscriptions }}
-// safeSendTo{{ .MessageType }}Channel attempts to send to state channel with overflow detection
-func (sub *subscription) safeSendTo{{ .MessageType }}Channel(msg {{ .TypesPackageType }}) bool {
-	logger := log.WithFunc("rpc", "safeSendTo{{ .MessageType }}Channel").With("subs_uid", sub.id, "sub_user", sub.userName)
-	select {
-	case sub.channels.{{ .ChannelFieldName }} <- msg:
-		sub.resetOverflow()
-		return true
-	case <-time.After(overflowTimeout):
-		logger.Warn("{{ .MessageType }} channel send timeout (buffer overflow)")
-		return sub.recordOverflow()
-	default:
-		logger.Warn("{{ .MessageType }} channel full (buffer overflow)")
-		return sub.recordOverflow()
-	}
-}
 
-{{- end }}
 
 // getSubscriptionPermissionMethod returns the RBAC permission method for a subscription type
 func (s *StreamingService) getSubscriptionPermissionMethod(subscriptionType aquariumv2.SubscriptionType) string {
@@ -365,7 +347,7 @@ func (s *StreamingService) getSubscriptionPermissionMethod(subscriptionType aqua
 		return auth.{{ .PermissionMethod }}
 {{- end }}
 	default:
-		return ""
+    	return ""
 	}
 }
 `
@@ -377,6 +359,20 @@ var templateFuncs = template.FuncMap{
 			return ""
 		}
 		return strings.ToLower(s[:1]) + s[1:]
+	},
+	"toCamelCase": func(s string) string {
+		if s == "" {
+			return ""
+		}
+
+		parts := strings.Split(s, "_")
+		result := ""
+		for _, part := range parts {
+			if len(part) > 0 {
+				result += strings.ToUpper(part[:1]) + part[1:]
+			}
+		}
+		return result
 	},
 }
 
@@ -404,21 +400,6 @@ func generateVariableName(serviceName string) string {
 		return ""
 	}
 	return strings.ToLower(serviceName[:1]) + serviceName[1:]
-}
-
-// isRequestMessage checks if a message name ends with "Request"
-func isRequestMessage(messageName string) bool {
-	return strings.HasSuffix(messageName, "Request")
-}
-
-// isResponseMessage checks if a message name ends with "Response"
-func isResponseMessage(messageName string) bool {
-	return strings.HasSuffix(messageName, "Response")
-}
-
-// getResponseTypeName converts request type name to response type name
-func getResponseTypeName(requestTypeName string) string {
-	return strings.Replace(requestTypeName, "Request", "Response", 1)
 }
 
 // processServices processes protobuf services to extract streaming information
@@ -533,9 +514,16 @@ func processSubscriptions(plugin *protogen.Plugin) []SubscriptionInfo {
 				ext := proto.GetExtension(opts, aquariumv2.E_SubscribeConfig)
 				ac, ok := ext.(*aquariumv2.SubscribeConfig)
 
+				primaryFieldName := ""
+				for _, field := range message.Fields {
+					primaryFieldName = string(field.Desc.Name())
+					break
+				}
+
 				if ok && ac != nil {
 					subscriptions = append(subscriptions, SubscriptionInfo{
 						MessageType:      messageName,
+						PrimaryIDField:   primaryFieldName,
 						SubscriptionType: "SubscriptionType_SUBSCRIPTION_TYPE_" + strings.ToUpper(toSnake(messageName)),
 						PermissionMethod: ac.GetPermissionCheck(),
 						TypesPackageType: "*typesv2." + messageName,
