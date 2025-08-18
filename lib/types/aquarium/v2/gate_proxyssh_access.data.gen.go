@@ -33,6 +33,7 @@ type GateProxySSHAccess struct {
 	CreatedAt              time.Time `json:"created_at,omitempty"`
 	Key                    string    `json:"key,omitempty"`
 	Password               string    `json:"password,omitempty"`
+	Static                 bool      `json:"static,omitempty"`
 	Uid                    uuid.UUID `json:"uid,omitempty"`
 	Username               string    `json:"username,omitempty"`
 }
@@ -53,6 +54,7 @@ func FromGateProxySSHAccess(src *pbTypes.GateProxySSHAccess) GateProxySSHAccess 
 	}
 	result.Key = src.GetKey()
 	result.Password = src.GetPassword()
+	result.Static = src.GetStatic()
 	if uid, err := uuid.Parse(src.GetUid()); err == nil {
 		result.Uid = uid
 	}
@@ -69,6 +71,7 @@ func (g GateProxySSHAccess) ToGateProxySSHAccess() *pbTypes.GateProxySSHAccess {
 	result.CreatedAt = timestamppb.New(g.CreatedAt)
 	result.Key = g.Key
 	result.Password = g.Password
+	result.Static = g.Static
 	result.Uid = g.Uid.String()
 	result.Username = g.Username
 	return result

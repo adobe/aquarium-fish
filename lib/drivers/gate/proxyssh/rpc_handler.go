@@ -149,6 +149,8 @@ func (d *driverRPCHandler) GetResourceAccess(reqCtx context.Context, req *connec
 		Username: userName,
 		Password: fmt.Sprintf("%x", pwdHash),
 		Key:      string(pubkey),
+
+		Static: req.Msg.GetStatic(),
 	}
 
 	// Create entry in database first

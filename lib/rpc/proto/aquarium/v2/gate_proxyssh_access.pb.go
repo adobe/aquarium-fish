@@ -51,7 +51,9 @@ type GateProxySSHAccess struct {
 	// The password to use when logging into the fish node.
 	Password string `protobuf:"bytes,6,opt,name=password,proto3" json:"password,omitempty"`
 	// SSH key could be used instead of password to access the system.
-	Key           string `protobuf:"bytes,7,opt,name=key,proto3" json:"key,omitempty"`
+	Key string `protobuf:"bytes,7,opt,name=key,proto3" json:"key,omitempty"`
+	// Static allows to skip removal when the user needs to keep credentials for a long time
+	Static        bool `protobuf:"varint,8,opt,name=static,proto3" json:"static,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -135,11 +137,20 @@ func (x *GateProxySSHAccess) GetKey() string {
 	return ""
 }
 
+func (x *GateProxySSHAccess) GetStatic() bool {
+	if x != nil {
+		return x.Static
+	}
+	return false
+}
+
 type GateProxySSHServiceGetResourceAccessRequest struct {
 	state                  protoimpl.MessageState `protogen:"open.v1"`
 	ApplicationResourceUid string                 `protobuf:"bytes,1,opt,name=application_resource_uid,json=applicationResourceUid,proto3" json:"application_resource_uid,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// Allows to receive long-term access credentials, which will not self-destruct on use
+	Static        *bool `protobuf:"varint,2,opt,name=static,proto3,oneof" json:"static,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GateProxySSHServiceGetResourceAccessRequest) Reset() {
@@ -177,6 +188,13 @@ func (x *GateProxySSHServiceGetResourceAccessRequest) GetApplicationResourceUid(
 		return x.ApplicationResourceUid
 	}
 	return ""
+}
+
+func (x *GateProxySSHServiceGetResourceAccessRequest) GetStatic() bool {
+	if x != nil && x.Static != nil {
+		return *x.Static
+	}
+	return false
 }
 
 type GateProxySSHServiceGetResourceAccessResponse struct {
@@ -243,7 +261,7 @@ var File_aquarium_v2_gate_proxyssh_access_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_gate_proxyssh_access_proto_rawDesc = "" +
 	"\n" +
-	"&aquarium/v2/gate_proxyssh_access.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1eaquarium/v2/options_rbac.proto\"\xff\x01\n" +
+	"&aquarium/v2/gate_proxyssh_access.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1eaquarium/v2/options_rbac.proto\"\x97\x02\n" +
 	"\x12GateProxySSHAccess\x12\x10\n" +
 	"\x03uid\x18\x01 \x01(\tR\x03uid\x129\n" +
 	"\n" +
@@ -252,9 +270,12 @@ const file_aquarium_v2_gate_proxyssh_access_proto_rawDesc = "" +
 	"\aaddress\x18\x04 \x01(\tR\aaddress\x12\x1a\n" +
 	"\busername\x18\x05 \x01(\tR\busername\x12\x1a\n" +
 	"\bpassword\x18\x06 \x01(\tR\bpassword\x12\x10\n" +
-	"\x03key\x18\a \x01(\tR\x03key\"g\n" +
+	"\x03key\x18\a \x01(\tR\x03key\x12\x16\n" +
+	"\x06static\x18\b \x01(\bR\x06static\"\x8f\x01\n" +
 	"+GateProxySSHServiceGetResourceAccessRequest\x128\n" +
-	"\x18application_resource_uid\x18\x01 \x01(\tR\x16applicationResourceUid\"\x95\x01\n" +
+	"\x18application_resource_uid\x18\x01 \x01(\tR\x16applicationResourceUid\x12\x1b\n" +
+	"\x06static\x18\x02 \x01(\bH\x00R\x06static\x88\x01\x01B\t\n" +
+	"\a_static\"\x95\x01\n" +
 	",GateProxySSHServiceGetResourceAccessResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x123\n" +
@@ -299,6 +320,7 @@ func file_aquarium_v2_gate_proxyssh_access_proto_init() {
 		return
 	}
 	file_aquarium_v2_options_rbac_proto_init()
+	file_aquarium_v2_gate_proxyssh_access_proto_msgTypes[1].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

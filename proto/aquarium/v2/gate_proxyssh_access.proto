@@ -48,10 +48,14 @@ message GateProxySSHAccess {
   string password = 6;
   // SSH key could be used instead of password to access the system.
   string key = 7;
+  // Static allows to skip removal when the user needs to keep credentials for a long time
+  bool static = 8;
 }
 
 message GateProxySSHServiceGetResourceAccessRequest {
   string application_resource_uid = 1;
+  // Allows to receive long-term access credentials, which will not self-destruct on use
+  optional bool static = 2;
 }
 
 message GateProxySSHServiceGetResourceAccessResponse {

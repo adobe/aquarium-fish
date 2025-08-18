@@ -160,3 +160,5 @@ linters-settings:
         disabled: true
       - name: max-public-structs
         arguments: [20]  # 5 by default is not much helping
+      - name: function-result-limit
+        arguments: [4]  # Increased a bit from 3 to fit the requirements

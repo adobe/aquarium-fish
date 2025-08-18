@@ -130,7 +130,7 @@ func (c *Config) Validate() (err error) {
 	}
 
 	// Verify that connection is possible with those creds and get the account ID
-	conn := sts.NewFromConfig(aws.Config{
+	awsCfg := aws.Config{
 		Region: c.Region,
 		Credentials: aws.CredentialsProviderFunc(func(_ /*ctx*/ context.Context) (aws.Credentials, error) {
 			return aws.Credentials{
@@ -144,10 +144,12 @@ func (c *Config) Validate() (err error) {
 		// https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/retry-backoff.html
 		RetryMaxAttempts: 3,
 		RetryMode:        aws.RetryModeStandard,
-
+	}
+	if c.BaseEndpoint != "" {
 		// Used in tests for mock server
-		BaseEndpoint: aws.String(c.BaseEndpoint),
-	})
+		awsCfg.BaseEndpoint = aws.String(c.BaseEndpoint)
+	}
+	conn := sts.NewFromConfig(awsCfg)
 	input := &sts.GetCallerIdentityInput{}
 
 	// Checking the connection for 1 minute in case network is unavailable

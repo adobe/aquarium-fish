@@ -25,7 +25,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file aquarium/v2/gate_proxyssh_access.proto.
  */
 export const file_aquarium_v2_gate_proxyssh_access: GenFile = /*@__PURE__*/
-  fileDesc("CiZhcXVhcml1bS92Mi9nYXRlX3Byb3h5c3NoX2FjY2Vzcy5wcm90bxILYXF1YXJpdW0udjIitQEKEkdhdGVQcm94eVNTSEFjY2VzcxILCgN1aWQYASABKAkSLgoKY3JlYXRlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASIAoYYXBwbGljYXRpb25fcmVzb3VyY2VfdWlkGAMgASgJEg8KB2FkZHJlc3MYBCABKAkSEAoIdXNlcm5hbWUYBSABKAkSEAoIcGFzc3dvcmQYBiABKAkSCwoDa2V5GAcgASgJIk8KK0dhdGVQcm94eVNTSFNlcnZpY2VHZXRSZXNvdXJjZUFjY2Vzc1JlcXVlc3QSIAoYYXBwbGljYXRpb25fcmVzb3VyY2VfdWlkGAEgASgJIn4KLEdhdGVQcm94eVNTSFNlcnZpY2VHZXRSZXNvdXJjZUFjY2Vzc1Jlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEi0KBGRhdGEYAyABKAsyHy5hcXVhcml1bS52Mi5HYXRlUHJveHlTU0hBY2Nlc3MywwEKE0dhdGVQcm94eVNTSFNlcnZpY2USqwEKEUdldFJlc291cmNlQWNjZXNzEjguYXF1YXJpdW0udjIuR2F0ZVByb3h5U1NIU2VydmljZUdldFJlc291cmNlQWNjZXNzUmVxdWVzdBo5LmFxdWFyaXVtLnYyLkdhdGVQcm94eVNTSFNlcnZpY2VHZXRSZXNvdXJjZUFjY2Vzc1Jlc3BvbnNlIiGCtRgdGgVQb3dlciIUR2V0UmVzb3VyY2VBY2Nlc3NBbGxCRVpDZ2l0aHViLmNvbS9hZG9iZS9hcXVhcml1bS1maXNoL2xpYi9ycGMvcHJvdG8vYXF1YXJpdW0vdjI7YXF1YXJpdW12MmIGcHJvdG8z", [file_google_protobuf_timestamp, file_aquarium_v2_options_rbac]);
+  fileDesc("CiZhcXVhcml1bS92Mi9nYXRlX3Byb3h5c3NoX2FjY2Vzcy5wcm90bxILYXF1YXJpdW0udjIixQEKEkdhdGVQcm94eVNTSEFjY2VzcxILCgN1aWQYASABKAkSLgoKY3JlYXRlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASIAoYYXBwbGljYXRpb25fcmVzb3VyY2VfdWlkGAMgASgJEg8KB2FkZHJlc3MYBCABKAkSEAoIdXNlcm5hbWUYBSABKAkSEAoIcGFzc3dvcmQYBiABKAkSCwoDa2V5GAcgASgJEg4KBnN0YXRpYxgIIAEoCCJvCitHYXRlUHJveHlTU0hTZXJ2aWNlR2V0UmVzb3VyY2VBY2Nlc3NSZXF1ZXN0EiAKGGFwcGxpY2F0aW9uX3Jlc291cmNlX3VpZBgBIAEoCRITCgZzdGF0aWMYAiABKAhIAIgBAUIJCgdfc3RhdGljIn4KLEdhdGVQcm94eVNTSFNlcnZpY2VHZXRSZXNvdXJjZUFjY2Vzc1Jlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEi0KBGRhdGEYAyABKAsyHy5hcXVhcml1bS52Mi5HYXRlUHJveHlTU0hBY2Nlc3MywwEKE0dhdGVQcm94eVNTSFNlcnZpY2USqwEKEUdldFJlc291cmNlQWNjZXNzEjguYXF1YXJpdW0udjIuR2F0ZVByb3h5U1NIU2VydmljZUdldFJlc291cmNlQWNjZXNzUmVxdWVzdBo5LmFxdWFyaXVtLnYyLkdhdGVQcm94eVNTSFNlcnZpY2VHZXRSZXNvdXJjZUFjY2Vzc1Jlc3BvbnNlIiGCtRgdGgVQb3dlciIUR2V0UmVzb3VyY2VBY2Nlc3NBbGxCRVpDZ2l0aHViLmNvbS9hZG9iZS9hcXVhcml1bS1maXNoL2xpYi9ycGMvcHJvdG8vYXF1YXJpdW0vdjI7YXF1YXJpdW12MmIGcHJvdG8z", [file_google_protobuf_timestamp, file_aquarium_v2_options_rbac]);
 
 /**
  * ProxySSHAccess represents user accessor to connect to the ApplicationResource.
@@ -79,6 +79,13 @@ export type GateProxySSHAccess = Message<"aquarium.v2.GateProxySSHAccess"> & {
    * @generated from field: string key = 7;
    */
   key: string;
+
+  /**
+   * Static allows to skip removal when the user needs to keep credentials for a long time
+   *
+   * @generated from field: bool static = 8;
+   */
+  static: boolean;
 };
 
 /**
@@ -96,6 +103,13 @@ export type GateProxySSHServiceGetResourceAccessRequest = Message<"aquarium.v2.G
    * @generated from field: string application_resource_uid = 1;
    */
   applicationResourceUid: string;
+
+  /**
+   * Allows to receive long-term access credentials, which will not self-destruct on use
+   *
+   * @generated from field: optional bool static = 2;
+   */
+  static?: boolean;
 };
 
 /**

@@ -58,10 +58,10 @@ func (d *Database) applicationTaskListByApplicationImpl(ctx context.Context, app
 // applicationTaskCreateImpl makes a new ApplicationTask
 func (d *Database) applicationTaskCreateImpl(_ context.Context, at *typesv2.ApplicationTask) error {
 	if at.ApplicationUid == uuid.Nil {
-		return fmt.Errorf("Fish: ApplicationUID can't be unset")
+		return fmt.Errorf("application task application UID can't be unset")
 	}
 	if at.Task == "" {
-		return fmt.Errorf("Fish: Task can't be empty")
+		return fmt.Errorf("application task can't be empty")
 	}
 
 	d.beMu.RLock()
@@ -82,7 +82,7 @@ func (d *Database) applicationTaskCreateImpl(_ context.Context, at *typesv2.Appl
 // applicationTaskSaveImpl stores the ApplicationTask
 func (d *Database) applicationTaskSaveImpl(_ context.Context, at *typesv2.ApplicationTask) error {
 	if at.Uid == uuid.Nil {
-		return fmt.Errorf("Fish: UID can't be unset")
+		return fmt.Errorf("application task UID can't be unset")
 	}
 
 	d.beMu.RLock()

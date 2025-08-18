@@ -54,16 +54,16 @@ func (d *Database) applicationResourceListNodeImpl(ctx context.Context, nodeUID 
 // applicationResourceCreateImpl makes new Resource
 func (d *Database) applicationResourceCreateImpl(_ context.Context, r *typesv2.ApplicationResource) error {
 	if r.ApplicationUid == uuid.Nil {
-		return fmt.Errorf("Fish: ApplicationUID can't be unset")
+		return fmt.Errorf("application resource application UID can't be unset")
 	}
 	if r.LabelUid == uuid.Nil {
-		return fmt.Errorf("Fish: LabelUID can't be unset")
+		return fmt.Errorf("application resource label UID can't be unset")
 	}
 	if r.NodeUid == uuid.Nil {
-		return fmt.Errorf("Fish: NodeUID can't be unset")
+		return fmt.Errorf("application resource node UID can't be unset")
 	}
 	if len(r.Identifier) == 0 {
-		return fmt.Errorf("Fish: Identifier can't be empty")
+		return fmt.Errorf("application resource identifier can't be empty")
 	}
 
 	d.beMu.RLock()
@@ -188,7 +188,7 @@ func (d *Database) applicationResourceGetByIPImpl(ctx context.Context, ip string
 	// Check by IP first
 	all, err := d.ApplicationResourceList(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to get any ApplicationResource")
+		return nil, fmt.Errorf("unable to get any ApplicationResource")
 	}
 	for _, r := range all {
 		if r.NodeUid == d.GetNodeUID() && r.IpAddr == ip {
@@ -199,7 +199,7 @@ func (d *Database) applicationResourceGetByIPImpl(ctx context.Context, ip string
 	if res != nil {
 		// Check if the state is allocated to prevent old resources access
 		if d.ApplicationIsAllocated(ctx, res.ApplicationUid) != nil {
-			return nil, fmt.Errorf("Prohibited to access the ApplicationResource of not allocated Application")
+			return nil, fmt.Errorf("prohibited to access the ApplicationResource of not allocated Application")
 		}
 
 		return res, nil
@@ -208,7 +208,7 @@ func (d *Database) applicationResourceGetByIPImpl(ctx context.Context, ip string
 	// Make sure the IP is the controlled network, otherwise someone from outside
 	// could become a local node resource, so let's be careful
 	if !isControlledNetwork(ip) {
-		return nil, fmt.Errorf("Prohibited to serve the ApplicationResource IP from not controlled network")
+		return nil, fmt.Errorf("prohibited to serve the ApplicationResource IP from not controlled network")
 	}
 
 	// Check by MAC and update IP if found
@@ -224,12 +224,12 @@ func (d *Database) applicationResourceGetByIPImpl(ctx context.Context, ip string
 		}
 	}
 	if res == nil {
-		return nil, fmt.Errorf("No ApplicationResource with HW address %s", hwAddr)
+		return nil, fmt.Errorf("no ApplicationResource with HW address %s", hwAddr)
 	}
 
 	// Check if the state is allocated to prevent old resources access
 	if d.ApplicationIsAllocated(ctx, res.ApplicationUid) != nil {
-		return nil, fmt.Errorf("Prohibited to access the ApplicationResource of not allocated Application")
+		return nil, fmt.Errorf("prohibited to access the ApplicationResource of not allocated Application")
 	}
 
 	log.WithFunc("database", "applicationResourceGetByIPImpl").Debug("Update IP address for the ApplicationResource", "app_uid", res.ApplicationUid, "ip", ip)
@@ -249,7 +249,7 @@ func (d *Database) applicationResourceGetByApplicationImpl(ctx context.Context, 
 			}
 		}
 	}
-	return res, fmt.Errorf("Fish: Unable to find ApplicationResource with requested Application UID: %s", appUID.String())
+	return res, fmt.Errorf("unable to find ApplicationResource with requested Application UID: %s", appUID.String())
 }
 
 // subscribeApplicationResourceImpl adds a channel to the subscription list

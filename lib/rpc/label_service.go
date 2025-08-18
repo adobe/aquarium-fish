@@ -56,7 +56,7 @@ func (s *LabelService) List(ctx context.Context, req *connect.Request[aquariumv2
 	}
 
 	return connect.NewResponse(&aquariumv2.LabelServiceListResponse{
-		Status: true, Message: "Labels retrieved successfully",
+		Status: true, Message: "Labels listed successfully",
 		Data: protoLabels,
 	}), nil
 }
