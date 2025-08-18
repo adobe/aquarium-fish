@@ -46,7 +46,7 @@ func (d *Database) applicationListImpl(_ context.Context) (as []typesv2.Applicat
 // applicationCreateImpl makes new Application
 func (d *Database) applicationCreateImpl(ctx context.Context, a *typesv2.Application) error {
 	if a.LabelUid == uuid.Nil {
-		return fmt.Errorf("Fish: LabelUID can't be unset")
+		return fmt.Errorf("label UID can't be unset")
 	}
 
 	a.Uid = d.NewUID()
@@ -112,7 +112,7 @@ func (d *Database) applicationIsAllocatedImpl(ctx context.Context, appUID typesv
 	if err != nil {
 		return err
 	} else if state.Status != typesv2.ApplicationState_ALLOCATED {
-		return fmt.Errorf("Fish: The Application is not allocated")
+		return fmt.Errorf("the Application is not allocated")
 	}
 
 	return nil
@@ -122,7 +122,7 @@ func (d *Database) applicationIsAllocatedImpl(ctx context.Context, appUID typesv
 func (d *Database) applicationDeallocateImpl(ctx context.Context, appUID typesv2.ApplicationUID, requestor string) (*typesv2.ApplicationState, error) {
 	out, err := d.ApplicationStateGetByApplication(ctx, appUID)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to find status for the Application: %s, %w", appUID, err)
+		return nil, fmt.Errorf("unable to find status for the Application: %s, %w", appUID, err)
 	}
 
 	if !d.ApplicationStateIsActive(out.Status) {
@@ -143,7 +143,7 @@ func (d *Database) applicationDeallocateImpl(ctx context.Context, appUID typesv2
 	}
 
 	if err = d.ApplicationStateCreate(ctx, as); err != nil {
-		return nil, fmt.Errorf("Unable to deallocate the Application: %s, %w", appUID, err)
+		return nil, fmt.Errorf("unable to deallocate the Application: %s, %w", appUID, err)
 	}
 
 	return as, nil

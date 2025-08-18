@@ -71,10 +71,10 @@ func (d *Database) nodeActiveListImpl(ctx context.Context) (ns []typesv2.Node, e
 // nodeCreateImpl makes new Node
 func (d *Database) nodeCreateImpl(_ context.Context, n *typesv2.Node) error {
 	if n.Name == "" {
-		return fmt.Errorf("Fish: Name can't be empty")
+		return fmt.Errorf("node name can't be empty")
 	}
 	if n.Pubkey == nil {
-		return fmt.Errorf("Fish: Node should be initialized before create")
+		return fmt.Errorf("node should be initialized before create")
 	}
 
 	d.beMu.RLock()

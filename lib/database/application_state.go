@@ -46,10 +46,10 @@ func (d *Database) applicationStateListImpl(_ context.Context) (ass []typesv2.Ap
 // applicationStateCreateImpl makes new ApplicationState
 func (d *Database) applicationStateCreateImpl(_ context.Context, as *typesv2.ApplicationState) error {
 	if as.ApplicationUid == uuid.Nil {
-		return fmt.Errorf("Fish: ApplicationUID can't be unset")
+		return fmt.Errorf("application state application UID can't be unset")
 	}
 	if as.Status == typesv2.ApplicationState_UNSPECIFIED {
-		return fmt.Errorf("Fish: Status can't be empty")
+		return fmt.Errorf("application state status can't be empty")
 	}
 
 	d.beMu.RLock()
@@ -175,7 +175,7 @@ func (d *Database) applicationStateGetByApplicationImpl(ctx context.Context, app
 		}
 	}
 	if state == nil {
-		err = fmt.Errorf("Fish: Unable to find any state with ApplicationUID %s", appUID)
+		err = fmt.Errorf("unable to find any state with ApplicationUID %s", appUID)
 	}
 
 	return state, err

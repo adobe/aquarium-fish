@@ -52,7 +52,7 @@ func (d *Database) roleGetImpl(_ context.Context, name string) (r *typesv2.Role,
 // roleCreateImpl makes a new role
 func (d *Database) roleCreateImpl(_ context.Context, r *typesv2.Role) error {
 	if r.Name == "" {
-		return fmt.Errorf("Fish: Role.Name can't be empty")
+		return fmt.Errorf("role name can't be empty")
 	}
 
 	d.beMu.RLock()
@@ -73,10 +73,10 @@ func (d *Database) roleCreateImpl(_ context.Context, r *typesv2.Role) error {
 // roleSaveImpl saves a role
 func (d *Database) roleSaveImpl(_ context.Context, r *typesv2.Role) error {
 	if r.Name == "" {
-		return fmt.Errorf("Fish: Role.Name can't be empty")
+		return fmt.Errorf("role name can't be empty")
 	}
 	if r.CreatedAt.IsZero() {
-		return fmt.Errorf("Fish: Role.CreatedAt can't be empty")
+		return fmt.Errorf("role createdat can't be empty")
 	}
 
 	r.UpdatedAt = time.Now()

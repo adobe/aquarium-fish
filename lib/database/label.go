@@ -49,7 +49,7 @@ func (d *Database) labelListImpl(_ context.Context, filters LabelListParams) (la
 		// Try to convert to int64
 		version64, err := strconv.ParseInt(*filters.Version, 10, 32)
 		if err != nil {
-			return labels, fmt.Errorf("Unable to parse Version integer: %v", err)
+			return labels, fmt.Errorf("unable to parse Version integer: %v", err)
 		}
 		// Converting to int32
 		filterVersion = int32(version64)
@@ -89,18 +89,18 @@ func (d *Database) labelListImpl(_ context.Context, filters LabelListParams) (la
 // labelCreateImpl makes new Label
 func (d *Database) labelCreateImpl(ctx context.Context, l *typesv2.Label) error {
 	if l.Name == "" {
-		return fmt.Errorf("Fish: Name can't be empty")
+		return fmt.Errorf("label name can't be empty")
 	}
 	if l.Version < 1 {
-		return fmt.Errorf("Fish: Version can't be less then 1")
+		return fmt.Errorf("label version can't be less then 1")
 	}
 	for i, def := range l.Definitions {
 		if def.Driver == "" {
-			return fmt.Errorf("Fish: Driver can't be empty in Label Definition %d", i)
+			return fmt.Errorf("label definition driver can't be empty in Label Definition %d", i)
 		}
 		// Executing Validate here on the list to allow to modify the incorrect data
 		if err := l.Definitions[i].Resources.Validate([]string{}, false); err != nil {
-			return fmt.Errorf("Fish: Resources validation failed: %v", err)
+			return fmt.Errorf("label definition resources validation failed: %v", err)
 		}
 	}
 
@@ -108,7 +108,7 @@ func (d *Database) labelCreateImpl(ctx context.Context, l *typesv2.Label) error 
 	strversion := fmt.Sprintf("%d", l.Version)
 	founds, err := d.LabelList(ctx, LabelListParams{Name: &l.Name, Version: &strversion})
 	if err != nil || len(founds) != 0 {
-		return fmt.Errorf("Fish: Label name + version is not unique: %v", err)
+		return fmt.Errorf("label name + version is not unique: %v", err)
 	}
 
 	d.beMu.RLock()

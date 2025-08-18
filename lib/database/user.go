@@ -45,10 +45,10 @@ func (d *Database) userListImpl(_ context.Context) (us []typesv2.User, err error
 // userCreateImpl makes new User
 func (d *Database) userCreateImpl(_ context.Context, u *typesv2.User) error {
 	if u.Name == "" {
-		return fmt.Errorf("Fish: Name can't be empty")
+		return fmt.Errorf("user name can't be empty")
 	}
 	if hash, err := u.GetHash(); err != nil || hash.IsEmpty() {
-		return fmt.Errorf("Fish: Hash can't be empty, err: %v", err)
+		return fmt.Errorf("user hash can't be empty, err: %v", err)
 	}
 
 	d.beMu.RLock()
@@ -139,7 +139,7 @@ func (*Database) userNewImpl(ctx context.Context, name string, password string) 
 	}
 	if err := user.SetHash(crypt.NewHash(password, nil)); err != nil {
 		log.WithFunc("database", "userNewImpl").ErrorContext(ctx, "Unable to set hash for new user", "name", name, "err", err)
-		return "", nil, fmt.Errorf("Fish: Unable to set hash for new user %q: %v", name, err)
+		return "", nil, fmt.Errorf("unable to set hash for new user %q: %v", name, err)
 	}
 
 	return password, user, nil
