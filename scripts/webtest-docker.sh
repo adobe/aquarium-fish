@@ -35,6 +35,7 @@ fi
 [ "x$CI" != x ] || opts=-it
 
 docker run -v $PWD:/ws -v $HOME/go/pkg:/go/pkg -w /ws --rm $opts aquarium-fish-webtests-playwright sh -exc "
+git config --global --add safe.directory /ws
 [ 'x$NOBUILD' != 'x' ] || ONLYBUILD=1 NO_WEB=1 ./build.sh
 
 echo '--- RUNNING WEBTESTS $TEST ---'
