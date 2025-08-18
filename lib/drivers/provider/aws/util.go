@@ -31,7 +31,7 @@ import (
 )
 
 func (d *Driver) newEC2Conn() *ec2.Client {
-	return ec2.NewFromConfig(aws.Config{
+	awsCfg := aws.Config{
 		Region: d.cfg.Region,
 		Credentials: aws.CredentialsProviderFunc(func(_ /*ctx*/ context.Context) (aws.Credentials, error) {
 			return aws.Credentials{
@@ -45,14 +45,16 @@ func (d *Driver) newEC2Conn() *ec2.Client {
 		// https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/retry-backoff.html
 		RetryMaxAttempts: 5,
 		RetryMode:        aws.RetryModeStandard,
-
+	}
+	if d.cfg.BaseEndpoint != "" {
 		// Used in tests for mock server
-		BaseEndpoint: aws.String(d.cfg.BaseEndpoint),
-	})
+		awsCfg.BaseEndpoint = aws.String(d.cfg.BaseEndpoint)
+	}
+	return ec2.NewFromConfig(awsCfg)
 }
 
 func (d *Driver) newKMSConn() *kms.Client {
-	return kms.NewFromConfig(aws.Config{
+	awsCfg := aws.Config{
 		Region: d.cfg.Region,
 		Credentials: aws.CredentialsProviderFunc(func(_ /*ctx*/ context.Context) (aws.Credentials, error) {
 			return aws.Credentials{
@@ -66,14 +68,16 @@ func (d *Driver) newKMSConn() *kms.Client {
 		// https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/retry-backoff.html
 		RetryMaxAttempts: 5,
 		RetryMode:        aws.RetryModeStandard,
-
+	}
+	if d.cfg.BaseEndpoint != "" {
 		// Used in tests for mock server
-		BaseEndpoint: aws.String(d.cfg.BaseEndpoint),
-	})
+		awsCfg.BaseEndpoint = aws.String(d.cfg.BaseEndpoint)
+	}
+	return kms.NewFromConfig(awsCfg)
 }
 
 func (d *Driver) newServiceQuotasConn() *servicequotas.Client {
-	return servicequotas.NewFromConfig(aws.Config{
+	awsCfg := aws.Config{
 		Region: d.cfg.Region,
 		Credentials: aws.CredentialsProviderFunc(func(_ /*ctx*/ context.Context) (aws.Credentials, error) {
 			return aws.Credentials{
@@ -87,10 +91,12 @@ func (d *Driver) newServiceQuotasConn() *servicequotas.Client {
 		// https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/retry-backoff.html
 		RetryMaxAttempts: 5,
 		RetryMode:        aws.RetryModeStandard,
-
+	}
+	if d.cfg.BaseEndpoint != "" {
 		// Used in tests for mock server
-		BaseEndpoint: aws.String(d.cfg.BaseEndpoint),
-	})
+		awsCfg.BaseEndpoint = aws.String(d.cfg.BaseEndpoint)
+	}
+	return servicequotas.NewFromConfig(awsCfg)
 }
 
 // Will verify and return subnet id
