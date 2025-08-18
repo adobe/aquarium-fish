@@ -1166,13 +1166,13 @@ drivers:
 			t.Fatalf("Unable to parse ProxySSH endpoint: %v", err)
 		}
 
-		_, apiPort, err := net.SplitHostPort(afi.APIEndpoint())
+		_, apiPort, _ := net.SplitHostPort(afi.APIEndpoint())
 		// Find a free local port for forwarding
 		listener, err := net.Listen("tcp", ":0")
 		if err != nil {
 			t.Fatalf("Unable to find free port: %v", err)
 		}
-		proxyApiPort := listener.Addr().(*net.TCPAddr).Port
+		proxyAPIPort := listener.Addr().(*net.TCPAddr).Port
 		listener.Close()
 
 		// Running command with timeout in background
@@ -1188,7 +1188,7 @@ drivers:
 			"-oGlobalKnownHostsFile=/dev/null",
 			"-l", "admin",
 			"-N", // Don't establish ssh session
-			"-L", strconv.Itoa(proxyApiPort)+":localhost:"+apiPort,
+			"-L", strconv.Itoa(proxyAPIPort)+":localhost:"+apiPort,
 			proxyHost,
 		)
 		t.Log("DEBUG: Executing:", strings.Join(cmd.Args, " "), acc.Password, string(sshdKey))
@@ -1204,7 +1204,7 @@ drivers:
 		var newAcc aquariumv2.GateProxySSHServiceGetResourceAccessResponse
 		apitest.New().
 			EnableNetworking(cli).
-			Post("https://127.0.0.1:"+strconv.Itoa(proxyApiPort)+"/grpc/aquarium.v2.GateProxySSHService/GetResourceAccess").
+			Post("https://127.0.0.1:"+strconv.Itoa(proxyAPIPort)+"/grpc/aquarium.v2.GateProxySSHService/GetResourceAccess").
 			JSON(`{"application_resource_uid": "`+acc.ApplicationResourceUid+`"}`).
 			BasicAuth("admin", afi.AdminToken()).
 			Expect(t).
@@ -1217,63 +1217,59 @@ drivers:
 		}
 	})
 
-	// TODO: For some reason mock server does not accept reverse port forwarding, but
-	// I spent too much time on that already, so the direct forwarding enough for testing now
-	//t.Run("Executing SSH port reverse pass through PROXYSSH", func(t *testing.T) {
-	//	// Writing ssh private key to temp file
-	//	proxyKeyFile, err := os.CreateTemp("", "proxykey")
-	//	if err != nil {
-	//		t.Fatalf("Unable to create temp proxykey file: %v", err)
-	//	}
-	//	defer os.Remove(proxyKeyFile.Name())
-	//	_, err = proxyKeyFile.WriteString(acc.Key)
-	//	if err != nil {
-	//		t.Fatalf("Unable to write temp proxykey file: %v", err)
-	//	}
-	//	proxyKeyFile.Close()
-	//	err = os.Chmod(proxyKeyFile.Name(), 0600)
-	//	if err != nil {
-	//		t.Fatalf("Unable to change temp proxykey file mod: %v", err)
-	//	}
-	//	proxyHost, proxyPort, err := net.SplitHostPort(proxysshEndpoint)
-	//	_, apiPort, err := net.SplitHostPort(afi.APIEndpoint())
-	//	// Picking semi-random port to listen on
-	//	proxyApiPort, _ := strconv.Atoi(apiPort)
-	//	proxyApiPort += 10
-	//
-	//	// Running command with timeout in background
-	//	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	//	defer cancel()
-	//	cmd := exec.CommandContext(ctx, "ssh", "-v",
-	//		// ssh -N -R 2223:localhost:2222 -p 2222 testuser@127.0.0.1
-	//		// ssh -N -L 2223:localhost:2222 -p 2222 testuser@127.0.0.1
-	//		"-i", proxyKeyFile.Name(),
-	//		"-p", proxyPort,
-	//		"-oStrictHostKeyChecking=no",
-	//		"-oUserKnownHostsFile=/dev/null",
-	//		"-oGlobalKnownHostsFile=/dev/null",
-	//		"-l", "admin",
-	//		"-N", // Don't establish ssh session
-	//		"-R", strconv.Itoa(proxyApiPort)+":localhost:"+apiPort,
-	//		proxyHost,
-	//	)
-	//	cmd.Stdout = os.Stderr
-	//	cmd.Stderr = os.Stderr
-	//	cmd.Start()
-	//
-	//	// Wait for ssh port passthrough startup
-	//	time.Sleep(2*time.Second)
-	//
-	//	// Requesting Fish API through proxied port
-	//	apitest.New().
-	//		EnableNetworking(cli).
-	//		Get("https://127.0.0.1:"+strconv.Itoa(proxyApiPort)+"/api/v1/application/"+app.Uid+"/resource").
-	//		BasicAuth("admin", afi.AdminToken()).
-	//		Expect(t).
-	//		Status(http.StatusOK).
-	//		End().
-	//		JSON(&res)
-	//})
+	t.Run("Executing SSH port reverse pass through PROXYSSH", func(t *testing.T) {
+		// Writing ssh private key to temp file
+		proxyKeyFile, err := os.CreateTemp("", "proxykey")
+		if err != nil {
+			t.Fatalf("Unable to create temp proxykey file: %v", err)
+		}
+		defer os.Remove(proxyKeyFile.Name())
+		_, err = proxyKeyFile.WriteString(acc.Key)
+		if err != nil {
+			t.Fatalf("Unable to write temp proxykey file: %v", err)
+		}
+		proxyKeyFile.Close()
+		err = os.Chmod(proxyKeyFile.Name(), 0600)
+		if err != nil {
+			t.Fatalf("Unable to change temp proxykey file mod: %v", err)
+		}
+		proxyHost, proxyPort, _ := net.SplitHostPort(proxysshEndpoint)
+		_, apiPort, _ := net.SplitHostPort(afi.APIEndpoint())
+		// Picking semi-random port to listen on
+		proxyAPIPort, _ := strconv.Atoi(apiPort)
+		proxyAPIPort += 10
+
+		// Running command with timeout in background
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, "ssh", "-v",
+			"-i", proxyKeyFile.Name(),
+			"-p", proxyPort,
+			"-oStrictHostKeyChecking=no",
+			"-oUserKnownHostsFile=/dev/null",
+			"-oGlobalKnownHostsFile=/dev/null",
+			"-l", "admin",
+			"-N", // Don't establish ssh session
+			"-R", strconv.Itoa(proxyAPIPort)+":localhost:"+apiPort,
+			proxyHost,
+		)
+		cmd.Stdout = os.Stderr
+		cmd.Stderr = os.Stderr
+		cmd.Start()
+
+		// Wait for ssh port passthrough startup
+		time.Sleep(2 * time.Second)
+
+		// Requesting Fish API through proxied port
+		apitest.New().
+			EnableNetworking(cli).
+			Post("https://127.0.0.1:"+apiPort+"/grpc/aquarium.v2.GateProxySSHService/GetResourceAccess").
+			JSON(`{"application_resource_uid": "`+acc.ApplicationResourceUid+`"}`).
+			BasicAuth("admin", afi.AdminToken()).
+			Expect(t).
+			Status(http.StatusOK).
+			End()
+	})
 
 	t.Run("Deallocate the Application", func(t *testing.T) {
 		_, err := appClient.Deallocate(
