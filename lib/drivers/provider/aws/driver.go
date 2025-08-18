@@ -592,7 +592,9 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 		}
 	}
 
-	res := &typesv2.ApplicationResource{}
+	res := &typesv2.ApplicationResource{
+		HwAddr: iName,
+	}
 
 	if keyPem != "" && def.Authentication != nil && def.Authentication.Username != "" {
 		var port int32 = 22
@@ -683,6 +685,8 @@ func (d *Driver) Deallocate(res typesv2.ApplicationResource) error {
 		return fmt.Errorf("AWS: %s: Invalid resource: %v", d.name, res)
 	}
 	conn := d.newEC2Conn()
+	iName := res.HwAddr
+	logger = logger.With("instance_hwaddr", iName)
 
 	input := ec2.TerminateInstancesInput{
 		InstanceIds: []string{res.Identifier},
@@ -690,16 +694,16 @@ func (d *Driver) Deallocate(res typesv2.ApplicationResource) error {
 
 	result, err := conn.TerminateInstances(context.TODO(), &input)
 	if err != nil || len(result.TerminatingInstances) < 1 {
-		return fmt.Errorf("AWS: %s: Error during termianting the instance %s: %s", d.name, res.Identifier, err)
+		return fmt.Errorf("AWS: %s: Error during termianting the instance %s: %s", d.name, iName, err)
 	}
 	inst := result.TerminatingInstances[0]
 	if aws.ToString(inst.InstanceId) != res.Identifier {
-		return fmt.Errorf("AWS: %s: Wrong instance id result %s during terminating of %s", d.name, aws.ToString(inst.InstanceId), res.Identifier)
+		return fmt.Errorf("AWS: %s: Wrong instance id result %s during terminating of %s", d.name, aws.ToString(inst.InstanceId), iName)
 	}
 
 	// Removing the generated instance key
 	if d.cfg.InstanceKey == "generate" && res.Authentication != nil {
-		keyName := fmt.Sprintf("%s%s", d.cfg.InstanceKeyPrefix, res.Identifier)
+		keyName := fmt.Sprintf("%s%s", d.cfg.InstanceKeyPrefix, res.HwAddr)
 		keypairInput := ec2.DeleteKeyPairInput{
 			KeyName: aws.String(keyName),
 		}
