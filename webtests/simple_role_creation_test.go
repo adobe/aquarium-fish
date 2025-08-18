@@ -289,8 +289,6 @@ drivers:
 			t.Errorf("ERROR: Edit modal did not close as expected: %v", err)
 		}
 
-		t.Errorf("ERROR: example")
-
 		t.Logf("INFO: Successfully verified role %s permissions in edit mode", testRoleName)
 	})
 }
