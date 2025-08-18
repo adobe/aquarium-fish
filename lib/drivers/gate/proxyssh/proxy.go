@@ -215,10 +215,10 @@ func (s *session) handleChannel(ch ssh.NewChannel, dstConn ssh.Conn) {
 
 			select {
 			case request = <-srcChnRequests:
-				//logger.Debug("Received src channel request", "request", request)
+				// logger.Debug("Received src channel request", "request", request)
 				targetChannel = dstChn
 			case request = <-dstChnRequests:
-				//logger.Debug("Received dst channel request", "request", request)
+				// logger.Debug("Received dst channel request", "request", request)
 				targetChannel = srcChn
 			}
 
@@ -327,7 +327,7 @@ func (d *Driver) passwordCallback(incomingConn ssh.ConnMetadata, pass []byte) (*
 	passHash := crypt.NewHash(string(pass), []byte{}).Hash
 	passHashStr := fmt.Sprintf("%x", passHash)
 
-	ra, err := d.db.GateProxySSHAccessSingleUsePasswordHash(fishUser.Name, passHashStr)
+	ra, err := d.db.GateProxySSHAccessUsePasswordHash(fishUser.Name, passHashStr)
 	if err != nil {
 		logger.Error("Invalid access for user", "user", fishUser.Name, "err", err)
 		return nil, fmt.Errorf("Invalid access")
@@ -359,7 +359,7 @@ func (d *Driver) publicKeyCallback(incomingConn ssh.ConnMetadata, key ssh.Public
 
 	stringKey := string(ssh.MarshalAuthorizedKey(key))
 
-	ra, err := d.db.GateProxySSHAccessSingleUseKey(fishUser.Name, stringKey)
+	ra, err := d.db.GateProxySSHAccessUseKey(fishUser.Name, stringKey)
 	if err != nil {
 		logger.Error("Invalid access for user", "user", fishUser.Name, "err", err)
 		return nil, fmt.Errorf("Invalid access")

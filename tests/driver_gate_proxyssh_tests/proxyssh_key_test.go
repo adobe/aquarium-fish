@@ -827,7 +827,7 @@ drivers:
 			t.Fatalf("Unable to change temp proxykey file mod: %v", err)
 		}
 
-		proxyHost, proxyPort, err := net.SplitHostPort(proxysshEndpoint)
+		proxyHost, proxyPort, _ := net.SplitHostPort(proxysshEndpoint)
 
 		stdout, stderr, err := util.RunAndLog("TEST", 5*time.Second, nil, "scp", "-v",
 			"-s", // Forcing SFTP for the scp < v9.0

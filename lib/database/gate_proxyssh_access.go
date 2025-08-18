@@ -77,21 +77,24 @@ func (d *Database) GateProxySSHAccessDeleteByResource(appresUID typesv2.Applicat
 	return fmt.Errorf("unable to find GateProxySSHAccess with ApplicationResourceUID: %s", appresUID.String())
 }
 
-// GateProxySSHAccessSingleUsePasswordHash retrieves the password hash from the database *AND* deletes
+// GateProxySSHAccessUsePasswordHash retrieves the password hash from the database *AND* deletes
 // it. Users must request a new Resource Access to connect again.
-func (d *Database) GateProxySSHAccessSingleUsePasswordHash(username string, hash string) (*typesv2.GateProxySSHAccess, error) {
+func (d *Database) GateProxySSHAccessUsePasswordHash(username string, hash string) (*typesv2.GateProxySSHAccess, error) {
 	all, err := d.GateProxySSHAccessList()
 	if err != nil {
 		return nil, fmt.Errorf("no available GateProxySSHAccess objects")
 	}
 	for _, ra := range all {
 		if ra.Username == username && ra.Password == hash {
-			if err = d.GateProxySSHAccessDelete(ra.Uid); err != nil {
-				// NOTE: in rare occasions, `err` here could end up propagating to the
-				// caller with a valid `ra`.  However, see ssh_proxy/proxy.go usage,
-				// in the event that our deletion failed (but nothing else), the single
-				// use connection ultimately gets rejected.
-				log.WithFunc("proxyssh", "GateProxySSHAccessSingleUsePasswordHash").Error("Unable to remove GateProxySSHAccess", "access_uid", ra.Uid, "err", err)
+			// Keeping credentials in place after usage if static flag is set
+			if !ra.Static {
+				if err = d.GateProxySSHAccessDelete(ra.Uid); err != nil {
+					// NOTE: in rare occasions, `err` here could end up propagating to the
+					// caller with a valid `ra`.  However, see ssh_proxy/proxy.go usage,
+					// in the event that our deletion failed (but nothing else), the single
+					// use connection ultimately gets rejected.
+					log.WithFunc("proxyssh", "GateProxySSHAccessUsePasswordHash").Error("Unable to remove GateProxySSHAccess", "access_uid", ra.Uid, "err", err)
+				}
 			}
 			return &ra, d.GateProxySSHAccessDelete(ra.Uid)
 		}
@@ -99,21 +102,24 @@ func (d *Database) GateProxySSHAccessSingleUsePasswordHash(username string, hash
 	return nil, fmt.Errorf("no GateProxySSHAccess found")
 }
 
-// GateProxySSHAccessSingleUseKey retrieves the key from the database *AND* deletes it.
+// GateProxySSHAccessUseKey retrieves the key from the database *AND* deletes it.
 // Users must request a new resource access to connect again.
-func (d *Database) GateProxySSHAccessSingleUseKey(username string, key string) (*typesv2.GateProxySSHAccess, error) {
+func (d *Database) GateProxySSHAccessUseKey(username string, key string) (*typesv2.GateProxySSHAccess, error) {
 	all, err := d.GateProxySSHAccessList()
 	if err != nil {
 		return nil, fmt.Errorf("no available GateProxySSHAccess objects")
 	}
 	for _, ra := range all {
 		if ra.Username == username && ra.Key == key {
-			if err = d.GateProxySSHAccessDelete(ra.Uid); err != nil {
-				// NOTE: in rare occasions, `err` here could end up propagating to the
-				// caller with a valid `ra`.  However, see ssh_proxy/proxy.go usage,
-				// in the event that our deletion failed (but nothing else), the single
-				// use connection ultimately gets rejected.
-				log.WithFunc("proxyssh", "GateProxySSHAccessSingleUseKey").Error("Unable to remove GateProxySSHAccess", "access_uid", ra.Uid, "err", err)
+			// Keeping credentials in place after usage if static flag is set
+			if !ra.Static {
+				if err = d.GateProxySSHAccessDelete(ra.Uid); err != nil {
+					// NOTE: in rare occasions, `err` here could end up propagating to the
+					// caller with a valid `ra`.  However, see ssh_proxy/proxy.go usage,
+					// in the event that our deletion failed (but nothing else), the single
+					// use connection ultimately gets rejected.
+					log.WithFunc("proxyssh", "GateProxySSHAccessUseKey").Error("Unable to remove GateProxySSHAccess", "access_uid", ra.Uid, "err", err)
+				}
 			}
 			return &ra, d.GateProxySSHAccessDelete(ra.Uid)
 		}
