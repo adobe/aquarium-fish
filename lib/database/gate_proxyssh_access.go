@@ -96,7 +96,7 @@ func (d *Database) GateProxySSHAccessUsePasswordHash(username string, hash strin
 					log.WithFunc("proxyssh", "GateProxySSHAccessUsePasswordHash").Error("Unable to remove GateProxySSHAccess", "access_uid", ra.Uid, "err", err)
 				}
 			}
-			return &ra, d.GateProxySSHAccessDelete(ra.Uid)
+			return &ra, nil
 		}
 	}
 	return nil, fmt.Errorf("no GateProxySSHAccess found")
@@ -121,7 +121,7 @@ func (d *Database) GateProxySSHAccessUseKey(username string, key string) (*types
 					log.WithFunc("proxyssh", "GateProxySSHAccessUseKey").Error("Unable to remove GateProxySSHAccess", "access_uid", ra.Uid, "err", err)
 				}
 			}
-			return &ra, d.GateProxySSHAccessDelete(ra.Uid)
+			return &ra, nil
 		}
 	}
 	return nil, fmt.Errorf("no GateProxySSHAccess found")

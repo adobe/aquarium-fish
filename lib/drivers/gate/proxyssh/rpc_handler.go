@@ -167,10 +167,13 @@ func (d *driverRPCHandler) GetResourceAccess(reqCtx context.Context, req *connec
 		Uid:                    accessEntry.Uid.String(),
 		CreatedAt:              timestamppb.New(accessEntry.CreatedAt),
 		ApplicationResourceUid: accessEntry.ApplicationResourceUid.String(),
-		Address:                accessEntry.Address,
-		Username:               accessEntry.Username,
-		Password:               pwd,
-		Key:                    string(key),
+
+		Address:  accessEntry.Address,
+		Username: accessEntry.Username,
+		Password: pwd,
+		Key:      string(key),
+
+		Static: req.Msg.GetStatic(),
 	}
 
 	logger.Info("Created password access entry for User to Resource", "user", userName, "resource", appResourceUID)
