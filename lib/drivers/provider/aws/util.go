@@ -87,6 +87,7 @@ func (d *Driver) newServiceQuotasConn() *servicequotas.Client {
 // If zone is set - will make sure that vpc will have properly picked subnet
 // Returns the found subnet_id, total count of available ip's and error if some
 func (d *Driver) getSubnetID(conn *ec2.Client, idTag, zone string) (string, int64, error) {
+	var subnets []types.Subnet
 	filter := types.Filter{}
 
 	// Check if the tag is provided ("<Key>:<Value>")
@@ -128,14 +129,14 @@ func (d *Driver) getSubnetID(conn *ec2.Client, idTag, zone string) (string, int6
 			if err != nil || len(resp.Subnets) == 0 {
 				return "", 0, fmt.Errorf("AWS: %s: Unable to locate vpc or subnet with specified tag %s:%q: %v", d.name, aws.ToString(filter.Name), filter.Values, err)
 			}
-			idTag = aws.ToString(resp.Subnets[0].SubnetId)
-			return idTag, int64(aws.ToInt32(resp.Subnets[0].AvailableIpAddressCount)), nil
+			subnets = resp.Subnets
+		} else {
+			if len(resp.Vpcs) > 1 {
+				log.Warnf("AWS: %s: There is more than one vpc with the same tag: %s", d.name, idTag)
+			}
+			idTag = aws.ToString(resp.Vpcs[0].VpcId)
+			log.Debugf("AWS: %s: Found VPC with id: %s", d.name, idTag)
 		}
-		if len(resp.Vpcs) > 1 {
-			log.Warnf("AWS: %s: There is more than one vpc with the same tag: %s", d.name, idTag)
-		}
-		idTag = aws.ToString(resp.Vpcs[0].VpcId)
-		log.Debugf("AWS: %s: Found VPC with id: %s", d.name, idTag)
 	} else {
 		// If network id is not a subnet - process as vpc
 		if !strings.HasPrefix(idTag, "subnet-") {
@@ -171,54 +172,60 @@ func (d *Driver) getSubnetID(conn *ec2.Client, idTag, zone string) (string, int6
 		}
 	}
 
-	if strings.HasPrefix(idTag, "vpc-") {
-		// Filtering subnets by VPC id
-		filter.Name = aws.String("vpc-id")
-		filter.Values = []string{idTag}
-	} else {
-		// Check subnet exists in the project
-		filter.Name = aws.String("subnet-id")
-		filter.Values = []string{idTag}
-	}
-	req := ec2.DescribeSubnetsInput{
-		Filters: []types.Filter{
-			filter,
-		},
-	}
-	if zone != "" {
-		req.Filters = append(req.Filters, types.Filter{
-			Name:   aws.String("availability-zone"),
-			Values: []string{zone},
-		})
-	}
-	resp, err := conn.DescribeSubnets(context.TODO(), &req)
-	if err != nil {
-		return "", 0, fmt.Errorf("AWS: %s: Unable to locate subnet for %q with zone %s: %v", d.name, idTag, zone, err)
-	}
-	if len(resp.Subnets) == 0 {
-		return "", 0, fmt.Errorf("AWS: %s: No Subnets available in the project for %q with zone %s", d.name, idTag, zone)
+	// If the subnets was not yet filled in, continue to process the id's
+	if len(subnets) == 0 {
+		if strings.HasPrefix(idTag, "vpc-") {
+			// Filtering subnets by VPC id
+			filter.Name = aws.String("vpc-id")
+			filter.Values = []string{idTag}
+		} else {
+			// Check subnet exists in the project
+			filter.Name = aws.String("subnet-id")
+			filter.Values = []string{idTag}
+		}
+		req := ec2.DescribeSubnetsInput{
+			Filters: []types.Filter{
+				filter,
+			},
+		}
+		if zone != "" {
+			req.Filters = append(req.Filters, types.Filter{
+				Name:   aws.String("availability-zone"),
+				Values: []string{zone},
+			})
+		}
+		resp, err := conn.DescribeSubnets(context.TODO(), &req)
+		if err != nil {
+			return "", 0, fmt.Errorf("AWS: %s: Unable to locate subnet for %q with zone %s: %v", d.name, idTag, zone, err)
+		}
+		if len(resp.Subnets) == 0 {
+			return "", 0, fmt.Errorf("AWS: %s: No Subnets available in the project for %q with zone %s", d.name, idTag, zone)
+		}
+		subnets = resp.Subnets
 	}
 
-	if strings.HasPrefix(idTag, "vpc-") {
-		// Chose the less used subnet in VPC
-		var currCount int32
-		var totalIPCount int64
-		for _, subnet := range resp.Subnets {
-			totalIPCount += int64(aws.ToInt32(subnet.AvailableIpAddressCount))
-			if currCount < aws.ToInt32(subnet.AvailableIpAddressCount) {
-				idTag = aws.ToString(subnet.SubnetId)
-				currCount = aws.ToInt32(subnet.AvailableIpAddressCount)
-			}
-		}
-		if currCount == 0 {
-			return "", 0, fmt.Errorf("AWS: Subnets have no available IP addresses")
-		}
-		return idTag, totalIPCount, nil
-	} else if idTag != aws.ToString(resp.Subnets[0].SubnetId) {
-		return "", 0, fmt.Errorf("AWS: %s: Unable to verify the subnet id: %q != %q", d.name, idTag, aws.ToString(resp.Subnets[0].SubnetId))
+	if len(subnets) == 0 {
+		// It's not good if we have no subnets here
+		return "", 0, fmt.Errorf("AWS: %s: Unable to get any subnet for %q", d.name, idTag)
+	} else if len(subnets) == 1 {
+		// Just one subnet - returning it
+		return aws.ToString(subnets[0].SubnetId), int64(aws.ToInt32(subnets[0].AvailableIpAddressCount)), nil
 	}
 
-	return idTag, int64(aws.ToInt32(resp.Subnets[0].AvailableIpAddressCount)), nil
+	// Chose the less used subnet in VPC
+	var currCount int32
+	var totalIPCount int64
+	for _, subnet := range subnets {
+		totalIPCount += int64(aws.ToInt32(subnet.AvailableIpAddressCount))
+		if currCount < aws.ToInt32(subnet.AvailableIpAddressCount) {
+			idTag = aws.ToString(subnet.SubnetId)
+			currCount = aws.ToInt32(subnet.AvailableIpAddressCount)
+		}
+	}
+	if currCount == 0 {
+		return "", 0, fmt.Errorf("AWS: Subnets have no available IP addresses")
+	}
+	return idTag, totalIPCount, nil
 }
 
 // Will verify and return image id
