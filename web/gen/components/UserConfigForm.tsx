@@ -31,9 +31,11 @@ interface UserConfigFormProps {
 
 interface UserConfigFormState {
   rateLimit: number;
+  streamsLimit: number;
 }
 const defaultUserConfigState: UserConfigFormState = {
   rateLimit: undefined,
+  streamsLimit: undefined,
 };
 
 
@@ -61,6 +63,7 @@ export const UserConfigForm: React.FC<UserConfigFormProps> = ({
     if (initialData) {
       const newFormData: UserConfigFormState = {
         rateLimit: initialData.rateLimit ?? undefined,
+        streamsLimit: initialData.streamsLimit ?? undefined,
       };
       setFormData(newFormData);
 
@@ -79,6 +82,7 @@ export const UserConfigForm: React.FC<UserConfigFormProps> = ({
           // Convert form data to protobuf message
           const data = create(UserConfigSchema, {
             rateLimit: formData.rateLimit || undefined,
+            streamsLimit: formData.streamsLimit || undefined,
           });
           onSubmit(data);
         } catch (error) {
@@ -104,6 +108,9 @@ const handleYamlLoad = () => {
     const newFormData: UserConfigFormState = { ...defaultUserConfigState };
     if (parsedData.rateLimit !== undefined) {
       newFormData.rateLimit = parsedData.rateLimit;
+    }
+    if (parsedData.streamsLimit !== undefined) {
+      newFormData.streamsLimit = parsedData.streamsLimit;
     }
 
     setFormData(newFormData);
@@ -131,6 +138,7 @@ const handleSubmit = () => {
     // Convert form data to protobuf message
     const data = create(UserConfigSchema, {
       rateLimit: formData.rateLimit || undefined,
+      streamsLimit: formData.streamsLimit || undefined,
     });
 
     onSubmit(data);
@@ -304,6 +312,37 @@ const isSimpleField = (field: any) => {
     {validationErrors.rateLimit && (
       <div className="text-xs text-red-600 dark:text-red-400 mt-1">
         {validationErrors.rateLimit}
+      </div>
+    )}
+  </div>
+</div>
+
+  </div>{/* Streams Limit field */}
+  <div>
+{/* Simple number field - inline layout */}
+<div className="flex items-center justify-between">
+  <div className="flex items-center space-x-2 min-w-0 flex-1">
+    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+      Streams Limit
+    </label>
+    <div className="relative group">
+      <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
+      <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
+        <pre className="whitespace-pre-wrap text-xs leading-relaxed">Limits the amount of streams of the same type per user. With 1 (default) user can open 1 Connect and 1 Subscribe stream</pre>
+      </div>
+    </div>
+  </div>
+  <div className="flex-1 max-w-xs ml-4">
+    <input
+      type="number"
+      value={formData.streamsLimit}
+      onChange={(e) => handleFieldChange('streamsLimit', parseInt(e.target.value) || 0)}
+      disabled={isReadOnly || (mode === 'edit' && false)}
+      className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+    />
+    {validationErrors.streamsLimit && (
+      <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+        {validationErrors.streamsLimit}
       </div>
     )}
   </div>

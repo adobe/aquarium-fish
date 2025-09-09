@@ -146,6 +146,10 @@ type StreamingService struct {
 	// Permission cache for subscription filtering
 	permissionCache *SubscriptionPermissionCache
 
+	// Stream limit tracking by user and connection type
+	streamLimitsMutex sync.RWMutex
+	userStreamCounts  map[string]map[string]int // userName -> connectionType -> count
+
 	// Shutdown coordination
 	shutdownMutex  sync.RWMutex
 	isShuttingDown bool
@@ -200,16 +204,167 @@ func NewStreamingService(f *fish.Fish) *StreamingService {
 		subscriptions:      make(map[string]*subscription),
 		connections:        make(map[string]*bidirectionalConnection),
 		permissionCache:    NewSubscriptionPermissionCache(),
+		userStreamCounts:   make(map[string]map[string]int),
 	}
+}
+
+// getUserStreamLimit gets the stream limit for a specific user from their configuration
+func (s *StreamingService) getUserStreamLimit(user *typesv2.User) int32 {
+	// Check if user has custom stream limit configuration
+	if user.Config != nil && user.Config.StreamsLimit != nil {
+		return *user.Config.StreamsLimit
+	}
+
+	// By default we allow only one Connect and Stream connection per user
+	return 1
+}
+
+// incrementStreamCount increments the stream count for a user and connection type
+func (s *StreamingService) incrementStreamCount(userName, connectionType string) {
+	s.streamLimitsMutex.Lock()
+	defer s.streamLimitsMutex.Unlock()
+
+	if s.userStreamCounts[userName] == nil {
+		s.userStreamCounts[userName] = make(map[string]int)
+	}
+	s.userStreamCounts[userName][connectionType]++
+}
+
+// decrementStreamCount decrements the stream count for a user and connection type
+func (s *StreamingService) decrementStreamCount(userName, connectionType string) {
+	s.streamLimitsMutex.Lock()
+	defer s.streamLimitsMutex.Unlock()
+
+	if s.userStreamCounts[userName] != nil {
+		if s.userStreamCounts[userName][connectionType] > 0 {
+			s.userStreamCounts[userName][connectionType]--
+		}
+		// Clean up empty entries
+		if s.userStreamCounts[userName][connectionType] == 0 {
+			delete(s.userStreamCounts[userName], connectionType)
+		}
+		if len(s.userStreamCounts[userName]) == 0 {
+			delete(s.userStreamCounts, userName)
+		}
+	}
+}
+
+// getStreamCount gets the current stream count for a user and connection type
+func (s *StreamingService) getStreamCount(userName, connectionType string) int {
+	s.streamLimitsMutex.RLock()
+	defer s.streamLimitsMutex.RUnlock()
+
+	if s.userStreamCounts[userName] == nil {
+		return 0
+	}
+	return s.userStreamCounts[userName][connectionType]
+}
+
+// enforceStreamLimit enforces stream limits by terminating old connections if necessary
+func (s *StreamingService) enforceStreamLimit(ctx context.Context, user *typesv2.User, connectionType string, newConnectionID string) error {
+	streamLimit := s.getUserStreamLimit(user)
+
+	// If limit is -1 (unlimited), no enforcement needed
+	if streamLimit == -1 {
+		return nil
+	}
+
+	// If limit is 0, reject all connections
+	if streamLimit == 0 {
+		return fmt.Errorf("limit 0 prevents user from having streaming connections: %s", user.Name)
+	}
+
+	currentCount := s.getStreamCount(user.Name, connectionType)
+
+	// If we're under the limit, no action needed
+	if currentCount < int(streamLimit) {
+		return nil
+	}
+
+	logger := log.WithFunc("rpc", "enforceStreamLimit").With("user", user.Name, "type", connectionType, "limit", streamLimit, "current", currentCount)
+	logger.Debug("Stream limit exceeded, terminating oldest connection")
+
+	// Find and terminate the oldest connection of this type
+	if connectionType == "connect" {
+		s.connectionsMutex.Lock()
+		var oldestConnID string
+		var oldestConn *bidirectionalConnection
+
+		// Find the oldest connection for this user (excluding the new one)
+		for connID, conn := range s.connections {
+			if conn.userName == user.Name && connID != newConnectionID {
+				if oldestConnID == "" {
+					oldestConnID = connID
+					oldestConn = conn
+					break
+				}
+			}
+		}
+
+		if oldestConn != nil {
+			logger.Debug("Terminating oldest bidirectional connection", "conn_id", oldestConnID)
+			// Send termination message to client
+			terminationMsg := &aquariumv2.StreamingServiceConnectResponse{
+				RequestId:    "stream-limit-exceeded",
+				ResponseType: "StreamLimitExceededNotification",
+				Error: &aquariumv2.StreamError{
+					Code:    connect.CodeResourceExhausted.String(),
+					Message: "Stream limit exceeded, terminating oldest connection",
+				},
+			}
+			oldestConn.safeSend(terminationMsg)
+			// Cancel the connection
+			oldestConn.cancel()
+			delete(s.connections, oldestConnID)
+		}
+		s.connectionsMutex.Unlock()
+	} else if connectionType == "subscribe" {
+		s.subscriptionsMutex.Lock()
+		var oldestSubID string
+		var oldestSub *subscription
+
+		// Find the oldest subscription for this user
+		for subID, sub := range s.subscriptions {
+			if sub.userName == user.Name {
+				if oldestSubID == "" {
+					oldestSubID = subID
+					oldestSub = sub
+					break
+				}
+			}
+		}
+
+		if oldestSub != nil {
+			logger.Debug("Terminating oldest subscription", "sub_id", oldestSubID)
+			// Send termination message to client
+			terminationResp := &aquariumv2.StreamingServiceSubscribeResponse{
+				ObjectType: aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED,
+				ChangeType: aquariumv2.ChangeType_CHANGE_TYPE_REMOVED,
+				Timestamp:  timestamppb.Now(),
+			}
+			oldestSub.streamMutex.Lock()
+			oldestSub.stream.Send(terminationResp)
+			oldestSub.streamMutex.Unlock()
+			// Cancel the subscription
+			oldestSub.cancel()
+			delete(s.subscriptions, oldestSubID)
+		}
+		s.subscriptionsMutex.Unlock()
+	}
+
+	return nil
 }
 
 // Connect handles bidirectional streaming for RPC requests
 func (s *StreamingService) Connect(ctx context.Context, stream *connect.BidiStream[aquariumv2.StreamingServiceConnectRequest, aquariumv2.StreamingServiceConnectResponse]) error {
-	userName := rpcutil.GetUserName(ctx)
-	connectionUID := fmt.Sprintf("%s-%s", userName, uuid.NewString())
-	logger := log.WithFunc("rpc", "Connect").With("conn_uid", connectionUID)
-	logger.Debug("New bidirectional connection for user", "user", userName)
-	defer logger.Debug("Completed bidirectional connection for user", "user", userName)
+	user := rpcutil.GetUserFromContext(ctx)
+	if user == nil {
+		return fmt.Errorf("no user found in context")
+	}
+	connectionUID := fmt.Sprintf("%s-%s", user.Name, uuid.NewString())
+	logger := log.WithFunc("rpc", "Connect").With("conn_uid", connectionUID, "user", user.Name)
+	logger.Debug("New bidirectional connection for user")
+	defer logger.Debug("Completed bidirectional connection for user")
 
 	// Check if server is shutting down
 	s.shutdownMutex.RLock()
@@ -220,13 +375,19 @@ func (s *StreamingService) Connect(ctx context.Context, stream *connect.BidiStre
 	}
 	s.shutdownMutex.RUnlock()
 
+	// Enforce stream limits before creating the connection
+	if err := s.enforceStreamLimit(ctx, user, "connect", connectionUID); err != nil {
+		logger.Error("Failed to enforce stream limit", "err", err)
+		return connect.NewError(connect.CodeInternal, fmt.Errorf("failed to enforce stream limit: %w", err))
+	}
+
 	// Create connection context
 	connCtx, cancel := context.WithCancel(ctx)
 
 	// Create and register connection
 	conn := &bidirectionalConnection{
 		stream:   stream,
-		userName: userName,
+		userName: user.Name,
 		ctx:      connCtx,
 		cancel:   cancel,
 	}
@@ -235,11 +396,18 @@ func (s *StreamingService) Connect(ctx context.Context, stream *connect.BidiStre
 	s.connections[connectionUID] = conn
 	s.connectionsMutex.Unlock()
 
+	// Increment stream count for this user and connection type
+	s.incrementStreamCount(user.Name, "connect")
+
 	defer func() {
 		// Clean up connection
 		s.connectionsMutex.Lock()
 		delete(s.connections, connectionUID)
 		s.connectionsMutex.Unlock()
+
+		// Decrement stream count
+		s.decrementStreamCount(user.Name, "connect")
+
 		cancel()
 		logger.Debug("Cleaned up bidirectional connection")
 	}()
@@ -291,7 +459,7 @@ func (s *StreamingService) Connect(ctx context.Context, stream *connect.BidiStre
 	for {
 		select {
 		case <-connCtx.Done():
-			logger.Debug("Bidirectional connection context cancelled for user", "user", userName)
+			logger.Debug("Bidirectional connection context cancelled for user", "user", user.Name)
 			return nil
 
 		case <-keepAliveTicker.C:
@@ -436,11 +604,11 @@ func (*StreamingService) getResponseType(requestType string) string {
 
 // Subscribe handles server streaming for database change notifications
 func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[aquariumv2.StreamingServiceSubscribeRequest], stream *connect.ServerStream[aquariumv2.StreamingServiceSubscribeResponse]) error {
-	userName := rpcutil.GetUserName(ctx)
+	user := rpcutil.GetUserFromContext(ctx)
 	// Generating SubscriptionID with NodeUID prefix to later figure out where the user come from
-	subscriptionUID := fmt.Sprintf("%s-%s", userName, s.fish.DB().NewUID())
+	subscriptionUID := fmt.Sprintf("%s-%s", user.Name, s.fish.DB().NewUID())
 
-	logger := log.WithFunc("rpc", "Subscribe").With("user", userName, "subs_uid", subscriptionUID)
+	logger := log.WithFunc("rpc", "Subscribe").With("user", user.Name, "subs_uid", subscriptionUID)
 	logger.Debug("New subscription from user")
 	defer logger.Debug("Completed subscription from user")
 
@@ -452,6 +620,12 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 		return connect.NewError(connect.CodeUnavailable, fmt.Errorf("server is shutting down"))
 	}
 	s.shutdownMutex.RUnlock()
+
+	// Enforce stream limits before creating the subscription
+	if err := s.enforceStreamLimit(ctx, user, "subscribe", subscriptionUID); err != nil {
+		logger.Error("Failed to enforce stream limit", "err", err)
+		return connect.NewError(connect.CodeInternal, fmt.Errorf("failed to enforce stream limit: %w", err))
+	}
 
 	// Check the requested subscriptions and if user has access to those by rbac permissions
 	for _, subType := range req.Msg.GetSubscriptionTypes() {
@@ -471,7 +645,7 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 		id:            subscriptionUID,
 		stream:        stream,
 		subscriptions: req.Msg.GetSubscriptionTypes(),
-		userName:      userName,
+		userName:      user.Name,
 		ctx:           subCtx,
 		cancel:        cancel,
 		channels:      s.setupChannels(),
@@ -482,6 +656,9 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 	s.subscriptions[subscriptionUID] = sub
 	s.subscriptionsMutex.Unlock()
 
+	// Increment stream count for this user and connection type
+	s.incrementStreamCount(user.Name, "subscribe")
+
 	// Subscribe to database changes using generated setup function
 	s.setupSubscriptions(subCtx, subscriptionUID, sub, req.Msg.GetSubscriptionTypes())
 
@@ -490,6 +667,9 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 		s.subscriptionsMutex.Lock()
 		delete(s.subscriptions, subscriptionUID)
 		s.subscriptionsMutex.Unlock()
+
+		// Decrement stream count
+		s.decrementStreamCount(user.Name, "subscribe")
 
 		cancel()
 
@@ -802,6 +982,11 @@ func (s *StreamingService) forceCloseAllConnections() {
 		delete(s.subscriptions, id)
 	}
 	s.subscriptionsMutex.Unlock()
+
+	// Clear all stream counts since all connections are closed
+	s.streamLimitsMutex.Lock()
+	s.userStreamCounts = make(map[string]map[string]int)
+	s.streamLimitsMutex.Unlock()
 
 	logger.Info("All connections forcefully closed")
 }

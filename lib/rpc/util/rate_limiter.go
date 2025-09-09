@@ -25,6 +25,7 @@ import (
 
 	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/log"
+	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
 
 // rateLimitEntry tracks request count and timing for rate limiting
@@ -120,14 +121,7 @@ func (h *UserRateLimitHandler) cleanupExpiredEntries() {
 }
 
 // getUserRateLimit gets the rate limit for a specific user
-func (h *UserRateLimitHandler) getUserRateLimit(ctx context.Context, userName string) int32 {
-	// Try to get user config from database
-	user, err := h.db.UserGet(ctx, userName)
-	if err != nil {
-		// If we can't get user config, use default
-		return h.defaultLimit
-	}
-
+func (h *UserRateLimitHandler) getUserRateLimit(ctx context.Context, user *typesv2.User) int32 {
 	// Check if user has custom rate limit configuration
 	if user.Config != nil {
 		if rateLimit := user.Config.RateLimit; rateLimit != nil {
@@ -154,7 +148,7 @@ func (h *UserRateLimitHandler) Handler(next http.Handler) http.Handler {
 		}
 
 		userName := user.Name
-		userLimit := h.getUserRateLimit(r.Context(), userName)
+		userLimit := h.getUserRateLimit(r.Context(), user)
 
 		// Checking if user's limit is set to -1 which means no limit
 		if userLimit == -1 {

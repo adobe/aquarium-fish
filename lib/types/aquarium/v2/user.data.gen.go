@@ -100,7 +100,8 @@ func (u User) ToUser() *pbTypes.User {
 
 // UserConfig is a data for UserConfig without internal locks
 type UserConfig struct {
-	RateLimit *int32 `json:"rate_limit,omitempty"`
+	RateLimit    *int32 `json:"rate_limit,omitempty"`
+	StreamsLimit *int32 `json:"streams_limit,omitempty"`
 }
 
 // FromUserConfig creates a UserConfig from UserConfig
@@ -114,6 +115,10 @@ func FromUserConfig(src *pbTypes.UserConfig) UserConfig {
 		val := src.GetRateLimit()
 		result.RateLimit = &val
 	}
+	if src.GetStreamsLimit() != 0 {
+		val := src.GetStreamsLimit()
+		result.StreamsLimit = &val
+	}
 	return result
 }
 
@@ -123,6 +128,9 @@ func (u UserConfig) ToUserConfig() *pbTypes.UserConfig {
 
 	if u.RateLimit != nil {
 		result.RateLimit = u.RateLimit
+	}
+	if u.StreamsLimit != nil {
+		result.StreamsLimit = u.StreamsLimit
 	}
 	return result
 }
