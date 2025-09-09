@@ -165,6 +165,7 @@ type subscription struct {
 	ctx           context.Context //nolint:containedctx // Is used for sending stop for goroutines
 	cancel        context.CancelFunc
 	channels      *subChannels
+	closed        bool // Indicates if the subscription has been closed
 
 	// Goroutine coordination
 	relayWg          sync.WaitGroup // WaitGroup to coordinate relay goroutine shutdown
@@ -178,18 +179,47 @@ type bidirectionalConnection struct {
 	userName    string
 	ctx         context.Context //nolint:containedctx // Is used for sending stop for goroutines
 	cancel      context.CancelFunc
+	closed      bool // Indicates if the connection has been closed
 }
 
 // safeSend safely sends a response through the bidirectional stream with proper synchronization
 func (conn *bidirectionalConnection) safeSend(response *aquariumv2.StreamingServiceConnectResponse) error {
 	conn.streamMutex.Lock()
 	defer conn.streamMutex.Unlock()
+
+	// Check if the connection has been closed or context cancelled
+	if conn.closed {
+		return fmt.Errorf("connection already closed")
+	}
+
+	select {
+	case <-conn.ctx.Done():
+		return fmt.Errorf("connection context cancelled")
+	default:
+	}
+
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Printf("Recovered from panic: %v\n", r)
+			// Mark connection as closed if we panic during send
+			conn.closed = true
 		}
 	}()
+
 	return conn.stream.Send(response)
+}
+
+// close marks the connection as closed
+func (conn *bidirectionalConnection) close() {
+	conn.streamMutex.Lock()
+	defer conn.streamMutex.Unlock()
+	conn.closed = true
+}
+
+// close marks the subscription as closed
+func (sub *subscription) close() {
+	sub.streamMutex.Lock()
+	defer sub.streamMutex.Unlock()
+	sub.closed = true
 }
 
 // NewStreamingService creates a new streaming service
@@ -313,7 +343,8 @@ func (s *StreamingService) enforceStreamLimit(ctx context.Context, user *typesv2
 				},
 			}
 			oldestConn.safeSend(terminationMsg)
-			// Cancel the connection
+			// Mark connection as closed and cancel the context
+			oldestConn.close()
 			oldestConn.cancel()
 			delete(s.connections, oldestConnID)
 		}
@@ -336,16 +367,14 @@ func (s *StreamingService) enforceStreamLimit(ctx context.Context, user *typesv2
 
 		if oldestSub != nil {
 			logger.Debug("Terminating oldest subscription", "sub_id", oldestSubID)
-			// Send termination message to client
-			terminationResp := &aquariumv2.StreamingServiceSubscribeResponse{
-				ObjectType: aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED,
-				ChangeType: aquariumv2.ChangeType_CHANGE_TYPE_REMOVED,
-				Timestamp:  timestamppb.Now(),
-			}
-			oldestSub.streamMutex.Lock()
-			oldestSub.stream.Send(terminationResp)
-			oldestSub.streamMutex.Unlock()
-			// Cancel the subscription
+			// Send termination message to client using the safe method
+			s.sendSubscriptionResponse(oldestSub,
+				aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED,
+				aquariumv2.ChangeType_CHANGE_TYPE_REMOVED,
+				nil,
+			)
+			// Mark subscription as closed and cancel the context
+			oldestSub.close()
 			oldestSub.cancel()
 			delete(s.subscriptions, oldestSubID)
 		}
@@ -400,6 +429,9 @@ func (s *StreamingService) Connect(ctx context.Context, stream *connect.BidiStre
 	s.incrementStreamCount(user.Name, "connect")
 
 	defer func() {
+		// Mark connection as closed first to prevent new sends
+		conn.close()
+
 		// Clean up connection
 		s.connectionsMutex.Lock()
 		delete(s.connections, connectionUID)
@@ -408,6 +440,7 @@ func (s *StreamingService) Connect(ctx context.Context, stream *connect.BidiStre
 		// Decrement stream count
 		s.decrementStreamCount(user.Name, "connect")
 
+		// Cancel context to stop background goroutines
 		cancel()
 		logger.Debug("Cleaned up bidirectional connection")
 	}()
@@ -663,6 +696,9 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 	s.setupSubscriptions(subCtx, subscriptionUID, sub, req.Msg.GetSubscriptionTypes())
 
 	defer func() {
+		// Mark subscription as closed first to prevent new sends
+		sub.close()
+
 		// Clean up subscription
 		s.subscriptionsMutex.Lock()
 		delete(s.subscriptions, subscriptionUID)
@@ -671,6 +707,7 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 		// Decrement stream count
 		s.decrementStreamCount(user.Name, "subscribe")
 
+		// Cancel context to stop background goroutines
 		cancel()
 
 		// Wait for all relay goroutines to finish before closing channels
@@ -720,7 +757,12 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 			logger.Debug("Cancelled")
 
 			// Normal shutdown notification
-			if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED, aquariumv2.ChangeType_CHANGE_TYPE_REMOVED, nil); err != nil {
+			if err := s.sendSubscriptionResponse(
+				sub,
+				aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED,
+				aquariumv2.ChangeType_CHANGE_TYPE_REMOVED,
+				nil,
+			); err != nil {
 				logger.Debug("Failed to send subscription shutdown notification", "err", err)
 			}
 			return nil
@@ -834,12 +876,18 @@ func (*StreamingService) shouldSendNodeObject(_ *subscription, _ *typesv2.Node, 
 
 // sendSubscriptionResponse sends a subscription response to the client
 func (*StreamingService) sendSubscriptionResponse(sub *subscription, objectType aquariumv2.SubscriptionType, changeType aquariumv2.ChangeType, obj proto.Message) error {
+	sub.streamMutex.Lock()
+	defer sub.streamMutex.Unlock()
+
+	// Check if subscription is closed
+	if sub.closed {
+		return fmt.Errorf("subscription already closed")
+	}
+
 	// Check if context is cancelled
 	select {
 	case <-sub.ctx.Done():
-		logger := log.WithFunc("rpc", "sendSubscriptionResponse").With("subs_uid", sub.id)
-		logger.Warn("Subscription context cancelled, skipping sending response")
-		return nil
+		return fmt.Errorf("subscription context cancelled")
 	default:
 	}
 
@@ -861,8 +909,12 @@ func (*StreamingService) sendSubscriptionResponse(sub *subscription, objectType 
 		ObjectData: objectData,
 	}
 
-	sub.streamMutex.Lock()
-	defer sub.streamMutex.Unlock()
+	defer func() {
+		if r := recover(); r != nil {
+			// Mark subscription as closed if we panic during send
+			sub.closed = true
+		}
+	}()
 
 	return sub.stream.Send(response)
 }
@@ -903,11 +955,10 @@ func (s *StreamingService) GracefulShutdown(ctx context.Context) {
 				},
 			}
 
-			if err := conn.stream.Send(shutdownMsg); err != nil {
-				logger.Debug("Failed to send shutdown message", "err", err)
-			}
+			conn.safeSend(shutdownMsg)
 
-			// Cancel the connection context to trigger graceful closure
+			// Mark connection as closed and cancel the context
+			conn.close()
 			conn.cancel()
 		}
 
@@ -921,8 +972,8 @@ func (s *StreamingService) GracefulShutdown(ctx context.Context) {
 
 		logger.Debug("Signaling subscriptions to shutdown", "count", len(subscriptions))
 		for _, sub := range subscriptions {
-			// Cancel subscription context - this will trigger the subscription goroutine
-			// to send the shutdown notification itself, avoiding race conditions
+			// Mark subscription as closed and cancel context
+			sub.close()
 			sub.cancel()
 		}
 
@@ -969,6 +1020,7 @@ func (s *StreamingService) forceCloseAllConnections() {
 	s.connectionsMutex.Lock()
 	for id, conn := range s.connections {
 		logger.Debug("Force closing bidirectional connection", "id", id)
+		conn.close()
 		conn.cancel()
 		delete(s.connections, id)
 	}
@@ -978,6 +1030,7 @@ func (s *StreamingService) forceCloseAllConnections() {
 	s.subscriptionsMutex.Lock()
 	for id, sub := range s.subscriptions {
 		logger.Debug("Force closing subscription", "id", id)
+		sub.close()
 		sub.cancel()
 		delete(s.subscriptions, id)
 	}
