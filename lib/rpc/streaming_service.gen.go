@@ -487,7 +487,7 @@ func (s *StreamingService) routeRequest(ctx context.Context, requestType string,
 
 // Subscription-related helper methods
 // relayApplicationNotifications relays application notifications with immediate disconnect on overflow
-func (s *StreamingService) relayApplicationNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.ApplicationSubscriptionEvent) {
+func (s *StreamingService) relayApplicationNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel chan database.ApplicationSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
 	logger := log.WithFunc("rpc", "relayApplicationNotifications").With("subs_uid", subscriptionID)
@@ -496,6 +496,12 @@ func (s *StreamingService) relayApplicationNotifications(ctx context.Context, su
 		if r := recover(); r != nil {
 			logger.Error("Application relay goroutine panic", "panic", r)
 		}
+	}()
+
+	// Don't forget to unsubscribe from database when the relay is completed
+	defer func() {
+		s.fish.DB().UnsubscribeApplication(ctx, dbChannel)
+		close(dbChannel) // Close the channel we created
 	}()
 
 	for {
@@ -523,7 +529,7 @@ func (s *StreamingService) relayApplicationNotifications(ctx context.Context, su
 }
 
 // relayApplicationStateNotifications relays applicationState notifications with immediate disconnect on overflow
-func (s *StreamingService) relayApplicationStateNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.ApplicationStateSubscriptionEvent) {
+func (s *StreamingService) relayApplicationStateNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel chan database.ApplicationStateSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
 	logger := log.WithFunc("rpc", "relayApplicationStateNotifications").With("subs_uid", subscriptionID)
@@ -532,6 +538,12 @@ func (s *StreamingService) relayApplicationStateNotifications(ctx context.Contex
 		if r := recover(); r != nil {
 			logger.Error("ApplicationState relay goroutine panic", "panic", r)
 		}
+	}()
+
+	// Don't forget to unsubscribe from database when the relay is completed
+	defer func() {
+		s.fish.DB().UnsubscribeApplicationState(ctx, dbChannel)
+		close(dbChannel) // Close the channel we created
 	}()
 
 	for {
@@ -559,7 +571,7 @@ func (s *StreamingService) relayApplicationStateNotifications(ctx context.Contex
 }
 
 // relayApplicationResourceNotifications relays applicationResource notifications with immediate disconnect on overflow
-func (s *StreamingService) relayApplicationResourceNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.ApplicationResourceSubscriptionEvent) {
+func (s *StreamingService) relayApplicationResourceNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel chan database.ApplicationResourceSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
 	logger := log.WithFunc("rpc", "relayApplicationResourceNotifications").With("subs_uid", subscriptionID)
@@ -568,6 +580,12 @@ func (s *StreamingService) relayApplicationResourceNotifications(ctx context.Con
 		if r := recover(); r != nil {
 			logger.Error("ApplicationResource relay goroutine panic", "panic", r)
 		}
+	}()
+
+	// Don't forget to unsubscribe from database when the relay is completed
+	defer func() {
+		s.fish.DB().UnsubscribeApplicationResource(ctx, dbChannel)
+		close(dbChannel) // Close the channel we created
 	}()
 
 	for {
@@ -595,7 +613,7 @@ func (s *StreamingService) relayApplicationResourceNotifications(ctx context.Con
 }
 
 // relayApplicationTaskNotifications relays applicationTask notifications with immediate disconnect on overflow
-func (s *StreamingService) relayApplicationTaskNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.ApplicationTaskSubscriptionEvent) {
+func (s *StreamingService) relayApplicationTaskNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel chan database.ApplicationTaskSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
 	logger := log.WithFunc("rpc", "relayApplicationTaskNotifications").With("subs_uid", subscriptionID)
@@ -604,6 +622,12 @@ func (s *StreamingService) relayApplicationTaskNotifications(ctx context.Context
 		if r := recover(); r != nil {
 			logger.Error("ApplicationTask relay goroutine panic", "panic", r)
 		}
+	}()
+
+	// Don't forget to unsubscribe from database when the relay is completed
+	defer func() {
+		s.fish.DB().UnsubscribeApplicationTask(ctx, dbChannel)
+		close(dbChannel) // Close the channel we created
 	}()
 
 	for {
@@ -631,7 +655,7 @@ func (s *StreamingService) relayApplicationTaskNotifications(ctx context.Context
 }
 
 // relayRoleNotifications relays role notifications with immediate disconnect on overflow
-func (s *StreamingService) relayRoleNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.RoleSubscriptionEvent) {
+func (s *StreamingService) relayRoleNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel chan database.RoleSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
 	logger := log.WithFunc("rpc", "relayRoleNotifications").With("subs_uid", subscriptionID)
@@ -640,6 +664,12 @@ func (s *StreamingService) relayRoleNotifications(ctx context.Context, subscript
 		if r := recover(); r != nil {
 			logger.Error("Role relay goroutine panic", "panic", r)
 		}
+	}()
+
+	// Don't forget to unsubscribe from database when the relay is completed
+	defer func() {
+		s.fish.DB().UnsubscribeRole(ctx, dbChannel)
+		close(dbChannel) // Close the channel we created
 	}()
 
 	for {
@@ -667,7 +697,7 @@ func (s *StreamingService) relayRoleNotifications(ctx context.Context, subscript
 }
 
 // relayLabelNotifications relays label notifications with immediate disconnect on overflow
-func (s *StreamingService) relayLabelNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.LabelSubscriptionEvent) {
+func (s *StreamingService) relayLabelNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel chan database.LabelSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
 	logger := log.WithFunc("rpc", "relayLabelNotifications").With("subs_uid", subscriptionID)
@@ -676,6 +706,12 @@ func (s *StreamingService) relayLabelNotifications(ctx context.Context, subscrip
 		if r := recover(); r != nil {
 			logger.Error("Label relay goroutine panic", "panic", r)
 		}
+	}()
+
+	// Don't forget to unsubscribe from database when the relay is completed
+	defer func() {
+		s.fish.DB().UnsubscribeLabel(ctx, dbChannel)
+		close(dbChannel) // Close the channel we created
 	}()
 
 	for {
@@ -703,7 +739,7 @@ func (s *StreamingService) relayLabelNotifications(ctx context.Context, subscrip
 }
 
 // relayNodeNotifications relays node notifications with immediate disconnect on overflow
-func (s *StreamingService) relayNodeNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.NodeSubscriptionEvent) {
+func (s *StreamingService) relayNodeNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel chan database.NodeSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
 	logger := log.WithFunc("rpc", "relayNodeNotifications").With("subs_uid", subscriptionID)
@@ -712,6 +748,12 @@ func (s *StreamingService) relayNodeNotifications(ctx context.Context, subscript
 		if r := recover(); r != nil {
 			logger.Error("Node relay goroutine panic", "panic", r)
 		}
+	}()
+
+	// Don't forget to unsubscribe from database when the relay is completed
+	defer func() {
+		s.fish.DB().UnsubscribeNode(ctx, dbChannel)
+		close(dbChannel) // Close the channel we created
 	}()
 
 	for {
@@ -739,7 +781,7 @@ func (s *StreamingService) relayNodeNotifications(ctx context.Context, subscript
 }
 
 // relayUserNotifications relays user notifications with immediate disconnect on overflow
-func (s *StreamingService) relayUserNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.UserSubscriptionEvent) {
+func (s *StreamingService) relayUserNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel chan database.UserSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
 	logger := log.WithFunc("rpc", "relayUserNotifications").With("subs_uid", subscriptionID)
@@ -748,6 +790,12 @@ func (s *StreamingService) relayUserNotifications(ctx context.Context, subscript
 		if r := recover(); r != nil {
 			logger.Error("User relay goroutine panic", "panic", r)
 		}
+	}()
+
+	// Don't forget to unsubscribe from database when the relay is completed
+	defer func() {
+		s.fish.DB().UnsubscribeUser(ctx, dbChannel)
+		close(dbChannel) // Close the channel we created
 	}()
 
 	for {

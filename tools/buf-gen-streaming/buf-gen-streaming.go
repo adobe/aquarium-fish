@@ -186,7 +186,7 @@ func (s *StreamingService) routeRequest(ctx context.Context, requestType string,
 // Subscription-related helper methods
 {{- range .Subscriptions }}
 // {{ .RelayMethodName }} relays {{ .MessageType | toLower }} notifications with immediate disconnect on overflow
-func (s *StreamingService) {{ .RelayMethodName }}(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.{{ .MessageType }}SubscriptionEvent) {
+func (s *StreamingService) {{ .RelayMethodName }}(ctx context.Context, subscriptionID string, sub *subscription, dbChannel chan database.{{ .MessageType }}SubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
 	logger := log.WithFunc("rpc", "{{ .RelayMethodName }}").With("subs_uid", subscriptionID)
@@ -195,6 +195,12 @@ func (s *StreamingService) {{ .RelayMethodName }}(ctx context.Context, subscript
 		if r := recover(); r != nil {
 			logger.Error("{{ .MessageType }} relay goroutine panic", "panic", r)
 		}
+	}()
+
+	// Don't forget to unsubscribe from database when the relay is completed
+	defer func() {
+		s.fish.DB().Unsubscribe{{ .MessageType }}(ctx, dbChannel)
+		close(dbChannel)  // Close the channel we created
 	}()
 
 	for {
