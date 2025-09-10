@@ -34,12 +34,12 @@ func FromRoleBasedAccessControl(src *pbTypes.RoleBasedAccessControl) RoleBasedAc
 
 	result := RoleBasedAccessControl{}
 	result.AdditionalActions = src.GetAdditionalActions()
-	if src.GetAllowUnauthenticated() != false {
+	if src.AllowUnauthenticated != nil {
 		val := src.GetAllowUnauthenticated()
 		result.AllowUnauthenticated = &val
 	}
 	result.AllowedRoles = src.GetAllowedRoles()
-	if src.GetNoPermissionNeeded() != false {
+	if src.NoPermissionNeeded != nil {
 		val := src.GetNoPermissionNeeded()
 		result.NoPermissionNeeded = &val
 	}

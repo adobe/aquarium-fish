@@ -291,8 +291,10 @@ func (s *StreamingService) getStreamCount(userName, connectionType string) int {
 }
 
 // enforceStreamLimit enforces stream limits by terminating old connections if necessary
-func (s *StreamingService) enforceStreamLimit(ctx context.Context, user *typesv2.User, connectionType string, newConnectionID string) error {
+func (s *StreamingService) enforceStreamLimit(user *typesv2.User, connectionType string, newConnectionID string) error {
+	logger := log.WithFunc("rpc", "enforceStreamLimit").With("user", user.Name, "type", connectionType)
 	streamLimit := s.getUserStreamLimit(user)
+	logger.Debug("Checking stream limit", "limit", streamLimit)
 
 	// If limit is -1 (unlimited), no enforcement needed
 	if streamLimit == -1 {
@@ -311,7 +313,7 @@ func (s *StreamingService) enforceStreamLimit(ctx context.Context, user *typesv2
 		return nil
 	}
 
-	logger := log.WithFunc("rpc", "enforceStreamLimit").With("user", user.Name, "type", connectionType, "limit", streamLimit, "current", currentCount)
+	logger = logger.With("limit", streamLimit, "current", currentCount)
 	logger.Debug("Stream limit exceeded, terminating oldest connection")
 
 	// Find and terminate the oldest connection of this type
@@ -405,8 +407,8 @@ func (s *StreamingService) Connect(ctx context.Context, stream *connect.BidiStre
 	s.shutdownMutex.RUnlock()
 
 	// Enforce stream limits before creating the connection
-	if err := s.enforceStreamLimit(ctx, user, "connect", connectionUID); err != nil {
-		logger.Error("Failed to enforce stream limit", "err", err)
+	if err := s.enforceStreamLimit(user, "connect", connectionUID); err != nil {
+		logger.Error("Stream limit enforcer denied access", "err", err)
 		return connect.NewError(connect.CodeInternal, fmt.Errorf("failed to enforce stream limit: %w", err))
 	}
 
@@ -655,8 +657,8 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 	s.shutdownMutex.RUnlock()
 
 	// Enforce stream limits before creating the subscription
-	if err := s.enforceStreamLimit(ctx, user, "subscribe", subscriptionUID); err != nil {
-		logger.Error("Failed to enforce stream limit", "err", err)
+	if err := s.enforceStreamLimit(user, "subscribe", subscriptionUID); err != nil {
+		logger.Error("Stream limit enforcer denied access", "err", err)
 		return connect.NewError(connect.CodeInternal, fmt.Errorf("failed to enforce stream limit: %w", err))
 	}
 

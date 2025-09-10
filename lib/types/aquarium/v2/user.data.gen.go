@@ -61,7 +61,7 @@ func FromUser(src *pbTypes.User) User {
 		}
 	}
 	result.Name = src.GetName()
-	if src.GetPassword() != "" {
+	if src.Password != nil {
 		val := src.GetPassword()
 		result.Password = &val
 	}
@@ -111,11 +111,11 @@ func FromUserConfig(src *pbTypes.UserConfig) UserConfig {
 	}
 
 	result := UserConfig{}
-	if src.GetRateLimit() != 0 {
+	if src.RateLimit != nil {
 		val := src.GetRateLimit()
 		result.RateLimit = &val
 	}
-	if src.GetStreamsLimit() != 0 {
+	if src.StreamsLimit != nil {
 		val := src.GetStreamsLimit()
 		result.StreamsLimit = &val
 	}
