@@ -15,7 +15,6 @@
 package util
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -121,7 +120,7 @@ func (h *UserRateLimitHandler) cleanupExpiredEntries() {
 }
 
 // getUserRateLimit gets the rate limit for a specific user
-func (h *UserRateLimitHandler) getUserRateLimit(ctx context.Context, user *typesv2.User) int32 {
+func (h *UserRateLimitHandler) getUserRateLimit(user *typesv2.User) int32 {
 	// Check if user has custom rate limit configuration
 	if user.Config != nil {
 		if rateLimit := user.Config.RateLimit; rateLimit != nil {
@@ -148,7 +147,7 @@ func (h *UserRateLimitHandler) Handler(next http.Handler) http.Handler {
 		}
 
 		userName := user.Name
-		userLimit := h.getUserRateLimit(r.Context(), user)
+		userLimit := h.getUserRateLimit(user)
 
 		// Checking if user's limit is set to -1 which means no limit
 		if userLimit == -1 {

@@ -239,7 +239,7 @@ func NewStreamingService(f *fish.Fish) *StreamingService {
 }
 
 // getUserStreamLimit gets the stream limit for a specific user from their configuration
-func (s *StreamingService) getUserStreamLimit(user *typesv2.User) int32 {
+func (*StreamingService) getUserStreamLimit(user *typesv2.User) int32 {
 	// Check if user has custom stream limit configuration
 	if user.Config != nil && user.Config.StreamsLimit != nil {
 		return *user.Config.StreamsLimit
