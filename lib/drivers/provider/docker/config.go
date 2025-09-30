@@ -27,7 +27,13 @@ import (
 
 // Config - node driver configuration
 type Config struct {
-	DockerPath string `json:"docker_path"` // '/Applications/Docker.app/Contents/Resources/bin/docker'
+	DockerPath string `json:"docker_path"` // On macos is '/Applications/Docker.app/Contents/Resources/bin/docker'
+	MountPath  string `json:"mount_path"`  // Path to the mount (list of mounted volumes) binary
+
+	HdiutilPath string `json:"hdiutil_path"` // Path to the hdiutil (macos images create/mount/umount) binary
+
+	DdPath       string `json:"dd_path"`       // Path to the dd (linux file create) binary
+	MkfsExt4Path string `json:"mkfsext4_path"` // Path to the mkfs.ext4 (linux filesystem format) binary
 
 	IsRemote bool `json:"is_remote"` // In case the docker client does not use the local node resources
 
@@ -79,6 +85,19 @@ func (c *Config) Validate() (err error) {
 			logger.Error("Unable to locate `docker` path", "err", err)
 			return fmt.Errorf("DOCKER: Unable to locate `docker` path: %v", err)
 		}
+	}
+
+	if c.MountPath == "" {
+		// Look in the PATH
+		if c.MountPath, err = exec.LookPath("mount"); err != nil {
+			logger.Error("Unable to locate `mount` path", "err", err)
+			return fmt.Errorf("DOCKER: Unable to locate `mount` path: %v", err)
+		}
+	}
+
+	// Run os-specific validation
+	if err = c.validateSpec(); err != nil {
+		return err
 	}
 
 	if c.ImagesPath == "" {

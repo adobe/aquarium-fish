@@ -42,8 +42,10 @@ type ConfigDrivers struct {
 	Gates     map[string]util.UnparsedJSON `json:"gates"`
 }
 
-var gateDrivers map[string]gate.Driver
-var providerDrivers map[string]provider.Driver
+var (
+	gateDrivers     map[string]gate.Driver
+	providerDrivers map[string]provider.Driver
+)
 
 // Init loads and prepares all kind of available drivers
 func Init(db *database.Database, wd string, configs ConfigDrivers) error {
@@ -57,7 +59,11 @@ func Init(db *database.Database, wd string, configs ConfigDrivers) error {
 	}
 	ok, errs := prepare(wd, configs)
 	if len(errs) > 0 {
-		logger.Error("Unable to prepare some provider drivers", "errs", errs)
+		errors := ""
+		for err := range errs {
+			errors += fmt.Sprintf(" %v", err)
+		}
+		logger.Error("Unable to prepare some provider drivers", "errs", errors)
 	}
 	if !ok {
 		return fmt.Errorf("Drivers: Failed to prepare drivers")

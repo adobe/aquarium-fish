@@ -373,7 +373,7 @@ func (d *Driver) Deallocate(res typesv2.ApplicationResource) error {
 	}
 
 	// Umount the disk volumes if needed
-	mounts, _, err := util.RunAndLog("docker", 3*time.Second, nil, "/sbin/mount")
+	mounts, _, err := util.RunAndLog("docker", 3*time.Second, nil, d.cfg.MountPath)
 	if err != nil {
 		logger.Error("Unable to list the mount points for container", "err", err)
 		return fmt.Errorf("DOCKER: %s: Unable to list the mount points for container %q: %v", d.name, cName, err)
@@ -382,7 +382,7 @@ func (d *Driver) Deallocate(res typesv2.ApplicationResource) error {
 		if volPath == "" || !strings.Contains(mounts, volPath) {
 			continue
 		}
-		if _, _, err := util.RunAndLog("docker", 5*time.Second, nil, "/usr/bin/hdiutil", "detach", volPath); err != nil {
+		if _, _, err := util.RunAndLog("docker", 5*time.Second, nil, d.cfg.HdiutilPath, "detach", volPath); err != nil {
 			logger.Error("Unable to detach container volume disk", "volume_path", volPath, "err", err)
 			return fmt.Errorf("DOCKER: %s: Unable to detach container %q volume disk %q: %v", d.name, cName, volPath, err)
 		}

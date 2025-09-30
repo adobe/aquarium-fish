@@ -342,7 +342,6 @@ func (d *Driver) disksCreate(cName string, runArgs *[]string, disks map[string]t
 		}
 
 		// Create disk
-		// TODO: support other operating systems & filesystems
 		// TODO: Ensure failures doesn't leave the changes behind (like mounted disks or files)
 
 		if disk.Type == "dir" {
@@ -355,55 +354,28 @@ func (d *Driver) disksCreate(cName string, runArgs *[]string, disks map[string]t
 		}
 
 		// Create virtual disk in order to restrict the disk space
-		dmgPath := diskPath + ".dmg"
-
-		label := dName
+		label := disk.Label
 		if disk.Label != "" {
 			// Label can be used as mount point so cut the path separator out
-			label = strings.ReplaceAll(disk.Label, "/", "")
+			disk.Label = strings.ReplaceAll(disk.Label, "/", "")
 		} else {
-			disk.Label = label
+			disk.Label = dName
 		}
 
-		// Do not recreate the disk if it is exists
-		if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
-			var diskType string
-			switch disk.Type {
-			case "hfs+":
-				diskType = "HFS+"
-			case "fat32":
-				diskType = "FAT32"
-			default:
-				diskType = "ExFAT"
-			}
-			args := []string{
-				"create", dmgPath,
-				"-fs", diskType,
-				"-layout", "NONE",
-				"-volname", label,
-				"-size", fmt.Sprintf("%dm", disk.Size*1024),
-			}
-			if _, _, err := util.RunAndLog("docker", 10*time.Minute, nil, "/usr/bin/hdiutil", args...); err != nil {
-				logger.Error("Unable to create dmg disk", "dmg_path", dmgPath, "err", err)
-				return fmt.Errorf("DOCKER: %s: Unable to create dmg disk %q: %v", d.name, dmgPath, err)
-			}
+		var err error
+		diskPath, err = d.diskCreateSpec(disk, diskPath)
+		if err != nil {
+			logger.Error("Failed to create disk", "disk_path", diskPath, "err", err)
+			return err
 		}
 
-		mountPoint := filepath.Join("/Volumes", fmt.Sprintf("%s-%s", cName, dName))
-
-		// Attach & mount disk
-		if _, _, err := util.RunAndLog("docker", 10*time.Second, nil, "/usr/bin/hdiutil", "attach", dmgPath, "-mountpoint", mountPoint); err != nil {
-			logger.Error("Unable to attach dmg disk", "dmg_path", dmgPath, "mount_point", mountPoint, "err", err)
-			return fmt.Errorf("DOCKER: %s: Unable to attach dmg disk %q to %q: %v", d.name, dmgPath, mountPoint, err)
+		mountPoint, err := d.diskMountSpec(diskPath, fmt.Sprintf("%s-%s", cName, dName))
+		if err != nil {
+			logger.Error("Failed to mount disk", "disk_path", diskPath, "mount_point", mountPoint, "err", err)
+			return err
 		}
 
-		// Allow anyone to modify the disk content
-		if err := os.Chmod(mountPoint, 0o777); err != nil {
-			logger.Error("Unable to change the mount point access rights", "mount_point", mountPoint, "err", err)
-			return fmt.Errorf("DOCKER: %s: Unable to change the mount point %q access rights: %v", d.name, mountPoint, err)
-		}
-
-		diskPaths[mountPoint] = disk.Label
+		diskPaths[mountPoint] = label
 	}
 
 	if len(diskPaths) == 0 {
