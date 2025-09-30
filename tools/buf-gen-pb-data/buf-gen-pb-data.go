@@ -254,7 +254,7 @@ func From{{.OriginalName}}(src *pbTypes.{{.OriginalName}}) {{.DataName}} {
 	result.{{.Name}} = {{.Type}}(src.Get{{toCamelCase .OriginalName}}())
 {{- else }}
 {{- if .IsOptional }}
-	if src.Get{{toCamelCase .OriginalName}}() != {{zeroValue .Type}} {
+	if src.{{toCamelCase .OriginalName}} != nil {
 		val := src.Get{{toCamelCase .OriginalName}}()
 		result.{{.Name}} = &val
 	}

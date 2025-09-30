@@ -54,25 +54,26 @@ func NewServer(f *fish.Fish, additionalServices []gate.RPCService) *Server {
 		userRateLimiter: rpcutil.NewUserRateLimitHandler(f.DB(), 60, time.Minute), // 60 requests per minute for users
 	}
 
-	// Create OpenTelemetry interceptor for tracing and metrics
-	// We don't need to trust remote right now because all the incoming requests are from clients
-	// otelconnect.WithTrustRemote(), // Trust remote tracing information for internal microservices
-	otelInterceptor, err := otelconnect.NewInterceptor()
-	if err != nil {
-		logger.Error("Failed to create OpenTelemetry interceptor", "err", err)
-		// Continue without instrumentation if OTEL fails
-		otelInterceptor = nil
+	// Create interceptor options
+	var interceptors []connect.Interceptor
+
+	if f.GetMonitor() != nil && f.GetMonitor().IsEnabled() {
+		// Create OpenTelemetry interceptor for tracing and metrics
+		otelInterceptor, err := otelconnect.NewInterceptor()
+		if err != nil {
+			logger.Error("Failed to create OpenTelemetry interceptor", "err", err)
+			// Continue without instrumentation if OTEL fails
+			otelInterceptor = nil
+		}
+
+		if otelInterceptor != nil {
+			interceptors = append(interceptors, otelInterceptor)
+			logger.Debug("OpenTelemetry interceptor enabled")
+		}
 	}
 
 	// Create timeout interceptor for unary operations (10 seconds default)
 	timeoutInterceptor := rpcutil.NewTimeoutInterceptor(10 * time.Second)
-
-	// Create interceptor options
-	var interceptors []connect.Interceptor
-	if otelInterceptor != nil {
-		interceptors = append(interceptors, otelInterceptor)
-		logger.Debug("OpenTelemetry interceptor enabled")
-	}
 	interceptors = append(interceptors, timeoutInterceptor)
 	logger.Debug("Timeout interceptor enabled", "timeout", 30*time.Second)
 

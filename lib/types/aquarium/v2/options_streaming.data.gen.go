@@ -30,7 +30,7 @@ func FromSubscribeConfig(src *pbTypes.SubscribeConfig) SubscribeConfig {
 	}
 
 	result := SubscribeConfig{}
-	if src.GetPermissionCheck() != "" {
+	if src.PermissionCheck != nil {
 		val := src.GetPermissionCheck()
 		result.PermissionCheck = &val
 	}

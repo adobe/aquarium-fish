@@ -186,7 +186,7 @@ func (s *StreamingService) routeRequest(ctx context.Context, requestType string,
 // Subscription-related helper methods
 {{- range .Subscriptions }}
 // {{ .RelayMethodName }} relays {{ .MessageType | toLower }} notifications with immediate disconnect on overflow
-func (s *StreamingService) {{ .RelayMethodName }}(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.{{ .MessageType }}SubscriptionEvent) {
+func (s *StreamingService) {{ .RelayMethodName }}(ctx context.Context, subscriptionID string, sub *subscription, dbChannel chan database.{{ .MessageType }}SubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
 	logger := log.WithFunc("rpc", "{{ .RelayMethodName }}").With("subs_uid", subscriptionID)
@@ -195,6 +195,18 @@ func (s *StreamingService) {{ .RelayMethodName }}(ctx context.Context, subscript
 		if r := recover(); r != nil {
 			logger.Error("{{ .MessageType }} relay goroutine panic", "panic", r)
 		}
+	}()
+
+	// Don't forget to unsubscribe from database when the relay is completed
+	defer func() {
+		s.fish.DB().Unsubscribe{{ .MessageType }}(ctx, dbChannel)
+		// Use recover to prevent panics from closing already closed channel
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Debug("Recovered from panic while closing database channel", "panic", r)
+			}
+		}()
+		close(dbChannel)  // Close the channel we created
 	}()
 
 	for {
@@ -209,14 +221,24 @@ func (s *StreamingService) {{ .RelayMethodName }}(ctx context.Context, subscript
 			}
 
 			// Try to send with a short timeout - disconnect if client can't keep up
-			select {
-			case sub.channels.{{ .ChannelFieldName }} <- event:
-				// Successfully sent notification
-			case <-time.After(200 * time.Millisecond):
-				logger.Error("{{ .MessageType }} channel send timeout - client cannot keep up, disconnecting")
-				sub.cancel() // This will cause the main subscription loop to exit
-				return
-			}
+			// Use a function with recover to handle any panic from sending to closed channel
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Debug("Recovered from panic while sending to subscription channel", "panic", r)
+						sub.cancel() // Cancel subscription if channel is closed
+					}
+				}()
+
+				select {
+				case sub.channels.{{ .ChannelFieldName }} <- event:
+					// Successfully sent notification
+				case <-time.After(200 * time.Millisecond):
+					logger.Error("{{ .MessageType }} channel send timeout - client cannot keep up, disconnecting")
+					sub.cancel() // This will cause the main subscription loop to exit
+					return
+				}
+			}()
 		}
 	}
 }
@@ -271,7 +293,15 @@ func (s *StreamingService) listenChannels(sub *subscription, ctx, subCtx context
 // Close will close all the channels
 func (s *subChannels) Close() {
 {{- range .Subscriptions }}
-	close(s.{{ .ChannelFieldName }})
+	// Use recover to handle potential double-close panics
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				// Channel was already closed, ignore the panic
+			}
+		}()
+		close(s.{{ .ChannelFieldName }})
+	}()
 {{- end }}
 }
 

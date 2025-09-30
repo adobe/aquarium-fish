@@ -80,6 +80,8 @@ message UserConfig {
 
   // Request rate limit per minute
   optional int32 rate_limit = 1;
+  // Limits the amount of streams of the same type per user. With 1 (default) user can open 1 Connect and 1 Subscribe stream
+  optional int32 streams_limit = 2;
 }
 
 message UserServiceGetMeRequest {}

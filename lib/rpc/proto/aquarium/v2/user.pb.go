@@ -140,7 +140,9 @@ func (x *User) GetRoles() []string {
 type UserConfig struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Request rate limit per minute
-	RateLimit     *int32 `protobuf:"varint,1,opt,name=rate_limit,json=rateLimit,proto3,oneof" json:"rate_limit,omitempty"`
+	RateLimit *int32 `protobuf:"varint,1,opt,name=rate_limit,json=rateLimit,proto3,oneof" json:"rate_limit,omitempty"`
+	// Limits the amount of streams of the same type per user. With 1 (default) user can open 1 Connect and 1 Subscribe stream
+	StreamsLimit  *int32 `protobuf:"varint,2,opt,name=streams_limit,json=streamsLimit,proto3,oneof" json:"streams_limit,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -178,6 +180,13 @@ func (*UserConfig) Descriptor() ([]byte, []int) {
 func (x *UserConfig) GetRateLimit() int32 {
 	if x != nil && x.RateLimit != nil {
 		return *x.RateLimit
+	}
+	return 0
+}
+
+func (x *UserConfig) GetStreamsLimit() int32 {
+	if x != nil && x.StreamsLimit != nil {
+		return *x.StreamsLimit
 	}
 	return 0
 }
@@ -800,12 +809,14 @@ const file_aquarium_v2_user_proto_rawDesc = "" +
 	"\x0eUserServiceGet\x92\xb5\x18\x02\b\x01B\a\n" +
 	"\x05_hashB\v\n" +
 	"\t_passwordB\t\n" +
-	"\a_config\"G\n" +
+	"\a_config\"\x83\x01\n" +
 	"\n" +
 	"UserConfig\x12\"\n" +
 	"\n" +
-	"rate_limit\x18\x01 \x01(\x05H\x00R\trateLimit\x88\x01\x01:\x06\x92\xb5\x18\x02\b\x01B\r\n" +
-	"\v_rate_limit\"\x19\n" +
+	"rate_limit\x18\x01 \x01(\x05H\x00R\trateLimit\x88\x01\x01\x12(\n" +
+	"\rstreams_limit\x18\x02 \x01(\x05H\x01R\fstreamsLimit\x88\x01\x01:\x06\x92\xb5\x18\x02\b\x01B\r\n" +
+	"\v_rate_limitB\x10\n" +
+	"\x0e_streams_limit\"\x19\n" +
 	"\x17UserServiceGetMeRequest\"s\n" +
 	"\x18UserServiceGetMeResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +

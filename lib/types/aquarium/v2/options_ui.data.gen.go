@@ -33,19 +33,19 @@ func FromFieldUiConfig(src *pbTypes.FieldUiConfig) FieldUiConfig {
 	}
 
 	result := FieldUiConfig{}
-	if src.GetAutofill() != "" {
+	if src.Autofill != nil {
 		val := src.GetAutofill()
 		result.Autofill = &val
 	}
-	if src.GetName() != "" {
+	if src.Name != nil {
 		val := src.GetName()
 		result.Name = &val
 	}
-	if src.GetNocreate() != false {
+	if src.Nocreate != nil {
 		val := src.GetNocreate()
 		result.Nocreate = &val
 	}
-	if src.GetNoedit() != false {
+	if src.Noedit != nil {
 		val := src.GetNoedit()
 		result.Noedit = &val
 	}
@@ -83,7 +83,7 @@ func FromUiConfig(src *pbTypes.UiConfig) UiConfig {
 	}
 
 	result := UiConfig{}
-	if src.GetGenerateUi() != false {
+	if src.GenerateUi != nil {
 		val := src.GetGenerateUi()
 		result.GenerateUi = &val
 	}

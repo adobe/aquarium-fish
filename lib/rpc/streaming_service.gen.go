@@ -487,7 +487,7 @@ func (s *StreamingService) routeRequest(ctx context.Context, requestType string,
 
 // Subscription-related helper methods
 // relayApplicationNotifications relays application notifications with immediate disconnect on overflow
-func (s *StreamingService) relayApplicationNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.ApplicationSubscriptionEvent) {
+func (s *StreamingService) relayApplicationNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel chan database.ApplicationSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
 	logger := log.WithFunc("rpc", "relayApplicationNotifications").With("subs_uid", subscriptionID)
@@ -496,6 +496,18 @@ func (s *StreamingService) relayApplicationNotifications(ctx context.Context, su
 		if r := recover(); r != nil {
 			logger.Error("Application relay goroutine panic", "panic", r)
 		}
+	}()
+
+	// Don't forget to unsubscribe from database when the relay is completed
+	defer func() {
+		s.fish.DB().UnsubscribeApplication(ctx, dbChannel)
+		// Use recover to prevent panics from closing already closed channel
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Debug("Recovered from panic while closing database channel", "panic", r)
+			}
+		}()
+		close(dbChannel) // Close the channel we created
 	}()
 
 	for {
@@ -510,20 +522,30 @@ func (s *StreamingService) relayApplicationNotifications(ctx context.Context, su
 			}
 
 			// Try to send with a short timeout - disconnect if client can't keep up
-			select {
-			case sub.channels.applicationChannel <- event:
-				// Successfully sent notification
-			case <-time.After(200 * time.Millisecond):
-				logger.Error("Application channel send timeout - client cannot keep up, disconnecting")
-				sub.cancel() // This will cause the main subscription loop to exit
-				return
-			}
+			// Use a function with recover to handle any panic from sending to closed channel
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Debug("Recovered from panic while sending to subscription channel", "panic", r)
+						sub.cancel() // Cancel subscription if channel is closed
+					}
+				}()
+
+				select {
+				case sub.channels.applicationChannel <- event:
+					// Successfully sent notification
+				case <-time.After(200 * time.Millisecond):
+					logger.Error("Application channel send timeout - client cannot keep up, disconnecting")
+					sub.cancel() // This will cause the main subscription loop to exit
+					return
+				}
+			}()
 		}
 	}
 }
 
 // relayApplicationStateNotifications relays applicationState notifications with immediate disconnect on overflow
-func (s *StreamingService) relayApplicationStateNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.ApplicationStateSubscriptionEvent) {
+func (s *StreamingService) relayApplicationStateNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel chan database.ApplicationStateSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
 	logger := log.WithFunc("rpc", "relayApplicationStateNotifications").With("subs_uid", subscriptionID)
@@ -532,6 +554,18 @@ func (s *StreamingService) relayApplicationStateNotifications(ctx context.Contex
 		if r := recover(); r != nil {
 			logger.Error("ApplicationState relay goroutine panic", "panic", r)
 		}
+	}()
+
+	// Don't forget to unsubscribe from database when the relay is completed
+	defer func() {
+		s.fish.DB().UnsubscribeApplicationState(ctx, dbChannel)
+		// Use recover to prevent panics from closing already closed channel
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Debug("Recovered from panic while closing database channel", "panic", r)
+			}
+		}()
+		close(dbChannel) // Close the channel we created
 	}()
 
 	for {
@@ -546,20 +580,30 @@ func (s *StreamingService) relayApplicationStateNotifications(ctx context.Contex
 			}
 
 			// Try to send with a short timeout - disconnect if client can't keep up
-			select {
-			case sub.channels.applicationStateChannel <- event:
-				// Successfully sent notification
-			case <-time.After(200 * time.Millisecond):
-				logger.Error("ApplicationState channel send timeout - client cannot keep up, disconnecting")
-				sub.cancel() // This will cause the main subscription loop to exit
-				return
-			}
+			// Use a function with recover to handle any panic from sending to closed channel
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Debug("Recovered from panic while sending to subscription channel", "panic", r)
+						sub.cancel() // Cancel subscription if channel is closed
+					}
+				}()
+
+				select {
+				case sub.channels.applicationStateChannel <- event:
+					// Successfully sent notification
+				case <-time.After(200 * time.Millisecond):
+					logger.Error("ApplicationState channel send timeout - client cannot keep up, disconnecting")
+					sub.cancel() // This will cause the main subscription loop to exit
+					return
+				}
+			}()
 		}
 	}
 }
 
 // relayApplicationResourceNotifications relays applicationResource notifications with immediate disconnect on overflow
-func (s *StreamingService) relayApplicationResourceNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.ApplicationResourceSubscriptionEvent) {
+func (s *StreamingService) relayApplicationResourceNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel chan database.ApplicationResourceSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
 	logger := log.WithFunc("rpc", "relayApplicationResourceNotifications").With("subs_uid", subscriptionID)
@@ -568,6 +612,18 @@ func (s *StreamingService) relayApplicationResourceNotifications(ctx context.Con
 		if r := recover(); r != nil {
 			logger.Error("ApplicationResource relay goroutine panic", "panic", r)
 		}
+	}()
+
+	// Don't forget to unsubscribe from database when the relay is completed
+	defer func() {
+		s.fish.DB().UnsubscribeApplicationResource(ctx, dbChannel)
+		// Use recover to prevent panics from closing already closed channel
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Debug("Recovered from panic while closing database channel", "panic", r)
+			}
+		}()
+		close(dbChannel) // Close the channel we created
 	}()
 
 	for {
@@ -582,20 +638,30 @@ func (s *StreamingService) relayApplicationResourceNotifications(ctx context.Con
 			}
 
 			// Try to send with a short timeout - disconnect if client can't keep up
-			select {
-			case sub.channels.applicationResourceChannel <- event:
-				// Successfully sent notification
-			case <-time.After(200 * time.Millisecond):
-				logger.Error("ApplicationResource channel send timeout - client cannot keep up, disconnecting")
-				sub.cancel() // This will cause the main subscription loop to exit
-				return
-			}
+			// Use a function with recover to handle any panic from sending to closed channel
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Debug("Recovered from panic while sending to subscription channel", "panic", r)
+						sub.cancel() // Cancel subscription if channel is closed
+					}
+				}()
+
+				select {
+				case sub.channels.applicationResourceChannel <- event:
+					// Successfully sent notification
+				case <-time.After(200 * time.Millisecond):
+					logger.Error("ApplicationResource channel send timeout - client cannot keep up, disconnecting")
+					sub.cancel() // This will cause the main subscription loop to exit
+					return
+				}
+			}()
 		}
 	}
 }
 
 // relayApplicationTaskNotifications relays applicationTask notifications with immediate disconnect on overflow
-func (s *StreamingService) relayApplicationTaskNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.ApplicationTaskSubscriptionEvent) {
+func (s *StreamingService) relayApplicationTaskNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel chan database.ApplicationTaskSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
 	logger := log.WithFunc("rpc", "relayApplicationTaskNotifications").With("subs_uid", subscriptionID)
@@ -604,6 +670,18 @@ func (s *StreamingService) relayApplicationTaskNotifications(ctx context.Context
 		if r := recover(); r != nil {
 			logger.Error("ApplicationTask relay goroutine panic", "panic", r)
 		}
+	}()
+
+	// Don't forget to unsubscribe from database when the relay is completed
+	defer func() {
+		s.fish.DB().UnsubscribeApplicationTask(ctx, dbChannel)
+		// Use recover to prevent panics from closing already closed channel
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Debug("Recovered from panic while closing database channel", "panic", r)
+			}
+		}()
+		close(dbChannel) // Close the channel we created
 	}()
 
 	for {
@@ -618,20 +696,30 @@ func (s *StreamingService) relayApplicationTaskNotifications(ctx context.Context
 			}
 
 			// Try to send with a short timeout - disconnect if client can't keep up
-			select {
-			case sub.channels.applicationTaskChannel <- event:
-				// Successfully sent notification
-			case <-time.After(200 * time.Millisecond):
-				logger.Error("ApplicationTask channel send timeout - client cannot keep up, disconnecting")
-				sub.cancel() // This will cause the main subscription loop to exit
-				return
-			}
+			// Use a function with recover to handle any panic from sending to closed channel
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Debug("Recovered from panic while sending to subscription channel", "panic", r)
+						sub.cancel() // Cancel subscription if channel is closed
+					}
+				}()
+
+				select {
+				case sub.channels.applicationTaskChannel <- event:
+					// Successfully sent notification
+				case <-time.After(200 * time.Millisecond):
+					logger.Error("ApplicationTask channel send timeout - client cannot keep up, disconnecting")
+					sub.cancel() // This will cause the main subscription loop to exit
+					return
+				}
+			}()
 		}
 	}
 }
 
 // relayRoleNotifications relays role notifications with immediate disconnect on overflow
-func (s *StreamingService) relayRoleNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.RoleSubscriptionEvent) {
+func (s *StreamingService) relayRoleNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel chan database.RoleSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
 	logger := log.WithFunc("rpc", "relayRoleNotifications").With("subs_uid", subscriptionID)
@@ -640,6 +728,18 @@ func (s *StreamingService) relayRoleNotifications(ctx context.Context, subscript
 		if r := recover(); r != nil {
 			logger.Error("Role relay goroutine panic", "panic", r)
 		}
+	}()
+
+	// Don't forget to unsubscribe from database when the relay is completed
+	defer func() {
+		s.fish.DB().UnsubscribeRole(ctx, dbChannel)
+		// Use recover to prevent panics from closing already closed channel
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Debug("Recovered from panic while closing database channel", "panic", r)
+			}
+		}()
+		close(dbChannel) // Close the channel we created
 	}()
 
 	for {
@@ -654,20 +754,30 @@ func (s *StreamingService) relayRoleNotifications(ctx context.Context, subscript
 			}
 
 			// Try to send with a short timeout - disconnect if client can't keep up
-			select {
-			case sub.channels.roleChannel <- event:
-				// Successfully sent notification
-			case <-time.After(200 * time.Millisecond):
-				logger.Error("Role channel send timeout - client cannot keep up, disconnecting")
-				sub.cancel() // This will cause the main subscription loop to exit
-				return
-			}
+			// Use a function with recover to handle any panic from sending to closed channel
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Debug("Recovered from panic while sending to subscription channel", "panic", r)
+						sub.cancel() // Cancel subscription if channel is closed
+					}
+				}()
+
+				select {
+				case sub.channels.roleChannel <- event:
+					// Successfully sent notification
+				case <-time.After(200 * time.Millisecond):
+					logger.Error("Role channel send timeout - client cannot keep up, disconnecting")
+					sub.cancel() // This will cause the main subscription loop to exit
+					return
+				}
+			}()
 		}
 	}
 }
 
 // relayLabelNotifications relays label notifications with immediate disconnect on overflow
-func (s *StreamingService) relayLabelNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.LabelSubscriptionEvent) {
+func (s *StreamingService) relayLabelNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel chan database.LabelSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
 	logger := log.WithFunc("rpc", "relayLabelNotifications").With("subs_uid", subscriptionID)
@@ -676,6 +786,18 @@ func (s *StreamingService) relayLabelNotifications(ctx context.Context, subscrip
 		if r := recover(); r != nil {
 			logger.Error("Label relay goroutine panic", "panic", r)
 		}
+	}()
+
+	// Don't forget to unsubscribe from database when the relay is completed
+	defer func() {
+		s.fish.DB().UnsubscribeLabel(ctx, dbChannel)
+		// Use recover to prevent panics from closing already closed channel
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Debug("Recovered from panic while closing database channel", "panic", r)
+			}
+		}()
+		close(dbChannel) // Close the channel we created
 	}()
 
 	for {
@@ -690,20 +812,30 @@ func (s *StreamingService) relayLabelNotifications(ctx context.Context, subscrip
 			}
 
 			// Try to send with a short timeout - disconnect if client can't keep up
-			select {
-			case sub.channels.labelChannel <- event:
-				// Successfully sent notification
-			case <-time.After(200 * time.Millisecond):
-				logger.Error("Label channel send timeout - client cannot keep up, disconnecting")
-				sub.cancel() // This will cause the main subscription loop to exit
-				return
-			}
+			// Use a function with recover to handle any panic from sending to closed channel
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Debug("Recovered from panic while sending to subscription channel", "panic", r)
+						sub.cancel() // Cancel subscription if channel is closed
+					}
+				}()
+
+				select {
+				case sub.channels.labelChannel <- event:
+					// Successfully sent notification
+				case <-time.After(200 * time.Millisecond):
+					logger.Error("Label channel send timeout - client cannot keep up, disconnecting")
+					sub.cancel() // This will cause the main subscription loop to exit
+					return
+				}
+			}()
 		}
 	}
 }
 
 // relayNodeNotifications relays node notifications with immediate disconnect on overflow
-func (s *StreamingService) relayNodeNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.NodeSubscriptionEvent) {
+func (s *StreamingService) relayNodeNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel chan database.NodeSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
 	logger := log.WithFunc("rpc", "relayNodeNotifications").With("subs_uid", subscriptionID)
@@ -712,6 +844,18 @@ func (s *StreamingService) relayNodeNotifications(ctx context.Context, subscript
 		if r := recover(); r != nil {
 			logger.Error("Node relay goroutine panic", "panic", r)
 		}
+	}()
+
+	// Don't forget to unsubscribe from database when the relay is completed
+	defer func() {
+		s.fish.DB().UnsubscribeNode(ctx, dbChannel)
+		// Use recover to prevent panics from closing already closed channel
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Debug("Recovered from panic while closing database channel", "panic", r)
+			}
+		}()
+		close(dbChannel) // Close the channel we created
 	}()
 
 	for {
@@ -726,20 +870,30 @@ func (s *StreamingService) relayNodeNotifications(ctx context.Context, subscript
 			}
 
 			// Try to send with a short timeout - disconnect if client can't keep up
-			select {
-			case sub.channels.nodeChannel <- event:
-				// Successfully sent notification
-			case <-time.After(200 * time.Millisecond):
-				logger.Error("Node channel send timeout - client cannot keep up, disconnecting")
-				sub.cancel() // This will cause the main subscription loop to exit
-				return
-			}
+			// Use a function with recover to handle any panic from sending to closed channel
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Debug("Recovered from panic while sending to subscription channel", "panic", r)
+						sub.cancel() // Cancel subscription if channel is closed
+					}
+				}()
+
+				select {
+				case sub.channels.nodeChannel <- event:
+					// Successfully sent notification
+				case <-time.After(200 * time.Millisecond):
+					logger.Error("Node channel send timeout - client cannot keep up, disconnecting")
+					sub.cancel() // This will cause the main subscription loop to exit
+					return
+				}
+			}()
 		}
 	}
 }
 
 // relayUserNotifications relays user notifications with immediate disconnect on overflow
-func (s *StreamingService) relayUserNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel <-chan database.UserSubscriptionEvent) {
+func (s *StreamingService) relayUserNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel chan database.UserSubscriptionEvent) {
 	// Signal completion when this goroutine exits
 	defer sub.relayWg.Done()
 	logger := log.WithFunc("rpc", "relayUserNotifications").With("subs_uid", subscriptionID)
@@ -748,6 +902,18 @@ func (s *StreamingService) relayUserNotifications(ctx context.Context, subscript
 		if r := recover(); r != nil {
 			logger.Error("User relay goroutine panic", "panic", r)
 		}
+	}()
+
+	// Don't forget to unsubscribe from database when the relay is completed
+	defer func() {
+		s.fish.DB().UnsubscribeUser(ctx, dbChannel)
+		// Use recover to prevent panics from closing already closed channel
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Debug("Recovered from panic while closing database channel", "panic", r)
+			}
+		}()
+		close(dbChannel) // Close the channel we created
 	}()
 
 	for {
@@ -762,14 +928,24 @@ func (s *StreamingService) relayUserNotifications(ctx context.Context, subscript
 			}
 
 			// Try to send with a short timeout - disconnect if client can't keep up
-			select {
-			case sub.channels.userChannel <- event:
-				// Successfully sent notification
-			case <-time.After(200 * time.Millisecond):
-				logger.Error("User channel send timeout - client cannot keep up, disconnecting")
-				sub.cancel() // This will cause the main subscription loop to exit
-				return
-			}
+			// Use a function with recover to handle any panic from sending to closed channel
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Debug("Recovered from panic while sending to subscription channel", "panic", r)
+						sub.cancel() // Cancel subscription if channel is closed
+					}
+				}()
+
+				select {
+				case sub.channels.userChannel <- event:
+					// Successfully sent notification
+				case <-time.After(200 * time.Millisecond):
+					logger.Error("User channel send timeout - client cannot keep up, disconnecting")
+					sub.cancel() // This will cause the main subscription loop to exit
+					return
+				}
+			}()
 		}
 	}
 }
@@ -886,14 +1062,78 @@ func (s *StreamingService) listenChannels(sub *subscription, ctx, subCtx context
 
 // Close will close all the channels
 func (s *subChannels) Close() {
-	close(s.applicationChannel)
-	close(s.applicationStateChannel)
-	close(s.applicationResourceChannel)
-	close(s.applicationTaskChannel)
-	close(s.roleChannel)
-	close(s.labelChannel)
-	close(s.nodeChannel)
-	close(s.userChannel)
+	// Use recover to handle potential double-close panics
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				// Channel was already closed, ignore the panic
+			}
+		}()
+		close(s.applicationChannel)
+	}()
+	// Use recover to handle potential double-close panics
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				// Channel was already closed, ignore the panic
+			}
+		}()
+		close(s.applicationStateChannel)
+	}()
+	// Use recover to handle potential double-close panics
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				// Channel was already closed, ignore the panic
+			}
+		}()
+		close(s.applicationResourceChannel)
+	}()
+	// Use recover to handle potential double-close panics
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				// Channel was already closed, ignore the panic
+			}
+		}()
+		close(s.applicationTaskChannel)
+	}()
+	// Use recover to handle potential double-close panics
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				// Channel was already closed, ignore the panic
+			}
+		}()
+		close(s.roleChannel)
+	}()
+	// Use recover to handle potential double-close panics
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				// Channel was already closed, ignore the panic
+			}
+		}()
+		close(s.labelChannel)
+	}()
+	// Use recover to handle potential double-close panics
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				// Channel was already closed, ignore the panic
+			}
+		}()
+		close(s.nodeChannel)
+	}()
+	// Use recover to handle potential double-close panics
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				// Channel was already closed, ignore the panic
+			}
+		}()
+		close(s.userChannel)
+	}()
 }
 
 // setupSubscriptions sets up database subscriptions and relay goroutines

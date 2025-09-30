@@ -184,7 +184,7 @@ func FromResources(src *pbTypes.Resources) Resources {
 	result.NodeFilter = src.GetNodeFilter()
 	result.Ram = src.GetRam()
 	result.RamOverbook = src.GetRamOverbook()
-	if src.GetSlots() != 0 {
+	if src.Slots != nil {
 		val := src.GetSlots()
 		result.Slots = &val
 	}
