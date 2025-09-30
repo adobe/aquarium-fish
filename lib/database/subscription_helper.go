@@ -48,15 +48,31 @@ func notifySubscribersHelper[T any](d *Database, channels *[]chan T, event T, ev
 
 	// Send notifications without holding the lock
 	go func() {
-		for _, ch := range channelsCopy {
-			// Use select with default to prevent panic if channel is closed
-			select {
-			case ch <- event:
-				// Successfully sent notification
-			default:
-				// Channel is closed or full, skip this subscriber
-				log.WithFunc("database", "notifySubscribersHelper").Debug("Failed to send notification, channel closed or full", "event_type", eventType)
+		// Use defer with recover to handle any panics from sending to closed channels
+		defer func() {
+			if r := recover(); r != nil {
+				log.WithFunc("database", "notifySubscribersHelper").Debug("Recovered from panic while sending notification", "event_type", eventType, "panic", r)
 			}
+		}()
+
+		for _, ch := range channelsCopy {
+			func() {
+				// Use individual defer/recover for each channel send to prevent one panic from stopping all sends
+				defer func() {
+					if r := recover(); r != nil {
+						log.WithFunc("database", "notifySubscribersHelper").Debug("Recovered from panic sending to individual channel", "event_type", eventType, "panic", r)
+					}
+				}()
+
+				// Use select with default to prevent panic if channel is closed
+				select {
+				case ch <- event:
+					// Successfully sent notification
+				default:
+					// Channel is closed or full, skip this subscriber
+					log.WithFunc("database", "notifySubscribersHelper").Debug("Failed to send notification, channel closed or full", "event_type", eventType)
+				}
+			}()
 		}
 	}()
 }
