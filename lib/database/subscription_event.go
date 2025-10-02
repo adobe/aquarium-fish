@@ -46,6 +46,9 @@ type UserSubscriptionEvent = SubscriptionEvent[*typesv2.User]
 // RoleSubscriptionEvent represents a Role change event
 type RoleSubscriptionEvent = SubscriptionEvent[*typesv2.Role]
 
+// UserGroupSubscriptionEvent represents a UserGroup change event
+type UserGroupSubscriptionEvent = SubscriptionEvent[*typesv2.UserGroup]
+
 // NodeSubscriptionEvent represents a Node change event
 type NodeSubscriptionEvent = SubscriptionEvent[*typesv2.Node]
 

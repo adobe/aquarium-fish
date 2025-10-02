@@ -86,6 +86,9 @@ func (s *AuthService) Login(ctx context.Context, req *connect.Request[aquariumv2
 		}), nil
 	}
 
+	// Enrich user with group configurations
+	s.fish.DB().EnrichUserWithGroupConfig(ctx, user)
+
 	// Generate JWT token
 	token, err := s.generateToken(user)
 	if err != nil {
@@ -150,6 +153,9 @@ func (s *AuthService) RefreshToken(ctx context.Context, req *connect.Request[aqu
 			Message: "User not found",
 		}), nil
 	}
+
+	// Enrich user with group configurations
+	s.fish.DB().EnrichUserWithGroupConfig(ctx, user)
 
 	// Generate new JWT token
 	newToken, err := s.generateToken(user)
@@ -236,6 +242,9 @@ func (s *AuthService) ValidateToken(ctx context.Context, req *connect.Request[aq
 			Message: "User not found",
 		}), nil
 	}
+
+	// Enrich user with group configurations
+	s.fish.DB().EnrichUserWithGroupConfig(ctx, user)
 
 	// Build user session
 	session, err := s.buildUserSession(ctx, user)

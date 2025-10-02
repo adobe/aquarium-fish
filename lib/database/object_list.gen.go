@@ -44,6 +44,7 @@ const (
 	ObjectUiConfig               = "UiConfig"
 	ObjectUser                   = "User"
 	ObjectUserConfig             = "UserConfig"
+	ObjectUserGroup              = "UserGroup"
 	ObjectUserSession            = "UserSession"
 	ObjectVote                   = "Vote"
 )

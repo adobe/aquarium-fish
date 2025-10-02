@@ -625,7 +625,7 @@ var File_aquarium_v2_auth_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_auth_proto_rawDesc = "" +
 	"\n" +
-	"\x16aquarium/v2/auth.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16aquarium/v2/role.proto\x1a\x1eaquarium/v2/options_rbac.proto\"\xca\x01\n" +
+	"\x16aquarium/v2/auth.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16aquarium/v2/role.proto\x1a\x1eaquarium/v2/options_rbac.proto\x1a#aquarium/v2/options_streaming.proto\"\xca\x01\n" +
 	"\bJWTToken\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\x129\n" +
 	"\n" +
@@ -671,12 +671,12 @@ const file_aquarium_v2_auth_proto_rawDesc = "" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x127\n" +
 	"\asession\x18\x03 \x01(\v2\x18.aquarium.v2.UserSessionH\x00R\asession\x88\x01\x01B\n" +
 	"\n" +
-	"\b_session2\xcd\x03\n" +
+	"\b_session2\xd3\x03\n" +
 	"\vAuthService\x12\\\n" +
 	"\x05Login\x12$.aquarium.v2.AuthServiceLoginRequest\x1a%.aquarium.v2.AuthServiceLoginResponse\"\x06\x82\xb5\x18\x02\b\x01\x12t\n" +
 	"\rValidateToken\x12,.aquarium.v2.AuthServiceValidateTokenRequest\x1a-.aquarium.v2.AuthServiceValidateTokenResponse\"\x06\x82\xb5\x18\x02\b\x01\x12q\n" +
 	"\fRefreshToken\x12+.aquarium.v2.AuthServiceRefreshTokenRequest\x1a,.aquarium.v2.AuthServiceRefreshTokenResponse\"\x06\x82\xb5\x18\x02\x10\x01\x12w\n" +
-	"\x0eGetPermissions\x12-.aquarium.v2.AuthServiceGetPermissionsRequest\x1a..aquarium.v2.AuthServiceGetPermissionsResponse\"\x06\x82\xb5\x18\x02\x10\x01BEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"
+	"\x0eGetPermissions\x12-.aquarium.v2.AuthServiceGetPermissionsRequest\x1a..aquarium.v2.AuthServiceGetPermissionsResponse\"\x06\x82\xb5\x18\x02\x10\x01\x1a\x04\x90\xb5\x18\x01BEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"
 
 var (
 	file_aquarium_v2_auth_proto_rawDescOnce sync.Once
@@ -738,6 +738,7 @@ func file_aquarium_v2_auth_proto_init() {
 	}
 	file_aquarium_v2_role_proto_init()
 	file_aquarium_v2_options_rbac_proto_init()
+	file_aquarium_v2_options_streaming_proto_init()
 	file_aquarium_v2_auth_proto_msgTypes[3].OneofWrappers = []any{}
 	file_aquarium_v2_auth_proto_msgTypes[5].OneofWrappers = []any{}
 	file_aquarium_v2_auth_proto_msgTypes[7].OneofWrappers = []any{}

@@ -298,9 +298,13 @@ func (f *Fish) initDefaultRoles(ctx context.Context) error {
 		return fmt.Errorf("Fish: Failed to create enforcer: %v", err)
 	}
 
-	// Create all roles described in the proto specs
+	// Create all roles described in the proto specs and update Aministrator role if needed
 	for role, perms := range auth.GetRolePermissions() {
-		_, err := f.db.RoleGet(ctx, role)
+		r, err := f.db.RoleGet(ctx, role)
+		if err != nil && err != database.ErrObjectNotFound {
+			logger.Error("Unable to get role", "role", role, "err", err)
+			return fmt.Errorf("Fish: Unable to get %q role: %v", role, err)
+		}
 		if err == database.ErrObjectNotFound {
 			logger.Debug("Create role and assigning permissions", "role", role)
 			newRole := typesv2.Role{
@@ -311,9 +315,14 @@ func (f *Fish) initDefaultRoles(ctx context.Context) error {
 				logger.Error("Failed to create role", "role", role, "err", err)
 				return fmt.Errorf("Fish: Failed to create %q role: %v", role, err)
 			}
-		} else if err != nil {
-			logger.Error("Unable to get role", "role", role, "err", err)
-			return fmt.Errorf("Fish: Unable to get %q role: %v", role, err)
+		} else if role == auth.AdminRoleName && len(r.Permissions) < len(perms) {
+			// NOTE: Here we can't use "!=" because that will cause issues with different versions of nodes in cluster
+			logger.Debug("Updating Administrator role to reflect node changes", "role", role)
+			r.Permissions = perms
+			if err := f.db.RoleSave(ctx, r); err != nil {
+				logger.Error("Failed to create role", "role", role, "err", err)
+				return fmt.Errorf("Fish: Failed to create %q role: %v", role, err)
+			}
 		}
 	}
 

@@ -17,11 +17,14 @@ package aquarium.v2;
 import "google/protobuf/timestamp.proto";
 import "aquarium/v2/role.proto";
 import "aquarium/v2/options_rbac.proto";
+import "aquarium/v2/options_streaming.proto";
 
 option go_package = "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2";
 
 // AuthService handles authentication and authorization operations
 service AuthService {
+  option (skip_service_streaming) = true;
+
   // Login authenticates a user and returns a JWT token
   rpc Login(AuthServiceLoginRequest) returns (AuthServiceLoginResponse) {
     option (access_control) = {

@@ -158,14 +158,14 @@ func main() {
 
 	targetDir := os.Args[1]
 
-	fmt.Printf("Generating interface tracing functions for directory: %s\n", targetDir)
+	fmt.Printf("trace-gen-functions: Generating interface tracing functions for directory: %s\n", targetDir)
 
 	if err := generateTracingFunctions(targetDir); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("Tracing functions generated successfully")
+	fmt.Println("trace-gen-functions: Tracing functions generated successfully")
 }
 
 func generateTracingFunctions(rootDir string) error {
@@ -278,7 +278,7 @@ func analyzeFunctionDecl(fn *ast.FuncDecl, packageName, filePath string) *Functi
 		paramType := typeToString(param.Type)
 		// Skip if we can't determine the type
 		if paramType == "" {
-			fmt.Printf("Warning: skipping function %s due to unknown parameter type\n", fn.Name.Name)
+			fmt.Printf("trace-gen-functions: Warning: skipping function %s due to unknown parameter type\n", fn.Name.Name)
 			return nil
 		}
 		if len(param.Names) > 0 {
@@ -307,7 +307,7 @@ func analyzeFunctionDecl(fn *ast.FuncDecl, packageName, filePath string) *Functi
 			resultType := typeToString(result.Type)
 			// Skip if we can't determine the type
 			if resultType == "" {
-				fmt.Printf("Warning: skipping function %s due to unknown result type\n", fn.Name.Name)
+				fmt.Printf("trace-gen-functions: Warning: skipping function %s due to unknown result type\n", fn.Name.Name)
 				return nil
 			}
 			if len(result.Names) > 0 {
@@ -431,7 +431,7 @@ func generateInterfaceWrappers(originalFile string, functions []FunctionInfo) er
 	usedTypes := collectUsedTypes(functions)
 	filteredImports := filterImports(allImports, usedTypes)
 
-	fmt.Printf("Generating release interface wrapper: %s ...\n", releaseFile)
+	fmt.Printf("trace-gen-functions: Generating release interface wrapper: %s ...\n", releaseFile)
 
 	// Generate the release file content
 	content, err := generateReleaseWrapperContent(functions, filteredImports)
@@ -444,7 +444,7 @@ func generateInterfaceWrappers(originalFile string, functions []FunctionInfo) er
 		return err
 	}
 
-	fmt.Printf("Generating debug interface wrapper: %s ...\n", debugFile)
+	fmt.Printf("trace-gen-functions: Generating debug interface wrapper: %s ...\n", debugFile)
 
 	// Generate the debug file content
 	content, err = generateDebugWrapperContent(functions, filteredImports)

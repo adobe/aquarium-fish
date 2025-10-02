@@ -73,11 +73,16 @@ var rolePermissions = map[string][]typesv2.Permission{
 
 		// UserService
 		{Resource: UserService, Action: UserServiceCreate},         // gRPC
+		{Resource: UserService, Action: UserServiceCreateGroup},    // gRPC
 		{Resource: UserService, Action: UserServiceGet},            // gRPC
+		{Resource: UserService, Action: UserServiceGetGroup},       // gRPC
 		{Resource: UserService, Action: UserServiceList},           // gRPC
+		{Resource: UserService, Action: UserServiceListGroup},      // gRPC
 		{Resource: UserService, Action: UserServiceRemove},         // gRPC
+		{Resource: UserService, Action: UserServiceRemoveGroup},    // gRPC
 		{Resource: UserService, Action: UserServiceUpdate},         // gRPC
 		{Resource: UserService, Action: UserServiceUpdateAll},      // gRPC additional
+		{Resource: UserService, Action: UserServiceUpdateGroup},    // gRPC
 		{Resource: UserService, Action: UserServiceUpdatePassword}, // gRPC additional
 		{Resource: UserService, Action: UserServiceUpdateRoles},    // gRPC additional
 	},

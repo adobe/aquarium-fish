@@ -59,8 +59,11 @@ import {
 import {
   UserService,
   UserServiceListRequestSchema,
+  UserServiceListGroupRequestSchema,
   type User,
   UserSchema,
+  type UserGroup,
+  UserGroupSchema,
 } from '../../gen/aquarium/v2/user_pb';
 import {
   RoleService,
@@ -163,6 +166,7 @@ interface StreamingData {
   labels: Label[];
   nodes: Node[];
   users: User[];
+  usergroups: UserGroup[];
   roles: Role[];
 }
 
@@ -182,6 +186,7 @@ interface StreamingContextType {
   fetchLabels: () => Promise<void>;
   fetchNodes: () => Promise<void>;
   fetchUsers: () => Promise<void>;
+  fetchUserGroups: () => Promise<void>;
   fetchRoles: () => Promise<void>;
   fetchApplicationStates: () => Promise<void>;
   fetchApplicationResources: () => Promise<void>;
@@ -216,6 +221,7 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
     labels: [],
     nodes: [],
     users: [],
+    usergroups: [],
     roles: [],
   };
 
@@ -460,6 +466,42 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
     } catch (err) {
       logger.error('Failed to fetch roles:', err);
       addNotification('error', 'Failed to fetch roles', String(err));
+    }
+  }, [isAuthenticated, hasPermission, notifySubscribers, addNotification, fetchedDataTypes]);
+
+  const fetchUserGroups = useCallback(async () => {
+    if (!isAuthenticated) return;
+
+    // Check if user groups have already been fetched in this session
+    if (fetchedDataTypes.has('usergroups')) {
+      logger.debug('User groups already fetched in this session, skipping');
+      return;
+    }
+
+    const canListUsers = hasPermission(PermService.User, PermUser.List);
+    if (!canListUsers) {
+      logger.info('User does not have permission to list user groups');
+      return;
+    }
+
+    try {
+      logger.info('Fetching user groups...');
+      const response = await userClient.listGroup(create(UserServiceListGroupRequestSchema));
+      const usergroups = response.data || [];
+
+      setData(prevData => {
+        const newData = { ...prevData, usergroups };
+        currentDataRef.current = newData;
+        notifySubscribers(newData);
+        return newData;
+      });
+
+      // Mark user groups as fetched
+      setFetchedDataTypes(prev => new Set([...prev, 'usergroups']));
+      logger.info('User groups fetched:', usergroups.length);
+    } catch (err) {
+      logger.error('Failed to fetch user groups:', err);
+      addNotification('error', 'Failed to fetch user groups', String(err));
     }
   }, [isAuthenticated, hasPermission, notifySubscribers, addNotification, fetchedDataTypes]);
 
@@ -758,6 +800,23 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
             }
             break;
           }
+
+          case SubscriptionType.USER_GROUP: {
+            const usergroup = fromBinary(UserGroupSchema, binaryData);
+            switch (response.changeType) {
+              case ChangeType.CREATED:
+              case ChangeType.UPDATED:
+                newData.usergroups = newData.usergroups.filter(g => g.name !== usergroup.name);
+                newData.usergroups.push(usergroup);
+                logger.info(`User group ${response.changeType === ChangeType.CREATED ? 'created' : 'updated'}:`, usergroup.name);
+                break;
+              case ChangeType.REMOVED:
+                newData.usergroups = newData.usergroups.filter(g => g.name !== usergroup.name);
+                logger.info('User group removed:', usergroup.name);
+                break;
+            }
+            break;
+          }
         }
       } catch (err) {
         logger.error('Error processing subscription update:', err);
@@ -830,6 +889,18 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
           response = await userClient.remove(request);
           addNotification('info', 'User deleted successfully');
           break;
+        case 'UserServiceCreateGroupRequest':
+          response = await userClient.createGroup(request);
+          addNotification('info', 'User group created successfully');
+          break;
+        case 'UserServiceUpdateGroupRequest':
+          response = await userClient.updateGroup(request);
+          addNotification('info', 'User group updated successfully');
+          break;
+        case 'UserServiceRemoveGroupRequest':
+          response = await userClient.removeGroup(request);
+          addNotification('info', 'User group deleted successfully');
+          break;
         case 'RoleServiceCreateRequest':
           response = await roleClient.create(request);
           addNotification('info', 'Role created successfully');
@@ -875,6 +946,7 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
       hasPermission(PermService.Label, PermLabel.Get) && subscriptionTypes.push(SubscriptionType.LABEL);
       hasPermission(PermService.Node, PermNode.Get) && subscriptionTypes.push(SubscriptionType.NODE);
       hasPermission(PermService.User, PermUser.Get) && subscriptionTypes.push(SubscriptionType.USER);
+      hasPermission(PermService.User, PermUser.Get) && subscriptionTypes.push(SubscriptionType.USER_GROUP);
       hasPermission(PermService.Role, PermRole.Get) && subscriptionTypes.push(SubscriptionType.ROLE);
 
       const subscribeRequest = create(StreamingServiceSubscribeRequestSchema, {
@@ -991,6 +1063,7 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
     fetchLabels,
     fetchNodes,
     fetchUsers,
+    fetchUserGroups,
     fetchRoles,
     fetchApplicationStates,
     fetchApplicationResources,

@@ -42,6 +42,22 @@ func (d *Database) UnsubscribeUser(ctx context.Context, ch chan UserSubscription
 
 }
 
+func (d *Database) SubscribeUserGroup(ctx context.Context, ch chan UserGroupSubscriptionEvent) {
+	ctx, span := debugTracerDatabaseUser.Start(ctx, "database.Database.subscribeUserGroupImpl")
+	defer span.End()
+
+	d.subscribeUserGroupImpl(ctx, ch)
+
+}
+
+func (d *Database) UnsubscribeUserGroup(ctx context.Context, ch chan UserGroupSubscriptionEvent) {
+	ctx, span := debugTracerDatabaseUser.Start(ctx, "database.Database.unsubscribeUserGroupImpl")
+	defer span.End()
+
+	d.unsubscribeUserGroupImpl(ctx, ch)
+
+}
+
 func (d *Database) UserList(ctx context.Context) ([]typesv2.User, error) {
 	ctx, span := debugTracerDatabaseUser.Start(ctx, "database.Database.userListImpl")
 	defer span.End()
@@ -139,5 +155,80 @@ func (d *Database) UserNew(ctx context.Context, name string, password string) (s
 	}
 
 	return r0, r1, err2
+
+}
+
+func (d *Database) UserGroupList(ctx context.Context) ([]typesv2.UserGroup, error) {
+	ctx, span := debugTracerDatabaseUser.Start(ctx, "database.Database.userGroupListImpl")
+	defer span.End()
+
+	groups, err1 := d.userGroupListImpl(ctx)
+
+	if err1 != nil {
+		span.RecordError(err1)
+		span.SetStatus(codes.Error, err1.Error())
+	}
+
+	return groups, err1
+
+}
+
+func (d *Database) UserGroupCreate(ctx context.Context, g *typesv2.UserGroup) error {
+	ctx, span := debugTracerDatabaseUser.Start(ctx, "database.Database.userGroupCreateImpl")
+	defer span.End()
+
+	err0 := d.userGroupCreateImpl(ctx, g)
+
+	if err0 != nil {
+		span.RecordError(err0)
+		span.SetStatus(codes.Error, err0.Error())
+	}
+
+	return err0
+
+}
+
+func (d *Database) UserGroupSave(ctx context.Context, g *typesv2.UserGroup) error {
+	ctx, span := debugTracerDatabaseUser.Start(ctx, "database.Database.userGroupSaveImpl")
+	defer span.End()
+
+	err0 := d.userGroupSaveImpl(ctx, g)
+
+	if err0 != nil {
+		span.RecordError(err0)
+		span.SetStatus(codes.Error, err0.Error())
+	}
+
+	return err0
+
+}
+
+func (d *Database) UserGroupGet(ctx context.Context, name string) (*typesv2.UserGroup, error) {
+	ctx, span := debugTracerDatabaseUser.Start(ctx, "database.Database.userGroupGetImpl")
+	defer span.End()
+
+	g, err1 := d.userGroupGetImpl(ctx, name)
+
+	if err1 != nil {
+		span.RecordError(err1)
+		span.SetStatus(codes.Error, err1.Error())
+	}
+
+	return g, err1
+
+}
+
+func (d *Database) UserGroupDelete(ctx context.Context, name string) error {
+	ctx, span := debugTracerDatabaseUser.Start(ctx, "database.Database.userGroupDeleteImpl")
+	defer span.End()
+
+	err0 := d.userGroupDeleteImpl(ctx, name)
+
+	if err0 != nil {
+		span.RecordError(err0)
+		span.SetStatus(codes.Error, err0.Error())
+	}
+
+	return err0
 
 }

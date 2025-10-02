@@ -199,6 +199,9 @@ func (h *AuthHandler) Handler(next http.Handler) http.Handler {
 			return
 		}
 
+		// Enrich user with group configurations before adding to context
+		h.db.EnrichUserWithGroupConfig(r.Context(), user)
+
 		// Add user to context
 		ctx := context.WithValue(r.Context(), userContextKey, user)
 		r = r.WithContext(ctx)

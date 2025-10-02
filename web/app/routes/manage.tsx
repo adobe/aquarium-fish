@@ -20,11 +20,11 @@ import { useStreaming } from '../contexts/StreamingContext';
 import { StreamingList, type ListColumn, type ListItemAction } from '../components/StreamingList';
 
 import { create } from '@bufbuild/protobuf';
-import { UserServiceCreateRequestSchema, UserServiceUpdateRequestSchema, UserServiceRemoveRequestSchema } from '../../gen/aquarium/v2/user_pb';
-import type { User } from '../../gen/aquarium/v2/user_pb';
+import { UserServiceCreateRequestSchema, UserServiceUpdateRequestSchema, UserServiceRemoveRequestSchema, UserServiceCreateGroupRequestSchema, UserServiceUpdateGroupRequestSchema, UserServiceRemoveGroupRequestSchema } from '../../gen/aquarium/v2/user_pb';
+import type { User, UserGroup } from '../../gen/aquarium/v2/user_pb';
 import { RoleServiceCreateRequestSchema, RoleServiceUpdateRequestSchema, RoleServiceRemoveRequestSchema } from '../../gen/aquarium/v2/role_pb';
 import type { Role } from '../../gen/aquarium/v2/role_pb';
-import { UserForm, RoleForm } from '../../gen/components';
+import { UserForm, RoleForm, UserGroupForm } from '../../gen/components';
 import { PermService, PermUser, PermRole } from '../../gen/permissions/permissions_grpc';
 
 export function meta() {
@@ -36,8 +36,8 @@ export function meta() {
 
 export default function Manage() {
   const { user, hasPermission } = useAuth();
-  const { sendRequest, fetchUsers, fetchRoles } = useStreaming();
-  const [activeTab, setActiveTab] = useState<'users' | 'roles'>('users');
+  const { sendRequest, fetchUsers, fetchRoles, fetchUserGroups } = useStreaming();
+  const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'usergroups'>('users');
 
   // Users state
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
@@ -49,10 +49,16 @@ export default function Manage() {
   const [showRoleDetailsModal, setShowRoleDetailsModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
 
+  // User Groups state
+  const [showCreateUserGroupModal, setShowCreateUserGroupModal] = useState(false);
+  const [showUserGroupDetailsModal, setShowUserGroupDetailsModal] = useState(false);
+  const [selectedUserGroup, setSelectedUserGroup] = useState<UserGroup | null>(null);
+
   // Fetch data when component mounts
   useEffect(() => {
     fetchUsers();
     fetchRoles();
+    fetchUserGroups();
   }, []);
 
   // Format timestamp
@@ -144,6 +150,47 @@ export default function Manage() {
     }
   };
 
+  // User Group operations
+  const handleCreateUserGroup = async (groupData: UserGroup) => {
+    try {
+      const createRequest = create(UserServiceCreateGroupRequestSchema, {
+        usergroup: groupData,
+      });
+      await sendRequest(createRequest, 'UserServiceCreateGroupRequest');
+      setShowCreateUserGroupModal(false);
+    } catch (error) {
+      console.error(`Failed to create user group: ${error}`);
+    }
+  };
+
+  const handleUpdateUserGroup = async (groupData: UserGroup) => {
+    if (!selectedUserGroup) return;
+
+    try {
+      const updateRequest = create(UserServiceUpdateGroupRequestSchema, {
+        usergroup: groupData,
+      });
+      await sendRequest(updateRequest, 'UserServiceUpdateGroupRequest');
+      setShowUserGroupDetailsModal(false);
+      setSelectedUserGroup(null);
+    } catch (error) {
+      console.error(`Failed to update user group: ${error}`);
+    }
+  };
+
+  const handleRemoveUserGroup = async (group: UserGroup) => {
+    if (!confirm('Are you sure you want to delete this user group?')) return;
+
+    try {
+      const removeRequest = create(UserServiceRemoveGroupRequestSchema, {
+        groupName: group.name,
+      });
+      await sendRequest(removeRequest, 'UserServiceRemoveGroupRequest');
+    } catch (error) {
+      console.error(`Failed to delete user group: ${error}`);
+    }
+  };
+
   // Define columns for users list
   const userColumns: ListColumn[] = [
     {
@@ -222,9 +269,48 @@ export default function Manage() {
     },
   ];
 
+  // Define columns for user groups list
+  const userGroupColumns: ListColumn[] = [
+    {
+      key: 'name',
+      label: 'User Group',
+      filterable: true,
+      render: (group: UserGroup) => (
+        <div>
+          <div className="text-sm font-medium text-gray-900 dark:text-white">
+            {group.name}
+          </div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            Users: {(group.users || []).length} | Config: {group.config ? 'Yes' : 'No'}
+          </div>
+        </div>
+      ),
+    },
+  ];
+
+  // Define actions for user groups
+  const userGroupActions: ListItemAction[] = [
+    {
+      label: 'Edit',
+      onClick: (group: UserGroup) => {
+        setSelectedUserGroup(group);
+        setShowUserGroupDetailsModal(true);
+      },
+      className: 'px-3 py-1 text-sm bg-green-100 text-green-800 rounded-md hover:bg-green-200',
+      permission: { resource: PermService.User, action: PermUser.Update }, // Using User service permissions for UserGroup
+    },
+    {
+      label: 'Remove',
+      onClick: handleRemoveUserGroup,
+      className: 'px-3 py-1 text-sm bg-red-100 text-red-800 rounded-md hover:bg-red-200',
+      permission: { resource: PermService.User, action: PermUser.Remove }, // Using User service permissions for UserGroup
+    },
+  ];
+
   // Permissions
   const canCreateUser = hasPermission(PermService.User, PermUser.Create);
   const canCreateRole = hasPermission(PermService.Role, PermRole.Create);
+  const canCreateUserGroup = hasPermission(PermService.User, PermUser.Create); // Using User service permissions for UserGroup
 
   return (
     <ProtectedRoute>
@@ -264,6 +350,16 @@ export default function Manage() {
                 }`}
               >
                 Roles
+              </button>
+              <button
+                onClick={() => setActiveTab('usergroups')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'usergroups'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                User Groups
               </button>
             </nav>
           </div>
@@ -329,6 +425,37 @@ export default function Manage() {
               />
             </div>
           )}
+
+          {/* User Groups Tab */}
+          {activeTab === 'usergroups' && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                    User Group Management
+                  </h2>
+                </div>
+                {canCreateUserGroup && (
+                  <button
+                    onClick={() => setShowCreateUserGroupModal(true)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  >
+                    Create User Group
+                  </button>
+                )}
+              </div>
+
+              <StreamingList
+                objectType="usergroups"
+                columns={userGroupColumns}
+                actions={userGroupActions}
+                filterBy={['name']}
+                itemKey={(group: UserGroup) => group.name}
+                permissions={{ list: { resource: PermService.User, action: PermUser.List } }}
+                emptyMessage="No user groups found"
+              />
+            </div>
+          )}
         </div>
 
         {/* Create Role Modal */}
@@ -390,6 +517,38 @@ export default function Manage() {
                   setSelectedUser(null);
                 }}
                 title={`Edit User: ${selectedUser.name}`}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Create User Group Modal */}
+        {showCreateUserGroupModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <UserGroupForm
+                mode="create"
+                onSubmit={handleCreateUserGroup}
+                onCancel={() => setShowCreateUserGroupModal(false)}
+                title="Create User Group"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Edit User Group Modal */}
+        {showUserGroupDetailsModal && selectedUserGroup && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <UserGroupForm
+                mode="edit"
+                initialData={selectedUserGroup}
+                onSubmit={handleUpdateUserGroup}
+                onCancel={() => {
+                  setShowUserGroupDetailsModal(false);
+                  setSelectedUserGroup(null);
+                }}
+                title={`Edit User Group: ${selectedUserGroup.name}`}
               />
             </div>
           </div>

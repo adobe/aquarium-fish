@@ -463,3 +463,417 @@ drivers:
 
 	t.Log("Custom stream limit tests completed successfully!")
 }
+
+// Test_user_group_stream_limit_fallback tests that user inherits stream limit from user group
+func Test_user_group_stream_limit_fallback(t *testing.T) {
+	t.Parallel()
+	afi := h.NewAquariumFish(t, "node-1", `---
+node_location: test_loc
+
+api_address: 127.0.0.1:0
+
+drivers:
+  gates: {}
+  providers:
+    test:`)
+
+	// Create admin client
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientGRPC, afi.GetCA(t))
+
+	// Create user service client
+	userClient := aquariumv2connect.NewUserServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	// Create a user group with stream limit
+	groupName := "stream-group"
+	streamsLimit := int32(2)
+
+	t.Run("Create user group with stream limit", func(t *testing.T) {
+		_, err := userClient.CreateGroup(ctx, connect.NewRequest(&aquariumv2.UserServiceCreateGroupRequest{
+			Usergroup: &aquariumv2.UserGroup{
+				Name:   groupName,
+				Users:  []string{},
+				Config: &aquariumv2.UserConfig{StreamsLimit: &streamsLimit},
+			},
+		}))
+		if err != nil {
+			t.Fatal("Failed to create user group:", err)
+		}
+	})
+
+	// Create a test user without stream limit config
+	testUser := "streamgroupuser"
+	testPassword := "testpass123"
+
+	t.Run("Create test user without stream limit", func(t *testing.T) {
+		createReq := &aquariumv2.UserServiceCreateRequest{
+			User: &aquariumv2.User{
+				Name:     testUser,
+				Password: &testPassword,
+				Roles:    []string{"User"},
+				// No config set - should inherit from group
+			},
+		}
+
+		_, err := userClient.Create(ctx, connect.NewRequest(createReq))
+		if err != nil {
+			t.Fatal("Failed to create test user:", err)
+		}
+	})
+
+	// Add user to the group
+	t.Run("Add user to group", func(t *testing.T) {
+		_, err := userClient.UpdateGroup(ctx, connect.NewRequest(&aquariumv2.UserServiceUpdateGroupRequest{
+			Usergroup: &aquariumv2.UserGroup{
+				Name:   groupName,
+				Users:  []string{testUser},
+				Config: &aquariumv2.UserConfig{StreamsLimit: &streamsLimit},
+			},
+		}))
+		if err != nil {
+			t.Fatal("Failed to update user group:", err)
+		}
+	})
+
+	// Create client for the test user
+	testCli, testOpts := h.NewRPCClient(testUser, testPassword, h.RPCClientGRPC, afi.GetCA(t))
+	testStreamingClient := aquariumv2connect.NewStreamingServiceClient(
+		testCli,
+		afi.APIAddress("grpc"),
+		testOpts...,
+	)
+
+	t.Run("User inherits stream limit from group", func(t *testing.T) {
+		// Create first two connections - should succeed
+		conn1 := testStreamingClient.Connect(ctx)
+		defer conn1.CloseRequest()
+
+		conn2 := testStreamingClient.Connect(ctx)
+		defer conn2.CloseRequest()
+
+		// Send keep-alives to both
+		err := conn1.Send(&aquariumv2.StreamingServiceConnectRequest{
+			RequestId:   "keepalive-1",
+			RequestType: "KeepAliveRequest",
+		})
+		if err != nil {
+			t.Fatal("Failed to send keep-alive on first connection:", err)
+		}
+
+		err = conn2.Send(&aquariumv2.StreamingServiceConnectRequest{
+			RequestId:   "keepalive-2",
+			RequestType: "KeepAliveRequest",
+		})
+		if err != nil {
+			t.Fatal("Failed to send keep-alive on second connection:", err)
+		}
+
+		// Both should work
+		_, err = conn1.Receive()
+		if err != nil {
+			t.Error("First connection failed:", err)
+		}
+
+		_, err = conn2.Receive()
+		if err != nil {
+			t.Error("Second connection failed:", err)
+		}
+
+		// Create third connection - should terminate the first one
+		conn3 := testStreamingClient.Connect(ctx)
+		defer conn3.CloseRequest()
+
+		err = conn3.Send(&aquariumv2.StreamingServiceConnectRequest{
+			RequestId:   "keepalive-3",
+			RequestType: "KeepAliveRequest",
+		})
+		if err != nil {
+			t.Fatal("Failed to send keep-alive on third connection:", err)
+		}
+
+		// First connection should be terminated
+		terminationReceived := false
+		for range 3 {
+			_, err := conn1.Receive()
+			if err != nil {
+				terminationReceived = true
+				t.Log("First connection terminated as expected (group limit=2):", err)
+				break
+			}
+		}
+
+		if !terminationReceived {
+			t.Error("First connection was not terminated when group limit was exceeded")
+		}
+
+		t.Log("User successfully inherited stream limit from group")
+	})
+}
+
+// Test_user_group_stream_limit_precedence tests that user's own config takes precedence over group
+func Test_user_group_stream_limit_precedence(t *testing.T) {
+	t.Parallel()
+	afi := h.NewAquariumFish(t, "node-1", `---
+node_location: test_loc
+
+api_address: 127.0.0.1:0
+
+drivers:
+  gates: {}
+  providers:
+    test:`)
+
+	// Create admin client
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientGRPC, afi.GetCA(t))
+
+	// Create user service client
+	userClient := aquariumv2connect.NewUserServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	// Create a user group with low stream limit
+	groupName := "low-stream-group"
+	groupStreamsLimit := int32(1)
+
+	t.Run("Create user group with low stream limit", func(t *testing.T) {
+		_, err := userClient.CreateGroup(ctx, connect.NewRequest(&aquariumv2.UserServiceCreateGroupRequest{
+			Usergroup: &aquariumv2.UserGroup{
+				Name:   groupName,
+				Users:  []string{},
+				Config: &aquariumv2.UserConfig{StreamsLimit: &groupStreamsLimit},
+			},
+		}))
+		if err != nil {
+			t.Fatal("Failed to create user group:", err)
+		}
+	})
+
+	// Create a test user with higher stream limit
+	testUser := "streamprecedenceuser"
+	userStreamsLimit := int32(3) // Higher than group limit
+	createReq := &aquariumv2.UserServiceCreateRequest{
+		User: &aquariumv2.User{
+			Name:  testUser,
+			Roles: []string{"User"},
+			Config: &aquariumv2.UserConfig{
+				StreamsLimit: &userStreamsLimit,
+			},
+		},
+	}
+
+	userResp, err := userClient.Create(ctx, connect.NewRequest(createReq))
+	if err != nil {
+		t.Fatal("Failed to create test user:", err)
+	}
+	testPassword := userResp.Msg.GetData().GetPassword()
+
+	// Add user to the group
+	t.Run("Add user to group", func(t *testing.T) {
+		_, err := userClient.UpdateGroup(ctx, connect.NewRequest(&aquariumv2.UserServiceUpdateGroupRequest{
+			Usergroup: &aquariumv2.UserGroup{
+				Name:   groupName,
+				Users:  []string{testUser},
+				Config: &aquariumv2.UserConfig{StreamsLimit: &groupStreamsLimit},
+			},
+		}))
+		if err != nil {
+			t.Fatal("Failed to update user group:", err)
+		}
+	})
+
+	// Create client for the test user
+	testCli, testOpts := h.NewRPCClient(testUser, testPassword, h.RPCClientGRPC, afi.GetCA(t))
+	testStreamingClient := aquariumv2connect.NewStreamingServiceClient(
+		testCli,
+		afi.APIAddress("grpc"),
+		testOpts...,
+	)
+
+	t.Run("User's own config takes precedence over group", func(t *testing.T) {
+		// Create connections up to user's limit (3)
+		var connections []*connect.BidiStreamForClient[aquariumv2.StreamingServiceConnectRequest, aquariumv2.StreamingServiceConnectResponse]
+		for i := range 3 {
+			conn := testStreamingClient.Connect(ctx)
+			connections = append(connections, conn)
+
+			// Send keep-alive
+			err = conn.Send(&aquariumv2.StreamingServiceConnectRequest{
+				RequestId:   fmt.Sprintf("keepalive-%d", i+1),
+				RequestType: "KeepAliveRequest",
+			})
+			if err != nil {
+				t.Fatalf("Failed to send keep-alive on connection %d: %v", i+1, err)
+			}
+		}
+
+		// All connections should be working (more than group limit of 1)
+		for i, conn := range connections {
+			_, err := conn.Receive()
+			if err != nil {
+				t.Fatalf("Connection %d failed: %v", i+1, err)
+			}
+		}
+
+		// Clean up
+		for _, conn := range connections {
+			conn.CloseRequest()
+		}
+
+		t.Logf("User successfully used own stream limit (%d) instead of group limit (%d)", userStreamsLimit, groupStreamsLimit)
+	})
+}
+
+// Test_user_group_stream_limit_max_value tests that max value from multiple groups is used
+func Test_user_group_stream_limit_max_value(t *testing.T) {
+	t.Parallel()
+	afi := h.NewAquariumFish(t, "node-1", `---
+node_location: test_loc
+
+api_address: 127.0.0.1:0
+
+drivers:
+  gates: {}
+  providers:
+    test:`)
+
+	// Create admin client
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientGRPC, afi.GetCA(t))
+
+	// Create user service client
+	userClient := aquariumv2connect.NewUserServiceClient(
+		adminCli,
+		afi.APIAddress("grpc"),
+		adminOpts...,
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	// Create two user groups with different stream limits
+	group1Name := "low-stream-group-1"
+	group1StreamsLimit := int32(1)
+
+	group2Name := "high-stream-group-2"
+	group2StreamsLimit := int32(2) // Higher limit
+
+	t.Run("Create first user group with low stream limit", func(t *testing.T) {
+		_, err := userClient.CreateGroup(ctx, connect.NewRequest(&aquariumv2.UserServiceCreateGroupRequest{
+			Usergroup: &aquariumv2.UserGroup{
+				Name:   group1Name,
+				Users:  []string{},
+				Config: &aquariumv2.UserConfig{StreamsLimit: &group1StreamsLimit},
+			},
+		}))
+		if err != nil {
+			t.Fatal("Failed to create first user group:", err)
+		}
+	})
+
+	t.Run("Create second user group with higher stream limit", func(t *testing.T) {
+		_, err := userClient.CreateGroup(ctx, connect.NewRequest(&aquariumv2.UserServiceCreateGroupRequest{
+			Usergroup: &aquariumv2.UserGroup{
+				Name:   group2Name,
+				Users:  []string{},
+				Config: &aquariumv2.UserConfig{StreamsLimit: &group2StreamsLimit},
+			},
+		}))
+		if err != nil {
+			t.Fatal("Failed to create second user group:", err)
+		}
+	})
+
+	// Create a test user without stream limit config
+	testUser := "multistreamgroupuser"
+	createReq := &aquariumv2.UserServiceCreateRequest{
+		User: &aquariumv2.User{
+			Name:  testUser,
+			Roles: []string{"User"},
+			// No config set - should inherit max from groups
+		},
+	}
+
+	userResp, err := userClient.Create(ctx, connect.NewRequest(createReq))
+	if err != nil {
+		t.Fatal("Failed to create test user:", err)
+	}
+	testPassword := userResp.Msg.GetData().GetPassword()
+
+	// Add user to both groups
+	t.Run("Add user to first group", func(t *testing.T) {
+		_, err := userClient.UpdateGroup(ctx, connect.NewRequest(&aquariumv2.UserServiceUpdateGroupRequest{
+			Usergroup: &aquariumv2.UserGroup{
+				Name:   group1Name,
+				Users:  []string{testUser},
+				Config: &aquariumv2.UserConfig{StreamsLimit: &group1StreamsLimit},
+			},
+		}))
+		if err != nil {
+			t.Fatal("Failed to update first user group:", err)
+		}
+	})
+
+	t.Run("Add user to second group", func(t *testing.T) {
+		_, err := userClient.UpdateGroup(ctx, connect.NewRequest(&aquariumv2.UserServiceUpdateGroupRequest{
+			Usergroup: &aquariumv2.UserGroup{
+				Name:   group2Name,
+				Users:  []string{testUser},
+				Config: &aquariumv2.UserConfig{StreamsLimit: &group2StreamsLimit},
+			},
+		}))
+		if err != nil {
+			t.Fatal("Failed to update second user group:", err)
+		}
+	})
+
+	// Create client for the test user
+	testCli, testOpts := h.NewRPCClient(testUser, testPassword, h.RPCClientGRPC, afi.GetCA(t))
+	testStreamingClient := aquariumv2connect.NewStreamingServiceClient(
+		testCli,
+		afi.APIAddress("grpc"),
+		testOpts...,
+	)
+
+	t.Run("User uses max stream limit from multiple groups", func(t *testing.T) {
+		// Create connections up to the higher group limit (2)
+		var connections []*connect.BidiStreamForClient[aquariumv2.StreamingServiceConnectRequest, aquariumv2.StreamingServiceConnectResponse]
+		for i := range 2 {
+			conn := testStreamingClient.Connect(ctx)
+			connections = append(connections, conn)
+
+			// Send keep-alive
+			err = conn.Send(&aquariumv2.StreamingServiceConnectRequest{
+				RequestId:   fmt.Sprintf("keepalive-%d", i+1),
+				RequestType: "KeepAliveRequest",
+			})
+			if err != nil {
+				t.Fatalf("Failed to send keep-alive on connection %d: %v", i+1, err)
+			}
+		}
+
+		// All connections should work (more than lower group limit of 1)
+		for i, conn := range connections {
+			_, err := conn.Receive()
+			if err != nil {
+				t.Fatalf("Connection %d failed: %v", i+1, err)
+			}
+		}
+
+		// Clean up
+		for _, conn := range connections {
+			conn.CloseRequest()
+		}
+
+		t.Logf("User successfully used max group stream limit (%d) instead of lower limit (%d)", group2StreamsLimit, group1StreamsLimit)
+	})
+}

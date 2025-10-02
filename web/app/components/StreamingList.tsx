@@ -16,7 +16,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAuth } from '../contexts/AuthContext';
 import { useStreaming } from '../contexts/StreamingContext';
 
-export type ObjectType = 'applications' | 'labels' | 'nodes' | 'users' | 'roles';
+export type ObjectType = 'applications' | 'labels' | 'nodes' | 'users' | 'roles' | 'usergroups';
 export type ItemStatus = 'normal' | 'created' | 'updated' | 'removing';
 
 export interface ListItemAction {
@@ -117,6 +117,8 @@ export const StreamingList: React.FC<StreamingListProps> = ({
         return data.users;
       case 'roles':
         return data.roles;
+      case 'usergroups':
+        return data.usergroups;
       default:
         return [];
     }
@@ -256,6 +258,9 @@ export const StreamingList: React.FC<StreamingListProps> = ({
           break;
         case 'roles':
           newData = streamingData.roles;
+          break;
+        case 'usergroups':
+          newData = streamingData.usergroups;
           break;
         default:
           newData = [];
