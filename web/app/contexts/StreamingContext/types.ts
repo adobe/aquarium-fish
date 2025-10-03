@@ -51,5 +51,6 @@ export interface StreamingContextType {
   fetchApplicationResources: () => Promise<void>;
   // Utility functions
   resetFetchedDataTypes: () => void;
+  clearData: () => void;
 }
 

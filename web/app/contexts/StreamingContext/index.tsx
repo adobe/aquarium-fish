@@ -44,7 +44,7 @@ interface StreamingProviderProps {
 }
 
 export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }) => {
-  const { user, isAuthenticated, hasPermission } = useAuth();
+  const { user, isAuthenticated, hasPermission, logout } = useAuth();
   const initialData: StreamingData = {
     applications: [],
     applicationStates: new Map(),
@@ -184,6 +184,28 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
     setFetchedDataTypes(new Set());
   }, []);
 
+  // Clear all dashboard data
+  const clearData = useCallback(() => {
+    logger.info('Clearing all dashboard data');
+    const emptyData: StreamingData = {
+      applications: [],
+      applicationStates: new Map(),
+      applicationResources: new Map(),
+      applicationTasks: new Map(),
+      labels: [],
+      nodes: [],
+      users: [],
+      usergroups: [],
+      roles: [],
+    };
+    setData(emptyData);
+    currentDataRef.current = emptyData;
+    notifySubscribers(emptyData);
+    // Also reset fetched data types
+    fetchedDataTypesRef.current.clear();
+    setFetchedDataTypes(new Set());
+  }, [notifySubscribers]);
+
   // Handle subscription updates
   const handleUpdate = useCallback((response: any) => {
     setData(prevData => {
@@ -236,9 +258,15 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
       () => {
         setIsConnected(false);
         setConnectionStatus('disconnected');
+      },
+      () => {
+        // Handle 401 Unauthenticated - logout user
+        logger.warn('Streaming connection received 401, triggering logout');
+        addNotification('warning', 'Session expired', 'You have been logged out due to authentication failure');
+        logout();
       }
     );
-  }, [isAuthenticated, hasPermission, handleUpdate, addNotification]);
+  }, [isAuthenticated, hasPermission, handleUpdate, addNotification, logout]);
 
   // Disconnect from streaming
   const disconnect = useCallback(() => {
@@ -251,10 +279,9 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
       addNotification('info', 'Disconnected from streaming service');
     }
 
-    // Reset fetched data types when disconnecting (new session will need fresh data)
-    fetchedDataTypesRef.current.clear();
-    setFetchedDataTypes(new Set());
-  }, [addNotification]);
+    // Clear all data and reset fetched data types when disconnecting (new session will need fresh data)
+    clearData();
+  }, [addNotification, clearData]);
 
   // Effect to manage connection - only runs when auth state changes
   useEffect(() => {
@@ -283,6 +310,7 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
     fetchApplicationStates,
     fetchApplicationResources,
     resetFetchedDataTypes,
+    clearData,
   };
 
   return (

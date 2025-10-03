@@ -51,7 +51,8 @@ export class StreamingConnection {
     onUpdate: (response: StreamingServiceSubscribeResponse) => void,
     onError: (error: string) => void,
     onConnect: () => void,
-    onDisconnect: () => void
+    onDisconnect: () => void,
+    onUnauthenticated?: () => void
   ): Promise<void> {
     if (this.isReconnecting) return;
 
@@ -77,22 +78,32 @@ export class StreamingConnection {
     } catch (err) {
       if (err instanceof ConnectError && err.code === Code.Canceled) {
         // This is a valid abort due to logout - no need to panic
+        logger.debug('Streaming disconnected:', err);
+        return;
+      }
+      if (err instanceof ConnectError && err.code === Code.Unauthenticated) {
+        // 401 Unauthenticated - trigger logout
+        logger.warn('Streaming connection unauthenticated (401), logging out user');
+        if (onUnauthenticated) {
+          onUnauthenticated();
+        }
         return;
       }
       logger.error('Streaming connection error:', err);
       const errorMsg = `Connection error: ${err}`;
       onError(errorMsg);
-      onDisconnect();
+    }
+    logger.debug('Stream disconnected');
+    onDisconnect();
 
-      // Schedule reconnection
-      if (!this.isReconnecting) {
-        this.isReconnecting = true;
-        logger.info('Scheduling reconnection in 10 seconds...');
-        this.reconnectTimeout = window.setTimeout(() => {
-          this.isReconnecting = false;
-          this.connect(subscriptionTypes, onUpdate, onError, onConnect, onDisconnect);
-        }, 10000);
-      }
+    // Schedule reconnection
+    if (!this.isReconnecting) {
+      this.isReconnecting = true;
+      logger.info('Scheduling reconnection in 10 seconds...');
+      this.reconnectTimeout = window.setTimeout(() => {
+        this.isReconnecting = false;
+        this.connect(subscriptionTypes, onUpdate, onError, onConnect, onDisconnect, onUnauthenticated);
+      }, 10000);
     }
   }
 
