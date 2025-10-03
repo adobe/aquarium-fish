@@ -12,24 +12,21 @@
 
 // Author: Sergei Parshev (@sparshev)
 
-import React from 'react';
-import { DashboardLayout } from '../components/DashboardLayout';
-import { ProtectedRoute } from '../components/ProtectedRoute';
-import { ManagePage } from '../features/users/components/ManagePage';
+import { create } from '@bufbuild/protobuf';
+import { gateProxySSHClient } from '../../../lib/api/client';
+import {
+  GateProxySSHServiceGetResourceAccessRequestSchema,
+  type GateProxySSHServiceGetResourceAccessResponse,
+} from '../../../../gen/aquarium/v2/gate_proxyssh_access_pb';
 
-export function meta() {
-  return [
-    { title: 'Management - Aquarium Fish' },
-    { name: 'description', content: 'Manage users and roles' },
-  ];
+export class SSHService {
+  async getResourceAccess(applicationResourceUid: string): Promise<GateProxySSHServiceGetResourceAccessResponse> {
+    const request = create(GateProxySSHServiceGetResourceAccessRequestSchema, {
+      applicationResourceUid,
+    });
+    return await gateProxySSHClient.getResourceAccess(request);
+  }
 }
 
-export default function Manage() {
-  return (
-    <ProtectedRoute>
-      <DashboardLayout>
-        <ManagePage />
-      </DashboardLayout>
-    </ProtectedRoute>
-  );
-}
+export const sshService = new SSHService();
+

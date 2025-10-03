@@ -12,24 +12,13 @@
 
 // Author: Sergei Parshev (@sparshev)
 
-import React from 'react';
-import { DashboardLayout } from '../components/DashboardLayout';
-import { ProtectedRoute } from '../components/ProtectedRoute';
-import { ManagePage } from '../features/users/components/ManagePage';
+import type { Application, ApplicationState, ApplicationResource } from '../../../../gen/aquarium/v2/application_pb';
 
-export function meta() {
-  return [
-    { title: 'Management - Aquarium Fish' },
-    { name: 'description', content: 'Manage users and roles' },
-  ];
+export interface ApplicationWithDetails extends Application {
+  state?: ApplicationState;
+  resource?: ApplicationResource;
+  isUserOwned?: boolean;
 }
 
-export default function Manage() {
-  return (
-    <ProtectedRoute>
-      <DashboardLayout>
-        <ManagePage />
-      </DashboardLayout>
-    </ProtectedRoute>
-  );
-}
+export type { Application, ApplicationState, ApplicationResource };
+
