@@ -63,7 +63,7 @@ service LabelService {
 // Combination of Name and Version should be unique.
 message Label {
   option (ui_config) = { generate_ui: true };
-  option (subscribe_config) = { permission_check: "LabelServiceGet" };
+  option (subscribe_config) = { permission_check: "Get" };
 
   string uid = 1 [(field_ui_config) = { nocreate: true, noedit: true }];
   google.protobuf.Timestamp created_at = 2 [(field_ui_config) = { nocreate: true, noedit: true }];

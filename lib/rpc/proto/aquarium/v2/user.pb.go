@@ -791,11 +791,597 @@ func (x *UserServiceRemoveResponse) GetMessage() string {
 	return ""
 }
 
+// UserGroup makes a team of users
+//
+// Contains a list of users and their common configuration options, very useful to share Labels
+// and make changes that affecting everyone in the team.
+type UserGroup struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Name      string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	CreatedAt *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	// List of user names participating in the group
+	Users []string `protobuf:"bytes,4,rep,name=users,proto3" json:"users,omitempty"`
+	// Common User configuration settings
+	Config        *UserConfig `protobuf:"bytes,5,opt,name=config,proto3,oneof" json:"config,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserGroup) Reset() {
+	*x = UserGroup{}
+	mi := &file_aquarium_v2_user_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserGroup) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserGroup) ProtoMessage() {}
+
+func (x *UserGroup) ProtoReflect() protoreflect.Message {
+	mi := &file_aquarium_v2_user_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserGroup.ProtoReflect.Descriptor instead.
+func (*UserGroup) Descriptor() ([]byte, []int) {
+	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *UserGroup) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *UserGroup) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *UserGroup) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+func (x *UserGroup) GetUsers() []string {
+	if x != nil {
+		return x.Users
+	}
+	return nil
+}
+
+func (x *UserGroup) GetConfig() *UserConfig {
+	if x != nil {
+		return x.Config
+	}
+	return nil
+}
+
+type UserServiceListGroupRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserServiceListGroupRequest) Reset() {
+	*x = UserServiceListGroupRequest{}
+	mi := &file_aquarium_v2_user_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserServiceListGroupRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserServiceListGroupRequest) ProtoMessage() {}
+
+func (x *UserServiceListGroupRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aquarium_v2_user_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserServiceListGroupRequest.ProtoReflect.Descriptor instead.
+func (*UserServiceListGroupRequest) Descriptor() ([]byte, []int) {
+	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{15}
+}
+
+type UserServiceListGroupResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        bool                   `protobuf:"varint,1,opt,name=status,proto3" json:"status,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Data          []*UserGroup           `protobuf:"bytes,3,rep,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserServiceListGroupResponse) Reset() {
+	*x = UserServiceListGroupResponse{}
+	mi := &file_aquarium_v2_user_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserServiceListGroupResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserServiceListGroupResponse) ProtoMessage() {}
+
+func (x *UserServiceListGroupResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aquarium_v2_user_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserServiceListGroupResponse.ProtoReflect.Descriptor instead.
+func (*UserServiceListGroupResponse) Descriptor() ([]byte, []int) {
+	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *UserServiceListGroupResponse) GetStatus() bool {
+	if x != nil {
+		return x.Status
+	}
+	return false
+}
+
+func (x *UserServiceListGroupResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *UserServiceListGroupResponse) GetData() []*UserGroup {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+type UserServiceGetGroupRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	GroupName     string                 `protobuf:"bytes,1,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserServiceGetGroupRequest) Reset() {
+	*x = UserServiceGetGroupRequest{}
+	mi := &file_aquarium_v2_user_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserServiceGetGroupRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserServiceGetGroupRequest) ProtoMessage() {}
+
+func (x *UserServiceGetGroupRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aquarium_v2_user_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserServiceGetGroupRequest.ProtoReflect.Descriptor instead.
+func (*UserServiceGetGroupRequest) Descriptor() ([]byte, []int) {
+	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *UserServiceGetGroupRequest) GetGroupName() string {
+	if x != nil {
+		return x.GroupName
+	}
+	return ""
+}
+
+type UserServiceGetGroupResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        bool                   `protobuf:"varint,1,opt,name=status,proto3" json:"status,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Data          *UserGroup             `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserServiceGetGroupResponse) Reset() {
+	*x = UserServiceGetGroupResponse{}
+	mi := &file_aquarium_v2_user_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserServiceGetGroupResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserServiceGetGroupResponse) ProtoMessage() {}
+
+func (x *UserServiceGetGroupResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aquarium_v2_user_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserServiceGetGroupResponse.ProtoReflect.Descriptor instead.
+func (*UserServiceGetGroupResponse) Descriptor() ([]byte, []int) {
+	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *UserServiceGetGroupResponse) GetStatus() bool {
+	if x != nil {
+		return x.Status
+	}
+	return false
+}
+
+func (x *UserServiceGetGroupResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *UserServiceGetGroupResponse) GetData() *UserGroup {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+type UserServiceCreateGroupRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Usergroup     *UserGroup             `protobuf:"bytes,1,opt,name=usergroup,proto3" json:"usergroup,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserServiceCreateGroupRequest) Reset() {
+	*x = UserServiceCreateGroupRequest{}
+	mi := &file_aquarium_v2_user_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserServiceCreateGroupRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserServiceCreateGroupRequest) ProtoMessage() {}
+
+func (x *UserServiceCreateGroupRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aquarium_v2_user_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserServiceCreateGroupRequest.ProtoReflect.Descriptor instead.
+func (*UserServiceCreateGroupRequest) Descriptor() ([]byte, []int) {
+	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *UserServiceCreateGroupRequest) GetUsergroup() *UserGroup {
+	if x != nil {
+		return x.Usergroup
+	}
+	return nil
+}
+
+type UserServiceCreateGroupResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        bool                   `protobuf:"varint,1,opt,name=status,proto3" json:"status,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Data          *UserGroup             `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserServiceCreateGroupResponse) Reset() {
+	*x = UserServiceCreateGroupResponse{}
+	mi := &file_aquarium_v2_user_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserServiceCreateGroupResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserServiceCreateGroupResponse) ProtoMessage() {}
+
+func (x *UserServiceCreateGroupResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aquarium_v2_user_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserServiceCreateGroupResponse.ProtoReflect.Descriptor instead.
+func (*UserServiceCreateGroupResponse) Descriptor() ([]byte, []int) {
+	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *UserServiceCreateGroupResponse) GetStatus() bool {
+	if x != nil {
+		return x.Status
+	}
+	return false
+}
+
+func (x *UserServiceCreateGroupResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *UserServiceCreateGroupResponse) GetData() *UserGroup {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+type UserServiceUpdateGroupRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Usergroup     *UserGroup             `protobuf:"bytes,1,opt,name=usergroup,proto3" json:"usergroup,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserServiceUpdateGroupRequest) Reset() {
+	*x = UserServiceUpdateGroupRequest{}
+	mi := &file_aquarium_v2_user_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserServiceUpdateGroupRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserServiceUpdateGroupRequest) ProtoMessage() {}
+
+func (x *UserServiceUpdateGroupRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aquarium_v2_user_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserServiceUpdateGroupRequest.ProtoReflect.Descriptor instead.
+func (*UserServiceUpdateGroupRequest) Descriptor() ([]byte, []int) {
+	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *UserServiceUpdateGroupRequest) GetUsergroup() *UserGroup {
+	if x != nil {
+		return x.Usergroup
+	}
+	return nil
+}
+
+type UserServiceUpdateGroupResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        bool                   `protobuf:"varint,1,opt,name=status,proto3" json:"status,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Data          *UserGroup             `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserServiceUpdateGroupResponse) Reset() {
+	*x = UserServiceUpdateGroupResponse{}
+	mi := &file_aquarium_v2_user_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserServiceUpdateGroupResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserServiceUpdateGroupResponse) ProtoMessage() {}
+
+func (x *UserServiceUpdateGroupResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aquarium_v2_user_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserServiceUpdateGroupResponse.ProtoReflect.Descriptor instead.
+func (*UserServiceUpdateGroupResponse) Descriptor() ([]byte, []int) {
+	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *UserServiceUpdateGroupResponse) GetStatus() bool {
+	if x != nil {
+		return x.Status
+	}
+	return false
+}
+
+func (x *UserServiceUpdateGroupResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *UserServiceUpdateGroupResponse) GetData() *UserGroup {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+type UserServiceRemoveGroupRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	GroupName     string                 `protobuf:"bytes,1,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserServiceRemoveGroupRequest) Reset() {
+	*x = UserServiceRemoveGroupRequest{}
+	mi := &file_aquarium_v2_user_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserServiceRemoveGroupRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserServiceRemoveGroupRequest) ProtoMessage() {}
+
+func (x *UserServiceRemoveGroupRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aquarium_v2_user_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserServiceRemoveGroupRequest.ProtoReflect.Descriptor instead.
+func (*UserServiceRemoveGroupRequest) Descriptor() ([]byte, []int) {
+	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *UserServiceRemoveGroupRequest) GetGroupName() string {
+	if x != nil {
+		return x.GroupName
+	}
+	return ""
+}
+
+type UserServiceRemoveGroupResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        bool                   `protobuf:"varint,1,opt,name=status,proto3" json:"status,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserServiceRemoveGroupResponse) Reset() {
+	*x = UserServiceRemoveGroupResponse{}
+	mi := &file_aquarium_v2_user_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserServiceRemoveGroupResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserServiceRemoveGroupResponse) ProtoMessage() {}
+
+func (x *UserServiceRemoveGroupResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aquarium_v2_user_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserServiceRemoveGroupResponse.ProtoReflect.Descriptor instead.
+func (*UserServiceRemoveGroupResponse) Descriptor() ([]byte, []int) {
+	return file_aquarium_v2_user_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *UserServiceRemoveGroupResponse) GetStatus() bool {
+	if x != nil {
+		return x.Status
+	}
+	return false
+}
+
+func (x *UserServiceRemoveGroupResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 var File_aquarium_v2_user_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_user_proto_rawDesc = "" +
 	"\n" +
-	"\x16aquarium/v2/user.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1eaquarium/v2/options_rbac.proto\x1a#aquarium/v2/options_streaming.proto\x1a\x1caquarium/v2/options_ui.proto\"\xa5\x03\n" +
+	"\x16aquarium/v2/user.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1eaquarium/v2/options_rbac.proto\x1a#aquarium/v2/options_streaming.proto\x1a\x1caquarium/v2/options_ui.proto\"\x9a\x03\n" +
 	"\x04User\x12\x1a\n" +
 	"\x04name\x18\x01 \x01(\tB\x06\x9a\xb5\x18\x02\x10\x01R\x04name\x12C\n" +
 	"\n" +
@@ -805,8 +1391,8 @@ const file_aquarium_v2_user_proto_rawDesc = "" +
 	"\x04hash\x18\x04 \x01(\v2\x17.google.protobuf.StructB\b\x9a\xb5\x18\x04\b\x01\x10\x01H\x00R\x04hash\x88\x01\x01\x12\x1f\n" +
 	"\bpassword\x18\x05 \x01(\tH\x01R\bpassword\x88\x01\x01\x124\n" +
 	"\x06config\x18\x06 \x01(\v2\x17.aquarium.v2.UserConfigH\x02R\x06config\x88\x01\x01\x12'\n" +
-	"\x05roles\x18\a \x03(\tB\x11\x9a\xb5\x18\r\x1a\x05Roles\"\x04RoleR\x05roles:\x1a\x8a\xb5\x18\x10\n" +
-	"\x0eUserServiceGet\x92\xb5\x18\x02\b\x01B\a\n" +
+	"\x05roles\x18\a \x03(\tB\x11\x9a\xb5\x18\r\x1a\x05Roles\"\x04RoleR\x05roles:\x0f\x8a\xb5\x18\x05\n" +
+	"\x03Get\x92\xb5\x18\x02\b\x01B\a\n" +
 	"\x05_hashB\v\n" +
 	"\t_passwordB\t\n" +
 	"\a_config\"\x83\x01\n" +
@@ -849,14 +1435,60 @@ const file_aquarium_v2_user_proto_rawDesc = "" +
 	"\tuser_name\x18\x01 \x01(\tR\buserName\"M\n" +
 	"\x19UserServiceRemoveResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage2\xd0\x04\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\xb1\x02\n" +
+	"\tUserGroup\x12\x1a\n" +
+	"\x04name\x18\x01 \x01(\tB\x06\x9a\xb5\x18\x02\x10\x01R\x04name\x12C\n" +
+	"\n" +
+	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\b\x9a\xb5\x18\x04\b\x01\x10\x01R\tcreatedAt\x12C\n" +
+	"\n" +
+	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\b\x9a\xb5\x18\x04\b\x01\x10\x01R\tupdatedAt\x12'\n" +
+	"\x05users\x18\x04 \x03(\tB\x11\x9a\xb5\x18\r\x1a\x05Users\"\x04UserR\x05users\x124\n" +
+	"\x06config\x18\x05 \x01(\v2\x17.aquarium.v2.UserConfigH\x00R\x06config\x88\x01\x01:\x14\x8a\xb5\x18\n" +
+	"\n" +
+	"\bGetGroup\x92\xb5\x18\x02\b\x01B\t\n" +
+	"\a_config\"\x1d\n" +
+	"\x1bUserServiceListGroupRequest\"|\n" +
+	"\x1cUserServiceListGroupResponse\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12*\n" +
+	"\x04data\x18\x03 \x03(\v2\x16.aquarium.v2.UserGroupR\x04data\";\n" +
+	"\x1aUserServiceGetGroupRequest\x12\x1d\n" +
+	"\n" +
+	"group_name\x18\x01 \x01(\tR\tgroupName\"{\n" +
+	"\x1bUserServiceGetGroupResponse\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12*\n" +
+	"\x04data\x18\x03 \x01(\v2\x16.aquarium.v2.UserGroupR\x04data\"U\n" +
+	"\x1dUserServiceCreateGroupRequest\x124\n" +
+	"\tusergroup\x18\x01 \x01(\v2\x16.aquarium.v2.UserGroupR\tusergroup\"~\n" +
+	"\x1eUserServiceCreateGroupResponse\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12*\n" +
+	"\x04data\x18\x03 \x01(\v2\x16.aquarium.v2.UserGroupR\x04data\"U\n" +
+	"\x1dUserServiceUpdateGroupRequest\x124\n" +
+	"\tusergroup\x18\x01 \x01(\v2\x16.aquarium.v2.UserGroupR\tusergroup\"~\n" +
+	"\x1eUserServiceUpdateGroupResponse\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12*\n" +
+	"\x04data\x18\x03 \x01(\v2\x16.aquarium.v2.UserGroupR\x04data\">\n" +
+	"\x1dUserServiceRemoveGroupRequest\x12\x1d\n" +
+	"\n" +
+	"group_name\x18\x01 \x01(\tR\tgroupName\"R\n" +
+	"\x1eUserServiceRemoveGroupResponse\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage2\xd3\b\n" +
 	"\vUserService\x12\\\n" +
 	"\x05GetMe\x12$.aquarium.v2.UserServiceGetMeRequest\x1a%.aquarium.v2.UserServiceGetMeResponse\"\x06\x82\xb5\x18\x02\x10\x01\x12S\n" +
 	"\x04List\x12#.aquarium.v2.UserServiceListRequest\x1a$.aquarium.v2.UserServiceListResponse\"\x00\x12P\n" +
 	"\x03Get\x12\".aquarium.v2.UserServiceGetRequest\x1a#.aquarium.v2.UserServiceGetResponse\"\x00\x12Y\n" +
 	"\x06Create\x12%.aquarium.v2.UserServiceCreateRequest\x1a&.aquarium.v2.UserServiceCreateResponse\"\x00\x12\x85\x01\n" +
 	"\x06Update\x12%.aquarium.v2.UserServiceUpdateRequest\x1a&.aquarium.v2.UserServiceUpdateResponse\",\x82\xb5\x18(\"\tUpdateAll\"\x0eUpdatePassword\"\vUpdateRoles\x12Y\n" +
-	"\x06Remove\x12%.aquarium.v2.UserServiceRemoveRequest\x1a&.aquarium.v2.UserServiceRemoveResponse\"\x00BEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"
+	"\x06Remove\x12%.aquarium.v2.UserServiceRemoveRequest\x1a&.aquarium.v2.UserServiceRemoveResponse\"\x00\x12b\n" +
+	"\tListGroup\x12(.aquarium.v2.UserServiceListGroupRequest\x1a).aquarium.v2.UserServiceListGroupResponse\"\x00\x12_\n" +
+	"\bGetGroup\x12'.aquarium.v2.UserServiceGetGroupRequest\x1a(.aquarium.v2.UserServiceGetGroupResponse\"\x00\x12h\n" +
+	"\vCreateGroup\x12*.aquarium.v2.UserServiceCreateGroupRequest\x1a+.aquarium.v2.UserServiceCreateGroupResponse\"\x00\x12h\n" +
+	"\vUpdateGroup\x12*.aquarium.v2.UserServiceUpdateGroupRequest\x1a+.aquarium.v2.UserServiceUpdateGroupResponse\"\x00\x12h\n" +
+	"\vRemoveGroup\x12*.aquarium.v2.UserServiceRemoveGroupRequest\x1a+.aquarium.v2.UserServiceRemoveGroupResponse\"\x00BEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"
 
 var (
 	file_aquarium_v2_user_proto_rawDescOnce sync.Once
@@ -870,29 +1502,40 @@ func file_aquarium_v2_user_proto_rawDescGZIP() []byte {
 	return file_aquarium_v2_user_proto_rawDescData
 }
 
-var file_aquarium_v2_user_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_aquarium_v2_user_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_aquarium_v2_user_proto_goTypes = []any{
-	(*User)(nil),                      // 0: aquarium.v2.User
-	(*UserConfig)(nil),                // 1: aquarium.v2.UserConfig
-	(*UserServiceGetMeRequest)(nil),   // 2: aquarium.v2.UserServiceGetMeRequest
-	(*UserServiceGetMeResponse)(nil),  // 3: aquarium.v2.UserServiceGetMeResponse
-	(*UserServiceListRequest)(nil),    // 4: aquarium.v2.UserServiceListRequest
-	(*UserServiceListResponse)(nil),   // 5: aquarium.v2.UserServiceListResponse
-	(*UserServiceGetRequest)(nil),     // 6: aquarium.v2.UserServiceGetRequest
-	(*UserServiceGetResponse)(nil),    // 7: aquarium.v2.UserServiceGetResponse
-	(*UserServiceCreateRequest)(nil),  // 8: aquarium.v2.UserServiceCreateRequest
-	(*UserServiceCreateResponse)(nil), // 9: aquarium.v2.UserServiceCreateResponse
-	(*UserServiceUpdateRequest)(nil),  // 10: aquarium.v2.UserServiceUpdateRequest
-	(*UserServiceUpdateResponse)(nil), // 11: aquarium.v2.UserServiceUpdateResponse
-	(*UserServiceRemoveRequest)(nil),  // 12: aquarium.v2.UserServiceRemoveRequest
-	(*UserServiceRemoveResponse)(nil), // 13: aquarium.v2.UserServiceRemoveResponse
-	(*timestamppb.Timestamp)(nil),     // 14: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),           // 15: google.protobuf.Struct
+	(*User)(nil),                           // 0: aquarium.v2.User
+	(*UserConfig)(nil),                     // 1: aquarium.v2.UserConfig
+	(*UserServiceGetMeRequest)(nil),        // 2: aquarium.v2.UserServiceGetMeRequest
+	(*UserServiceGetMeResponse)(nil),       // 3: aquarium.v2.UserServiceGetMeResponse
+	(*UserServiceListRequest)(nil),         // 4: aquarium.v2.UserServiceListRequest
+	(*UserServiceListResponse)(nil),        // 5: aquarium.v2.UserServiceListResponse
+	(*UserServiceGetRequest)(nil),          // 6: aquarium.v2.UserServiceGetRequest
+	(*UserServiceGetResponse)(nil),         // 7: aquarium.v2.UserServiceGetResponse
+	(*UserServiceCreateRequest)(nil),       // 8: aquarium.v2.UserServiceCreateRequest
+	(*UserServiceCreateResponse)(nil),      // 9: aquarium.v2.UserServiceCreateResponse
+	(*UserServiceUpdateRequest)(nil),       // 10: aquarium.v2.UserServiceUpdateRequest
+	(*UserServiceUpdateResponse)(nil),      // 11: aquarium.v2.UserServiceUpdateResponse
+	(*UserServiceRemoveRequest)(nil),       // 12: aquarium.v2.UserServiceRemoveRequest
+	(*UserServiceRemoveResponse)(nil),      // 13: aquarium.v2.UserServiceRemoveResponse
+	(*UserGroup)(nil),                      // 14: aquarium.v2.UserGroup
+	(*UserServiceListGroupRequest)(nil),    // 15: aquarium.v2.UserServiceListGroupRequest
+	(*UserServiceListGroupResponse)(nil),   // 16: aquarium.v2.UserServiceListGroupResponse
+	(*UserServiceGetGroupRequest)(nil),     // 17: aquarium.v2.UserServiceGetGroupRequest
+	(*UserServiceGetGroupResponse)(nil),    // 18: aquarium.v2.UserServiceGetGroupResponse
+	(*UserServiceCreateGroupRequest)(nil),  // 19: aquarium.v2.UserServiceCreateGroupRequest
+	(*UserServiceCreateGroupResponse)(nil), // 20: aquarium.v2.UserServiceCreateGroupResponse
+	(*UserServiceUpdateGroupRequest)(nil),  // 21: aquarium.v2.UserServiceUpdateGroupRequest
+	(*UserServiceUpdateGroupResponse)(nil), // 22: aquarium.v2.UserServiceUpdateGroupResponse
+	(*UserServiceRemoveGroupRequest)(nil),  // 23: aquarium.v2.UserServiceRemoveGroupRequest
+	(*UserServiceRemoveGroupResponse)(nil), // 24: aquarium.v2.UserServiceRemoveGroupResponse
+	(*timestamppb.Timestamp)(nil),          // 25: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),                // 26: google.protobuf.Struct
 }
 var file_aquarium_v2_user_proto_depIdxs = []int32{
-	14, // 0: aquarium.v2.User.created_at:type_name -> google.protobuf.Timestamp
-	14, // 1: aquarium.v2.User.updated_at:type_name -> google.protobuf.Timestamp
-	15, // 2: aquarium.v2.User.hash:type_name -> google.protobuf.Struct
+	25, // 0: aquarium.v2.User.created_at:type_name -> google.protobuf.Timestamp
+	25, // 1: aquarium.v2.User.updated_at:type_name -> google.protobuf.Timestamp
+	26, // 2: aquarium.v2.User.hash:type_name -> google.protobuf.Struct
 	1,  // 3: aquarium.v2.User.config:type_name -> aquarium.v2.UserConfig
 	0,  // 4: aquarium.v2.UserServiceGetMeResponse.data:type_name -> aquarium.v2.User
 	0,  // 5: aquarium.v2.UserServiceListResponse.data:type_name -> aquarium.v2.User
@@ -901,23 +1544,42 @@ var file_aquarium_v2_user_proto_depIdxs = []int32{
 	0,  // 8: aquarium.v2.UserServiceCreateResponse.data:type_name -> aquarium.v2.User
 	0,  // 9: aquarium.v2.UserServiceUpdateRequest.user:type_name -> aquarium.v2.User
 	0,  // 10: aquarium.v2.UserServiceUpdateResponse.data:type_name -> aquarium.v2.User
-	2,  // 11: aquarium.v2.UserService.GetMe:input_type -> aquarium.v2.UserServiceGetMeRequest
-	4,  // 12: aquarium.v2.UserService.List:input_type -> aquarium.v2.UserServiceListRequest
-	6,  // 13: aquarium.v2.UserService.Get:input_type -> aquarium.v2.UserServiceGetRequest
-	8,  // 14: aquarium.v2.UserService.Create:input_type -> aquarium.v2.UserServiceCreateRequest
-	10, // 15: aquarium.v2.UserService.Update:input_type -> aquarium.v2.UserServiceUpdateRequest
-	12, // 16: aquarium.v2.UserService.Remove:input_type -> aquarium.v2.UserServiceRemoveRequest
-	3,  // 17: aquarium.v2.UserService.GetMe:output_type -> aquarium.v2.UserServiceGetMeResponse
-	5,  // 18: aquarium.v2.UserService.List:output_type -> aquarium.v2.UserServiceListResponse
-	7,  // 19: aquarium.v2.UserService.Get:output_type -> aquarium.v2.UserServiceGetResponse
-	9,  // 20: aquarium.v2.UserService.Create:output_type -> aquarium.v2.UserServiceCreateResponse
-	11, // 21: aquarium.v2.UserService.Update:output_type -> aquarium.v2.UserServiceUpdateResponse
-	13, // 22: aquarium.v2.UserService.Remove:output_type -> aquarium.v2.UserServiceRemoveResponse
-	17, // [17:23] is the sub-list for method output_type
-	11, // [11:17] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	25, // 11: aquarium.v2.UserGroup.created_at:type_name -> google.protobuf.Timestamp
+	25, // 12: aquarium.v2.UserGroup.updated_at:type_name -> google.protobuf.Timestamp
+	1,  // 13: aquarium.v2.UserGroup.config:type_name -> aquarium.v2.UserConfig
+	14, // 14: aquarium.v2.UserServiceListGroupResponse.data:type_name -> aquarium.v2.UserGroup
+	14, // 15: aquarium.v2.UserServiceGetGroupResponse.data:type_name -> aquarium.v2.UserGroup
+	14, // 16: aquarium.v2.UserServiceCreateGroupRequest.usergroup:type_name -> aquarium.v2.UserGroup
+	14, // 17: aquarium.v2.UserServiceCreateGroupResponse.data:type_name -> aquarium.v2.UserGroup
+	14, // 18: aquarium.v2.UserServiceUpdateGroupRequest.usergroup:type_name -> aquarium.v2.UserGroup
+	14, // 19: aquarium.v2.UserServiceUpdateGroupResponse.data:type_name -> aquarium.v2.UserGroup
+	2,  // 20: aquarium.v2.UserService.GetMe:input_type -> aquarium.v2.UserServiceGetMeRequest
+	4,  // 21: aquarium.v2.UserService.List:input_type -> aquarium.v2.UserServiceListRequest
+	6,  // 22: aquarium.v2.UserService.Get:input_type -> aquarium.v2.UserServiceGetRequest
+	8,  // 23: aquarium.v2.UserService.Create:input_type -> aquarium.v2.UserServiceCreateRequest
+	10, // 24: aquarium.v2.UserService.Update:input_type -> aquarium.v2.UserServiceUpdateRequest
+	12, // 25: aquarium.v2.UserService.Remove:input_type -> aquarium.v2.UserServiceRemoveRequest
+	15, // 26: aquarium.v2.UserService.ListGroup:input_type -> aquarium.v2.UserServiceListGroupRequest
+	17, // 27: aquarium.v2.UserService.GetGroup:input_type -> aquarium.v2.UserServiceGetGroupRequest
+	19, // 28: aquarium.v2.UserService.CreateGroup:input_type -> aquarium.v2.UserServiceCreateGroupRequest
+	21, // 29: aquarium.v2.UserService.UpdateGroup:input_type -> aquarium.v2.UserServiceUpdateGroupRequest
+	23, // 30: aquarium.v2.UserService.RemoveGroup:input_type -> aquarium.v2.UserServiceRemoveGroupRequest
+	3,  // 31: aquarium.v2.UserService.GetMe:output_type -> aquarium.v2.UserServiceGetMeResponse
+	5,  // 32: aquarium.v2.UserService.List:output_type -> aquarium.v2.UserServiceListResponse
+	7,  // 33: aquarium.v2.UserService.Get:output_type -> aquarium.v2.UserServiceGetResponse
+	9,  // 34: aquarium.v2.UserService.Create:output_type -> aquarium.v2.UserServiceCreateResponse
+	11, // 35: aquarium.v2.UserService.Update:output_type -> aquarium.v2.UserServiceUpdateResponse
+	13, // 36: aquarium.v2.UserService.Remove:output_type -> aquarium.v2.UserServiceRemoveResponse
+	16, // 37: aquarium.v2.UserService.ListGroup:output_type -> aquarium.v2.UserServiceListGroupResponse
+	18, // 38: aquarium.v2.UserService.GetGroup:output_type -> aquarium.v2.UserServiceGetGroupResponse
+	20, // 39: aquarium.v2.UserService.CreateGroup:output_type -> aquarium.v2.UserServiceCreateGroupResponse
+	22, // 40: aquarium.v2.UserService.UpdateGroup:output_type -> aquarium.v2.UserServiceUpdateGroupResponse
+	24, // 41: aquarium.v2.UserService.RemoveGroup:output_type -> aquarium.v2.UserServiceRemoveGroupResponse
+	31, // [31:42] is the sub-list for method output_type
+	20, // [20:31] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_aquarium_v2_user_proto_init() }
@@ -930,13 +1592,14 @@ func file_aquarium_v2_user_proto_init() {
 	file_aquarium_v2_options_ui_proto_init()
 	file_aquarium_v2_user_proto_msgTypes[0].OneofWrappers = []any{}
 	file_aquarium_v2_user_proto_msgTypes[1].OneofWrappers = []any{}
+	file_aquarium_v2_user_proto_msgTypes[14].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aquarium_v2_user_proto_rawDesc), len(file_aquarium_v2_user_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   14,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

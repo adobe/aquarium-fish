@@ -89,8 +89,10 @@ func (d *Database) nodeCreateImpl(_ context.Context, n *typesv2.Node) error {
 	err := d.be.Collection(ObjectNode).Add(n.Name, n)
 
 	if err == nil {
+		// Create a copy of the node to avoid data races with subscribers
+		nodeCopy := *n
 		// Notify subscribers about the new Node
-		notifySubscribersHelper(d, &d.subsNode, NewCreateEvent(n), ObjectNode)
+		notifySubscribersHelper(d, &d.subsNode, NewCreateEvent(&nodeCopy), ObjectNode)
 	}
 
 	return err
@@ -105,8 +107,10 @@ func (d *Database) nodeSaveImpl(_ context.Context, node *typesv2.Node) error {
 	err := d.be.Collection(ObjectNode).Add(node.Name, node)
 
 	if err == nil {
+		// Create a copy of the node to avoid data races with subscribers
+		nodeCopy := *node
 		// Notify subscribers about the removed Node
-		notifySubscribersHelper(d, &d.subsNode, NewUpdateEvent(node), ObjectNode)
+		notifySubscribersHelper(d, &d.subsNode, NewUpdateEvent(&nodeCopy), ObjectNode)
 	}
 
 	return err
