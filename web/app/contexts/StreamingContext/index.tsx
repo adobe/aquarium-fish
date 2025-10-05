@@ -253,7 +253,6 @@ export const StreamingProvider: React.FC<StreamingProviderProps> = ({ children }
       () => {
         setConnectionStatus('connected');
         setIsConnected(true);
-        addNotification('info', 'Connected to real-time updates');
       },
       () => {
         setIsConnected(false);

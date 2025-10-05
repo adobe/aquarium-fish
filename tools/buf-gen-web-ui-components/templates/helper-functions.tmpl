@@ -1,5 +1,39 @@
-{{define "helper-functions"}}  // Load from YAML
-const handleYamlLoad = () => {
+{{define "helper-functions"}}  // Toggle YAML view and sync with current form data
+const handleToggleYamlView = () => {
+  if (!showYamlInput) {
+    // Switching to YAML view - export current form data to YAML
+    try {
+      const data = create({{.TypeName}}Schema, {
+{{- range .Fields }}
+{{- if .IsTimestamp }}
+        {{.JSONName}}: formData.{{.JSONName}} ? { seconds: BigInt(Math.floor(new Date(formData.{{.JSONName}}).getTime() / 1000)) } : undefined,
+{{- else if .IsStruct }}
+        {{.JSONName}}: formData.{{.JSONName}},
+{{- else if .IsOptional }}
+        {{.JSONName}}: formData.{{.JSONName}} || undefined,
+{{- else }}
+        {{.JSONName}}: formData.{{.JSONName}},
+{{- end }}
+{{- end }}
+      });
+
+      // Convert protobuf to plain object for YAML
+      const plainObj = JSON.parse(JSON.stringify(data, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value
+      ));
+
+      const yamlStr = yaml.dump(plainObj, { indent: 2, lineWidth: -1 });
+      setYamlText(yamlStr);
+      setYamlError(null);
+    } catch (error) {
+      setYamlError('Failed to convert to YAML: ' + error);
+    }
+  }
+  setShowYamlInput(!showYamlInput);
+};
+
+// Load from YAML (apply changes)
+const handleYamlApply = () => {
   try {
     setYamlError(null);
     const parsedData = yaml.load(yamlText) as any;
@@ -37,6 +71,15 @@ const handleYamlLoad = () => {
   }
 };
 
+// Copy YAML to clipboard
+const handleCopyYaml = () => {
+  navigator.clipboard.writeText(yamlText).then(() => {
+    alert('YAML copied to clipboard!');
+  }).catch(() => {
+    alert('Failed to copy to clipboard');
+  });
+};
+
 // Validate form data
 const validateForm = (): boolean => {
   const errors: Record<string, string> = {};
@@ -66,17 +109,20 @@ const handleSubmit = () => {
   }
 
   try {
+    // Collect data from this component and all nested components
+    const collectedData = getData();
+
     // Convert form data to protobuf message
     const data = create({{.TypeName}}Schema, {
 {{- range .Fields }}
 {{- if .IsTimestamp }}
-      {{.JSONName}}: formData.{{.JSONName}} ? { seconds: BigInt(Math.floor(new Date(formData.{{.JSONName}}).getTime() / 1000)) } : undefined,
+      {{.JSONName}}: collectedData.{{.JSONName}} ? { seconds: BigInt(Math.floor(new Date(collectedData.{{.JSONName}}).getTime() / 1000)) } : undefined,
 {{- else if .IsStruct }}
-      {{.JSONName}}: formData.{{.JSONName}},
+      {{.JSONName}}: collectedData.{{.JSONName}},
 {{- else if .IsOptional }}
-      {{.JSONName}}: formData.{{.JSONName}} || undefined,
+      {{.JSONName}}: collectedData.{{.JSONName}} || undefined,
 {{- else }}
-      {{.JSONName}}: formData.{{.JSONName}},
+      {{.JSONName}}: collectedData.{{.JSONName}},
 {{- end }}
 {{- end }}
     });
@@ -123,10 +169,27 @@ const addArrayItem = (field: string, defaultValue: any) => {
 
 // Remove array item
 const removeArrayItem = (field: string, index: number) => {
+  // Unregister the nested component
+  unregisterNestedGetData(field + '[' + index + ']');
+
+  // Remove from formData
   setFormData(prev => ({
     ...prev,
     [field]: (prev[field as keyof {{.Name}}FormState] as any[]).filter((_, i) => i !== index)
   }));
+
+  // Re-register remaining items with updated indices
+  setTimeout(() => {
+    const remainingItems = (formData[field as keyof {{.Name}}FormState] as any[]).length - 1;
+    for (let i = index; i < remainingItems; i++) {
+      const oldKey = field + '[' + (i + 1) + ']';
+      const newKey = field + '[' + i + ']';
+      if (nestedGetDataFns.current[oldKey]) {
+        nestedGetDataFns.current[newKey] = nestedGetDataFns.current[oldKey];
+        delete nestedGetDataFns.current[oldKey];
+      }
+    }
+  }, 0);
 };
 
 const isReadOnly = readonly || mode === 'view';

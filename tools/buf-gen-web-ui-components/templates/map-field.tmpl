@@ -49,17 +49,15 @@
             if (NestedComponent) {
               return (
                 <NestedComponent
+                  key={key}
                   mode={mode}
                   initialData={value}
-                  onSubmit={(data: any) => {
-                    const newMap = { ...formData.{{.JSONName}} };
-                    newMap[key] = data;
-                    handleFieldChange('{{.JSONName}}', newMap);
-                  }}
+                  onSubmit={() => {}}
                   onCancel={() => {}}
                   title={key}
                   readonly={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
                   nested={true}
+                  onRegister={(getDataFn: () => any) => registerNestedGetData('{{.JSONName}}.' + key, getDataFn)}
                 />
               );
             }

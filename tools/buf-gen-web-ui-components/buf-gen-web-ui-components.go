@@ -107,7 +107,8 @@ func loadTemplates() (*template.Template, error) {
 	// Load all template files
 	pattern := filepath.Join(templatesDir, "*.tmpl")
 	tmpl := template.New("react_component").Funcs(template.FuncMap{
-		"lower": strings.ToLower,
+		"lower":      strings.ToLower,
+		"htmlEscape": template.HTMLEscapeString,
 	})
 
 	// Parse all template files
