@@ -38,7 +38,7 @@ type ApplicationService struct {
 	fish *fish.Fish
 }
 
-// checkApplicationOwnerOrHasAccess checks if user has permission to deallocate this application
+// checkApplicationOwnerOrHasAccess checks if user has permission to somehow interact with this application
 // Set method to "" when you need to check the owner only
 func (s *ApplicationService) getApplicationIfUserIsOwnerOrHasAccess(ctx context.Context, appUIDStr, method string) (*typesv2.Application, error) {
 	ctx, span := rpcTracer.Start(ctx, "rpc.ApplicationService.getApplicationIfUserIsOwnerOrHasAccess",

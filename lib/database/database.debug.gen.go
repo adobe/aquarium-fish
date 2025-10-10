@@ -25,7 +25,7 @@ import (
 var debugTracerDatabaseDatabase = otel.Tracer("aquarium-fish/database")
 
 func (d *Database) Shutdown(ctx context.Context) error {
-	ctx, span := debugTracerDatabaseDatabase.Start(ctx, "database.Database.shutdownImpl")
+	ctx, span := debugTracerDatabaseDatabase.Start(ctx, "database.Database.Shutdown")
 	defer span.End()
 
 	err0 := d.shutdownImpl(ctx)

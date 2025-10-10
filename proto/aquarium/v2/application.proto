@@ -119,7 +119,7 @@ service ApplicationService {
 // the ApplicationResource and the cluster choose which one node will actually do the work.
 message Application {
   option (ui_config) = { generate_ui: true };
-  option (subscribe_config) = { permission_check: "ApplicationServiceGet" };
+  option (subscribe_config) = { permission_check: "Get" };
 
   string uid = 1                           [(field_ui_config) = { nocreate: true, noedit: true }];
   google.protobuf.Timestamp created_at = 2 [(field_ui_config) = { nocreate: true, noedit: true }];
@@ -130,7 +130,7 @@ message Application {
   //   JENKINS_URL: 'http://172.16.1.1:8085/'
   //   JENKINS_AGENT_SECRET: 03839eabcf945b1e780be8f9488d264c4c57bf388546da9a84588345555f29b0
   //   JENKINS_AGENT_NAME: test-node
-  google.protobuf.Struct metadata = 5;
+  google.protobuf.Struct metadata = 5 [(field_ui_config) = { required: false }];
 }
 
 // ApplicationState represents the current state of an application
@@ -139,7 +139,7 @@ message Application {
 // info when the Application comes to this state and the last one describes the current state
 // of the Application.
 message ApplicationState {
-  option (subscribe_config) = { permission_check: "ApplicationServiceGetState" };
+  option (subscribe_config) = { permission_check: "GetState" };
 
   // Enum for ApplicationState status field
   enum Status {
@@ -170,7 +170,7 @@ message ApplicationState {
 // Could be created and updated only by the node which won the Application execution.
 message ApplicationResource {
   option (ui_config) = { generate_ui: true };
-  option (subscribe_config) = { permission_check: "ApplicationServiceGetResource" };
+  option (subscribe_config) = { permission_check: "GetResource" };
 
   string uid = 1 [(field_ui_config) = { nocreate: true, noedit: true }];
   google.protobuf.Timestamp created_at = 2 [(field_ui_config) = { nocreate: true, noedit: true }];
@@ -212,7 +212,7 @@ message ApplicationResource {
 //
 // It could be created by any Node but updated by the one which won the Application execution.
 message ApplicationTask {
-  option (subscribe_config) = { permission_check: "ApplicationServiceGetTask" };
+  option (subscribe_config) = { permission_check: "GetTask" };
 
   string uid = 1;
   google.protobuf.Timestamp created_at = 2;

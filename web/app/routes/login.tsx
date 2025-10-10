@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Navigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
 
 export function meta() {
   return [
@@ -12,7 +11,6 @@ export function meta() {
 
 export default function Login() {
   const { isAuthenticated, login, isLoading } = useAuth();
-  const { theme, setTheme } = useTheme();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');

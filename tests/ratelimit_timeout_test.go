@@ -595,3 +595,298 @@ func (*streamingAuthInterceptor) WrapStreamingHandler(next connect.StreamingHand
 		return next(ctx, conn)
 	}
 }
+
+// Test_user_group_rate_limit_fallback tests that user inherits rate limit from user group
+func Test_user_group_rate_limit_fallback(t *testing.T) {
+	t.Parallel()
+	afi := h.NewAquariumFish(t, "node-1", `---
+node_location: test_loc
+api_address: 127.0.0.1:0
+drivers:
+  gates: {}
+  providers:
+    test:`)
+
+	// Create admin client
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
+	userClient := aquariumv2connect.NewUserServiceClient(adminCli, afi.APIAddress("grpc"), adminOpts...)
+
+	// Create a user group with custom rate limit
+	groupName := "test-group"
+	groupRateLimit := int32(3) // Very low limit for testing
+
+	t.Run("Create user group with rate limit", func(t *testing.T) {
+		_, err := userClient.CreateGroup(context.Background(), connect.NewRequest(&aquariumv2.UserServiceCreateGroupRequest{
+			Usergroup: &aquariumv2.UserGroup{
+				Name:   groupName,
+				Users:  []string{}, // Will add user later
+				Config: &aquariumv2.UserConfig{RateLimit: &groupRateLimit},
+			},
+		}))
+		if err != nil {
+			t.Fatalf("Failed to create user group: %v", err)
+		}
+	})
+
+	// Create a test user without rate limit config
+	testUser := "groupuser"
+	testPassword := "testpass123"
+
+	t.Run("Create test user without rate limit", func(t *testing.T) {
+		_, err := userClient.Create(context.Background(), connect.NewRequest(&aquariumv2.UserServiceCreateRequest{
+			User: &aquariumv2.User{
+				Name:     testUser,
+				Password: &testPassword,
+				Roles:    []string{"User"},
+				// No config set - should inherit from group
+			},
+		}))
+		if err != nil {
+			t.Fatalf("Failed to create test user: %v", err)
+		}
+	})
+
+	// Add user to the group
+	t.Run("Add user to group", func(t *testing.T) {
+		_, err := userClient.UpdateGroup(context.Background(), connect.NewRequest(&aquariumv2.UserServiceUpdateGroupRequest{
+			Usergroup: &aquariumv2.UserGroup{
+				Name:   groupName,
+				Users:  []string{testUser},
+				Config: &aquariumv2.UserConfig{RateLimit: &groupRateLimit},
+			},
+		}))
+		if err != nil {
+			t.Fatalf("Failed to update user group: %v", err)
+		}
+	})
+
+	// Create client for the test user
+	testCli, testOpts := h.NewRPCClient(testUser, testPassword, h.RPCClientREST, afi.GetCA(t))
+	testUserClient := aquariumv2connect.NewUserServiceClient(testCli, afi.APIAddress("grpc"), testOpts...)
+
+	t.Run("User inherits rate limit from group", func(t *testing.T) {
+		// Make requests to exceed the group's rate limit (3 requests/minute)
+		rateLimitHit := false
+		for i := range 5 {
+			_, err := testUserClient.GetMe(context.Background(), connect.NewRequest(&aquariumv2.UserServiceGetMeRequest{}))
+			if err != nil {
+				if strings.Contains(err.Error(), "Rate limit exceeded") || strings.Contains(err.Error(), "429") {
+					rateLimitHit = true
+					t.Logf("Group rate limit hit at request %d (expected at ~%d)", i+1, groupRateLimit+1)
+					break
+				}
+				t.Logf("Request %d failed with non-rate-limit error: %v", i+1, err)
+			}
+		}
+		if !rateLimitHit {
+			t.Fatal("Expected to hit group rate limit but didn't")
+		}
+	})
+}
+
+// Test_user_group_rate_limit_precedence tests that user's own config takes precedence over group
+func Test_user_group_rate_limit_precedence(t *testing.T) {
+	t.Parallel()
+	afi := h.NewAquariumFish(t, "node-1", `---
+node_location: test_loc
+api_address: 127.0.0.1:0
+drivers:
+  gates: {}
+  providers:
+    test:`)
+
+	// Create admin client
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
+	userClient := aquariumv2connect.NewUserServiceClient(adminCli, afi.APIAddress("grpc"), adminOpts...)
+
+	// Create a user group with low rate limit
+	groupName := "low-limit-group"
+	groupRateLimit := int32(3)
+
+	t.Run("Create user group with low rate limit", func(t *testing.T) {
+		_, err := userClient.CreateGroup(context.Background(), connect.NewRequest(&aquariumv2.UserServiceCreateGroupRequest{
+			Usergroup: &aquariumv2.UserGroup{
+				Name:   groupName,
+				Users:  []string{},
+				Config: &aquariumv2.UserConfig{RateLimit: &groupRateLimit},
+			},
+		}))
+		if err != nil {
+			t.Fatalf("Failed to create user group: %v", err)
+		}
+	})
+
+	// Create a test user with higher rate limit
+	testUser := "precedenceuser"
+	testPassword := "testpass123"
+	userRateLimit := int32(10) // Higher than group limit
+
+	t.Run("Create test user with higher rate limit", func(t *testing.T) {
+		_, err := userClient.Create(context.Background(), connect.NewRequest(&aquariumv2.UserServiceCreateRequest{
+			User: &aquariumv2.User{
+				Name:     testUser,
+				Password: &testPassword,
+				Roles:    []string{"User"},
+				Config:   &aquariumv2.UserConfig{RateLimit: &userRateLimit},
+			},
+		}))
+		if err != nil {
+			t.Fatalf("Failed to create test user: %v", err)
+		}
+	})
+
+	// Add user to the group
+	t.Run("Add user to group", func(t *testing.T) {
+		_, err := userClient.UpdateGroup(context.Background(), connect.NewRequest(&aquariumv2.UserServiceUpdateGroupRequest{
+			Usergroup: &aquariumv2.UserGroup{
+				Name:   groupName,
+				Users:  []string{testUser},
+				Config: &aquariumv2.UserConfig{RateLimit: &groupRateLimit},
+			},
+		}))
+		if err != nil {
+			t.Fatalf("Failed to update user group: %v", err)
+		}
+	})
+
+	// Create client for the test user
+	testCli, testOpts := h.NewRPCClient(testUser, testPassword, h.RPCClientREST, afi.GetCA(t))
+	testUserClient := aquariumv2connect.NewUserServiceClient(testCli, afi.APIAddress("grpc"), testOpts...)
+
+	t.Run("User's own config takes precedence over group", func(t *testing.T) {
+		// Make requests - should be able to make more than group limit (3)
+		// but should hit user's limit (10)
+		successfulRequests := 0
+		for range 6 { // Try 6 requests (more than group limit of 3)
+			_, err := testUserClient.GetMe(context.Background(), connect.NewRequest(&aquariumv2.UserServiceGetMeRequest{}))
+			if err == nil {
+				successfulRequests++
+			}
+		}
+
+		// We should be able to make more than the group limit
+		if successfulRequests <= int(groupRateLimit) {
+			t.Fatalf("User hit group limit (%d) instead of using own limit (%d). Successful requests: %d",
+				groupRateLimit, userRateLimit, successfulRequests)
+		}
+		t.Logf("User successfully used own rate limit. Successful requests: %d", successfulRequests)
+	})
+}
+
+// Test_user_group_rate_limit_max_value tests that max value from multiple groups is used
+func Test_user_group_rate_limit_max_value(t *testing.T) {
+	t.Parallel()
+	afi := h.NewAquariumFish(t, "node-1", `---
+node_location: test_loc
+api_address: 127.0.0.1:0
+drivers:
+  gates: {}
+  providers:
+    test:`)
+
+	// Create admin client
+	adminCli, adminOpts := h.NewRPCClient("admin", afi.AdminToken(), h.RPCClientREST, afi.GetCA(t))
+	userClient := aquariumv2connect.NewUserServiceClient(adminCli, afi.APIAddress("grpc"), adminOpts...)
+
+	// Create two user groups with different rate limits
+	group1Name := "low-limit-group-1"
+	group1RateLimit := int32(3)
+
+	group2Name := "high-limit-group-2"
+	group2RateLimit := int32(7) // Higher limit
+
+	t.Run("Create first user group with low rate limit", func(t *testing.T) {
+		_, err := userClient.CreateGroup(context.Background(), connect.NewRequest(&aquariumv2.UserServiceCreateGroupRequest{
+			Usergroup: &aquariumv2.UserGroup{
+				Name:   group1Name,
+				Users:  []string{},
+				Config: &aquariumv2.UserConfig{RateLimit: &group1RateLimit},
+			},
+		}))
+		if err != nil {
+			t.Fatalf("Failed to create first user group: %v", err)
+		}
+	})
+
+	t.Run("Create second user group with higher rate limit", func(t *testing.T) {
+		_, err := userClient.CreateGroup(context.Background(), connect.NewRequest(&aquariumv2.UserServiceCreateGroupRequest{
+			Usergroup: &aquariumv2.UserGroup{
+				Name:   group2Name,
+				Users:  []string{},
+				Config: &aquariumv2.UserConfig{RateLimit: &group2RateLimit},
+			},
+		}))
+		if err != nil {
+			t.Fatalf("Failed to create second user group: %v", err)
+		}
+	})
+
+	// Create a test user without rate limit config
+	testUser := "multigroupuser"
+	testPassword := "testpass123"
+
+	t.Run("Create test user without rate limit", func(t *testing.T) {
+		_, err := userClient.Create(context.Background(), connect.NewRequest(&aquariumv2.UserServiceCreateRequest{
+			User: &aquariumv2.User{
+				Name:     testUser,
+				Password: &testPassword,
+				Roles:    []string{"User"},
+			},
+		}))
+		if err != nil {
+			t.Fatalf("Failed to create test user: %v", err)
+		}
+	})
+
+	// Add user to both groups
+	t.Run("Add user to first group", func(t *testing.T) {
+		_, err := userClient.UpdateGroup(context.Background(), connect.NewRequest(&aquariumv2.UserServiceUpdateGroupRequest{
+			Usergroup: &aquariumv2.UserGroup{
+				Name:   group1Name,
+				Users:  []string{testUser},
+				Config: &aquariumv2.UserConfig{RateLimit: &group1RateLimit},
+			},
+		}))
+		if err != nil {
+			t.Fatalf("Failed to update first user group: %v", err)
+		}
+	})
+
+	t.Run("Add user to second group", func(t *testing.T) {
+		_, err := userClient.UpdateGroup(context.Background(), connect.NewRequest(&aquariumv2.UserServiceUpdateGroupRequest{
+			Usergroup: &aquariumv2.UserGroup{
+				Name:   group2Name,
+				Users:  []string{testUser},
+				Config: &aquariumv2.UserConfig{RateLimit: &group2RateLimit},
+			},
+		}))
+		if err != nil {
+			t.Fatalf("Failed to update second user group: %v", err)
+		}
+	})
+
+	// Create client for the test user
+	testCli, testOpts := h.NewRPCClient(testUser, testPassword, h.RPCClientREST, afi.GetCA(t))
+	testUserClient := aquariumv2connect.NewUserServiceClient(testCli, afi.APIAddress("grpc"), testOpts...)
+
+	t.Run("User uses max rate limit from multiple groups", func(t *testing.T) {
+		// Make requests - should be able to make more than lower group limit (3)
+		successfulRequests := 0
+		for i := range 10 {
+			_, err := testUserClient.GetMe(context.Background(), connect.NewRequest(&aquariumv2.UserServiceGetMeRequest{}))
+			if err == nil {
+				successfulRequests++
+			} else if strings.Contains(err.Error(), "Rate limit exceeded") || strings.Contains(err.Error(), "429") {
+				t.Logf("Rate limit hit at request %d", i+1)
+				break
+			}
+		}
+
+		// We should be able to make more than the lower group limit
+		if successfulRequests <= int(group1RateLimit) {
+			t.Fatalf("User hit lower group limit (%d) instead of using max limit (%d). Successful requests: %d",
+				group1RateLimit, group2RateLimit, successfulRequests)
+		}
+		t.Logf("User successfully used max group rate limit. Successful requests: %d (expected ~%d)", successfulRequests, group2RateLimit)
+	})
+}

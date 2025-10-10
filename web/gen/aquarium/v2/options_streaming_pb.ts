@@ -25,7 +25,7 @@
 
 import type { GenExtension, GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { extDesc, fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
-import type { MessageOptions } from "@bufbuild/protobuf/wkt";
+import type { MessageOptions, ServiceOptions } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_descriptor } from "@bufbuild/protobuf/wkt";
 import type { Message } from "@bufbuild/protobuf";
 
@@ -33,7 +33,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file aquarium/v2/options_streaming.proto.
  */
 export const file_aquarium_v2_options_streaming: GenFile = /*@__PURE__*/
-  fileDesc("CiNhcXVhcml1bS92Mi9vcHRpb25zX3N0cmVhbWluZy5wcm90bxILYXF1YXJpdW0udjIiRQoPU3Vic2NyaWJlQ29uZmlnEh0KEHBlcm1pc3Npb25fY2hlY2sYASABKAlIAIgBAUITChFfcGVybWlzc2lvbl9jaGVjazptChBzdWJzY3JpYmVfY29uZmlnEh8uZ29vZ2xlLnByb3RvYnVmLk1lc3NhZ2VPcHRpb25zGNGGAyABKAsyHC5hcXVhcml1bS52Mi5TdWJzY3JpYmVDb25maWdSD3N1YnNjcmliZUNvbmZpZ4gBAUJFWkNnaXRodWIuY29tL2Fkb2JlL2FxdWFyaXVtLWZpc2gvbGliL3JwYy9wcm90by9hcXVhcml1bS92MjthcXVhcml1bXYyYgZwcm90bzM", [file_google_protobuf_descriptor]);
+  fileDesc("CiNhcXVhcml1bS92Mi9vcHRpb25zX3N0cmVhbWluZy5wcm90bxILYXF1YXJpdW0udjIiRQoPU3Vic2NyaWJlQ29uZmlnEh0KEHBlcm1pc3Npb25fY2hlY2sYASABKAlIAIgBAUITChFfcGVybWlzc2lvbl9jaGVjazptChBzdWJzY3JpYmVfY29uZmlnEh8uZ29vZ2xlLnByb3RvYnVmLk1lc3NhZ2VPcHRpb25zGNGGAyABKAsyHC5hcXVhcml1bS52Mi5TdWJzY3JpYmVDb25maWdSD3N1YnNjcmliZUNvbmZpZ4gBATpaChZza2lwX3NlcnZpY2Vfc3RyZWFtaW5nEh8uZ29vZ2xlLnByb3RvYnVmLlNlcnZpY2VPcHRpb25zGNKGAyABKAhSFHNraXBTZXJ2aWNlU3RyZWFtaW5niAEBQkVaQ2dpdGh1Yi5jb20vYWRvYmUvYXF1YXJpdW0tZmlzaC9saWIvcnBjL3Byb3RvL2FxdWFyaXVtL3YyO2FxdWFyaXVtdjJiBnByb3RvMw", [file_google_protobuf_descriptor]);
 
 /**
  * StreamingConfig defines streaming configuration for a message
@@ -64,4 +64,12 @@ export const SubscribeConfigSchema: GenMessage<SubscribeConfig> = /*@__PURE__*/
  */
 export const subscribe_config: GenExtension<MessageOptions, SubscribeConfig> = /*@__PURE__*/
   extDesc(file_aquarium_v2_options_streaming, 0);
+
+/**
+ * Streaming configuration for the service
+ *
+ * @generated from extension: optional bool skip_service_streaming = 50002;
+ */
+export const skip_service_streaming: GenExtension<ServiceOptions, boolean> = /*@__PURE__*/
+  extDesc(file_aquarium_v2_options_streaming, 1);
 

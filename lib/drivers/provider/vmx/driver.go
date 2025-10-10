@@ -140,12 +140,12 @@ func (d *Driver) AvailableCapacity(nodeUsage typesv2.Resources, req typesv2.Labe
 		nodeUsage.CpuOverbook = req.Resources.CpuOverbook
 		nodeUsage.RamOverbook = req.Resources.RamOverbook
 	}
-	if nodeUsage.Multitenancy && req.Resources.Multitenancy {
+	if nodeUsage.Multitenancy != nil && *nodeUsage.Multitenancy && req.Resources.Multitenancy != nil && *req.Resources.Multitenancy {
 		// Ok we can run more tenants, let's calculate how much
-		if nodeUsage.CpuOverbook && req.Resources.CpuOverbook {
+		if nodeUsage.CpuOverbook != nil && *nodeUsage.CpuOverbook && req.Resources.CpuOverbook != nil && *req.Resources.CpuOverbook {
 			availCPU += d.cfg.CPUOverbook
 		}
-		if nodeUsage.RamOverbook && req.Resources.RamOverbook {
+		if nodeUsage.RamOverbook != nil && *nodeUsage.RamOverbook && req.Resources.RamOverbook != nil && *req.Resources.RamOverbook {
 			availRAM += d.cfg.RAMOverbook
 		}
 	}
@@ -179,9 +179,9 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, _ /*metadata*/ map[string
 	vmID := fmt.Sprintf("%02x%02x%02x%02x%02x%02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5])
 	vmHwaddr := fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5])
 
-	vmNetwork := def.Resources.Network
-	if vmNetwork == "" {
-		vmNetwork = "hostonly"
+	vmNetwork := "hostonly"
+	if def.Resources.Network != nil && *def.Resources.Network != "" {
+		vmNetwork = *def.Resources.Network
 	}
 
 	vmDir := filepath.Join(d.cfg.WorkspacePath, vmID)
@@ -190,7 +190,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, _ /*metadata*/ map[string
 	logger = logger.With("vm_name", vmxPath)
 
 	// Load the required images
-	imgPath, err := d.loadImages(vmxPath, &opts, vmImagesDir)
+	imgPath, err := d.loadImages(vmxPath, def.Images, vmImagesDir)
 	if err != nil {
 		d.cleanupVM(vmDir)
 		logger.Error("Unable to load the required images", "err", err)
@@ -198,7 +198,8 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, _ /*metadata*/ map[string
 	}
 
 	// Clone VM from the image
-	args := []string{"-T", "fusion", "clone",
+	args := []string{
+		"-T", "fusion", "clone",
 		imgPath, vmxPath,
 		"linked", "-snapshot", "original",
 		"-cloneName", vmID,

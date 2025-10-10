@@ -1667,16 +1667,16 @@ var File_aquarium_v2_application_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_application_proto_rawDesc = "" +
 	"\n" +
-	"\x1daquarium/v2/application.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x18aquarium/v2/common.proto\x1a\x1eaquarium/v2/options_rbac.proto\x1a#aquarium/v2/options_streaming.proto\x1a\x1caquarium/v2/options_ui.proto\"\xa0\x02\n" +
+	"\x1daquarium/v2/application.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x18aquarium/v2/common.proto\x1a\x1eaquarium/v2/options_rbac.proto\x1a#aquarium/v2/options_streaming.proto\x1a\x1caquarium/v2/options_ui.proto\"\x96\x02\n" +
 	"\vApplication\x12\x1a\n" +
 	"\x03uid\x18\x01 \x01(\tB\b\x9a\xb5\x18\x04\b\x01\x10\x01R\x03uid\x12C\n" +
 	"\n" +
 	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\b\x9a\xb5\x18\x04\b\x01\x10\x01R\tcreatedAt\x12'\n" +
 	"\n" +
 	"owner_name\x18\x03 \x01(\tB\b\x9a\xb5\x18\x04\b\x01\x10\x01R\townerName\x12/\n" +
-	"\tlabel_uid\x18\x04 \x01(\tB\x12\x9a\xb5\x18\x0e\x1a\x05Label\"\x05LabelR\blabelUid\x123\n" +
-	"\bmetadata\x18\x05 \x01(\v2\x17.google.protobuf.StructR\bmetadata:!\x8a\xb5\x18\x17\n" +
-	"\x15ApplicationServiceGet\x92\xb5\x18\x02\b\x01\"\xf6\x02\n" +
+	"\tlabel_uid\x18\x04 \x01(\tB\x12\x9a\xb5\x18\x0e\x1a\x05Label\"\x05LabelR\blabelUid\x12;\n" +
+	"\bmetadata\x18\x05 \x01(\v2\x17.google.protobuf.StructB\x06\x9a\xb5\x18\x02(\x00R\bmetadata:\x0f\x8a\xb5\x18\x05\n" +
+	"\x03Get\x92\xb5\x18\x02\b\x01\"\xe4\x02\n" +
 	"\x10ApplicationState\x12\x10\n" +
 	"\x03uid\x18\x01 \x01(\tR\x03uid\x129\n" +
 	"\n" +
@@ -1692,8 +1692,9 @@ const file_aquarium_v2_application_proto_rawDesc = "" +
 	"\n" +
 	"DEALLOCATE\x10\x04\x12\x0f\n" +
 	"\vDEALLOCATED\x10\x05\x12\t\n" +
-	"\x05ERROR\x10\x06: \x8a\xb5\x18\x1c\n" +
-	"\x1aApplicationServiceGetState\"\x9d\x05\n" +
+	"\x05ERROR\x10\x06:\x0e\x8a\xb5\x18\n" +
+	"\n" +
+	"\bGetState\"\x8b\x05\n" +
 	"\x13ApplicationResource\x12\x1a\n" +
 	"\x03uid\x18\x01 \x01(\tB\b\x9a\xb5\x18\x04\b\x01\x10\x01R\x03uid\x12C\n" +
 	"\n" +
@@ -1712,11 +1713,11 @@ const file_aquarium_v2_application_proto_rawDesc = "" +
 	" \x01(\tR\x06hwAddr\x123\n" +
 	"\bmetadata\x18\v \x01(\v2\x17.google.protobuf.StructR\bmetadata\x129\n" +
 	"\atimeout\x18\f \x01(\v2\x1a.google.protobuf.TimestampH\x00R\atimeout\x88\x01\x01\x12H\n" +
-	"\x0eauthentication\x18\r \x01(\v2\x1b.aquarium.v2.AuthenticationH\x01R\x0eauthentication\x88\x01\x01:)\x8a\xb5\x18\x1f\n" +
-	"\x1dApplicationServiceGetResource\x92\xb5\x18\x02\b\x01B\n" +
+	"\x0eauthentication\x18\r \x01(\v2\x1b.aquarium.v2.AuthenticationH\x01R\x0eauthentication\x88\x01\x01:\x17\x8a\xb5\x18\r\n" +
+	"\vGetResource\x92\xb5\x18\x02\b\x01B\n" +
 	"\n" +
 	"\b_timeoutB\x11\n" +
-	"\x0f_authentication\"\x95\x03\n" +
+	"\x0f_authentication\"\x83\x03\n" +
 	"\x0fApplicationTask\x12\x10\n" +
 	"\x03uid\x18\x01 \x01(\tR\x03uid\x129\n" +
 	"\n" +
@@ -1727,8 +1728,8 @@ const file_aquarium_v2_application_proto_rawDesc = "" +
 	"\x04task\x18\x05 \x01(\tR\x04task\x128\n" +
 	"\x04when\x18\x06 \x01(\x0e2$.aquarium.v2.ApplicationState.StatusR\x04when\x121\n" +
 	"\aoptions\x18\a \x01(\v2\x17.google.protobuf.StructR\aoptions\x12/\n" +
-	"\x06result\x18\b \x01(\v2\x17.google.protobuf.StructR\x06result:\x1f\x8a\xb5\x18\x1b\n" +
-	"\x19ApplicationServiceGetTask\"\x1f\n" +
+	"\x06result\x18\b \x01(\v2\x17.google.protobuf.StructR\x06result:\r\x8a\xb5\x18\t\n" +
+	"\aGetTask\"\x1f\n" +
 	"\x1dApplicationServiceListRequest\"\x80\x01\n" +
 	"\x1eApplicationServiceListResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +

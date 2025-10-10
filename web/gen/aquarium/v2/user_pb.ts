@@ -27,7 +27,7 @@ import type { JsonObject, Message } from "@bufbuild/protobuf";
  * Describes the file aquarium/v2/user.proto.
  */
 export const file_aquarium_v2_user: GenFile = /*@__PURE__*/
-  fileDesc("ChZhcXVhcml1bS92Mi91c2VyLnByb3RvEgthcXVhcml1bS52MiLqAgoEVXNlchIUCgRuYW1lGAEgASgJQgaatRgCEAESOAoKY3JlYXRlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCCJq1GAQIARABEjgKCnVwZGF0ZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgiatRgECAEQARI0CgRoYXNoGAQgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdEIImrUYBAgBEAFIAIgBARIVCghwYXNzd29yZBgFIAEoCUgBiAEBEiwKBmNvbmZpZxgGIAEoCzIXLmFxdWFyaXVtLnYyLlVzZXJDb25maWdIAogBARIgCgVyb2xlcxgHIAMoCUIRmrUYDRoFUm9sZXMiBFJvbGU6Goq1GBAKDlVzZXJTZXJ2aWNlR2V0krUYAggBQgcKBV9oYXNoQgsKCV9wYXNzd29yZEIJCgdfY29uZmlnImoKClVzZXJDb25maWcSFwoKcmF0ZV9saW1pdBgBIAEoBUgAiAEBEhoKDXN0cmVhbXNfbGltaXQYAiABKAVIAYgBAToGkrUYAggBQg0KC19yYXRlX2xpbWl0QhAKDl9zdHJlYW1zX2xpbWl0IhkKF1VzZXJTZXJ2aWNlR2V0TWVSZXF1ZXN0IlwKGFVzZXJTZXJ2aWNlR2V0TWVSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIfCgRkYXRhGAMgASgLMhEuYXF1YXJpdW0udjIuVXNlciIYChZVc2VyU2VydmljZUxpc3RSZXF1ZXN0IlsKF1VzZXJTZXJ2aWNlTGlzdFJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEh8KBGRhdGEYAyADKAsyES5hcXVhcml1bS52Mi5Vc2VyIioKFVVzZXJTZXJ2aWNlR2V0UmVxdWVzdBIRCgl1c2VyX25hbWUYASABKAkiWgoWVXNlclNlcnZpY2VHZXRSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIfCgRkYXRhGAMgASgLMhEuYXF1YXJpdW0udjIuVXNlciI7ChhVc2VyU2VydmljZUNyZWF0ZVJlcXVlc3QSHwoEdXNlchgBIAEoCzIRLmFxdWFyaXVtLnYyLlVzZXIiXQoZVXNlclNlcnZpY2VDcmVhdGVSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIfCgRkYXRhGAMgASgLMhEuYXF1YXJpdW0udjIuVXNlciI7ChhVc2VyU2VydmljZVVwZGF0ZVJlcXVlc3QSHwoEdXNlchgBIAEoCzIRLmFxdWFyaXVtLnYyLlVzZXIiXQoZVXNlclNlcnZpY2VVcGRhdGVSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIfCgRkYXRhGAMgASgLMhEuYXF1YXJpdW0udjIuVXNlciItChhVc2VyU2VydmljZVJlbW92ZVJlcXVlc3QSEQoJdXNlcl9uYW1lGAEgASgJIjwKGVVzZXJTZXJ2aWNlUmVtb3ZlUmVzcG9uc2USDgoGc3RhdHVzGAEgASgIEg8KB21lc3NhZ2UYAiABKAky0AQKC1VzZXJTZXJ2aWNlElwKBUdldE1lEiQuYXF1YXJpdW0udjIuVXNlclNlcnZpY2VHZXRNZVJlcXVlc3QaJS5hcXVhcml1bS52Mi5Vc2VyU2VydmljZUdldE1lUmVzcG9uc2UiBoK1GAIQARJTCgRMaXN0EiMuYXF1YXJpdW0udjIuVXNlclNlcnZpY2VMaXN0UmVxdWVzdBokLmFxdWFyaXVtLnYyLlVzZXJTZXJ2aWNlTGlzdFJlc3BvbnNlIgASUAoDR2V0EiIuYXF1YXJpdW0udjIuVXNlclNlcnZpY2VHZXRSZXF1ZXN0GiMuYXF1YXJpdW0udjIuVXNlclNlcnZpY2VHZXRSZXNwb25zZSIAElkKBkNyZWF0ZRIlLmFxdWFyaXVtLnYyLlVzZXJTZXJ2aWNlQ3JlYXRlUmVxdWVzdBomLmFxdWFyaXVtLnYyLlVzZXJTZXJ2aWNlQ3JlYXRlUmVzcG9uc2UiABKFAQoGVXBkYXRlEiUuYXF1YXJpdW0udjIuVXNlclNlcnZpY2VVcGRhdGVSZXF1ZXN0GiYuYXF1YXJpdW0udjIuVXNlclNlcnZpY2VVcGRhdGVSZXNwb25zZSIsgrUYKCIJVXBkYXRlQWxsIg5VcGRhdGVQYXNzd29yZCILVXBkYXRlUm9sZXMSWQoGUmVtb3ZlEiUuYXF1YXJpdW0udjIuVXNlclNlcnZpY2VSZW1vdmVSZXF1ZXN0GiYuYXF1YXJpdW0udjIuVXNlclNlcnZpY2VSZW1vdmVSZXNwb25zZSIAQkVaQ2dpdGh1Yi5jb20vYWRvYmUvYXF1YXJpdW0tZmlzaC9saWIvcnBjL3Byb3RvL2FxdWFyaXVtL3YyO2FxdWFyaXVtdjJiBnByb3RvMw", [file_google_protobuf_timestamp, file_google_protobuf_struct, file_aquarium_v2_options_rbac, file_aquarium_v2_options_streaming, file_aquarium_v2_options_ui]);
+  fileDesc("ChZhcXVhcml1bS92Mi91c2VyLnByb3RvEgthcXVhcml1bS52MiLfAgoEVXNlchIUCgRuYW1lGAEgASgJQgaatRgCEAESOAoKY3JlYXRlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCCJq1GAQIARABEjgKCnVwZGF0ZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgiatRgECAEQARI0CgRoYXNoGAQgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdEIImrUYBAgBEAFIAIgBARIVCghwYXNzd29yZBgFIAEoCUgBiAEBEiwKBmNvbmZpZxgGIAEoCzIXLmFxdWFyaXVtLnYyLlVzZXJDb25maWdIAogBARIgCgVyb2xlcxgHIAMoCUIRmrUYDRoFUm9sZXMiBFJvbGU6D4q1GAUKA0dldJK1GAIIAUIHCgVfaGFzaEILCglfcGFzc3dvcmRCCQoHX2NvbmZpZyJqCgpVc2VyQ29uZmlnEhcKCnJhdGVfbGltaXQYASABKAVIAIgBARIaCg1zdHJlYW1zX2xpbWl0GAIgASgFSAGIAQE6BpK1GAIIAUINCgtfcmF0ZV9saW1pdEIQCg5fc3RyZWFtc19saW1pdCIZChdVc2VyU2VydmljZUdldE1lUmVxdWVzdCJcChhVc2VyU2VydmljZUdldE1lUmVzcG9uc2USDgoGc3RhdHVzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkSHwoEZGF0YRgDIAEoCzIRLmFxdWFyaXVtLnYyLlVzZXIiGAoWVXNlclNlcnZpY2VMaXN0UmVxdWVzdCJbChdVc2VyU2VydmljZUxpc3RSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIfCgRkYXRhGAMgAygLMhEuYXF1YXJpdW0udjIuVXNlciIqChVVc2VyU2VydmljZUdldFJlcXVlc3QSEQoJdXNlcl9uYW1lGAEgASgJIloKFlVzZXJTZXJ2aWNlR2V0UmVzcG9uc2USDgoGc3RhdHVzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkSHwoEZGF0YRgDIAEoCzIRLmFxdWFyaXVtLnYyLlVzZXIiOwoYVXNlclNlcnZpY2VDcmVhdGVSZXF1ZXN0Eh8KBHVzZXIYASABKAsyES5hcXVhcml1bS52Mi5Vc2VyIl0KGVVzZXJTZXJ2aWNlQ3JlYXRlUmVzcG9uc2USDgoGc3RhdHVzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkSHwoEZGF0YRgDIAEoCzIRLmFxdWFyaXVtLnYyLlVzZXIiOwoYVXNlclNlcnZpY2VVcGRhdGVSZXF1ZXN0Eh8KBHVzZXIYASABKAsyES5hcXVhcml1bS52Mi5Vc2VyIl0KGVVzZXJTZXJ2aWNlVXBkYXRlUmVzcG9uc2USDgoGc3RhdHVzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkSHwoEZGF0YRgDIAEoCzIRLmFxdWFyaXVtLnYyLlVzZXIiLQoYVXNlclNlcnZpY2VSZW1vdmVSZXF1ZXN0EhEKCXVzZXJfbmFtZRgBIAEoCSI8ChlVc2VyU2VydmljZVJlbW92ZVJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJIoYCCglVc2VyR3JvdXASFAoEbmFtZRgBIAEoCUIGmrUYAhABEjgKCmNyZWF0ZWRfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgiatRgECAEQARI4Cgp1cGRhdGVkX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIImrUYBAgBEAESIAoFdXNlcnMYBCADKAlCEZq1GA0aBVVzZXJzIgRVc2VyEiwKBmNvbmZpZxgFIAEoCzIXLmFxdWFyaXVtLnYyLlVzZXJDb25maWdIAIgBAToUirUYCgoIR2V0R3JvdXCStRgCCAFCCQoHX2NvbmZpZyIdChtVc2VyU2VydmljZUxpc3RHcm91cFJlcXVlc3QiZQocVXNlclNlcnZpY2VMaXN0R3JvdXBSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIkCgRkYXRhGAMgAygLMhYuYXF1YXJpdW0udjIuVXNlckdyb3VwIjAKGlVzZXJTZXJ2aWNlR2V0R3JvdXBSZXF1ZXN0EhIKCmdyb3VwX25hbWUYASABKAkiZAobVXNlclNlcnZpY2VHZXRHcm91cFJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEiQKBGRhdGEYAyABKAsyFi5hcXVhcml1bS52Mi5Vc2VyR3JvdXAiSgodVXNlclNlcnZpY2VDcmVhdGVHcm91cFJlcXVlc3QSKQoJdXNlcmdyb3VwGAEgASgLMhYuYXF1YXJpdW0udjIuVXNlckdyb3VwImcKHlVzZXJTZXJ2aWNlQ3JlYXRlR3JvdXBSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIkCgRkYXRhGAMgASgLMhYuYXF1YXJpdW0udjIuVXNlckdyb3VwIkoKHVVzZXJTZXJ2aWNlVXBkYXRlR3JvdXBSZXF1ZXN0EikKCXVzZXJncm91cBgBIAEoCzIWLmFxdWFyaXVtLnYyLlVzZXJHcm91cCJnCh5Vc2VyU2VydmljZVVwZGF0ZUdyb3VwUmVzcG9uc2USDgoGc3RhdHVzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkSJAoEZGF0YRgDIAEoCzIWLmFxdWFyaXVtLnYyLlVzZXJHcm91cCIzCh1Vc2VyU2VydmljZVJlbW92ZUdyb3VwUmVxdWVzdBISCgpncm91cF9uYW1lGAEgASgJIkEKHlVzZXJTZXJ2aWNlUmVtb3ZlR3JvdXBSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCTLTCAoLVXNlclNlcnZpY2USXAoFR2V0TWUSJC5hcXVhcml1bS52Mi5Vc2VyU2VydmljZUdldE1lUmVxdWVzdBolLmFxdWFyaXVtLnYyLlVzZXJTZXJ2aWNlR2V0TWVSZXNwb25zZSIGgrUYAhABElMKBExpc3QSIy5hcXVhcml1bS52Mi5Vc2VyU2VydmljZUxpc3RSZXF1ZXN0GiQuYXF1YXJpdW0udjIuVXNlclNlcnZpY2VMaXN0UmVzcG9uc2UiABJQCgNHZXQSIi5hcXVhcml1bS52Mi5Vc2VyU2VydmljZUdldFJlcXVlc3QaIy5hcXVhcml1bS52Mi5Vc2VyU2VydmljZUdldFJlc3BvbnNlIgASWQoGQ3JlYXRlEiUuYXF1YXJpdW0udjIuVXNlclNlcnZpY2VDcmVhdGVSZXF1ZXN0GiYuYXF1YXJpdW0udjIuVXNlclNlcnZpY2VDcmVhdGVSZXNwb25zZSIAEoUBCgZVcGRhdGUSJS5hcXVhcml1bS52Mi5Vc2VyU2VydmljZVVwZGF0ZVJlcXVlc3QaJi5hcXVhcml1bS52Mi5Vc2VyU2VydmljZVVwZGF0ZVJlc3BvbnNlIiyCtRgoIglVcGRhdGVBbGwiDlVwZGF0ZVBhc3N3b3JkIgtVcGRhdGVSb2xlcxJZCgZSZW1vdmUSJS5hcXVhcml1bS52Mi5Vc2VyU2VydmljZVJlbW92ZVJlcXVlc3QaJi5hcXVhcml1bS52Mi5Vc2VyU2VydmljZVJlbW92ZVJlc3BvbnNlIgASYgoJTGlzdEdyb3VwEiguYXF1YXJpdW0udjIuVXNlclNlcnZpY2VMaXN0R3JvdXBSZXF1ZXN0GikuYXF1YXJpdW0udjIuVXNlclNlcnZpY2VMaXN0R3JvdXBSZXNwb25zZSIAEl8KCEdldEdyb3VwEicuYXF1YXJpdW0udjIuVXNlclNlcnZpY2VHZXRHcm91cFJlcXVlc3QaKC5hcXVhcml1bS52Mi5Vc2VyU2VydmljZUdldEdyb3VwUmVzcG9uc2UiABJoCgtDcmVhdGVHcm91cBIqLmFxdWFyaXVtLnYyLlVzZXJTZXJ2aWNlQ3JlYXRlR3JvdXBSZXF1ZXN0GisuYXF1YXJpdW0udjIuVXNlclNlcnZpY2VDcmVhdGVHcm91cFJlc3BvbnNlIgASaAoLVXBkYXRlR3JvdXASKi5hcXVhcml1bS52Mi5Vc2VyU2VydmljZVVwZGF0ZUdyb3VwUmVxdWVzdBorLmFxdWFyaXVtLnYyLlVzZXJTZXJ2aWNlVXBkYXRlR3JvdXBSZXNwb25zZSIAEmgKC1JlbW92ZUdyb3VwEiouYXF1YXJpdW0udjIuVXNlclNlcnZpY2VSZW1vdmVHcm91cFJlcXVlc3QaKy5hcXVhcml1bS52Mi5Vc2VyU2VydmljZVJlbW92ZUdyb3VwUmVzcG9uc2UiAEJFWkNnaXRodWIuY29tL2Fkb2JlL2FxdWFyaXVtLWZpc2gvbGliL3JwYy9wcm90by9hcXVhcml1bS92MjthcXVhcml1bXYyYgZwcm90bzM", [file_google_protobuf_timestamp, file_google_protobuf_struct, file_aquarium_v2_options_rbac, file_aquarium_v2_options_streaming, file_aquarium_v2_options_ui]);
 
 /**
  * User represents a user in the system
@@ -369,6 +369,263 @@ export const UserServiceRemoveResponseSchema: GenMessage<UserServiceRemoveRespon
   messageDesc(file_aquarium_v2_user, 13);
 
 /**
+ * UserGroup makes a team of users
+ *
+ * Contains a list of users and their common configuration options, very useful to share Labels
+ * and make changes that affecting everyone in the team.
+ *
+ * @generated from message aquarium.v2.UserGroup
+ */
+export type UserGroup = Message<"aquarium.v2.UserGroup"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 2;
+   */
+  createdAt?: Timestamp;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp updated_at = 3;
+   */
+  updatedAt?: Timestamp;
+
+  /**
+   * List of user names participating in the group
+   *
+   * @generated from field: repeated string users = 4;
+   */
+  users: string[];
+
+  /**
+   * Common User configuration settings
+   *
+   * @generated from field: optional aquarium.v2.UserConfig config = 5;
+   */
+  config?: UserConfig;
+};
+
+/**
+ * Describes the message aquarium.v2.UserGroup.
+ * Use `create(UserGroupSchema)` to create a new message.
+ */
+export const UserGroupSchema: GenMessage<UserGroup> = /*@__PURE__*/
+  messageDesc(file_aquarium_v2_user, 14);
+
+/**
+ * @generated from message aquarium.v2.UserServiceListGroupRequest
+ */
+export type UserServiceListGroupRequest = Message<"aquarium.v2.UserServiceListGroupRequest"> & {
+};
+
+/**
+ * Describes the message aquarium.v2.UserServiceListGroupRequest.
+ * Use `create(UserServiceListGroupRequestSchema)` to create a new message.
+ */
+export const UserServiceListGroupRequestSchema: GenMessage<UserServiceListGroupRequest> = /*@__PURE__*/
+  messageDesc(file_aquarium_v2_user, 15);
+
+/**
+ * @generated from message aquarium.v2.UserServiceListGroupResponse
+ */
+export type UserServiceListGroupResponse = Message<"aquarium.v2.UserServiceListGroupResponse"> & {
+  /**
+   * @generated from field: bool status = 1;
+   */
+  status: boolean;
+
+  /**
+   * @generated from field: string message = 2;
+   */
+  message: string;
+
+  /**
+   * @generated from field: repeated aquarium.v2.UserGroup data = 3;
+   */
+  data: UserGroup[];
+};
+
+/**
+ * Describes the message aquarium.v2.UserServiceListGroupResponse.
+ * Use `create(UserServiceListGroupResponseSchema)` to create a new message.
+ */
+export const UserServiceListGroupResponseSchema: GenMessage<UserServiceListGroupResponse> = /*@__PURE__*/
+  messageDesc(file_aquarium_v2_user, 16);
+
+/**
+ * @generated from message aquarium.v2.UserServiceGetGroupRequest
+ */
+export type UserServiceGetGroupRequest = Message<"aquarium.v2.UserServiceGetGroupRequest"> & {
+  /**
+   * @generated from field: string group_name = 1;
+   */
+  groupName: string;
+};
+
+/**
+ * Describes the message aquarium.v2.UserServiceGetGroupRequest.
+ * Use `create(UserServiceGetGroupRequestSchema)` to create a new message.
+ */
+export const UserServiceGetGroupRequestSchema: GenMessage<UserServiceGetGroupRequest> = /*@__PURE__*/
+  messageDesc(file_aquarium_v2_user, 17);
+
+/**
+ * @generated from message aquarium.v2.UserServiceGetGroupResponse
+ */
+export type UserServiceGetGroupResponse = Message<"aquarium.v2.UserServiceGetGroupResponse"> & {
+  /**
+   * @generated from field: bool status = 1;
+   */
+  status: boolean;
+
+  /**
+   * @generated from field: string message = 2;
+   */
+  message: string;
+
+  /**
+   * @generated from field: aquarium.v2.UserGroup data = 3;
+   */
+  data?: UserGroup;
+};
+
+/**
+ * Describes the message aquarium.v2.UserServiceGetGroupResponse.
+ * Use `create(UserServiceGetGroupResponseSchema)` to create a new message.
+ */
+export const UserServiceGetGroupResponseSchema: GenMessage<UserServiceGetGroupResponse> = /*@__PURE__*/
+  messageDesc(file_aquarium_v2_user, 18);
+
+/**
+ * @generated from message aquarium.v2.UserServiceCreateGroupRequest
+ */
+export type UserServiceCreateGroupRequest = Message<"aquarium.v2.UserServiceCreateGroupRequest"> & {
+  /**
+   * @generated from field: aquarium.v2.UserGroup usergroup = 1;
+   */
+  usergroup?: UserGroup;
+};
+
+/**
+ * Describes the message aquarium.v2.UserServiceCreateGroupRequest.
+ * Use `create(UserServiceCreateGroupRequestSchema)` to create a new message.
+ */
+export const UserServiceCreateGroupRequestSchema: GenMessage<UserServiceCreateGroupRequest> = /*@__PURE__*/
+  messageDesc(file_aquarium_v2_user, 19);
+
+/**
+ * @generated from message aquarium.v2.UserServiceCreateGroupResponse
+ */
+export type UserServiceCreateGroupResponse = Message<"aquarium.v2.UserServiceCreateGroupResponse"> & {
+  /**
+   * @generated from field: bool status = 1;
+   */
+  status: boolean;
+
+  /**
+   * @generated from field: string message = 2;
+   */
+  message: string;
+
+  /**
+   * @generated from field: aquarium.v2.UserGroup data = 3;
+   */
+  data?: UserGroup;
+};
+
+/**
+ * Describes the message aquarium.v2.UserServiceCreateGroupResponse.
+ * Use `create(UserServiceCreateGroupResponseSchema)` to create a new message.
+ */
+export const UserServiceCreateGroupResponseSchema: GenMessage<UserServiceCreateGroupResponse> = /*@__PURE__*/
+  messageDesc(file_aquarium_v2_user, 20);
+
+/**
+ * @generated from message aquarium.v2.UserServiceUpdateGroupRequest
+ */
+export type UserServiceUpdateGroupRequest = Message<"aquarium.v2.UserServiceUpdateGroupRequest"> & {
+  /**
+   * @generated from field: aquarium.v2.UserGroup usergroup = 1;
+   */
+  usergroup?: UserGroup;
+};
+
+/**
+ * Describes the message aquarium.v2.UserServiceUpdateGroupRequest.
+ * Use `create(UserServiceUpdateGroupRequestSchema)` to create a new message.
+ */
+export const UserServiceUpdateGroupRequestSchema: GenMessage<UserServiceUpdateGroupRequest> = /*@__PURE__*/
+  messageDesc(file_aquarium_v2_user, 21);
+
+/**
+ * @generated from message aquarium.v2.UserServiceUpdateGroupResponse
+ */
+export type UserServiceUpdateGroupResponse = Message<"aquarium.v2.UserServiceUpdateGroupResponse"> & {
+  /**
+   * @generated from field: bool status = 1;
+   */
+  status: boolean;
+
+  /**
+   * @generated from field: string message = 2;
+   */
+  message: string;
+
+  /**
+   * @generated from field: aquarium.v2.UserGroup data = 3;
+   */
+  data?: UserGroup;
+};
+
+/**
+ * Describes the message aquarium.v2.UserServiceUpdateGroupResponse.
+ * Use `create(UserServiceUpdateGroupResponseSchema)` to create a new message.
+ */
+export const UserServiceUpdateGroupResponseSchema: GenMessage<UserServiceUpdateGroupResponse> = /*@__PURE__*/
+  messageDesc(file_aquarium_v2_user, 22);
+
+/**
+ * @generated from message aquarium.v2.UserServiceRemoveGroupRequest
+ */
+export type UserServiceRemoveGroupRequest = Message<"aquarium.v2.UserServiceRemoveGroupRequest"> & {
+  /**
+   * @generated from field: string group_name = 1;
+   */
+  groupName: string;
+};
+
+/**
+ * Describes the message aquarium.v2.UserServiceRemoveGroupRequest.
+ * Use `create(UserServiceRemoveGroupRequestSchema)` to create a new message.
+ */
+export const UserServiceRemoveGroupRequestSchema: GenMessage<UserServiceRemoveGroupRequest> = /*@__PURE__*/
+  messageDesc(file_aquarium_v2_user, 23);
+
+/**
+ * @generated from message aquarium.v2.UserServiceRemoveGroupResponse
+ */
+export type UserServiceRemoveGroupResponse = Message<"aquarium.v2.UserServiceRemoveGroupResponse"> & {
+  /**
+   * @generated from field: bool status = 1;
+   */
+  status: boolean;
+
+  /**
+   * @generated from field: string message = 2;
+   */
+  message: string;
+};
+
+/**
+ * Describes the message aquarium.v2.UserServiceRemoveGroupResponse.
+ * Use `create(UserServiceRemoveGroupResponseSchema)` to create a new message.
+ */
+export const UserServiceRemoveGroupResponseSchema: GenMessage<UserServiceRemoveGroupResponse> = /*@__PURE__*/
+  messageDesc(file_aquarium_v2_user, 24);
+
+/**
  * User service handles user management operations
  *
  * @generated from service aquarium.v2.UserService
@@ -433,6 +690,56 @@ export const UserService: GenService<{
     methodKind: "unary";
     input: typeof UserServiceRemoveRequestSchema;
     output: typeof UserServiceRemoveResponseSchema;
+  },
+  /**
+   * Get list of user groups
+   *
+   * @generated from rpc aquarium.v2.UserService.ListGroup
+   */
+  listGroup: {
+    methodKind: "unary";
+    input: typeof UserServiceListGroupRequestSchema;
+    output: typeof UserServiceListGroupResponseSchema;
+  },
+  /**
+   * Get user group by name
+   *
+   * @generated from rpc aquarium.v2.UserService.GetGroup
+   */
+  getGroup: {
+    methodKind: "unary";
+    input: typeof UserServiceGetGroupRequestSchema;
+    output: typeof UserServiceGetGroupResponseSchema;
+  },
+  /**
+   * Create new user group
+   *
+   * @generated from rpc aquarium.v2.UserService.CreateGroup
+   */
+  createGroup: {
+    methodKind: "unary";
+    input: typeof UserServiceCreateGroupRequestSchema;
+    output: typeof UserServiceCreateGroupResponseSchema;
+  },
+  /**
+   * Update existing user group
+   *
+   * @generated from rpc aquarium.v2.UserService.UpdateGroup
+   */
+  updateGroup: {
+    methodKind: "unary";
+    input: typeof UserServiceUpdateGroupRequestSchema;
+    output: typeof UserServiceUpdateGroupResponseSchema;
+  },
+  /**
+   * Remove user group
+   *
+   * @generated from rpc aquarium.v2.UserService.RemoveGroup
+   */
+  removeGroup: {
+    methodKind: "unary";
+    input: typeof UserServiceRemoveGroupRequestSchema;
+    output: typeof UserServiceRemoveGroupResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_aquarium_v2_user, 0);

@@ -31,7 +31,6 @@ import (
 	"github.com/alessio/shellescape"
 
 	"github.com/adobe/aquarium-fish/lib/crypt"
-	"github.com/adobe/aquarium-fish/lib/drivers/provider"
 	"github.com/adobe/aquarium-fish/lib/log"
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 	"github.com/adobe/aquarium-fish/lib/util"
@@ -58,15 +57,15 @@ func (d *Driver) getAvailResources() (availCPU, availRAM uint32) {
 }
 
 // Load images and unpack them according the tags
-func (d *Driver) loadImages(user string, images []provider.Image, diskPaths map[string]string) error {
+func (d *Driver) loadImages(user string, images []typesv2.Image, diskPaths map[string]string) error {
 	logger := log.WithFunc("native", "loadImages").With("provider.name", d.name)
 	var wg sync.WaitGroup
 	for _, image := range images {
-		logger.Info("Loading the required image", "image_name", image.Name, "image_version", image.Version, "image_url", image.URL)
+		logger.Info("Loading the required image", "image_name", image.GetName(), "image_version", image.GetVersion(), "image_url", image.GetURL())
 
 		// Running the background routine to download, unpack and process the image
 		wg.Add(1)
-		go func(image provider.Image) {
+		go func(image typesv2.Image) {
 			defer wg.Done()
 			if err := image.DownloadUnpack(d.cfg.ImagesPath, d.cfg.DownloadUser, d.cfg.DownloadPassword); err != nil {
 				logger.Error("Unable to download and unpack the image", "err", err)
@@ -79,7 +78,7 @@ func (d *Driver) loadImages(user string, images []provider.Image, diskPaths map[
 
 	// The images have to be processed sequentially - child images could override the parent files
 	for _, image := range images {
-		imageUnpacked := filepath.Join(d.cfg.ImagesPath, image.Name+"-"+image.Version)
+		imageUnpacked := filepath.Join(d.cfg.ImagesPath, image.GetNameVersion("-"))
 
 		// Getting the image subdir name in the unpacked dir
 		subdir := ""
@@ -89,7 +88,7 @@ func (d *Driver) loadImages(user string, images []provider.Image, diskPaths map[
 			return fmt.Errorf("NATIVE: %s: Unable to read the unpacked directory %q: %v", d.name, imageUnpacked, err)
 		}
 		for _, f := range items {
-			if strings.HasPrefix(f.Name(), image.Name) {
+			if strings.HasPrefix(f.Name(), image.GetName()) {
 				if f.Type()&fs.ModeSymlink != 0 {
 					// Potentially it can be a symlink (like used in local tests)
 					if _, err := os.Stat(filepath.Join(imageUnpacked, f.Name())); err != nil {
@@ -108,11 +107,11 @@ func (d *Driver) loadImages(user string, images []provider.Image, diskPaths map[
 
 		// Unpacking the image according its specified tag. If tag is empty - unpacks to home dir,
 		// otherwise if tag exists in the disks map - then use its path to unpack there
-		imageArchive := filepath.Join(imageUnpacked, subdir, image.Name+".tar")
-		unpackPath, ok := diskPaths[image.Tag]
+		imageArchive := filepath.Join(imageUnpacked, subdir, image.GetName()+".tar")
+		unpackPath, ok := diskPaths[image.GetTag()]
 		if !ok {
 			logger.Error("Unable to find where to unpack the image", "image_tag", image.Tag, "image_archive", imageArchive)
-			return fmt.Errorf("NATIVE: %s: Unable to find where to unpack the image %q %q: %v", d.name, image.Tag, imageArchive, err)
+			return fmt.Errorf("NATIVE: %s: Unable to find where to unpack the image %q %q: %v", d.name, image.GetTag(), imageArchive, err)
 		}
 
 		// Since the image is under Fish node control and user could have no read access to the file
@@ -472,7 +471,7 @@ func (d *Driver) disksCreate(user string, disks map[string]typesv2.ResourcesDisk
 		// Create disk
 		// TODO: Ensure failures doesn't leave the changes behind (like mounted disks or files)
 
-		if disk.Type == "dir" {
+		if disk.Type != nil && *disk.Type == "dir" {
 			if err := os.MkdirAll(diskPath, 0o777); err != nil {
 				return diskPaths, err
 			}
@@ -485,20 +484,25 @@ func (d *Driver) disksCreate(user string, disks map[string]typesv2.ResourcesDisk
 		dmgPath := diskPath + ".dmg"
 
 		label := dName
-		if disk.Label != "" {
+		if disk.Label != nil && *disk.Label != "" {
 			// Label can be used as mount point so cut the path separator out
-			label = strings.ReplaceAll(disk.Label, "/", "")
+			label = strings.ReplaceAll(*disk.Label, "/", "")
 		} else {
-			disk.Label = label
+			disk.Label = &label
 		}
 
 		// Do not recreate the disk if it is exists
 		if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
-			args := []string{"create", dmgPath,
+			if disk.Size == nil {
+				logger.Error("Unable to create disk with unset size", "dmg_path", dmgPath)
+				return diskPaths, fmt.Errorf("NATIVE: %s: Unable to create disk with unset size", d.name)
+			}
+			args := []string{
+				"create", dmgPath,
 				"-fs", "HFS+",
 				"-layout", "NONE",
 				"-volname", label,
-				"-size", fmt.Sprintf("%dm", disk.Size*1024),
+				"-size", fmt.Sprintf("%dm", *disk.Size*1024),
 			}
 			if _, _, err := util.RunAndLog("native", 10*time.Minute, nil, d.cfg.HdiutilPath, args...); err != nil {
 				logger.Error("Unable to create dmg disk", "dmg_path", dmgPath, "err", err)

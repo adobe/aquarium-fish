@@ -27,7 +27,7 @@ import (
 var debugTracerDatabaseApplication = otel.Tracer("aquarium-fish/database")
 
 func (d *Database) SubscribeApplication(ctx context.Context, ch chan ApplicationSubscriptionEvent) {
-	ctx, span := debugTracerDatabaseApplication.Start(ctx, "database.Database.subscribeApplicationImpl")
+	ctx, span := debugTracerDatabaseApplication.Start(ctx, "database.Database.SubscribeApplication")
 	defer span.End()
 
 	d.subscribeApplicationImpl(ctx, ch)
@@ -35,7 +35,7 @@ func (d *Database) SubscribeApplication(ctx context.Context, ch chan Application
 }
 
 func (d *Database) UnsubscribeApplication(ctx context.Context, ch chan ApplicationSubscriptionEvent) {
-	ctx, span := debugTracerDatabaseApplication.Start(ctx, "database.Database.unsubscribeApplicationImpl")
+	ctx, span := debugTracerDatabaseApplication.Start(ctx, "database.Database.UnsubscribeApplication")
 	defer span.End()
 
 	d.unsubscribeApplicationImpl(ctx, ch)
@@ -43,7 +43,7 @@ func (d *Database) UnsubscribeApplication(ctx context.Context, ch chan Applicati
 }
 
 func (d *Database) ApplicationList(ctx context.Context) ([]typesv2.Application, error) {
-	ctx, span := debugTracerDatabaseApplication.Start(ctx, "database.Database.applicationListImpl")
+	ctx, span := debugTracerDatabaseApplication.Start(ctx, "database.Database.ApplicationList")
 	defer span.End()
 
 	as, err1 := d.applicationListImpl(ctx)
@@ -58,7 +58,7 @@ func (d *Database) ApplicationList(ctx context.Context) ([]typesv2.Application, 
 }
 
 func (d *Database) ApplicationCreate(ctx context.Context, a *typesv2.Application) error {
-	ctx, span := debugTracerDatabaseApplication.Start(ctx, "database.Database.applicationCreateImpl")
+	ctx, span := debugTracerDatabaseApplication.Start(ctx, "database.Database.ApplicationCreate")
 	defer span.End()
 
 	err0 := d.applicationCreateImpl(ctx, a)
@@ -73,7 +73,7 @@ func (d *Database) ApplicationCreate(ctx context.Context, a *typesv2.Application
 }
 
 func (d *Database) ApplicationGet(ctx context.Context, uid typesv2.ApplicationUID) (*typesv2.Application, error) {
-	ctx, span := debugTracerDatabaseApplication.Start(ctx, "database.Database.applicationGetImpl")
+	ctx, span := debugTracerDatabaseApplication.Start(ctx, "database.Database.ApplicationGet")
 	defer span.End()
 
 	a, err1 := d.applicationGetImpl(ctx, uid)
@@ -88,7 +88,7 @@ func (d *Database) ApplicationGet(ctx context.Context, uid typesv2.ApplicationUI
 }
 
 func (d *Database) ApplicationDelete(ctx context.Context, uid typesv2.ApplicationUID) error {
-	ctx, span := debugTracerDatabaseApplication.Start(ctx, "database.Database.applicationDeleteImpl")
+	ctx, span := debugTracerDatabaseApplication.Start(ctx, "database.Database.ApplicationDelete")
 	defer span.End()
 
 	err0 := d.applicationDeleteImpl(ctx, uid)
@@ -103,7 +103,7 @@ func (d *Database) ApplicationDelete(ctx context.Context, uid typesv2.Applicatio
 }
 
 func (d *Database) ApplicationIsAllocated(ctx context.Context, appUID typesv2.ApplicationUID) error {
-	ctx, span := debugTracerDatabaseApplication.Start(ctx, "database.Database.applicationIsAllocatedImpl")
+	ctx, span := debugTracerDatabaseApplication.Start(ctx, "database.Database.ApplicationIsAllocated")
 	defer span.End()
 
 	err0 := d.applicationIsAllocatedImpl(ctx, appUID)
@@ -118,7 +118,7 @@ func (d *Database) ApplicationIsAllocated(ctx context.Context, appUID typesv2.Ap
 }
 
 func (d *Database) ApplicationDeallocate(ctx context.Context, appUID typesv2.ApplicationUID, requestor string) (*typesv2.ApplicationState, error) {
-	ctx, span := debugTracerDatabaseApplication.Start(ctx, "database.Database.applicationDeallocateImpl")
+	ctx, span := debugTracerDatabaseApplication.Start(ctx, "database.Database.ApplicationDeallocate")
 	defer span.End()
 
 	r0, err1 := d.applicationDeallocateImpl(ctx, appUID, requestor)

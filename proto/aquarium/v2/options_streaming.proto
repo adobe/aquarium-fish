@@ -38,3 +38,8 @@ extend google.protobuf.MessageOptions {
   // Streaming configuration for the message
   optional SubscribeConfig subscribe_config = 50001;
 }
+
+extend google.protobuf.ServiceOptions {
+  // Streaming configuration for the service
+  optional bool skip_service_streaming = 50002;
+}

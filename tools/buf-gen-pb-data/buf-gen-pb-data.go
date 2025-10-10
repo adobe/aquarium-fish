@@ -43,6 +43,7 @@ type DataField struct {
 	IsMap        bool   // Whether the field is a map
 	MapKeyType   string // For map fields, the key type
 	MapValueType string // For map fields, the value type
+	Custom       bool   // The custom field without data from the PB
 }
 
 // DataMessage represents a data struct for a protobuf message
@@ -142,7 +143,7 @@ type {{ .Name }} = uuid.UUID
 // {{.DataName}} is a data for {{.OriginalName}} without internal locks
 type {{.DataName}} struct {
 {{- range .Fields }}
-	{{.Name}} {{if .IsOptional}}*{{end}}{{if .IsRepeated}}[]{{end}}{{.Type}} ` + "`json:\"{{.OriginalName}},omitempty\"`" + `
+	{{.Name}} {{if .IsOptional}}*{{end}}{{if .IsRepeated}}[]{{end}}{{.Type}}{{ if not .Custom }} ` + "`json:\"{{.OriginalName}},omitempty\"`" + `{{ end }}
 {{- end }}}
 
 // From{{.OriginalName}} creates a {{.DataName}} from {{.OriginalName}}
@@ -153,6 +154,7 @@ func From{{.OriginalName}}(src *pbTypes.{{.OriginalName}}) {{.DataName}} {
 
 	result := {{.DataName}}{}
 {{- range .Fields }}
+{{- if .Custom }}{{- continue -}}{{ end -}}
 {{- if .IsMap }}
 	// Convert map field {{.OriginalName}}
 	if src.Get{{toCamelCase .OriginalName}}() != nil {
@@ -272,6 +274,7 @@ func ({{.ReceiverVar}} {{.DataName}}) To{{.OriginalName}}() *pbTypes.{{.Original
 {{ $receiverVar := .ReceiverVar }}
 {{- $mapDataNotDefined := true }}
 {{- range .Fields }}
+{{- if .Custom }}{{- continue -}}{{ end -}}
 {{- if .IsMap }}
 	// Convert map field {{.OriginalName}}
 	if {{$receiverVar}}.{{.Name}} != nil {
@@ -699,6 +702,22 @@ func processProtoFile(plugin *protogen.Plugin, file *protogen.File) {
 		sort.Slice(fields, func(i, j int) bool {
 			return fields[i].Name < fields[j].Name
 		})
+
+		// TODO: Prepare some better interface for this quick hack if will be used with some other datatype
+		// User needs additional groups field to store the groups user belongs to
+		if message.GoIdent.GoName == "User" {
+			fields = append(fields, DataField{
+				Name:         "groups",
+				Type:         "[]string",
+				OriginalName: "groups",
+				IsRepeated:   false,
+				IsOptional:   false,
+				IsMap:        false,
+				MapKeyType:   "",
+				MapValueType: "",
+				Custom:       true,
+			})
+		}
 
 		messages = append(messages, DataMessage{
 			DataName:     message.GoIdent.GoName,

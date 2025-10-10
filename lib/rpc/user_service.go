@@ -215,3 +215,166 @@ func (s *UserService) Remove(ctx context.Context, req *connect.Request[aquariumv
 		Status: true, Message: "User removed successfully",
 	}), nil
 }
+
+// UserGroup RPC methods
+
+// ListGroup implements the ListGroup RPC
+func (s *UserService) ListGroup(ctx context.Context, _ /*req*/ *connect.Request[aquariumv2.UserServiceListGroupRequest]) (*connect.Response[aquariumv2.UserServiceListGroupResponse], error) {
+	groups, err := s.fish.DB().UserGroupList(ctx)
+	if err != nil {
+		return connect.NewResponse(&aquariumv2.UserServiceListGroupResponse{
+			Status: false, Message: "Failed to list user groups: " + err.Error(),
+		}), connect.NewError(connect.CodeInternal, err)
+	}
+
+	resp := &aquariumv2.UserServiceListGroupResponse{
+		Status: true, Message: "User groups listed successfully",
+		Data: make([]*aquariumv2.UserGroup, len(groups)),
+	}
+
+	for i, group := range groups {
+		resp.Data[i] = &aquariumv2.UserGroup{
+			Name:      group.Name,
+			CreatedAt: timestamppb.New(group.CreatedAt),
+			UpdatedAt: timestamppb.New(group.UpdatedAt),
+			Users:     group.Users,
+		}
+		if group.Config != nil {
+			resp.Data[i].Config = group.Config.ToUserConfig()
+		}
+	}
+
+	return connect.NewResponse(resp), nil
+}
+
+// GetGroup implements the GetGroup RPC
+func (s *UserService) GetGroup(ctx context.Context, req *connect.Request[aquariumv2.UserServiceGetGroupRequest]) (*connect.Response[aquariumv2.UserServiceGetGroupResponse], error) {
+	group, err := s.fish.DB().UserGroupGet(ctx, req.Msg.GetGroupName())
+	if err != nil {
+		return connect.NewResponse(&aquariumv2.UserServiceGetGroupResponse{
+			Status: false, Message: "User group not found: " + err.Error(),
+		}), connect.NewError(connect.CodeNotFound, err)
+	}
+
+	result := &aquariumv2.UserGroup{
+		Name:      group.Name,
+		CreatedAt: timestamppb.New(group.CreatedAt),
+		UpdatedAt: timestamppb.New(group.UpdatedAt),
+		Users:     group.Users,
+	}
+	if group.Config != nil {
+		result.Config = group.Config.ToUserConfig()
+	}
+
+	return connect.NewResponse(&aquariumv2.UserServiceGetGroupResponse{
+		Status: true, Message: "User group retrieved successfully",
+		Data: result,
+	}), nil
+}
+
+// CreateGroup implements the CreateGroup RPC
+func (s *UserService) CreateGroup(ctx context.Context, req *connect.Request[aquariumv2.UserServiceCreateGroupRequest]) (*connect.Response[aquariumv2.UserServiceCreateGroupResponse], error) {
+	msgGroup := req.Msg.GetUsergroup()
+	if msgGroup == nil {
+		return connect.NewResponse(&aquariumv2.UserServiceCreateGroupResponse{
+			Status: false, Message: "User group not provided",
+		}), connect.NewError(connect.CodeInvalidArgument, nil)
+	}
+
+	// Convert proto to internal type
+	group := &typesv2.UserGroup{
+		Name:  msgGroup.GetName(),
+		Users: msgGroup.GetUsers(),
+	}
+
+	// Assigning config if provided
+	if msgGroup.GetConfig() != nil {
+		uc := typesv2.FromUserConfig(msgGroup.GetConfig())
+		group.Config = &uc
+	}
+
+	if err := s.fish.DB().UserGroupCreate(ctx, group); err != nil {
+		return connect.NewResponse(&aquariumv2.UserServiceCreateGroupResponse{
+			Status: false, Message: "Failed to create user group: " + err.Error(),
+		}), connect.NewError(connect.CodeInternal, err)
+	}
+
+	// Convert back to proto for response
+	result := &aquariumv2.UserGroup{
+		Name:      group.Name,
+		CreatedAt: timestamppb.New(group.CreatedAt),
+		UpdatedAt: timestamppb.New(group.UpdatedAt),
+		Users:     group.Users,
+	}
+	if group.Config != nil {
+		result.Config = group.Config.ToUserConfig()
+	}
+
+	return connect.NewResponse(&aquariumv2.UserServiceCreateGroupResponse{
+		Status: true, Message: "User group created successfully",
+		Data: result,
+	}), nil
+}
+
+// UpdateGroup implements the UpdateGroup RPC
+func (s *UserService) UpdateGroup(ctx context.Context, req *connect.Request[aquariumv2.UserServiceUpdateGroupRequest]) (*connect.Response[aquariumv2.UserServiceUpdateGroupResponse], error) {
+	msgGroup := req.Msg.GetUsergroup()
+	if msgGroup == nil {
+		return connect.NewResponse(&aquariumv2.UserServiceUpdateGroupResponse{
+			Status: false, Message: "User group not provided",
+		}), connect.NewError(connect.CodeInvalidArgument, nil)
+	}
+
+	group, err := s.fish.DB().UserGroupGet(ctx, msgGroup.GetName())
+	if err != nil {
+		return connect.NewResponse(&aquariumv2.UserServiceUpdateGroupResponse{
+			Status: false, Message: "User group not found: " + err.Error(),
+		}), connect.NewError(connect.CodeNotFound, err)
+	}
+
+	// Update users list
+	group.Users = msgGroup.GetUsers()
+
+	// Update config if provided
+	if msgGroup.GetConfig() != nil {
+		uc := typesv2.FromUserConfig(msgGroup.GetConfig())
+		group.Config = &uc
+	} else {
+		group.Config = nil
+	}
+
+	if err := s.fish.DB().UserGroupSave(ctx, group); err != nil {
+		return connect.NewResponse(&aquariumv2.UserServiceUpdateGroupResponse{
+			Status: false, Message: "Failed to update user group: " + err.Error(),
+		}), connect.NewError(connect.CodeInternal, err)
+	}
+
+	// Convert back to proto for response
+	result := &aquariumv2.UserGroup{
+		Name:      group.Name,
+		CreatedAt: timestamppb.New(group.CreatedAt),
+		UpdatedAt: timestamppb.New(group.UpdatedAt),
+		Users:     group.Users,
+	}
+	if group.Config != nil {
+		result.Config = group.Config.ToUserConfig()
+	}
+
+	return connect.NewResponse(&aquariumv2.UserServiceUpdateGroupResponse{
+		Status: true, Message: "User group updated successfully",
+		Data: result,
+	}), nil
+}
+
+// RemoveGroup implements the RemoveGroup RPC
+func (s *UserService) RemoveGroup(ctx context.Context, req *connect.Request[aquariumv2.UserServiceRemoveGroupRequest]) (*connect.Response[aquariumv2.UserServiceRemoveGroupResponse], error) {
+	if err := s.fish.DB().UserGroupDelete(ctx, req.Msg.GetGroupName()); err != nil {
+		return connect.NewResponse(&aquariumv2.UserServiceRemoveGroupResponse{
+			Status: false, Message: "Failed to remove user group: " + err.Error(),
+		}), connect.NewError(connect.CodeNotFound, err)
+	}
+
+	return connect.NewResponse(&aquariumv2.UserServiceRemoveGroupResponse{
+		Status: true, Message: "User group removed successfully",
+	}), nil
+}

@@ -68,7 +68,6 @@ drivers:
 	t.Run("Create AWS Label", func(t *testing.T) {
 		// Create label with AWS driver options
 		options, _ := structpb.NewStruct(map[string]any{
-			"image":           "ami-12345678",
 			"instance_type":   "t3.micro",
 			"security_groups": []any{"sg-12345678"},
 		})
@@ -82,12 +81,15 @@ drivers:
 					Version: 1,
 					Definitions: []*aquariumv2.LabelDefinition{{
 						Driver: "aws",
+						Images: []*aquariumv2.Image{{
+							Name: func() *string { val := "ami-12345678"; return &val }(),
+						}},
+						Options: options,
 						Resources: &aquariumv2.Resources{
 							Cpu:     1,
 							Ram:     2,
-							Network: "subnet-12345678", // Use default subnet from mock
+							Network: func() *string { val := "subnet-12345678"; return &val }(), // Use default subnet from mock
 						},
-						Options: options,
 					}},
 					Metadata: md,
 				},

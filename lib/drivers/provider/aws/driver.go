@@ -285,7 +285,11 @@ func (d *Driver) AvailableCapacity(_ /*nodeUsage*/ typesv2.Resources, def typesv
 	// Make sure we have enough IP's in the selected VPC or subnet
 	var ipCount int64
 	var err error
-	if _, ipCount, err = d.getSubnetID(connEc2, def.Resources.Network, ""); err != nil {
+	if def.Resources.Network == nil {
+		logger.Error("No network is set to find the required subnet", "err", err)
+		return -1
+	}
+	if _, ipCount, err = d.getSubnetID(connEc2, *def.Resources.Network, ""); err != nil {
 		logger.Error("Error during requesting subnet", "err", err)
 		return -1
 	}
@@ -324,7 +328,10 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 	conn := d.newEC2Conn()
 
 	// Looking for the AMI
-	vmImage := opts.Image
+	if len(def.Images) < 1 {
+		return nil, fmt.Errorf("AWS: %s: Image is not defined", iName)
+	}
+	vmImage := def.Images[0].GetNameVersion("-")
 	var err error
 	if vmImage, err = d.getImageID(conn, vmImage); err != nil {
 		return nil, fmt.Errorf("AWS: %s: Unable to get image: %v", iName, err)
@@ -440,7 +447,11 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 	}
 
 	// Checking the VPC exists or use default one
-	subnetID := def.Resources.Network
+	if def.Resources.Network == nil {
+		logger.Error("No network is set to find the required subnet")
+		return nil, fmt.Errorf("AWS: %s: No network is set to find the required subnet", iName)
+	}
+	subnetID := *def.Resources.Network
 	if subnetID, _, err = d.getSubnetID(conn, subnetID, netZone); err != nil {
 		logger.Error("Unable to get subnet", "err", err)
 		return nil, fmt.Errorf("AWS: %s: Unable to get subnet: %v", iName, err)
@@ -487,8 +498,8 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 				VolumeType:          ec2types.VolumeTypeGp3,
 			},
 		}
-		if disk.Type != "" {
-			typeData := strings.Split(disk.Type, ":")
+		if disk.Type != nil && *disk.Type != "" {
+			typeData := strings.Split(*disk.Type, ":")
 			if len(typeData) > 0 && typeData[0] != "" {
 				mapping.Ebs.VolumeType = ec2types.VolumeType(typeData[0])
 			}
@@ -507,9 +518,9 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 				mapping.Ebs.Throughput = aws.Int32(int32(val))
 			}
 		}
-		if disk.Clone != "" {
+		if disk.Clone != nil && *disk.Clone != "" {
 			// Use snapshot as the disk source
-			vmSnapshot := disk.Clone
+			vmSnapshot := *disk.Clone
 			if vmSnapshot, err = d.getSnapshotID(conn, vmSnapshot); err != nil {
 				return nil, fmt.Errorf("AWS: %s: Unable to get snapshot: %v", iName, err)
 			}
@@ -517,7 +528,10 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 			mapping.Ebs.SnapshotId = aws.String(vmSnapshot)
 		} else {
 			// Just create a new disk
-			mapping.Ebs.VolumeSize = aws.Int32(int32(disk.Size))
+			if disk.Size == nil {
+				return nil, fmt.Errorf("AWS: %s: Unable to create new disk, size is not set", iName)
+			}
+			mapping.Ebs.VolumeSize = aws.Int32(int32(*disk.Size))
 			if opts.EncryptKey != "" {
 				mapping.Ebs.Encrypted = aws.Bool(true)
 				keyID, err := d.getKeyID(opts.EncryptKey)
@@ -565,7 +579,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 		}
 		for _, bd := range inst.BlockDeviceMappings {
 			disk, ok := def.Resources.Disks[aws.ToString(bd.DeviceName)]
-			if !ok || disk.Label == "" {
+			if !ok || disk.Label == nil || *disk.Label == "" {
 				continue
 			}
 
@@ -574,7 +588,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 				Tags:      []ec2types.Tag{},
 			}
 
-			tagVals := strings.Split(disk.Label, ",")
+			tagVals := strings.Split(*disk.Label, ",")
 			for _, tagVal := range tagVals {
 				keyVal := strings.SplitN(tagVal, ":", 2)
 				if len(keyVal) < 2 {
