@@ -15,7 +15,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useStreaming } from '../../../contexts/StreamingContext/index';
-import { useLabels, useLabelCreate, useLabelRemove } from '../hooks/useLabels';
+import { useLabels, useLabelCreate, useLabelUpdate, useLabelRemove } from '../hooks/useLabels';
 import { StreamingList, type ListColumn, type ListItemAction } from '../../../components/StreamingList';
 import { LabelForm } from '../../../../gen/components';
 import { PermService, PermLabel } from '../../../../gen/permissions/permissions_grpc';
@@ -29,15 +29,19 @@ const formatTimestamp = (timestamp: any) => {
 };
 
 export function LabelsPage() {
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const { fetchLabels, data } = useStreaming();
   useLabels();
   const { create } = useLabelCreate();
+  const { update } = useLabelUpdate();
   const { remove } = useLabelRemove();
 
   const [showCreateLabelModal, setShowCreateLabelModal] = useState(false);
   const [showLabelDetailsModal, setShowLabelDetailsModal] = useState(false);
+  const [showEditLabelModal, setShowEditLabelModal] = useState(false);
   const [showCopyLabelModal, setShowCopyLabelModal] = useState(false);
+  const [showVersionZeroConfirm, setShowVersionZeroConfirm] = useState(false);
+  const [pendingLabelData, setPendingLabelData] = useState<Label | null>(null);
   const [selectedLabel, setSelectedLabel] = useState<Label | null>(null);
   const [labelToCopy, setLabelToCopy] = useState<Label | null>(null);
 
@@ -46,7 +50,39 @@ export function LabelsPage() {
     fetchLabels();
   }, [fetchLabels]);
 
+  // Check if user can edit a label (is owner and has Update permission, or has UpdateAll permission)
+  const canEditLabel = (label: Label): boolean => {
+    if (!user) return false;
+
+    // User needs to have Update or UpdateAll permission
+    const hasUpdatePermission = hasPermission(PermService.Label, PermLabel.Update);
+    const hasUpdateAllPermission = hasPermission(PermService.Label, PermLabel.UpdateAll);
+
+    if (!hasUpdatePermission && !hasUpdateAllPermission) {
+      return false;
+    }
+
+    // If user has UpdateAll permission, they can edit any label with version 0
+    if (hasUpdateAllPermission && label.version === 0) {
+      return true;
+    }
+
+    // If user has Update permission, they can only edit their own labels with version 0
+    if (hasUpdatePermission && label.version === 0 && label.ownerName === user.name) {
+      return true;
+    }
+
+    return false;
+  };
+
   const handleCreateLabel = async (labelData: Label) => {
+    // Check if version is 0 and ask for confirmation
+    if (labelData.version === 0) {
+      setPendingLabelData(labelData);
+      setShowVersionZeroConfirm(true);
+      return;
+    }
+
     try {
       console.debug('Creating:', labelData);
       await create(labelData);
@@ -54,6 +90,26 @@ export function LabelsPage() {
     } catch (error) {
       console.error('Failed to create label:', error);
     }
+  };
+
+  const handleConfirmVersionZero = async () => {
+    if (!pendingLabelData) return;
+
+    try {
+      console.debug('Creating editable label:', pendingLabelData);
+      await create(pendingLabelData);
+      setShowCreateLabelModal(false);
+      setShowVersionZeroConfirm(false);
+      setPendingLabelData(null);
+    } catch (error) {
+      console.error('Failed to create label:', error);
+    }
+  };
+
+  const handleCancelVersionZero = () => {
+    setShowVersionZeroConfirm(false);
+    setPendingLabelData(null);
+    // Keep the create modal open so user can change the version
   };
 
   const handleCopyLabel = async (labelData: Label) => {
@@ -70,6 +126,17 @@ export function LabelsPage() {
       setLabelToCopy(null);
     } catch (error) {
       console.error('Failed to copy label:', error);
+    }
+  };
+
+  const handleUpdateLabel = async (labelData: Label) => {
+    try {
+      console.debug('Updating:', labelData);
+      await update(labelData);
+      setShowEditLabelModal(false);
+      setSelectedLabel(null);
+    } catch (error) {
+      console.error('Failed to update label:', error);
     }
   };
 
@@ -105,12 +172,24 @@ export function LabelsPage() {
   // Define actions for each label
   const actions: ListItemAction[] = [
     {
-      label: 'View Details',
+      label: 'Edit',
+      onClick: (label: Label) => {
+        setSelectedLabel(label);
+        setShowEditLabelModal(true);
+      },
+      className: 'px-3 py-1 text-sm bg-purple-100 text-purple-800 rounded-md hover:bg-purple-200',
+      // Only show Edit if user can edit this label (version=0 and proper permissions)
+      condition: (label: Label) => canEditLabel(label),
+    },
+    {
+      label: 'View',
       onClick: (label: Label) => {
         setSelectedLabel(label);
         setShowLabelDetailsModal(true);
       },
       className: 'px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded-md hover:bg-blue-200',
+      // Only show View if user cannot edit this label
+      condition: (label: Label) => !canEditLabel(label),
     },
     {
       label: 'Copy',
@@ -171,7 +250,7 @@ export function LabelsPage() {
 
       {/* Create Label Modal */}
       {showCreateLabelModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <LabelForm
               mode="create"
@@ -185,7 +264,7 @@ export function LabelsPage() {
 
       {/* Label Details Modal */}
       {showLabelDetailsModal && selectedLabel && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <LabelForm
               mode="view"
@@ -199,9 +278,27 @@ export function LabelsPage() {
         </div>
       )}
 
+      {/* Edit Label Modal */}
+      {showEditLabelModal && selectedLabel && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <LabelForm
+              mode="edit"
+              initialData={selectedLabel}
+              onSubmit={handleUpdateLabel}
+              onCancel={() => {
+                setShowEditLabelModal(false);
+                setSelectedLabel(null);
+              }}
+              title={`Edit Label: ${selectedLabel.name}:${selectedLabel.version}`}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Copy Label Modal */}
       {showCopyLabelModal && labelToCopy && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <LabelForm
               mode="create"
@@ -213,6 +310,38 @@ export function LabelsPage() {
               }}
               title={`Copy Label: ${labelToCopy.name}:${labelToCopy.version}`}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Version Zero Confirmation Modal */}
+      {showVersionZeroConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+              Create Editable Label?
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              You are creating a label with version = 0. This label will be editable but temporary.
+              Editable labels must have a removal date set and will be automatically removed after that date.
+            </p>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              <strong>Do you want to create this editable label?</strong>
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={handleCancelVersionZero}
+                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300"
+              >
+                No, go back
+              </button>
+              <button
+                onClick={handleConfirmVersionZero}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Yes, create editable label
+              </button>
+            </div>
           </div>
         </div>
       )}

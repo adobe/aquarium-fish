@@ -75,7 +75,7 @@ drivers:
 						Resources: &aquariumv2.Resources{
 							Cpu:      1,
 							Ram:      2,
-							Lifetime: "15s",
+							Lifetime: func() *string { val := "15s"; return &val }(),
 						},
 					}},
 				},

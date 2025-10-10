@@ -38,3 +38,13 @@ func (u *User) SetHash(hash *crypt.Hash) error {
 	u.Hash = &jsonData
 	return nil
 }
+
+// GetGroups returns user's groups
+func (u *User) GetGroups() []string {
+	return u.groups
+}
+
+// SetGroups put groups in the user object
+func (u *User) SetGroups(groups []string) {
+	u.groups = groups
+}

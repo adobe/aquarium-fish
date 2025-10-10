@@ -77,7 +77,8 @@ func (f *Fish) maybeRunExecuteApplicationStart(appState *typesv2.ApplicationStat
 		}
 	} else {
 		logger.ErrorContext(ctx, "Can't allocate Application", "err", err)
-		appState = &typesv2.ApplicationState{ApplicationUid: appState.ApplicationUid, Status: typesv2.ApplicationState_ERROR,
+		appState = &typesv2.ApplicationState{
+			ApplicationUid: appState.ApplicationUid, Status: typesv2.ApplicationState_ERROR,
 			Description: fmt.Sprint("Driver allocate resource error:", err),
 		}
 	}
@@ -257,19 +258,22 @@ func (f *Fish) executeApplicationStart(appUID typesv2.ApplicationUID, defIndex i
 			var metadata map[string]any
 			if err := json.Unmarshal([]byte(app.Metadata), &metadata); err != nil {
 				logger.Error("Unable to parse the Application metadata", "err", err)
-				appState = &typesv2.ApplicationState{ApplicationUid: app.Uid, Status: typesv2.ApplicationState_ERROR,
+				appState = &typesv2.ApplicationState{
+					ApplicationUid: app.Uid, Status: typesv2.ApplicationState_ERROR,
 					Description: fmt.Sprint("Unable to parse the app metadata:", err),
 				}
 				f.db.ApplicationStateCreate(ctx, appState)
 			} else if err := json.Unmarshal([]byte(label.Metadata), &metadata); err != nil {
 				logger.Error("Unable to parse the Label metadata", "err", err, "label_uid", label.Uid)
-				appState = &typesv2.ApplicationState{ApplicationUid: app.Uid, Status: typesv2.ApplicationState_ERROR,
+				appState = &typesv2.ApplicationState{
+					ApplicationUid: app.Uid, Status: typesv2.ApplicationState_ERROR,
 					Description: fmt.Sprint("Unable to parse the label metadata:", err),
 				}
 				f.db.ApplicationStateCreate(ctx, appState)
 			} else if mergedMetadata, err = json.Marshal(metadata); err != nil {
 				logger.Error("Unable to merge metadata", "err", err, "label_uid", label.Uid)
-				appState = &typesv2.ApplicationState{ApplicationUid: app.Uid, Status: typesv2.ApplicationState_ERROR,
+				appState = &typesv2.ApplicationState{
+					ApplicationUid: app.Uid, Status: typesv2.ApplicationState_ERROR,
 					Description: fmt.Sprint("Unable to merge metadata:", err),
 				}
 				f.db.ApplicationStateCreate(ctx, appState)
@@ -283,7 +287,8 @@ func (f *Fish) executeApplicationStart(appUID typesv2.ApplicationUID, defIndex i
 			res, err = f.db.ApplicationResourceGetByApplication(ctx, app.Uid)
 			if err != nil {
 				logger.Error("Unable to get the allocated Resource", "err", err)
-				appState = &typesv2.ApplicationState{ApplicationUid: app.Uid, Status: typesv2.ApplicationState_ERROR,
+				appState = &typesv2.ApplicationState{
+					ApplicationUid: app.Uid, Status: typesv2.ApplicationState_ERROR,
 					Description: fmt.Sprint("Unable to find the allocated resource:", err),
 				}
 				f.db.ApplicationStateCreate(ctx, appState)
@@ -294,7 +299,8 @@ func (f *Fish) executeApplicationStart(appUID typesv2.ApplicationUID, defIndex i
 		if appState.Status == typesv2.ApplicationState_ELECTED {
 			if err := json.Unmarshal([]byte(res.Metadata), &metadata); err != nil {
 				logger.Error("Unable to parse the ApplicationResource metadata", "err", err)
-				appState = &typesv2.ApplicationState{ApplicationUid: app.Uid, Status: typesv2.ApplicationState_ERROR,
+				appState = &typesv2.ApplicationState{
+					ApplicationUid: app.Uid, Status: typesv2.ApplicationState_ERROR,
 					Description: fmt.Sprint("Unable to parse the res metadata:", err),
 				}
 				f.db.ApplicationStateCreate(ctx, appState)
@@ -321,7 +327,8 @@ func (f *Fish) executeApplicationStart(appUID typesv2.ApplicationUID, defIndex i
 					}
 				} else {
 					logger.Error("Unable to allocate Resource", "retries", retries, "err", err)
-					appState = &typesv2.ApplicationState{ApplicationUid: app.Uid, Status: typesv2.ApplicationState_ERROR,
+					appState = &typesv2.ApplicationState{
+						ApplicationUid: app.Uid, Status: typesv2.ApplicationState_ERROR,
 						Description: fmt.Sprint("Driver allocate resource error:", err),
 					}
 				}
@@ -334,17 +341,18 @@ func (f *Fish) executeApplicationStart(appUID typesv2.ApplicationUID, defIndex i
 				res.Authentication = drvRes.Authentication
 
 				// Getting the resource lifetime to know how much time it will live
-				resourceLifetime, err := time.ParseDuration(labelDef.Resources.Lifetime)
-				if labelDef.Resources.Lifetime != "" && err != nil {
-					logger.Error("Can't parse the Lifetime from Label", "label_uid", label.Uid, "res_def_index", res.DefinitionIndex, "err", err)
+				resourceLifetime := time.Duration(f.cfg.DefaultResourceLifetime) // Using fish node default
+				if resourceLifetime <= 0 {
+					// Not an error - in worst case the resource will just sit there but at least will
+					// not ruin the workload execution
+					logger.Warn("Default Resource Lifetime is not set in fish config")
 				}
-				if err != nil {
-					// Try to get default value from fish config
-					resourceLifetime = time.Duration(f.cfg.DefaultResourceLifetime)
-					if resourceLifetime <= 0 {
-						// Not an error - in worst case the resource will just sit there but at least will
-						// not ruin the workload execution
-						logger.Warn("Default Resource Lifetime is not set in fish config")
+				if labelDef.Resources.Lifetime != nil && *labelDef.Resources.Lifetime != "" {
+					labelLifetime, err := time.ParseDuration(*labelDef.Resources.Lifetime)
+					if err != nil {
+						logger.Error("Can't parse the Lifetime from Label", "label_uid", label.Uid, "res_def_index", res.DefinitionIndex, "err", err)
+					} else {
+						resourceLifetime = labelLifetime
 					}
 				}
 
@@ -356,7 +364,8 @@ func (f *Fish) executeApplicationStart(appUID typesv2.ApplicationUID, defIndex i
 				if err = f.db.ApplicationResourceCreate(ctx, res); err != nil {
 					logger.Error("Unable to store Resource", "err", err)
 				}
-				appState = &typesv2.ApplicationState{ApplicationUid: app.Uid, Status: typesv2.ApplicationState_ALLOCATED,
+				appState = &typesv2.ApplicationState{
+					ApplicationUid: app.Uid, Status: typesv2.ApplicationState_ALLOCATED,
 					Description: "Driver allocated the resource",
 				}
 				logger.Info("Allocated Resource", "res_identifier", res.Identifier)
@@ -469,7 +478,8 @@ func (f *Fish) executeApplicationStop(appUID typesv2.ApplicationUID) error {
 		for retry := range 20 {
 			if err := driver.Deallocate(*res); err != nil {
 				logger.Error("Unable to deallocate the ApplicationResource", "retry", retry, "err", err)
-				appState = &typesv2.ApplicationState{ApplicationUid: appUID, Status: typesv2.ApplicationState_ERROR,
+				appState = &typesv2.ApplicationState{
+					ApplicationUid: appUID, Status: typesv2.ApplicationState_ERROR,
 					Description: fmt.Sprint("Driver deallocate resource error:", err),
 				}
 				time.Sleep(10 * time.Second)
@@ -477,7 +487,8 @@ func (f *Fish) executeApplicationStop(appUID typesv2.ApplicationUID) error {
 			}
 
 			logger.Info("Application deallocated successfully")
-			appState = &typesv2.ApplicationState{ApplicationUid: appUID, Status: typesv2.ApplicationState_DEALLOCATED,
+			appState = &typesv2.ApplicationState{
+				ApplicationUid: appUID, Status: typesv2.ApplicationState_DEALLOCATED,
 				Description: "Driver deallocated the resource",
 			}
 			// We don't need timeout anymore
@@ -682,7 +693,7 @@ func (f *Fish) applicationTimeoutNext() (uid typesv2.ApplicationUID, to <-chan t
 	f.applicationsTimeoutsMutex.Lock()
 	defer f.applicationsTimeoutsMutex.Unlock()
 
-	var minTime = time.Now().Add(time.Hour)
+	minTime := time.Now().Add(time.Hour)
 
 	for appUID, timeout := range f.applicationsTimeouts {
 		if minTime.After(timeout) {

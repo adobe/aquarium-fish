@@ -181,12 +181,12 @@ func (d *Driver) AvailableCapacity(nodeUsage typesv2.Resources, req typesv2.Labe
 		nodeUsage.CpuOverbook = req.Resources.CpuOverbook
 		nodeUsage.RamOverbook = req.Resources.RamOverbook
 	}
-	if nodeUsage.Multitenancy && req.Resources.Multitenancy {
+	if nodeUsage.Multitenancy != nil && *nodeUsage.Multitenancy && req.Resources.Multitenancy != nil && *req.Resources.Multitenancy {
 		// Ok we can run more tenants, let's calculate how much
-		if nodeUsage.CpuOverbook && req.Resources.CpuOverbook {
+		if nodeUsage.CpuOverbook != nil && *nodeUsage.CpuOverbook && req.Resources.CpuOverbook != nil && *req.Resources.CpuOverbook {
 			availCPU += d.cfg.CPUOverbook
 		}
-		if nodeUsage.RamOverbook && req.Resources.RamOverbook {
+		if nodeUsage.RamOverbook != nil && *nodeUsage.RamOverbook && req.Resources.RamOverbook != nil && *req.Resources.RamOverbook {
 			availRAM += d.cfg.RAMOverbook
 		}
 	}
@@ -230,16 +230,16 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 	// have the separated container `hostonly` which allows only
 	// host.docker.internal access, but others to drop and to use it as
 	// `--net container:hostonly` in other containers in the future.
-	cNetwork := def.Resources.Network
-	if cNetwork == "" {
-		cNetwork = "hostonly"
+	cNetwork := "hostonly"
+	if def.Resources.Network != nil && *def.Resources.Network != "" {
+		cNetwork = *def.Resources.Network
 	}
 	if err := d.ensureNetwork(cNetwork); err != nil {
 		return nil, err
 	}
 
 	// Load the images
-	imgNameVersion, err := d.loadImages(cName, &opts)
+	imgNameVersion, err := d.loadImages(cName, def.Images)
 	if err != nil {
 		return nil, err
 	}

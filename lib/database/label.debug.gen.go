@@ -27,7 +27,7 @@ import (
 var debugTracerDatabaseLabel = otel.Tracer("aquarium-fish/database")
 
 func (d *Database) SubscribeLabel(ctx context.Context, ch chan LabelSubscriptionEvent) {
-	ctx, span := debugTracerDatabaseLabel.Start(ctx, "database.Database.subscribeLabelImpl")
+	ctx, span := debugTracerDatabaseLabel.Start(ctx, "database.Database.SubscribeLabel")
 	defer span.End()
 
 	d.subscribeLabelImpl(ctx, ch)
@@ -35,7 +35,7 @@ func (d *Database) SubscribeLabel(ctx context.Context, ch chan LabelSubscription
 }
 
 func (d *Database) UnsubscribeLabel(ctx context.Context, ch chan LabelSubscriptionEvent) {
-	ctx, span := debugTracerDatabaseLabel.Start(ctx, "database.Database.unsubscribeLabelImpl")
+	ctx, span := debugTracerDatabaseLabel.Start(ctx, "database.Database.UnsubscribeLabel")
 	defer span.End()
 
 	d.unsubscribeLabelImpl(ctx, ch)
@@ -43,7 +43,7 @@ func (d *Database) UnsubscribeLabel(ctx context.Context, ch chan LabelSubscripti
 }
 
 func (d *Database) LabelList(ctx context.Context, filters LabelListParams) ([]typesv2.Label, error) {
-	ctx, span := debugTracerDatabaseLabel.Start(ctx, "database.Database.labelListImpl")
+	ctx, span := debugTracerDatabaseLabel.Start(ctx, "database.Database.LabelList")
 	defer span.End()
 
 	labels, err1 := d.labelListImpl(ctx, filters)
@@ -58,7 +58,7 @@ func (d *Database) LabelList(ctx context.Context, filters LabelListParams) ([]ty
 }
 
 func (d *Database) LabelCreate(ctx context.Context, l *typesv2.Label) error {
-	ctx, span := debugTracerDatabaseLabel.Start(ctx, "database.Database.labelCreateImpl")
+	ctx, span := debugTracerDatabaseLabel.Start(ctx, "database.Database.LabelCreate")
 	defer span.End()
 
 	err0 := d.labelCreateImpl(ctx, l)
@@ -72,8 +72,23 @@ func (d *Database) LabelCreate(ctx context.Context, l *typesv2.Label) error {
 
 }
 
+func (d *Database) LabelSave(ctx context.Context, l *typesv2.Label) error {
+	ctx, span := debugTracerDatabaseLabel.Start(ctx, "database.Database.LabelSave")
+	defer span.End()
+
+	err0 := d.labelSaveImpl(ctx, l)
+
+	if err0 != nil {
+		span.RecordError(err0)
+		span.SetStatus(codes.Error, err0.Error())
+	}
+
+	return err0
+
+}
+
 func (d *Database) LabelGet(ctx context.Context, uid typesv2.LabelUID) (*typesv2.Label, error) {
-	ctx, span := debugTracerDatabaseLabel.Start(ctx, "database.Database.labelGetImpl")
+	ctx, span := debugTracerDatabaseLabel.Start(ctx, "database.Database.LabelGet")
 	defer span.End()
 
 	label, err1 := d.labelGetImpl(ctx, uid)
@@ -88,7 +103,7 @@ func (d *Database) LabelGet(ctx context.Context, uid typesv2.LabelUID) (*typesv2
 }
 
 func (d *Database) LabelDelete(ctx context.Context, uid typesv2.LabelUID) error {
-	ctx, span := debugTracerDatabaseLabel.Start(ctx, "database.Database.labelDeleteImpl")
+	ctx, span := debugTracerDatabaseLabel.Start(ctx, "database.Database.LabelDelete")
 	defer span.End()
 
 	err0 := d.labelDeleteImpl(ctx, uid)

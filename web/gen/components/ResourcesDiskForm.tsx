@@ -38,11 +38,11 @@ interface ResourcesDiskFormState {
   clone: string;
 }
 const defaultResourcesDiskState: ResourcesDiskFormState = {
-  type: '',
-  label: '',
-  size: 0,
-  reuse: false,
-  clone: '',
+  type: undefined,
+  label: undefined,
+  size: undefined,
+  reuse: undefined,
+  clone: undefined,
 };
 
 
@@ -73,11 +73,11 @@ export const ResourcesDiskForm: React.FC<ResourcesDiskFormProps> = ({
   useEffect(() => {
     if (initialData) {
       const newFormData: ResourcesDiskFormState = {
-        type: initialData.type || '',
-        label: initialData.label || '',
-        size: initialData.size || 0,
-        reuse: initialData.reuse || false,
-        clone: initialData.clone || '',
+        type: initialData.type ?? undefined,
+        label: initialData.label ?? undefined,
+        size: initialData.size ?? undefined,
+        reuse: initialData.reuse ?? undefined,
+        clone: initialData.clone ?? undefined,
       };
       setFormData(newFormData);
 
@@ -147,11 +147,11 @@ const handleToggleYamlView = () => {
     // Switching to YAML view - export current form data to YAML
     try {
       const data = create(ResourcesDiskSchema, {
-        type: formData.type,
-        label: formData.label,
-        size: formData.size,
-        reuse: formData.reuse,
-        clone: formData.clone,
+        type: formData.type || undefined,
+        label: formData.label || undefined,
+        size: formData.size || undefined,
+        reuse: formData.reuse || undefined,
+        clone: formData.clone || undefined,
       });
 
       // Convert protobuf to plain object for YAML
@@ -215,21 +215,6 @@ const handleCopyYaml = () => {
 // Validate form data
 const validateForm = (): boolean => {
   const errors: Record<string, string> = {};
-  if (!formData.type) {
-    errors.type = 'Type is required';
-  }
-  if (!formData.label) {
-    errors.label = 'Label is required';
-  }
-  if (!formData.size) {
-    errors.size = 'Size is required';
-  }
-  if (!formData.reuse) {
-    errors.reuse = 'Reuse is required';
-  }
-  if (!formData.clone) {
-    errors.clone = 'Clone is required';
-  }
 
   setValidationErrors(errors);
   return Object.keys(errors).length === 0;
@@ -247,11 +232,11 @@ const handleSubmit = () => {
 
     // Convert form data to protobuf message
     const data = create(ResourcesDiskSchema, {
-      type: collectedData.type,
-      label: collectedData.label,
-      size: collectedData.size,
-      reuse: collectedData.reuse,
-      clone: collectedData.clone,
+      type: collectedData.type || undefined,
+      label: collectedData.label || undefined,
+      size: collectedData.size || undefined,
+      reuse: collectedData.reuse || undefined,
+      clone: collectedData.clone || undefined,
     });
 
     onSubmit(data);
@@ -429,7 +414,7 @@ const isSimpleField = (field: any) => {
 <div className="flex items-center justify-between">
   <div className="flex items-center space-x-2 min-w-0 flex-1">
     <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-      Type *
+      Type
     </label>
     <div className="relative group">
       <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
@@ -460,7 +445,7 @@ const isSimpleField = (field: any) => {
 <div className="flex items-center justify-between">
   <div className="flex items-center space-x-2 min-w-0 flex-1">
     <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-      Label *
+      Label
     </label>
     <div className="relative group">
       <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
@@ -491,7 +476,7 @@ const isSimpleField = (field: any) => {
 <div className="flex items-center justify-between">
   <div className="flex items-center space-x-2 min-w-0 flex-1">
     <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-      Size *
+      Size
     </label>
     <div className="relative group">
       <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
@@ -522,7 +507,7 @@ const isSimpleField = (field: any) => {
 <div className="flex items-center justify-between">
   <div className="flex items-center space-x-2 min-w-0 flex-1">
     <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-      Reuse *
+      Reuse
     </label>
     <div className="relative group">
       <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
@@ -553,7 +538,7 @@ const isSimpleField = (field: any) => {
 <div className="flex items-center justify-between">
   <div className="flex items-center space-x-2 min-w-0 flex-1">
     <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-      Clone *
+      Clone
     </label>
     <div className="relative group">
       <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>

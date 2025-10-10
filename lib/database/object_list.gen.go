@@ -26,6 +26,7 @@ const (
 	ObjectFieldUiConfig          = "FieldUiConfig"
 	ObjectGateProxySSHAccess     = "GateProxySSHAccess"
 	ObjectHostInfo               = "HostInfo"
+	ObjectImage                  = "Image"
 	ObjectJWTToken               = "JWTToken"
 	ObjectLabel                  = "Label"
 	ObjectLabelDefinition        = "LabelDefinition"

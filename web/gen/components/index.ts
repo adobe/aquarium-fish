@@ -14,6 +14,7 @@
 export { ApplicationForm } from './ApplicationForm';
 export { ApplicationResourceForm } from './ApplicationResourceForm';
 export { AuthenticationForm } from './AuthenticationForm';
+export { ImageForm } from './ImageForm';
 export { LabelForm } from './LabelForm';
 export { LabelDefinitionForm } from './LabelDefinitionForm';
 export { PermissionForm } from './PermissionForm';

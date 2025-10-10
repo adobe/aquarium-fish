@@ -12,6 +12,7 @@
 
 // Author: Sergei Parshev (@sparshev)
 
+// Package fish is the core module of the Aquarium-Fish system
 package fish
 
 import (

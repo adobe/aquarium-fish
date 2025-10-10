@@ -53,11 +53,17 @@ const (
 	GateProxySSHServiceGetResourceAccessAll = "GetResourceAccessAll"
 
 	// LabelService service constants
-	LabelService       = "LabelService"
-	LabelServiceCreate = "Create"
-	LabelServiceGet    = "Get"
-	LabelServiceList   = "List"
-	LabelServiceRemove = "Remove"
+	LabelService          = "LabelService"
+	LabelServiceCreate    = "Create"
+	LabelServiceCreateAll = "CreateAll"
+	LabelServiceGet       = "Get"
+	LabelServiceGetAll    = "GetAll"
+	LabelServiceList      = "List"
+	LabelServiceListAll   = "ListAll"
+	LabelServiceRemove    = "Remove"
+	LabelServiceRemoveAll = "RemoveAll"
+	LabelServiceUpdate    = "Update"
+	LabelServiceUpdateAll = "UpdateAll"
 
 	// NodeService service constants
 	NodeService               = "NodeService"

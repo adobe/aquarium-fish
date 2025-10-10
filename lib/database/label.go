@@ -91,12 +91,18 @@ func (d *Database) labelCreateImpl(ctx context.Context, l *typesv2.Label) error 
 	if l.Name == "" {
 		return fmt.Errorf("label name can't be empty")
 	}
-	if l.Version < 1 {
-		return fmt.Errorf("label version can't be less then 1")
+	if l.Version < 0 {
+		return fmt.Errorf("label version can't be less then 0")
 	}
 	for i, def := range l.Definitions {
 		if def.Driver == "" {
 			return fmt.Errorf("label definition driver can't be empty in Label Definition %d", i)
+		}
+		// Check the provided images
+		for index := range l.Definitions[i].Images {
+			if err := l.Definitions[i].Images[index].Validate(); err != nil {
+				return fmt.Errorf("label definition images validation failed: %v", err)
+			}
 		}
 		// Executing Validate here on the list to allow to modify the incorrect data
 		if err := l.Definitions[i].Resources.Validate([]string{}, false); err != nil {
@@ -116,6 +122,7 @@ func (d *Database) labelCreateImpl(ctx context.Context, l *typesv2.Label) error 
 
 	l.Uid = d.NewUID()
 	l.CreatedAt = time.Now()
+	l.UpdatedAt = l.CreatedAt
 	err = d.be.Collection(ObjectLabel).Add(l.Uid.String(), l)
 
 	if err == nil {
@@ -126,14 +133,24 @@ func (d *Database) labelCreateImpl(ctx context.Context, l *typesv2.Label) error 
 	return err
 }
 
-// Intentionally disabled - labels can be created once and can't be updated
-// Create label with incremented version instead
-/*func (d *Database) labelSaveImpl(_ context.Context, label *typesv2.Label) error {
-	d.beMu.RLock()
-	defer d.beMu.RUnlock()
+// labelSaveImpl allows to save label with version=0, others are immutable
+func (d *Database) labelSaveImpl(_ context.Context, l *typesv2.Label) error {
+	if l.Version != 0 {
+		return fmt.Errorf("unable to save label with version != 0")
+	}
+	l.UpdatedAt = time.Now()
 
-	return d.be.Save(label).Error
-}*/
+	d.beMu.RLock()
+	err := d.be.Collection(ObjectLabel).Add(l.Uid.String(), l)
+	d.beMu.RUnlock()
+
+	if err == nil {
+		// Notify subscribers about the updated User
+		notifySubscribersHelper(d, &d.subsLabel, NewUpdateEvent(l), ObjectLabel)
+	}
+
+	return err
+}
 
 // labelGetImpl returns Label by UID
 func (d *Database) labelGetImpl(_ context.Context, uid typesv2.LabelUID) (label *typesv2.Label, err error) {

@@ -18,25 +18,12 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/adobe/aquarium-fish/lib/drivers/provider"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
-// Options for label definition
-//
-// Example:
-//
-//	images:
-//	  - url: https://artifact-storage/aquarium/image/vmx/macos1015-VERSION/macos1015-VERSION.tar.xz
-//	    sum: sha256:1234567890abcdef1234567890abcdef1
-//	  - url: https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-VERSION/macos1015-xcode122-VERSION.tar.xz
-//	    sum: sha256:1234567890abcdef1234567890abcdef2
-//	  - url: https://artifact-storage/aquarium/image/vmx/macos1015-xcode122-ci-VERSION/macos1015-xcode122-ci-VERSION.tar.xz
-//	    sum: sha256:1234567890abcdef1234567890abcdef3
-type Options struct {
-	Images []provider.Image `json:"images"` // List of image dependencies, last one is running one
-}
+// Options for label definition (empty)
+type Options struct{}
 
 // Apply takes json and applies it to the options structure
 func (o *Options) Apply(options util.UnparsedJSON) error {
@@ -50,17 +37,5 @@ func (o *Options) Apply(options util.UnparsedJSON) error {
 
 // Validate makes sure the options have the required defaults & that the required fields are set
 func (o *Options) Validate() error {
-	// Check images
-	var imgErr error
-	for index := range o.Images {
-		if err := o.Images[index].Validate(); err != nil {
-			log.WithFunc("vmx", "Validate").Error("Error during image validation", "err", err)
-			imgErr = fmt.Errorf("VMX: Error during image validation: %v", err)
-		}
-	}
-	if imgErr != nil {
-		return imgErr
-	}
-
 	return nil
 }

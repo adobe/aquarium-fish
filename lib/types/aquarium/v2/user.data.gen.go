@@ -38,6 +38,7 @@ type User struct {
 	Password  *string            `json:"password,omitempty"`
 	Roles     []string           `json:"roles,omitempty"`
 	UpdatedAt time.Time          `json:"updated_at,omitempty"`
+	groups    []string
 }
 
 // FromUser creates a User from User

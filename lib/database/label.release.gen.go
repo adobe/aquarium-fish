@@ -38,6 +38,10 @@ func (d *Database) LabelCreate(ctx context.Context, l *typesv2.Label) error {
 	return d.labelCreateImpl(ctx, l)
 }
 
+func (d *Database) LabelSave(ctx context.Context, l *typesv2.Label) error {
+	return d.labelSaveImpl(ctx, l)
+}
+
 func (d *Database) LabelGet(ctx context.Context, uid typesv2.LabelUID) (*typesv2.Label, error) {
 	return d.labelGetImpl(ctx, uid)
 }

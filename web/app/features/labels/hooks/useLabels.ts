@@ -52,6 +52,22 @@ export function useLabelCreate() {
   return { create };
 }
 
+export function useLabelUpdate() {
+  const { sendNotification } = useNotification();
+
+  const update = useCallback(async (labelData: Label): Promise<void> => {
+    try {
+      await labelsService.update(labelData);
+      sendNotification('info', 'Label updated successfully');
+    } catch (error) {
+      sendNotification('error', 'Failed to update label', String(error));
+      throw error;
+    }
+  }, [sendNotification]);
+
+  return { update };
+}
+
 export function useLabelRemove() {
   const { sendNotification } = useNotification();
 

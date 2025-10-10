@@ -85,3 +85,15 @@ func (d *Database) UserGroupGet(ctx context.Context, name string) (*typesv2.User
 func (d *Database) UserGroupDelete(ctx context.Context, name string) error {
 	return d.userGroupDeleteImpl(ctx, name)
 }
+
+func (d *Database) UserGroupListByUser(ctx context.Context, userName string) ([]*typesv2.UserGroup, error) {
+	return d.userGroupListByUserImpl(ctx, userName)
+}
+
+func (d *Database) MergeUserConfigWithGroups(ctx context.Context, user *typesv2.User, groups []*typesv2.UserGroup) *typesv2.UserConfig {
+	return d.mergeUserConfigWithGroupsImpl(ctx, user, groups)
+}
+
+func (d *Database) EnrichUserWithGroupConfig(ctx context.Context, user *typesv2.User) {
+	d.enrichUserWithGroupConfigImpl(ctx, user)
+}

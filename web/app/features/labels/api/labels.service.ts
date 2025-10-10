@@ -17,6 +17,7 @@ import { labelClient } from '../../../lib/api/client';
 import {
   LabelServiceListRequestSchema,
   LabelServiceCreateRequestSchema,
+  LabelServiceUpdateRequestSchema,
   LabelServiceRemoveRequestSchema,
   type Label,
 } from '../../../../gen/aquarium/v2/label_pb';
@@ -32,6 +33,13 @@ export class LabelsService {
       label,
     });
     await labelClient.create(request);
+  }
+
+  async update(label: Label): Promise<void> {
+    const request = create(LabelServiceUpdateRequestSchema, {
+      label,
+    });
+    await labelClient.update(request);
   }
 
   async remove(labelUid: string): Promise<void> {

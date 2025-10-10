@@ -21,7 +21,6 @@ import (
 	"runtime"
 	"text/template"
 
-	"github.com/adobe/aquarium-fish/lib/drivers/provider"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
@@ -30,20 +29,12 @@ import (
 //
 // Example:
 //
-//	images:
-//	  - url: https://artifact-storage/aquarium/image/native/macos-VERSION/macos-VERSION.tar.xz
-//	    sum: sha256:1234567890abcdef1234567890abcdef1
-//	    tag: ws  # The same as a name of disk in Label resource definition
-//	  - url: https://artifact-storage/aquarium/image/native/macos_amd64-ci-VERSION/macos_amd64-ci-VERSION.tar.xz
-//	    sum: sha256:1234567890abcdef1234567890abcdef2
-//	    tag: ws
 //	entry: "{{ .Disks.ws }}/init.sh"  # CWD is user home
 //	groups:
 //	  - staff
 //	  - importantgroup
 type Options struct {
-	Images []provider.Image `json:"images"` // Optional list of image dependencies, they will be unpacked in order
-	//TODO: Setup  string          `json:"setup"`  // Optional path to the executable, it will be started before the Entry with escalated privileges
+	// TODO: Setup  string          `json:"setup"`  // Optional path to the executable, it will be started before the Entry with escalated privileges
 	Entry  string   `json:"entry"`  // Optional path to the executable, it will be running as workload (default: init.sh / init.ps1)
 	Groups []string `json:"groups"` // Optional user groups user should have, first one is primary (default: staff)
 }
@@ -89,18 +80,6 @@ func (o *Options) Validate() error {
 			return fmt.Errorf("Native: Unable to get the current system user group name %s: %v", u.Gid, e)
 		}
 		o.Groups = append(o.Groups, group.Name)
-	}
-
-	// Check images
-	var imgErr error
-	for index := range o.Images {
-		if err := o.Images[index].Validate(); err != nil {
-			log.WithFunc("native", "Validate").Error("Error during image validation", "err", err)
-			imgErr = fmt.Errorf("Native: Error during image validation: %v", err)
-		}
-	}
-	if imgErr != nil {
-		return imgErr
 	}
 
 	return nil

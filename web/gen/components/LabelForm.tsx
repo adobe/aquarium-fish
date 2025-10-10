@@ -33,18 +33,26 @@ interface LabelFormProps {
 interface LabelFormState {
   uid: string;
   createdAt: string;
+  updatedAt: string;
   name: string;
   version: number;
+  ownerName: string;
   definitions: any;
   metadata: Record<string, any>;
+  visibleFor: string;
+  removeAt: string;
 }
 const defaultLabelState: LabelFormState = {
   uid: '',
   createdAt: '',
+  updatedAt: '',
   name: '',
   version: 0,
+  ownerName: '',
   definitions: [],
   metadata: {},
+  visibleFor: [],
+  removeAt: undefined,
 };
 
 
@@ -77,10 +85,14 @@ export const LabelForm: React.FC<LabelFormProps> = ({
       const newFormData: LabelFormState = {
         uid: initialData.uid || '',
         createdAt: initialData.createdAt ? new Date(Number(initialData.createdAt.seconds) * 1000).toISOString().slice(0, 16) : '',
+        updatedAt: initialData.updatedAt ? new Date(Number(initialData.updatedAt.seconds) * 1000).toISOString().slice(0, 16) : '',
         name: initialData.name || '',
         version: initialData.version || 0,
+        ownerName: initialData.ownerName || '',
         definitions: initialData.definitions || [],
         metadata: initialData.metadata || {},
+        visibleFor: initialData.visibleFor || [],
+        removeAt: initialData.removeAt ? new Date(Number(initialData.removeAt.seconds) * 1000).toISOString().slice(0, 16) : '',
       };
       setFormData(newFormData);
 
@@ -153,10 +165,14 @@ const handleToggleYamlView = () => {
       const data = create(LabelSchema, {
         uid: formData.uid,
         createdAt: formData.createdAt ? { seconds: BigInt(Math.floor(new Date(formData.createdAt).getTime() / 1000)) } : undefined,
+        updatedAt: formData.updatedAt ? { seconds: BigInt(Math.floor(new Date(formData.updatedAt).getTime() / 1000)) } : undefined,
         name: formData.name,
         version: formData.version,
+        ownerName: formData.ownerName,
         definitions: formData.definitions,
         metadata: formData.metadata,
+        visibleFor: formData.visibleFor || undefined,
+        removeAt: formData.removeAt ? { seconds: BigInt(Math.floor(new Date(formData.removeAt).getTime() / 1000)) } : undefined,
       });
 
       // Convert protobuf to plain object for YAML
@@ -193,11 +209,19 @@ const handleYamlApply = () => {
         newFormData.createdAt = new Date(parsedData.createdAt).toISOString().slice(0, 16);
       }
     }
+    if (parsedData.updatedAt !== undefined) {
+      if (typeof parsedData.updatedAt === 'string') {
+        newFormData.updatedAt = new Date(parsedData.updatedAt).toISOString().slice(0, 16);
+      }
+    }
     if (parsedData.name !== undefined) {
       newFormData.name = parsedData.name;
     }
     if (parsedData.version !== undefined) {
       newFormData.version = parsedData.version;
+    }
+    if (parsedData.ownerName !== undefined) {
+      newFormData.ownerName = parsedData.ownerName;
     }
     if (parsedData.definitions !== undefined) {
       if (Array.isArray(parsedData.definitions)) {
@@ -207,6 +231,16 @@ const handleYamlApply = () => {
     if (parsedData.metadata !== undefined) {
       if (typeof parsedData.metadata === 'object') {
         newFormData.metadata = parsedData.metadata;
+      }
+    }
+    if (parsedData.visibleFor !== undefined) {
+      if (Array.isArray(parsedData.visibleFor)) {
+        newFormData.visibleFor = parsedData.visibleFor;
+      }
+    }
+    if (parsedData.removeAt !== undefined) {
+      if (typeof parsedData.removeAt === 'string') {
+        newFormData.removeAt = new Date(parsedData.removeAt).toISOString().slice(0, 16);
       }
     }
 
@@ -235,17 +269,20 @@ const validateForm = (): boolean => {
   if (mode !== 'create' && (!formData.createdAt)) {
     errors.createdAt = 'Created At is required';
   }
-  if (!formData.name) {
+  if (mode !== 'create' && (!formData.updatedAt)) {
+    errors.updatedAt = 'Updated At is required';
+  }
+  if (mode !== 'create' && (!formData.name)) {
     errors.name = 'Name is required';
   }
-  if (!formData.version) {
+  if (mode !== 'create' && (!formData.version)) {
     errors.version = 'Version is required';
+  }
+  if (mode !== 'create' && (!formData.ownerName)) {
+    errors.ownerName = 'Owner Name is required';
   }
   if (!formData.definitions || formData.definitions.length === 0) {
     errors.definitions = 'Definitions is required';
-  }
-  if (!formData.metadata) {
-    errors.metadata = 'Metadata is required';
   }
 
   setValidationErrors(errors);
@@ -266,10 +303,14 @@ const handleSubmit = () => {
     const data = create(LabelSchema, {
       uid: collectedData.uid,
       createdAt: collectedData.createdAt ? { seconds: BigInt(Math.floor(new Date(collectedData.createdAt).getTime() / 1000)) } : undefined,
+      updatedAt: collectedData.updatedAt ? { seconds: BigInt(Math.floor(new Date(collectedData.updatedAt).getTime() / 1000)) } : undefined,
       name: collectedData.name,
       version: collectedData.version,
+      ownerName: collectedData.ownerName,
       definitions: collectedData.definitions,
       metadata: collectedData.metadata,
+      visibleFor: collectedData.visibleFor || undefined,
+      removeAt: collectedData.removeAt ? { seconds: BigInt(Math.floor(new Date(collectedData.removeAt).getTime() / 1000)) } : undefined,
     });
 
     onSubmit(data);
@@ -495,6 +536,33 @@ const isSimpleField = (field: any) => {
 
       </div>
     </div>
+  )}{/* Updated At field */}
+  {!(mode === 'create' && true) && (
+    <div>
+      {/* Complex field - traditional layout */}
+      <div className="space-y-2">
+<div className="flex items-center space-x-2">
+  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+    Updated At *
+  </label>
+</div>
+
+<input
+  type="datetime-local"
+  value={formData.updatedAt}
+  onChange={(e) => handleFieldChange('updatedAt', e.target.value)}
+  disabled={isReadOnly || (mode === 'edit' && true)}
+  className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+/>
+
+{validationErrors.updatedAt && (
+  <div className="text-sm text-red-600 dark:text-red-400 mt-1">
+    {validationErrors.updatedAt}
+  </div>
+)}
+
+      </div>
+    </div>
   )}{/* Name field */}
   <div>
 {/* Simple string field - inline layout */}
@@ -515,7 +583,7 @@ const isSimpleField = (field: any) => {
       type="text"
       value={formData.name}
       onChange={(e) => handleFieldChange('name', e.target.value)}
-      disabled={isReadOnly || (mode === 'edit' && false)}
+      disabled={isReadOnly || (mode === 'edit' && true)}
       className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
     />
     {validationErrors.name && (
@@ -537,7 +605,7 @@ const isSimpleField = (field: any) => {
     <div className="relative group">
       <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
       <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
-        <pre className="whitespace-pre-wrap text-xs leading-relaxed">In order to update the labels freely and save the previous Label state for the past builds.</pre>
+        <pre className="whitespace-pre-wrap text-xs leading-relaxed">In order to update the labels freely and save the previous Label state for the past builds. Editable labels has version 0 and could be updated. Those labls has to have remove_at defined. The regular labels starting with 1 and goes until int32 is over and you can&#39;t edit those, only add new ones.</pre>
       </div>
     </div>
   </div>
@@ -546,7 +614,7 @@ const isSimpleField = (field: any) => {
       type="number"
       value={formData.version}
       onChange={(e) => handleFieldChange('version', parseInt(e.target.value) || 0)}
-      disabled={isReadOnly || (mode === 'edit' && false)}
+      disabled={isReadOnly || (mode === 'edit' && true)}
       className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
     />
     {validationErrors.version && (
@@ -557,7 +625,40 @@ const isSimpleField = (field: any) => {
   </div>
 </div>
 
-  </div>{/* Definitions field */}
+  </div>{/* Owner Name field */}
+  {!(mode === 'create' && true) && (
+    <div>
+{/* Simple string field - inline layout */}
+<div className="flex items-center justify-between">
+  <div className="flex items-center space-x-2 min-w-0 flex-1">
+    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+      Owner Name *
+    </label>
+    <div className="relative group">
+      <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
+      <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
+        <pre className="whitespace-pre-wrap text-xs leading-relaxed">User who owns this label, if empty - then admin</pre>
+      </div>
+    </div>
+  </div>
+  <div className="flex-1 max-w-xs ml-4">
+    <input
+      type="text"
+      value={formData.ownerName}
+      onChange={(e) => handleFieldChange('ownerName', e.target.value)}
+      disabled={isReadOnly || (mode === 'edit' && true)}
+      className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+    />
+    {validationErrors.ownerName && (
+      <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+        {validationErrors.ownerName}
+      </div>
+    )}
+  </div>
+</div>
+
+    </div>
+  )}{/* Definitions field */}
   <div>
     {/* Complex field - traditional layout */}
     <div className="space-y-2">
@@ -568,7 +669,7 @@ const isSimpleField = (field: any) => {
   <div className="relative group">
     <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
     <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
-      <pre className="whitespace-pre-wrap text-xs leading-relaxed">List of label definitions that describes required resources, driver and it&#39;s options. The order is sequential - so the priority is to the first driver and if it&#39;s not available than the next definitions will be used. example: - driver: vmx options: image: winserver2019-vs2019-ci images: - url: &#39;https://artifact-storage/aquarium/image/vmx/winserver2019/winserver2019-VERSION.tar.xz&#39; - url: &#39;https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019/winserver2019-vs2019-VERSION.tar.xz&#39; - url: &#39;https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019-ci/winserver2019-vs2019-ci-VERSION.tar.xz&#39; resources: cpu: 16 ram: 20 disks: ws: size: 100 reuse: true network: nat - driver: aws options: image: aquarium/winserver2019-vs2019-ci-VERSION instance_type: c6a.4xlarge security_groups: - jenkins-worker userdata_format: ps1 resources: cpu: 16 ram: 32 disks: xvdb: size: 100 network: Name:build-vpc</pre>
+      <pre className="whitespace-pre-wrap text-xs leading-relaxed">List of label definitions that describes required resources, driver and it&#39;s options. The order is sequential - so the priority is to the first driver and if it&#39;s not available than the next definitions will be used. example: - driver: vmx images: - url: &#39;https://artifact-storage/aquarium/image/vmx/winserver2019/winserver2019-VERSION.tar.xz&#39; - url: &#39;https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019/winserver2019-vs2019-VERSION.tar.xz&#39; - url: &#39;https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019-ci/winserver2019-vs2019-ci-VERSION.tar.xz&#39; resources: cpu: 16 ram: 20 disks: ws: size: 100 reuse: true network: nat - driver: aws images: - name: aquarium/winserver2019-vs2019-ci-VERSION options: instance_type: c6a.4xlarge security_groups: - jenkins-worker userdata_format: ps1 resources: cpu: 16 ram: 32 disks: xvdb: size: 100 network: Name:build-vpc</pre>
     </div>
   </div>
 </div>
@@ -664,7 +765,7 @@ const isSimpleField = (field: any) => {
     <div className="space-y-2">
 <div className="flex items-center space-x-2">
   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-    Metadata *
+    Metadata
   </label>
   <div className="relative group">
     <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
@@ -702,6 +803,96 @@ const isSimpleField = (field: any) => {
 {validationErrors.metadata && (
   <div className="text-sm text-red-600 dark:text-red-400 mt-1">
     {validationErrors.metadata}
+  </div>
+)}
+
+    </div>
+  </div>{/* Visible For field */}
+  <div>
+    {/* Complex field - traditional layout */}
+    <div className="space-y-2">
+<div className="flex items-center space-x-2">
+  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+    Visible For
+  </label>
+  <div className="relative group">
+    <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
+    <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
+      <pre className="whitespace-pre-wrap text-xs leading-relaxed">List defines users or teams that can see the label, if empty then anyone can see it</pre>
+    </div>
+  </div>
+</div>
+
+<div className="space-y-3">
+  {formData.visibleFor.map((item, index) => (
+    <div key={index} className="relative border-2 border-gray-200 rounded-lg p-3 dark:border-gray-600 bg-gray-50 dark:bg-gray-800">
+      <div className="flex items-center justify-between">
+        <input
+          type="text"
+          value={item}
+          onChange={(e) => handleArrayChange('visibleFor', index, e.target.value)}
+          disabled={isReadOnly || (mode === 'edit' && false)}
+          className="flex-1 mr-3 px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+        />
+        {!isReadOnly && !(mode === 'edit' && false) && (
+          <button
+            type="button"
+            onClick={() => removeArrayItem('visibleFor', index)}
+            className="flex items-center justify-center w-6 h-6 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors"
+            title="Remove item"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+    </div>
+  ))}
+  {!isReadOnly && !(mode === 'edit' && false) && (
+    <button
+      onClick={() => addArrayItem('visibleFor', '')}
+      className="w-full px-3 py-2 text-sm border-2 border-dashed border-gray-300 text-gray-600 rounded-md hover:border-green-400 hover:text-green-600 transition-colors"
+    >
+      + Add Visible For
+    </button>
+  )}
+</div>
+
+{validationErrors.visibleFor && (
+  <div className="text-sm text-red-600 dark:text-red-400 mt-1">
+    {validationErrors.visibleFor}
+  </div>
+)}
+
+    </div>
+  </div>{/* Remove At field */}
+  <div>
+    {/* Complex field - traditional layout */}
+    <div className="space-y-2">
+<div className="flex items-center space-x-2">
+  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+    Remove At
+  </label>
+  <div className="relative group">
+    <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
+    <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
+      <pre className="whitespace-pre-wrap text-xs leading-relaxed">When the temporary template will become unavailable to be used and will be removed. If not set - then it&#39;s a persistent label (version &gt; 0), when version == 0 then this field must be defined. When time has come - the label can&#39;t be used to run new Application, but will exist until the last Application which used this label is removed. Then when it&#39;s time to remove the label - it will ask driver to post-process the label definitions as well (driver will decide what to do based on options provided within the definitions).</pre>
+    </div>
+  </div>
+</div>
+
+<input
+  type="datetime-local"
+  value={formData.removeAt}
+  onChange={(e) => handleFieldChange('removeAt', e.target.value)}
+  disabled={isReadOnly || (mode === 'edit' && false)}
+  className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+/>
+
+{validationErrors.removeAt && (
+  <div className="text-sm text-red-600 dark:text-red-400 mt-1">
+    {validationErrors.removeAt}
   </div>
 )}
 

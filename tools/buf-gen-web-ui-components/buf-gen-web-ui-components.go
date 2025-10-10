@@ -270,6 +270,9 @@ func processMessage(msg *protogen.Message) *TypeInfo {
 					if config.Autofill != nil && config.GetAutofill() != "" {
 						fieldInfo.AutofillType = config.GetAutofill()
 					}
+					if config.Required != nil {
+						fieldInfo.IsOptional = !config.GetRequired()
+					}
 				}
 			}
 		}

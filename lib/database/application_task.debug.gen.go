@@ -27,7 +27,7 @@ import (
 var debugTracerDatabaseApplication_task = otel.Tracer("aquarium-fish/database")
 
 func (d *Database) SubscribeApplicationTask(ctx context.Context, ch chan ApplicationTaskSubscriptionEvent) {
-	ctx, span := debugTracerDatabaseApplication_task.Start(ctx, "database.Database.subscribeApplicationTaskImpl")
+	ctx, span := debugTracerDatabaseApplication_task.Start(ctx, "database.Database.SubscribeApplicationTask")
 	defer span.End()
 
 	d.subscribeApplicationTaskImpl(ctx, ch)
@@ -35,7 +35,7 @@ func (d *Database) SubscribeApplicationTask(ctx context.Context, ch chan Applica
 }
 
 func (d *Database) UnsubscribeApplicationTask(ctx context.Context, ch chan ApplicationTaskSubscriptionEvent) {
-	ctx, span := debugTracerDatabaseApplication_task.Start(ctx, "database.Database.unsubscribeApplicationTaskImpl")
+	ctx, span := debugTracerDatabaseApplication_task.Start(ctx, "database.Database.UnsubscribeApplicationTask")
 	defer span.End()
 
 	d.unsubscribeApplicationTaskImpl(ctx, ch)
@@ -43,7 +43,7 @@ func (d *Database) UnsubscribeApplicationTask(ctx context.Context, ch chan Appli
 }
 
 func (d *Database) ApplicationTaskList(ctx context.Context) ([]typesv2.ApplicationTask, error) {
-	ctx, span := debugTracerDatabaseApplication_task.Start(ctx, "database.Database.applicationTaskListImpl")
+	ctx, span := debugTracerDatabaseApplication_task.Start(ctx, "database.Database.ApplicationTaskList")
 	defer span.End()
 
 	at, err1 := d.applicationTaskListImpl(ctx)
@@ -58,7 +58,7 @@ func (d *Database) ApplicationTaskList(ctx context.Context) ([]typesv2.Applicati
 }
 
 func (d *Database) ApplicationTaskListByApplication(ctx context.Context, appUID typesv2.ApplicationUID) ([]typesv2.ApplicationTask, error) {
-	ctx, span := debugTracerDatabaseApplication_task.Start(ctx, "database.Database.applicationTaskListByApplicationImpl")
+	ctx, span := debugTracerDatabaseApplication_task.Start(ctx, "database.Database.ApplicationTaskListByApplication")
 	defer span.End()
 
 	at, err1 := d.applicationTaskListByApplicationImpl(ctx, appUID)
@@ -73,7 +73,7 @@ func (d *Database) ApplicationTaskListByApplication(ctx context.Context, appUID 
 }
 
 func (d *Database) ApplicationTaskCreate(ctx context.Context, at *typesv2.ApplicationTask) error {
-	ctx, span := debugTracerDatabaseApplication_task.Start(ctx, "database.Database.applicationTaskCreateImpl")
+	ctx, span := debugTracerDatabaseApplication_task.Start(ctx, "database.Database.ApplicationTaskCreate")
 	defer span.End()
 
 	err0 := d.applicationTaskCreateImpl(ctx, at)
@@ -88,7 +88,7 @@ func (d *Database) ApplicationTaskCreate(ctx context.Context, at *typesv2.Applic
 }
 
 func (d *Database) ApplicationTaskSave(ctx context.Context, at *typesv2.ApplicationTask) error {
-	ctx, span := debugTracerDatabaseApplication_task.Start(ctx, "database.Database.applicationTaskSaveImpl")
+	ctx, span := debugTracerDatabaseApplication_task.Start(ctx, "database.Database.ApplicationTaskSave")
 	defer span.End()
 
 	err0 := d.applicationTaskSaveImpl(ctx, at)
@@ -103,7 +103,7 @@ func (d *Database) ApplicationTaskSave(ctx context.Context, at *typesv2.Applicat
 }
 
 func (d *Database) ApplicationTaskGet(ctx context.Context, uid typesv2.ApplicationTaskUID) (*typesv2.ApplicationTask, error) {
-	ctx, span := debugTracerDatabaseApplication_task.Start(ctx, "database.Database.applicationTaskGetImpl")
+	ctx, span := debugTracerDatabaseApplication_task.Start(ctx, "database.Database.ApplicationTaskGet")
 	defer span.End()
 
 	at, err1 := d.applicationTaskGetImpl(ctx, uid)
@@ -118,7 +118,7 @@ func (d *Database) ApplicationTaskGet(ctx context.Context, uid typesv2.Applicati
 }
 
 func (d *Database) ApplicationTaskDelete(ctx context.Context, uid typesv2.ApplicationTaskUID) error {
-	ctx, span := debugTracerDatabaseApplication_task.Start(ctx, "database.Database.applicationTaskDeleteImpl")
+	ctx, span := debugTracerDatabaseApplication_task.Start(ctx, "database.Database.ApplicationTaskDelete")
 	defer span.End()
 
 	err0 := d.applicationTaskDeleteImpl(ctx, uid)
@@ -133,7 +133,7 @@ func (d *Database) ApplicationTaskDelete(ctx context.Context, uid typesv2.Applic
 }
 
 func (d *Database) ApplicationTaskListByApplicationAndWhen(ctx context.Context, appUID typesv2.ApplicationUID, when typesv2.ApplicationState_Status) ([]typesv2.ApplicationTask, error) {
-	ctx, span := debugTracerDatabaseApplication_task.Start(ctx, "database.Database.applicationTaskListByApplicationAndWhenImpl")
+	ctx, span := debugTracerDatabaseApplication_task.Start(ctx, "database.Database.ApplicationTaskListByApplicationAndWhen")
 	defer span.End()
 
 	at, err1 := d.applicationTaskListByApplicationAndWhenImpl(ctx, appUID, when)

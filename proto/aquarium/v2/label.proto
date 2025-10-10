@@ -28,18 +28,44 @@ service LabelService {
   // Get list of labels
   rpc List(LabelServiceListRequest) returns (LabelServiceListResponse) {
     option (access_control) = {
-      allowed_roles: ["User"]
+      allowed_roles: ["User"],
+      additional_actions: ['ListAll'],
     };
   }
 
   // Get label by UID
-  rpc Get(LabelServiceGetRequest) returns (LabelServiceGetResponse) {}
+  rpc Get(LabelServiceGetRequest) returns (LabelServiceGetResponse) {
+    option (access_control) = {
+      allowed_roles: ["User"],
+      additional_actions: ['GetAll'],
+    };
+  }
 
   // Create new label
-  rpc Create(LabelServiceCreateRequest) returns (LabelServiceCreateResponse) {}
+  // Not only admin users can create labels, but also regular users can create temporary
+  // editable labels.
+  rpc Create(LabelServiceCreateRequest) returns (LabelServiceCreateResponse) {
+    option (access_control) = {
+      allowed_roles: ["User"],
+      additional_actions: ['CreateAll'],
+    };
+  }
+
+  // Update existing label ONLY with version = 0
+  rpc Update(LabelServiceUpdateRequest) returns (LabelServiceUpdateResponse) {
+    option (access_control) = {
+      allowed_roles: ["User"],
+      additional_actions: ['UpdateAll'],
+    };
+  }
 
   // Remove label by UID
-  rpc Remove(LabelServiceRemoveRequest) returns (LabelServiceRemoveResponse) {}
+  rpc Remove(LabelServiceRemoveRequest) returns (LabelServiceRemoveResponse) {
+    option (access_control) = {
+      allowed_roles: ["User"],
+      additional_actions: ['RemoveAll'],
+    };
+  }
 }
 
 // Label represents a reproducible environment configuration
@@ -67,22 +93,25 @@ message Label {
 
   string uid = 1 [(field_ui_config) = { nocreate: true, noedit: true }];
   google.protobuf.Timestamp created_at = 2 [(field_ui_config) = { nocreate: true, noedit: true }];
+  google.protobuf.Timestamp updated_at = 3 [(field_ui_config) = { nocreate: true, noedit: true }];
   // Simple name to identify the Label
   // example: macos1405-xcode161-ci_aws
-  string name = 3;
+  string name = 4 [(field_ui_config) = { noedit: true }];
   // In order to update the labels freely and save the previous Label state for the past builds.
-  int32 version = 4;
+  // Editable labels has version 0 and could be updated. Those labls has to have remove_at defined.
+  // The regular labels starting with 1 and goes until int32 is over and you can't edit those, only add new ones.
+  int32 version = 5 [(field_ui_config) = { noedit: true }];
+  // User who owns this label, if empty - then admin
+  string owner_name = 6 [(field_ui_config) = { nocreate: true, noedit: true }];
   // List of label definitions that describes required resources, driver and it's options.
   // The order is sequential - so the priority is to the first driver and if it's not
   // available than the next definitions will be used.
   // example:
   //   - driver: vmx
-  //     options:
-  //       image: winserver2019-vs2019-ci
-  //       images:
-  //         - url: 'https://artifact-storage/aquarium/image/vmx/winserver2019/winserver2019-VERSION.tar.xz'
-  //         - url: 'https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019/winserver2019-vs2019-VERSION.tar.xz'
-  //         - url: 'https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019-ci/winserver2019-vs2019-ci-VERSION.tar.xz'
+  //     images:
+  //       - url: 'https://artifact-storage/aquarium/image/vmx/winserver2019/winserver2019-VERSION.tar.xz'
+  //       - url: 'https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019/winserver2019-vs2019-VERSION.tar.xz'
+  //       - url: 'https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019-ci/winserver2019-vs2019-ci-VERSION.tar.xz'
   //     resources:
   //       cpu: 16
   //       ram: 20
@@ -92,8 +121,9 @@ message Label {
   //           reuse: true
   //       network: nat
   //   - driver: aws
+  //     images:
+  //       - name: aquarium/winserver2019-vs2019-ci-VERSION
   //     options:
-  //       image: aquarium/winserver2019-vs2019-ci-VERSION
   //       instance_type: c6a.4xlarge
   //       security_groups:
   //         - jenkins-worker
@@ -105,11 +135,19 @@ message Label {
   //         xvdb:
   //           size: 100
   //       network: Name:build-vpc
-  repeated LabelDefinition definitions = 5;
+  repeated LabelDefinition definitions = 7;
   // Basic metadata to pass to the ApplicationResource
   // example:
   //   JENKINS_AGENT_WORKSPACE: 'D:\'
-  google.protobuf.Struct metadata = 6;
+  google.protobuf.Struct metadata = 8 [(field_ui_config) = { required: false }];
+  // List defines users or teams that can see the label, if empty then anyone can see it
+  repeated string visible_for = 9 [(field_ui_config) = { required: false }];
+  // When the temporary template will become unavailable to be used and will be removed.
+  // If not set - then it's a persistent label (version > 0), when version == 0 then this field must be defined.
+  // When time has come - the label can't be used to run new Application, but will exist until the last Application
+  // which used this label is removed. Then when it's time to remove the label - it will ask driver to post-process
+  // the label definitions as well (driver will decide what to do based on options provided within the definitions).
+  optional google.protobuf.Timestamp remove_at = 10;
 }
 
 // LabelDefinition describes how to provide resources
@@ -121,13 +159,15 @@ message LabelDefinition {
 
   // Name of the driver to execute
   string driver = 1;
+  // Image(s) to use for the environment to startup
+  repeated Image images = 2 [(field_ui_config) = { required: false }];
   // Driver-specific options to execute the environment
-  google.protobuf.Struct options = 2;
+  google.protobuf.Struct options = 3 [(field_ui_config) = { required: false }];
   // Resources Driver need to provide for the Label execution
-  Resources resources = 3;
+  Resources resources = 4;
   // Authentication information to connect - is used by:
   // * ProxySSH gate to allow access to the resource
-  optional Authentication authentication = 4;
+  optional Authentication authentication = 5;
 }
 
 // Resources defines required compute resources for a label
@@ -151,27 +191,27 @@ message Resources {
   // Amount of RAM in GB
   uint32 ram = 3;
   // Defines disks to attach/clone...
-  map<string, ResourcesDisk> disks = 4;
+  map<string, ResourcesDisk> disks = 4 [(field_ui_config) = { required: false }];
   // Which network configuration to use for the environment
-  string network = 5;
+  optional string network = 5 [(field_ui_config) = { required: false }];
   // The list of the Node identifiers to run resource on, supports path wildcards
   // example:
   //   - OS:darwin
   //   - OSVersion:12.*
   //   - Arch:x86_64
-  repeated string node_filter = 6;
+  repeated string node_filter = 6 [(field_ui_config) = { required: false }];
   // Tolerate to run along with the other envs on the same node
-  bool multitenancy = 7;
+  optional bool multitenancy = 7;
   // Tolerate to node CPU overbooking when executed together with other envs
-  bool cpu_overbook = 8;
+  optional bool cpu_overbook = 8;
   // Tolerate to RAM overbooking when executed together with other envs
-  bool ram_overbook = 9;
+  optional bool ram_overbook = 9;
   // Total lifetime of the ApplicationResource in Time Duration (ex. "1h30m30s"). Begins on
   // ApplicationResource create time till deallocate by user or auto deallocate by timeout.
   // If it's empty or "0" then default value from fish node config will be used. If it's
   // negative (ex. "-1s") then the ApplicationResource will live forever or until the user
   // requests deallocate.
-  string lifetime = 10;
+  optional string lifetime = 10;
 }
 
 // ResourcesDisk defines disk configuration
@@ -179,15 +219,33 @@ message ResourcesDisk {
   option (ui_config) = { generate_ui: true };
 
   // Type of the filesystem to create by Fish - usually handled by the formatter of the image
-  string type = 1;
+  optional string type = 1;
   // Volume name will be given to the disk, empty will use the disk key
-  string label = 2;
+  optional string label = 2;
   // Amount of disk space in GB for new disk, could not used if clone is set
-  uint32 size = 3;
+  optional uint32 size = 3;
   // Do not remove the disk and reuse it for the next resource run
-  bool reuse = 4;
+  optional bool reuse = 4;
   // Clone the snapshot of existing disk instead of creating the new one
-  string clone = 5;
+  optional string clone = 5;
+}
+
+message Image {
+  option (ui_config) = { generate_ui: true };
+
+  // Name of the image, if not set will use a part of the Url file name prior to last minus ("-") or ext
+  optional string name = 1;
+
+  // Address of the remote image to download it
+  optional string url = 2;
+  // Checksum of the image in format "<algo>:<checksum>"
+  optional string sum = 3;
+
+  // Version of the image, if not set will use a part of the Url file name after the last minus ("-") to ext
+  optional string version = 4;
+
+  // Identifier used by drivers to make sure the images will be processed properly
+  optional string tag = 5;
 }
 
 message LabelServiceListRequest {
@@ -218,6 +276,16 @@ message LabelServiceCreateRequest {
 }
 
 message LabelServiceCreateResponse {
+  bool status = 1;
+  string message = 2;
+  Label data = 3;
+}
+
+message LabelServiceUpdateRequest {
+  Label label = 1;
+}
+
+message LabelServiceUpdateResponse {
   bool status = 1;
   string message = 2;
   Label data = 3;

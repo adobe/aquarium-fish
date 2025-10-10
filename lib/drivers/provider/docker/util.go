@@ -24,7 +24,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/adobe/aquarium-fish/lib/drivers/provider"
 	"github.com/adobe/aquarium-fish/lib/log"
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 	"github.com/adobe/aquarium-fish/lib/util"
@@ -101,13 +100,16 @@ func (d *Driver) getInitialUsage() (*typesv2.Resources, error) {
 	// Let's try to find the modificators that is used
 	if len(idsList) > 1 {
 		// There is more than one container is running so multitenancy is true
-		out.Multitenancy = true
+		val := true
+		out.Multitenancy = &val
 	}
 	if out.Cpu > d.totalCPU {
-		out.CpuOverbook = true
+		val := true
+		out.CpuOverbook = &val
 	}
 	if out.Ram > d.totalRAM {
-		out.RamOverbook = true
+		val := true
+		out.RamOverbook = &val
 	}
 
 	return out, nil
@@ -136,7 +138,7 @@ func (*Driver) getContainerName(hwaddr string) string {
 }
 
 // Load images and returns the target image name:version to use by container
-func (d *Driver) loadImages(cName string, opts *Options) (string, error) {
+func (d *Driver) loadImages(cName string, images []typesv2.Image) (string, error) {
 	logger := log.WithFunc("docker", "loadImages").With("provider.name", d.name, "cont_name", cName)
 
 	var existingImagesMu sync.Mutex
@@ -144,31 +146,31 @@ func (d *Driver) loadImages(cName string, opts *Options) (string, error) {
 
 	// Download the images and unpack them
 	var wg sync.WaitGroup
-	for _, image := range opts.Images {
-		logger.Info("Loading the required image", "image_name", image.Name, "image_version", image.Version, "image_url", image.URL)
+	for _, image := range images {
+		logger.Info("Loading the required image", "image_name", image.GetName(), "image_version", image.GetVersion(), "image_url", image.GetURL())
 
 		// Running the background routine to download, unpack and process the image
 		// Success will be checked later by existence of the image in local docker registry
 		wg.Add(1)
-		go func(image provider.Image) {
+		go func(image typesv2.Image) {
 			defer wg.Done()
 			imageID, _, err := util.RunAndLog("docker", 5*time.Second, nil, d.cfg.DockerPath, "image", "ls", "-q",
-				fmt.Sprintf("%s:%s", image.Name, image.Version),
+				fmt.Sprintf("%s:%s", image.GetName(), image.GetVersion()),
 			)
 			if err != nil {
-				logger.Error("Unable to check image in the local registry", "image_name", image.Name, "image_version", image.Version, "err", err)
+				logger.Error("Unable to check image in the local registry", "image_name", image.GetName(), "image_version", image.GetVersion(), "err", err)
 			}
 			imageID = strings.TrimSpace(imageID)
 			if imageID != "" {
-				logger.Debug("Found image in the local docker registry", "image_name", image.Name, "image_version", image.Version, "image_id", imageID)
+				logger.Debug("Found image in the local docker registry", "image_name", image.GetName(), "image_version", image.GetVersion(), "image_id", imageID)
 				existingImagesMu.Lock()
-				existingImages = append(existingImages, image.Name+":"+image.Version)
+				existingImages = append(existingImages, image.GetNameVersion(":"))
 				existingImagesMu.Unlock()
 				return
 			}
 
 			if err := image.DownloadUnpack(d.cfg.ImagesPath, d.cfg.DownloadUser, d.cfg.DownloadPassword); err != nil {
-				logger.Error("Unable to download and unpack the image", "image_name", image.Name, "image_url", image.URL, "err", err)
+				logger.Error("Unable to download and unpack the image", "image_name", image.GetName(), "image_url", image.GetURL(), "err", err)
 			}
 		}(image)
 	}
@@ -177,10 +179,10 @@ func (d *Driver) loadImages(cName string, opts *Options) (string, error) {
 	wg.Wait()
 
 	// Check if all the images are already in place - no need to unpack them
-	if len(existingImages) == len(opts.Images) {
+	if len(existingImages) == len(images) {
 		// Just return the last image name/version
-		lastImg := opts.Images[len(opts.Images)-1]
-		return lastImg.Name + ":" + lastImg.Version, nil
+		lastImg := images[len(images)-1]
+		return lastImg.GetNameVersion(":"), nil
 	}
 
 	// Loading the image layers tar archive into the local docker registry
@@ -189,18 +191,18 @@ func (d *Driver) loadImages(cName string, opts *Options) (string, error) {
 
 	targetOut := ""
 	var loadedImages []string
-	for imageIndex, image := range opts.Images {
-		imageUnpacked := filepath.Join(d.cfg.ImagesPath, image.Name+"-"+image.Version)
+	for imageIndex, image := range images {
+		imageUnpacked := filepath.Join(d.cfg.ImagesPath, image.GetNameVersion("-"))
 
 		// Getting the image subdir name in the unpacked dir
 		subdir := ""
 		items, err := os.ReadDir(imageUnpacked)
 		if err != nil {
 			logger.Error("Unable to read the unpacked directory", "image_unpacked", imageUnpacked, "err", err)
-			return "", fmt.Errorf("DOCKER: %s: The image %q was unpacked incorrectly, please check log for the errors", d.name, image.Name)
+			return "", fmt.Errorf("DOCKER: %s: The image %q was unpacked incorrectly, please check log for the errors", d.name, image.GetName())
 		}
 		for _, f := range items {
-			if strings.HasPrefix(f.Name(), image.Name) {
+			if strings.HasPrefix(f.Name(), image.GetName()) {
 				if f.Type()&fs.ModeSymlink != 0 {
 					// Potentially it can be a symlink (like used in local tests)
 					if _, err := os.Stat(filepath.Join(imageUnpacked, f.Name())); err != nil {
@@ -213,8 +215,8 @@ func (d *Driver) loadImages(cName string, opts *Options) (string, error) {
 			}
 		}
 		if subdir == "" {
-			logger.Error("Unpacked image has no subfolder", "image_unpacked", imageUnpacked, "image_name", image.Name, "items", items)
-			return "", fmt.Errorf("DOCKER: %s: The image %q was unpacked incorrectly, please check log for the errors", d.name, image.Name)
+			logger.Error("Unpacked image has no subfolder", "image_unpacked", imageUnpacked, "image_name", image.GetName(), "items", items)
+			return "", fmt.Errorf("DOCKER: %s: The image %q was unpacked incorrectly, please check log for the errors", d.name, image.GetName())
 		}
 
 		// Optimization to check if the image exists and not load it again
@@ -235,7 +237,7 @@ func (d *Driver) loadImages(cName string, opts *Options) (string, error) {
 						loadedImages = append(loadedImages, imageFound)
 
 						// If it's the last image then it's the target one
-						if imageIndex+1 == len(opts.Images) {
+						if imageIndex+1 == len(images) {
 							targetOut = imageFound
 						}
 						break
@@ -251,11 +253,11 @@ func (d *Driver) loadImages(cName string, opts *Options) (string, error) {
 
 		// Load the docker image
 		// sha256 prefix the same
-		imageArchive := filepath.Join(imageUnpacked, subdir, image.Name+".tar")
+		imageArchive := filepath.Join(imageUnpacked, subdir, image.GetName()+".tar")
 		stdout, _, err := util.RunAndLog("docker", 5*time.Minute, nil, d.cfg.DockerPath, "image", "load", "-q", "-i", imageArchive)
 		if err != nil {
 			logger.Error("Unable to load the image", "image_archive", imageArchive, "err", err)
-			return "", fmt.Errorf("DOCKER: %s: The image %q was unpacked incorrectly, please check log for the errors", d.name, image.Name)
+			return "", fmt.Errorf("DOCKER: %s: The image %q was unpacked incorrectly, please check log for the errors", d.name, image.GetName())
 		}
 		for _, line := range strings.Split(stdout, "\n") {
 			if !strings.HasPrefix(line, "Loaded image: ") {
@@ -266,7 +268,7 @@ func (d *Driver) loadImages(cName string, opts *Options) (string, error) {
 			loadedImages = append(loadedImages, imageNameVersion)
 
 			// If it's the last image then it's the target one
-			if imageIndex+1 == len(opts.Images) {
+			if imageIndex+1 == len(images) {
 				targetOut = imageNameVersion
 			}
 			break
@@ -276,9 +278,9 @@ func (d *Driver) loadImages(cName string, opts *Options) (string, error) {
 	logger.Info("All the images are processed")
 
 	// Check all the images are in place just by number of them
-	if len(opts.Images) != len(loadedImages) {
-		logger.Error("Not all the images are ok, please check log for the errors", "loaded_count", len(loadedImages), "total_count", len(opts.Images))
-		return "", fmt.Errorf("DOCKER: %s: Not all the images are ok (%d out of %d), please check log for the errors", d.name, len(loadedImages), len(opts.Images))
+	if len(images) != len(loadedImages) {
+		logger.Error("Not all the images are ok, please check log for the errors", "loaded_count", len(loadedImages), "total_count", len(images))
+		return "", fmt.Errorf("DOCKER: %s: Not all the images are ok (%d out of %d), please check log for the errors", d.name, len(loadedImages), len(images))
 	}
 
 	return targetOut, nil
@@ -334,7 +336,7 @@ func (d *Driver) disksCreate(cName string, runArgs *[]string, disks map[string]t
 
 	for dName, disk := range disks {
 		diskPath := filepath.Join(d.cfg.WorkspacePath, cName, "disk-"+dName)
-		if disk.Reuse {
+		if disk.Reuse != nil && *disk.Reuse {
 			diskPath = filepath.Join(d.cfg.WorkspacePath, "disk-"+dName)
 		}
 		if err := os.MkdirAll(filepath.Dir(diskPath), 0o755); err != nil {
@@ -345,11 +347,14 @@ func (d *Driver) disksCreate(cName string, runArgs *[]string, disks map[string]t
 		// TODO: support other operating systems & filesystems
 		// TODO: Ensure failures doesn't leave the changes behind (like mounted disks or files)
 
-		if disk.Type == "dir" {
+		if disk.Type != nil && *disk.Type == "dir" {
 			if err := os.MkdirAll(diskPath, 0o777); err != nil {
 				return err
 			}
-			diskPaths[diskPath] = disk.Label
+			diskPaths[diskPath] = ""
+			if disk.Label != nil {
+				diskPaths[diskPath] = *disk.Label
+			}
 			// TODO: Validate the available disk space for disk.Size
 			continue
 		}
@@ -358,30 +363,34 @@ func (d *Driver) disksCreate(cName string, runArgs *[]string, disks map[string]t
 		dmgPath := diskPath + ".dmg"
 
 		label := dName
-		if disk.Label != "" {
+		if disk.Label != nil && *disk.Label != "" {
 			// Label can be used as mount point so cut the path separator out
-			label = strings.ReplaceAll(disk.Label, "/", "")
+			label = strings.ReplaceAll(*disk.Label, "/", "")
 		} else {
-			disk.Label = label
+			disk.Label = &label
 		}
 
 		// Do not recreate the disk if it is exists
 		if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
-			var diskType string
-			switch disk.Type {
-			case "hfs+":
-				diskType = "HFS+"
-			case "fat32":
-				diskType = "FAT32"
-			default:
-				diskType = "ExFAT"
+			if disk.Size == nil {
+				logger.Error("Unable to create disk with unset size", "dmg_path", dmgPath)
+				return fmt.Errorf("DOCKER: %s: Unable to create disk with unset size", d.name)
+			}
+			diskType := "ExFAT"
+			if disk.Type != nil {
+				switch *disk.Type {
+				case "hfs+":
+					diskType = "HFS+"
+				case "fat32":
+					diskType = "FAT32"
+				}
 			}
 			args := []string{
 				"create", dmgPath,
 				"-fs", diskType,
 				"-layout", "NONE",
 				"-volname", label,
-				"-size", fmt.Sprintf("%dm", disk.Size*1024),
+				"-size", fmt.Sprintf("%dm", *disk.Size*1024),
 			}
 			if _, _, err := util.RunAndLog("docker", 10*time.Minute, nil, "/usr/bin/hdiutil", args...); err != nil {
 				logger.Error("Unable to create dmg disk", "dmg_path", dmgPath, "err", err)
@@ -403,7 +412,10 @@ func (d *Driver) disksCreate(cName string, runArgs *[]string, disks map[string]t
 			return fmt.Errorf("DOCKER: %s: Unable to change the mount point %q access rights: %v", d.name, mountPoint, err)
 		}
 
-		diskPaths[mountPoint] = disk.Label
+		diskPaths[mountPoint] = ""
+		if disk.Label != nil {
+			diskPaths[mountPoint] = *disk.Label
+		}
 	}
 
 	if len(diskPaths) == 0 {

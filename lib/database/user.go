@@ -233,12 +233,38 @@ func (d *Database) userGroupDeleteImpl(ctx context.Context, name string) error {
 	return err
 }
 
+// GetUserGroups Finds all groups of the user
+func (d *Database) userGroupListByUserImpl(ctx context.Context, userName string) ([]*typesv2.UserGroup, error) {
+	// Get all user groups and find the ones this user belongs to
+	var userGroups []*typesv2.UserGroup
+	groups, err := d.UserGroupList(ctx)
+	if err != nil {
+		return userGroups, err
+	}
+
+	// Collect configs from groups that contain this user
+	for _, group := range groups {
+		// Check if user is in this group
+		userInGroup := false
+		for _, groupUser := range group.Users {
+			if groupUser == userName {
+				userInGroup = true
+				break
+			}
+		}
+
+		if userInGroup {
+			userGroups = append(userGroups, &group)
+		}
+	}
+
+	return userGroups, nil
+}
+
 // MergeUserConfigWithGroups merges user configuration with user group configurations
 // Returns a new UserConfig that uses user's config values if set, otherwise uses the
 // maximum value from all user groups' configs, and finally falls back to defaults
-func (d *Database) MergeUserConfigWithGroups(ctx context.Context, user *typesv2.User) *typesv2.UserConfig {
-	logger := log.WithFunc("database", "MergeUserConfigWithGroups").With("user", user.Name)
-
+func (d *Database) mergeUserConfigWithGroupsImpl(ctx context.Context, user *typesv2.User, groups []*typesv2.UserGroup) *typesv2.UserConfig {
 	// Start with user's existing config or create a new one
 	mergedConfig := &typesv2.UserConfig{}
 	if user.Config != nil {
@@ -253,36 +279,17 @@ func (d *Database) MergeUserConfigWithGroups(ctx context.Context, user *typesv2.
 		}
 	}
 
-	// Get all user groups and find the ones this user belongs to
-	groups, err := d.UserGroupList(ctx)
-	if err != nil {
-		logger.Debug("Failed to get user groups for config merge", "err", err)
-		return mergedConfig
-	}
-
 	// Collect configs from groups that contain this user
 	var groupConfigs []*typesv2.UserConfig
 	for _, group := range groups {
-		// Check if user is in this group
-		userInGroup := false
-		for _, groupUser := range group.Users {
-			if groupUser == user.Name {
-				userInGroup = true
-				break
-			}
-		}
-
-		if userInGroup && group.Config != nil {
+		if group.Config != nil {
 			groupConfigs = append(groupConfigs, group.Config)
 		}
 	}
 
 	if len(groupConfigs) == 0 {
-		logger.Debug("No user groups with configs found for user")
 		return mergedConfig
 	}
-
-	logger.Debug("Found user groups with configs", "count", len(groupConfigs))
 
 	// Merge RateLimit: use user's value if set, otherwise use max from groups
 	if mergedConfig.RateLimit == nil {
@@ -297,7 +304,6 @@ func (d *Database) MergeUserConfigWithGroups(ctx context.Context, user *typesv2.
 		}
 		if maxRateLimit != nil {
 			mergedConfig.RateLimit = maxRateLimit
-			logger.Debug("Using rate limit from user group", "rate_limit", *maxRateLimit)
 		}
 	}
 
@@ -314,7 +320,6 @@ func (d *Database) MergeUserConfigWithGroups(ctx context.Context, user *typesv2.
 		}
 		if maxStreamsLimit != nil {
 			mergedConfig.StreamsLimit = maxStreamsLimit
-			logger.Debug("Using streams limit from user group", "streams_limit", *maxStreamsLimit)
 		}
 	}
 
@@ -323,24 +328,39 @@ func (d *Database) MergeUserConfigWithGroups(ctx context.Context, user *typesv2.
 
 // EnrichUserWithGroupConfig enriches a user object with merged configuration from user groups
 // This modifies the user object in place
-func (d *Database) EnrichUserWithGroupConfig(ctx context.Context, user *typesv2.User) {
+func (d *Database) enrichUserWithGroupConfigImpl(ctx context.Context, user *typesv2.User) {
 	if user == nil {
 		return
 	}
 
-	mergedConfig := d.MergeUserConfigWithGroups(ctx, user)
+	userGroups, err := d.UserGroupListByUser(ctx, user.Name)
+	if err != nil {
+		log.WithFunc("database", "EnrichUserWithGroupConfig").Error("Unable to get ")
+		return
+	}
+	if len(userGroups) > 0 {
+		// Set user groups list
+		var groupNames []string
+		for _, group := range userGroups {
+			groupNames = append(groupNames, group.Name)
+		}
+		user.SetGroups(groupNames)
 
-	// Only update if we got some config values from groups
-	if mergedConfig.RateLimit != nil || mergedConfig.StreamsLimit != nil {
-		if user.Config == nil {
-			user.Config = mergedConfig
-		} else {
-			// Merge into existing config
-			if user.Config.RateLimit == nil && mergedConfig.RateLimit != nil {
-				user.Config.RateLimit = mergedConfig.RateLimit
-			}
-			if user.Config.StreamsLimit == nil && mergedConfig.StreamsLimit != nil {
-				user.Config.StreamsLimit = mergedConfig.StreamsLimit
+		// Merge user config with the groups
+		mergedConfig := d.MergeUserConfigWithGroups(ctx, user, userGroups)
+
+		// Only update if we got some config values from groups
+		if mergedConfig.RateLimit != nil || mergedConfig.StreamsLimit != nil {
+			if user.Config == nil {
+				user.Config = mergedConfig
+			} else {
+				// Merge into existing config
+				if user.Config.RateLimit == nil && mergedConfig.RateLimit != nil {
+					user.Config.RateLimit = mergedConfig.RateLimit
+				}
+				if user.Config.StreamsLimit == nil && mergedConfig.StreamsLimit != nil {
+					user.Config.StreamsLimit = mergedConfig.StreamsLimit
+				}
 			}
 		}
 	}

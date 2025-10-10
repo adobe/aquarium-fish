@@ -27,7 +27,7 @@ import (
 var debugTracerDatabaseNode = otel.Tracer("aquarium-fish/database")
 
 func (d *Database) SubscribeNode(ctx context.Context, ch chan NodeSubscriptionEvent) {
-	ctx, span := debugTracerDatabaseNode.Start(ctx, "database.Database.subscribeNodeImpl")
+	ctx, span := debugTracerDatabaseNode.Start(ctx, "database.Database.SubscribeNode")
 	defer span.End()
 
 	d.subscribeNodeImpl(ctx, ch)
@@ -35,7 +35,7 @@ func (d *Database) SubscribeNode(ctx context.Context, ch chan NodeSubscriptionEv
 }
 
 func (d *Database) UnsubscribeNode(ctx context.Context, ch chan NodeSubscriptionEvent) {
-	ctx, span := debugTracerDatabaseNode.Start(ctx, "database.Database.unsubscribeNodeImpl")
+	ctx, span := debugTracerDatabaseNode.Start(ctx, "database.Database.UnsubscribeNode")
 	defer span.End()
 
 	d.unsubscribeNodeImpl(ctx, ch)
@@ -43,7 +43,7 @@ func (d *Database) UnsubscribeNode(ctx context.Context, ch chan NodeSubscription
 }
 
 func (d *Database) NodeList(ctx context.Context) ([]typesv2.Node, error) {
-	ctx, span := debugTracerDatabaseNode.Start(ctx, "database.Database.nodeListImpl")
+	ctx, span := debugTracerDatabaseNode.Start(ctx, "database.Database.NodeList")
 	defer span.End()
 
 	ns, err1 := d.nodeListImpl(ctx)
@@ -58,7 +58,7 @@ func (d *Database) NodeList(ctx context.Context) ([]typesv2.Node, error) {
 }
 
 func (d *Database) NodeGet(ctx context.Context, name string) (*typesv2.Node, error) {
-	ctx, span := debugTracerDatabaseNode.Start(ctx, "database.Database.nodeGetImpl")
+	ctx, span := debugTracerDatabaseNode.Start(ctx, "database.Database.NodeGet")
 	defer span.End()
 
 	node, err1 := d.nodeGetImpl(ctx, name)
@@ -73,7 +73,7 @@ func (d *Database) NodeGet(ctx context.Context, name string) (*typesv2.Node, err
 }
 
 func (d *Database) NodeActiveList(ctx context.Context) ([]typesv2.Node, error) {
-	ctx, span := debugTracerDatabaseNode.Start(ctx, "database.Database.nodeActiveListImpl")
+	ctx, span := debugTracerDatabaseNode.Start(ctx, "database.Database.NodeActiveList")
 	defer span.End()
 
 	ns, err1 := d.nodeActiveListImpl(ctx)
@@ -88,7 +88,7 @@ func (d *Database) NodeActiveList(ctx context.Context) ([]typesv2.Node, error) {
 }
 
 func (d *Database) NodeCreate(ctx context.Context, n *typesv2.Node) error {
-	ctx, span := debugTracerDatabaseNode.Start(ctx, "database.Database.nodeCreateImpl")
+	ctx, span := debugTracerDatabaseNode.Start(ctx, "database.Database.NodeCreate")
 	defer span.End()
 
 	err0 := d.nodeCreateImpl(ctx, n)
@@ -103,7 +103,7 @@ func (d *Database) NodeCreate(ctx context.Context, n *typesv2.Node) error {
 }
 
 func (d *Database) NodeSave(ctx context.Context, node *typesv2.Node) error {
-	ctx, span := debugTracerDatabaseNode.Start(ctx, "database.Database.nodeSaveImpl")
+	ctx, span := debugTracerDatabaseNode.Start(ctx, "database.Database.NodeSave")
 	defer span.End()
 
 	err0 := d.nodeSaveImpl(ctx, node)
@@ -118,7 +118,7 @@ func (d *Database) NodeSave(ctx context.Context, node *typesv2.Node) error {
 }
 
 func (d *Database) NodePing(ctx context.Context) error {
-	ctx, span := debugTracerDatabaseNode.Start(ctx, "database.Database.nodePingImpl")
+	ctx, span := debugTracerDatabaseNode.Start(ctx, "database.Database.NodePing")
 	defer span.End()
 
 	err0 := d.nodePingImpl(ctx)

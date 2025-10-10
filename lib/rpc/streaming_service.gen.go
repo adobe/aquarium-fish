@@ -69,6 +69,7 @@ var requestTypeMapping = map[string]serviceMethodInfo{
 	"LabelServiceGetRequest":                {auth.LabelService, auth.LabelServiceGet},
 	"LabelServiceListRequest":               {auth.LabelService, auth.LabelServiceList},
 	"LabelServiceRemoveRequest":             {auth.LabelService, auth.LabelServiceRemove},
+	"LabelServiceUpdateRequest":             {auth.LabelService, auth.LabelServiceUpdate},
 	"NodeServiceGetRequest":                 {auth.NodeService, auth.NodeServiceGet},
 	"NodeServiceGetThisRequest":             {auth.NodeService, auth.NodeServiceGetThis},
 	"NodeServiceListRequest":                {auth.NodeService, auth.NodeServiceList},
@@ -270,6 +271,17 @@ func (s *StreamingService) routeLabelServiceRequest(ctx context.Context, request
 			return nil, connect.NewError(connect.CodeInvalidArgument, err)
 		}
 		resp, err := s.labelService.Remove(ctx, connect.NewRequest(&req))
+		if err != nil {
+			return nil, err
+		}
+
+		return anypb.New(resp.Msg)
+	case "LabelServiceUpdateRequest":
+		var req aquariumv2.LabelServiceUpdateRequest
+		if err := requestData.UnmarshalTo(&req); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		resp, err := s.labelService.Update(ctx, connect.NewRequest(&req))
 		if err != nil {
 			return nil, err
 		}

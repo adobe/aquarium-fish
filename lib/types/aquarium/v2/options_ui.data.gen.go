@@ -24,6 +24,7 @@ type FieldUiConfig struct {
 	Name     *string `json:"name,omitempty"`
 	Nocreate *bool   `json:"nocreate,omitempty"`
 	Noedit   *bool   `json:"noedit,omitempty"`
+	Required *bool   `json:"required,omitempty"`
 }
 
 // FromFieldUiConfig creates a FieldUiConfig from FieldUiConfig
@@ -49,6 +50,10 @@ func FromFieldUiConfig(src *pbTypes.FieldUiConfig) FieldUiConfig {
 		val := src.GetNoedit()
 		result.Noedit = &val
 	}
+	if src.Required != nil {
+		val := src.GetRequired()
+		result.Required = &val
+	}
 	return result
 }
 
@@ -67,6 +72,9 @@ func (f FieldUiConfig) ToFieldUiConfig() *pbTypes.FieldUiConfig {
 	}
 	if f.Noedit != nil {
 		result.Noedit = f.Noedit
+	}
+	if f.Required != nil {
+		result.Required = f.Required
 	}
 	return result
 }

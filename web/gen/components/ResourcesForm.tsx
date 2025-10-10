@@ -47,12 +47,12 @@ const defaultResourcesState: ResourcesFormState = {
   cpu: 0,
   ram: 0,
   disks: {},
-  network: '',
+  network: undefined,
   nodeFilter: [],
-  multitenancy: false,
-  cpuOverbook: false,
-  ramOverbook: false,
-  lifetime: '',
+  multitenancy: undefined,
+  cpuOverbook: undefined,
+  ramOverbook: undefined,
+  lifetime: undefined,
 };
 
 
@@ -87,12 +87,12 @@ export const ResourcesForm: React.FC<ResourcesFormProps> = ({
         cpu: initialData.cpu || 0,
         ram: initialData.ram || 0,
         disks: initialData.disks && typeof initialData.disks === 'object' ? initialData.disks : {},
-        network: initialData.network || '',
+        network: initialData.network ?? undefined,
         nodeFilter: initialData.nodeFilter || [],
-        multitenancy: initialData.multitenancy || false,
-        cpuOverbook: initialData.cpuOverbook || false,
-        ramOverbook: initialData.ramOverbook || false,
-        lifetime: initialData.lifetime || '',
+        multitenancy: initialData.multitenancy ?? undefined,
+        cpuOverbook: initialData.cpuOverbook ?? undefined,
+        ramOverbook: initialData.ramOverbook ?? undefined,
+        lifetime: initialData.lifetime ?? undefined,
       };
       setFormData(newFormData);
 
@@ -165,13 +165,13 @@ const handleToggleYamlView = () => {
         slots: formData.slots || undefined,
         cpu: formData.cpu,
         ram: formData.ram,
-        disks: formData.disks,
-        network: formData.network,
-        nodeFilter: formData.nodeFilter,
-        multitenancy: formData.multitenancy,
-        cpuOverbook: formData.cpuOverbook,
-        ramOverbook: formData.ramOverbook,
-        lifetime: formData.lifetime,
+        disks: formData.disks || undefined,
+        network: formData.network || undefined,
+        nodeFilter: formData.nodeFilter || undefined,
+        multitenancy: formData.multitenancy || undefined,
+        cpuOverbook: formData.cpuOverbook || undefined,
+        ramOverbook: formData.ramOverbook || undefined,
+        lifetime: formData.lifetime || undefined,
       });
 
       // Convert protobuf to plain object for YAML
@@ -258,27 +258,6 @@ const validateForm = (): boolean => {
   if (!formData.ram) {
     errors.ram = 'Ram is required';
   }
-  if (!formData.disks) {
-    errors.disks = 'Disks is required';
-  }
-  if (!formData.network) {
-    errors.network = 'Network is required';
-  }
-  if (!formData.nodeFilter || formData.nodeFilter.length === 0) {
-    errors.nodeFilter = 'Node Filter is required';
-  }
-  if (!formData.multitenancy) {
-    errors.multitenancy = 'Multitenancy is required';
-  }
-  if (!formData.cpuOverbook) {
-    errors.cpuOverbook = 'Cpu Overbook is required';
-  }
-  if (!formData.ramOverbook) {
-    errors.ramOverbook = 'Ram Overbook is required';
-  }
-  if (!formData.lifetime) {
-    errors.lifetime = 'Lifetime is required';
-  }
 
   setValidationErrors(errors);
   return Object.keys(errors).length === 0;
@@ -299,13 +278,13 @@ const handleSubmit = () => {
       slots: collectedData.slots || undefined,
       cpu: collectedData.cpu,
       ram: collectedData.ram,
-      disks: collectedData.disks,
-      network: collectedData.network,
-      nodeFilter: collectedData.nodeFilter,
-      multitenancy: collectedData.multitenancy,
-      cpuOverbook: collectedData.cpuOverbook,
-      ramOverbook: collectedData.ramOverbook,
-      lifetime: collectedData.lifetime,
+      disks: collectedData.disks || undefined,
+      network: collectedData.network || undefined,
+      nodeFilter: collectedData.nodeFilter || undefined,
+      multitenancy: collectedData.multitenancy || undefined,
+      cpuOverbook: collectedData.cpuOverbook || undefined,
+      ramOverbook: collectedData.ramOverbook || undefined,
+      lifetime: collectedData.lifetime || undefined,
     });
 
     onSubmit(data);
@@ -576,7 +555,7 @@ const isSimpleField = (field: any) => {
     <div className="space-y-2">
 <div className="flex items-center space-x-2">
   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-    Disks *
+    Disks
   </label>
   <div className="relative group">
     <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
@@ -706,7 +685,7 @@ const isSimpleField = (field: any) => {
 <div className="flex items-center justify-between">
   <div className="flex items-center space-x-2 min-w-0 flex-1">
     <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-      Network *
+      Network
     </label>
     <div className="relative group">
       <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
@@ -737,7 +716,7 @@ const isSimpleField = (field: any) => {
     <div className="space-y-2">
 <div className="flex items-center space-x-2">
   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-    Node Filter *
+    Node Filter
   </label>
   <div className="relative group">
     <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
@@ -796,7 +775,7 @@ const isSimpleField = (field: any) => {
 <div className="flex items-center justify-between">
   <div className="flex items-center space-x-2 min-w-0 flex-1">
     <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-      Multitenancy *
+      Multitenancy
     </label>
     <div className="relative group">
       <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
@@ -827,7 +806,7 @@ const isSimpleField = (field: any) => {
 <div className="flex items-center justify-between">
   <div className="flex items-center space-x-2 min-w-0 flex-1">
     <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-      Cpu Overbook *
+      Cpu Overbook
     </label>
     <div className="relative group">
       <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
@@ -858,7 +837,7 @@ const isSimpleField = (field: any) => {
 <div className="flex items-center justify-between">
   <div className="flex items-center space-x-2 min-w-0 flex-1">
     <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-      Ram Overbook *
+      Ram Overbook
     </label>
     <div className="relative group">
       <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
@@ -889,7 +868,7 @@ const isSimpleField = (field: any) => {
 <div className="flex items-center justify-between">
   <div className="flex items-center space-x-2 min-w-0 flex-1">
     <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-      Lifetime *
+      Lifetime
     </label>
     <div className="relative group">
       <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>

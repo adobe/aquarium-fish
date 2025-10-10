@@ -29,7 +29,7 @@ import type { JsonObject, Message } from "@bufbuild/protobuf";
  * Describes the file aquarium/v2/label.proto.
  */
 export const file_aquarium_v2_label: GenFile = /*@__PURE__*/
-  fileDesc("ChdhcXVhcml1bS92Mi9sYWJlbC5wcm90bxILYXF1YXJpdW0udjIi5gEKBUxhYmVsEhUKA3VpZBgBIAEoCUIImrUYBAgBEAESOAoKY3JlYXRlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCCJq1GAQIARABEgwKBG5hbWUYAyABKAkSDwoHdmVyc2lvbhgEIAEoBRIxCgtkZWZpbml0aW9ucxgFIAMoCzIcLmFxdWFyaXVtLnYyLkxhYmVsRGVmaW5pdGlvbhIpCghtZXRhZGF0YRgGIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3Q6D4q1GAUKA0dldJK1GAIIASLLAQoPTGFiZWxEZWZpbml0aW9uEg4KBmRyaXZlchgBIAEoCRIoCgdvcHRpb25zGAIgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdBIpCglyZXNvdXJjZXMYAyABKAsyFi5hcXVhcml1bS52Mi5SZXNvdXJjZXMSOAoOYXV0aGVudGljYXRpb24YBCABKAsyGy5hcXVhcml1bS52Mi5BdXRoZW50aWNhdGlvbkgAiAEBOgaStRgCCAFCEQoPX2F1dGhlbnRpY2F0aW9uIsECCglSZXNvdXJjZXMSEgoFc2xvdHMYASABKA1IAIgBARILCgNjcHUYAiABKA0SCwoDcmFtGAMgASgNEjAKBWRpc2tzGAQgAygLMiEuYXF1YXJpdW0udjIuUmVzb3VyY2VzLkRpc2tzRW50cnkSDwoHbmV0d29yaxgFIAEoCRITCgtub2RlX2ZpbHRlchgGIAMoCRIUCgxtdWx0aXRlbmFuY3kYByABKAgSFAoMY3B1X292ZXJib29rGAggASgIEhQKDHJhbV9vdmVyYm9vaxgJIAEoCBIQCghsaWZldGltZRgKIAEoCRpICgpEaXNrc0VudHJ5EgsKA2tleRgBIAEoCRIpCgV2YWx1ZRgCIAEoCzIaLmFxdWFyaXVtLnYyLlJlc291cmNlc0Rpc2s6AjgBOgaStRgCCAFCCAoGX3Nsb3RzImAKDVJlc291cmNlc0Rpc2sSDAoEdHlwZRgBIAEoCRINCgVsYWJlbBgCIAEoCRIMCgRzaXplGAMgASgNEg0KBXJldXNlGAQgASgIEg0KBWNsb25lGAUgASgJOgaStRgCCAEiVwoXTGFiZWxTZXJ2aWNlTGlzdFJlcXVlc3QSEQoEbmFtZRgBIAEoCUgAiAEBEhQKB3ZlcnNpb24YAiABKAlIAYgBAUIHCgVfbmFtZUIKCghfdmVyc2lvbiJdChhMYWJlbFNlcnZpY2VMaXN0UmVzcG9uc2USDgoGc3RhdHVzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkSIAoEZGF0YRgDIAMoCzISLmFxdWFyaXVtLnYyLkxhYmVsIisKFkxhYmVsU2VydmljZUdldFJlcXVlc3QSEQoJbGFiZWxfdWlkGAEgASgJIlwKF0xhYmVsU2VydmljZUdldFJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEiAKBGRhdGEYAyABKAsyEi5hcXVhcml1bS52Mi5MYWJlbCI+ChlMYWJlbFNlcnZpY2VDcmVhdGVSZXF1ZXN0EiEKBWxhYmVsGAEgASgLMhIuYXF1YXJpdW0udjIuTGFiZWwiXwoaTGFiZWxTZXJ2aWNlQ3JlYXRlUmVzcG9uc2USDgoGc3RhdHVzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkSIAoEZGF0YRgDIAEoCzISLmFxdWFyaXVtLnYyLkxhYmVsIi4KGUxhYmVsU2VydmljZVJlbW92ZVJlcXVlc3QSEQoJbGFiZWxfdWlkGAEgASgJIj0KGkxhYmVsU2VydmljZVJlbW92ZVJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJMv0CCgxMYWJlbFNlcnZpY2USXwoETGlzdBIkLmFxdWFyaXVtLnYyLkxhYmVsU2VydmljZUxpc3RSZXF1ZXN0GiUuYXF1YXJpdW0udjIuTGFiZWxTZXJ2aWNlTGlzdFJlc3BvbnNlIgqCtRgGGgRVc2VyElIKA0dldBIjLmFxdWFyaXVtLnYyLkxhYmVsU2VydmljZUdldFJlcXVlc3QaJC5hcXVhcml1bS52Mi5MYWJlbFNlcnZpY2VHZXRSZXNwb25zZSIAElsKBkNyZWF0ZRImLmFxdWFyaXVtLnYyLkxhYmVsU2VydmljZUNyZWF0ZVJlcXVlc3QaJy5hcXVhcml1bS52Mi5MYWJlbFNlcnZpY2VDcmVhdGVSZXNwb25zZSIAElsKBlJlbW92ZRImLmFxdWFyaXVtLnYyLkxhYmVsU2VydmljZVJlbW92ZVJlcXVlc3QaJy5hcXVhcml1bS52Mi5MYWJlbFNlcnZpY2VSZW1vdmVSZXNwb25zZSIAQkVaQ2dpdGh1Yi5jb20vYWRvYmUvYXF1YXJpdW0tZmlzaC9saWIvcnBjL3Byb3RvL2FxdWFyaXVtL3YyO2FxdWFyaXVtdjJiBnByb3RvMw", [file_google_protobuf_timestamp, file_google_protobuf_struct, file_aquarium_v2_common, file_aquarium_v2_options_rbac, file_aquarium_v2_options_streaming, file_aquarium_v2_options_ui]);
+  fileDesc("ChdhcXVhcml1bS92Mi9sYWJlbC5wcm90bxILYXF1YXJpdW0udjIitQMKBUxhYmVsEhUKA3VpZBgBIAEoCUIImrUYBAgBEAESOAoKY3JlYXRlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCCJq1GAQIARABEjgKCnVwZGF0ZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgiatRgECAEQARIUCgRuYW1lGAQgASgJQgaatRgCEAESFwoHdmVyc2lvbhgFIAEoBUIGmrUYAhABEhwKCm93bmVyX25hbWUYBiABKAlCCJq1GAQIARABEjEKC2RlZmluaXRpb25zGAcgAygLMhwuYXF1YXJpdW0udjIuTGFiZWxEZWZpbml0aW9uEjEKCG1ldGFkYXRhGAggASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdEIGmrUYAigAEhsKC3Zpc2libGVfZm9yGAkgAygJQgaatRgCKAASMgoJcmVtb3ZlX2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEgAiAEBOg+KtRgFCgNHZXSStRgCCAFCDAoKX3JlbW92ZV9hdCL/AQoPTGFiZWxEZWZpbml0aW9uEg4KBmRyaXZlchgBIAEoCRIqCgZpbWFnZXMYAiADKAsyEi5hcXVhcml1bS52Mi5JbWFnZUIGmrUYAigAEjAKB29wdGlvbnMYAyABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0QgaatRgCKAASKQoJcmVzb3VyY2VzGAQgASgLMhYuYXF1YXJpdW0udjIuUmVzb3VyY2VzEjgKDmF1dGhlbnRpY2F0aW9uGAUgASgLMhsuYXF1YXJpdW0udjIuQXV0aGVudGljYXRpb25IAIgBAToGkrUYAggBQhEKD19hdXRoZW50aWNhdGlvbiK+AwoJUmVzb3VyY2VzEhIKBXNsb3RzGAEgASgNSACIAQESCwoDY3B1GAIgASgNEgsKA3JhbRgDIAEoDRI4CgVkaXNrcxgEIAMoCzIhLmFxdWFyaXVtLnYyLlJlc291cmNlcy5EaXNrc0VudHJ5QgaatRgCKAASHAoHbmV0d29yaxgFIAEoCUIGmrUYAigASAGIAQESGwoLbm9kZV9maWx0ZXIYBiADKAlCBpq1GAIoABIZCgxtdWx0aXRlbmFuY3kYByABKAhIAogBARIZCgxjcHVfb3ZlcmJvb2sYCCABKAhIA4gBARIZCgxyYW1fb3ZlcmJvb2sYCSABKAhIBIgBARIVCghsaWZldGltZRgKIAEoCUgFiAEBGkgKCkRpc2tzRW50cnkSCwoDa2V5GAEgASgJEikKBXZhbHVlGAIgASgLMhouYXF1YXJpdW0udjIuUmVzb3VyY2VzRGlzazoCOAE6BpK1GAIIAUIICgZfc2xvdHNCCgoIX25ldHdvcmtCDwoNX211bHRpdGVuYW5jeUIPCg1fY3B1X292ZXJib29rQg8KDV9yYW1fb3ZlcmJvb2tCCwoJX2xpZmV0aW1lIqkBCg1SZXNvdXJjZXNEaXNrEhEKBHR5cGUYASABKAlIAIgBARISCgVsYWJlbBgCIAEoCUgBiAEBEhEKBHNpemUYAyABKA1IAogBARISCgVyZXVzZRgEIAEoCEgDiAEBEhIKBWNsb25lGAUgASgJSASIAQE6BpK1GAIIAUIHCgVfdHlwZUIICgZfbGFiZWxCBwoFX3NpemVCCAoGX3JldXNlQggKBl9jbG9uZSKbAQoFSW1hZ2USEQoEbmFtZRgBIAEoCUgAiAEBEhAKA3VybBgCIAEoCUgBiAEBEhAKA3N1bRgDIAEoCUgCiAEBEhQKB3ZlcnNpb24YBCABKAlIA4gBARIQCgN0YWcYBSABKAlIBIgBAToGkrUYAggBQgcKBV9uYW1lQgYKBF91cmxCBgoEX3N1bUIKCghfdmVyc2lvbkIGCgRfdGFnIlcKF0xhYmVsU2VydmljZUxpc3RSZXF1ZXN0EhEKBG5hbWUYASABKAlIAIgBARIUCgd2ZXJzaW9uGAIgASgJSAGIAQFCBwoFX25hbWVCCgoIX3ZlcnNpb24iXQoYTGFiZWxTZXJ2aWNlTGlzdFJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEiAKBGRhdGEYAyADKAsyEi5hcXVhcml1bS52Mi5MYWJlbCIrChZMYWJlbFNlcnZpY2VHZXRSZXF1ZXN0EhEKCWxhYmVsX3VpZBgBIAEoCSJcChdMYWJlbFNlcnZpY2VHZXRSZXNwb25zZRIOCgZzdGF0dXMYASABKAgSDwoHbWVzc2FnZRgCIAEoCRIgCgRkYXRhGAMgASgLMhIuYXF1YXJpdW0udjIuTGFiZWwiPgoZTGFiZWxTZXJ2aWNlQ3JlYXRlUmVxdWVzdBIhCgVsYWJlbBgBIAEoCzISLmFxdWFyaXVtLnYyLkxhYmVsIl8KGkxhYmVsU2VydmljZUNyZWF0ZVJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEiAKBGRhdGEYAyABKAsyEi5hcXVhcml1bS52Mi5MYWJlbCI+ChlMYWJlbFNlcnZpY2VVcGRhdGVSZXF1ZXN0EiEKBWxhYmVsGAEgASgLMhIuYXF1YXJpdW0udjIuTGFiZWwiXwoaTGFiZWxTZXJ2aWNlVXBkYXRlUmVzcG9uc2USDgoGc3RhdHVzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkSIAoEZGF0YRgDIAEoCzISLmFxdWFyaXVtLnYyLkxhYmVsIi4KGUxhYmVsU2VydmljZVJlbW92ZVJlcXVlc3QSEQoJbGFiZWxfdWlkGAEgASgJIj0KGkxhYmVsU2VydmljZVJlbW92ZVJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJMrQECgxMYWJlbFNlcnZpY2USaAoETGlzdBIkLmFxdWFyaXVtLnYyLkxhYmVsU2VydmljZUxpc3RSZXF1ZXN0GiUuYXF1YXJpdW0udjIuTGFiZWxTZXJ2aWNlTGlzdFJlc3BvbnNlIhOCtRgPGgRVc2VyIgdMaXN0QWxsEmQKA0dldBIjLmFxdWFyaXVtLnYyLkxhYmVsU2VydmljZUdldFJlcXVlc3QaJC5hcXVhcml1bS52Mi5MYWJlbFNlcnZpY2VHZXRSZXNwb25zZSISgrUYDhoEVXNlciIGR2V0QWxsEnAKBkNyZWF0ZRImLmFxdWFyaXVtLnYyLkxhYmVsU2VydmljZUNyZWF0ZVJlcXVlc3QaJy5hcXVhcml1bS52Mi5MYWJlbFNlcnZpY2VDcmVhdGVSZXNwb25zZSIVgrUYERoEVXNlciIJQ3JlYXRlQWxsEnAKBlVwZGF0ZRImLmFxdWFyaXVtLnYyLkxhYmVsU2VydmljZVVwZGF0ZVJlcXVlc3QaJy5hcXVhcml1bS52Mi5MYWJlbFNlcnZpY2VVcGRhdGVSZXNwb25zZSIVgrUYERoEVXNlciIJVXBkYXRlQWxsEnAKBlJlbW92ZRImLmFxdWFyaXVtLnYyLkxhYmVsU2VydmljZVJlbW92ZVJlcXVlc3QaJy5hcXVhcml1bS52Mi5MYWJlbFNlcnZpY2VSZW1vdmVSZXNwb25zZSIVgrUYERoEVXNlciIJUmVtb3ZlQWxsQkVaQ2dpdGh1Yi5jb20vYWRvYmUvYXF1YXJpdW0tZmlzaC9saWIvcnBjL3Byb3RvL2FxdWFyaXVtL3YyO2FxdWFyaXVtdjJiBnByb3RvMw", [file_google_protobuf_timestamp, file_google_protobuf_struct, file_aquarium_v2_common, file_aquarium_v2_options_rbac, file_aquarium_v2_options_streaming, file_aquarium_v2_options_ui]);
 
 /**
  * Label represents a reproducible environment configuration
@@ -66,19 +66,33 @@ export type Label = Message<"aquarium.v2.Label"> & {
   createdAt?: Timestamp;
 
   /**
+   * @generated from field: google.protobuf.Timestamp updated_at = 3;
+   */
+  updatedAt?: Timestamp;
+
+  /**
    * Simple name to identify the Label
    * example: macos1405-xcode161-ci_aws
    *
-   * @generated from field: string name = 3;
+   * @generated from field: string name = 4;
    */
   name: string;
 
   /**
    * In order to update the labels freely and save the previous Label state for the past builds.
+   * Editable labels has version 0 and could be updated. Those labls has to have remove_at defined.
+   * The regular labels starting with 1 and goes until int32 is over and you can't edit those, only add new ones.
    *
-   * @generated from field: int32 version = 4;
+   * @generated from field: int32 version = 5;
    */
   version: number;
+
+  /**
+   * User who owns this label, if empty - then admin
+   *
+   * @generated from field: string owner_name = 6;
+   */
+  ownerName: string;
 
   /**
    * List of label definitions that describes required resources, driver and it's options.
@@ -86,12 +100,10 @@ export type Label = Message<"aquarium.v2.Label"> & {
    * available than the next definitions will be used.
    * example:
    *   - driver: vmx
-   *     options:
-   *       image: winserver2019-vs2019-ci
-   *       images:
-   *         - url: 'https://artifact-storage/aquarium/image/vmx/winserver2019/winserver2019-VERSION.tar.xz'
-   *         - url: 'https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019/winserver2019-vs2019-VERSION.tar.xz'
-   *         - url: 'https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019-ci/winserver2019-vs2019-ci-VERSION.tar.xz'
+   *     images:
+   *       - url: 'https://artifact-storage/aquarium/image/vmx/winserver2019/winserver2019-VERSION.tar.xz'
+   *       - url: 'https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019/winserver2019-vs2019-VERSION.tar.xz'
+   *       - url: 'https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019-ci/winserver2019-vs2019-ci-VERSION.tar.xz'
    *     resources:
    *       cpu: 16
    *       ram: 20
@@ -101,8 +113,9 @@ export type Label = Message<"aquarium.v2.Label"> & {
    *           reuse: true
    *       network: nat
    *   - driver: aws
+   *     images:
+   *       - name: aquarium/winserver2019-vs2019-ci-VERSION
    *     options:
-   *       image: aquarium/winserver2019-vs2019-ci-VERSION
    *       instance_type: c6a.4xlarge
    *       security_groups:
    *         - jenkins-worker
@@ -115,7 +128,7 @@ export type Label = Message<"aquarium.v2.Label"> & {
    *           size: 100
    *       network: Name:build-vpc
    *
-   * @generated from field: repeated aquarium.v2.LabelDefinition definitions = 5;
+   * @generated from field: repeated aquarium.v2.LabelDefinition definitions = 7;
    */
   definitions: LabelDefinition[];
 
@@ -124,9 +137,27 @@ export type Label = Message<"aquarium.v2.Label"> & {
    * example:
    *   JENKINS_AGENT_WORKSPACE: 'D:\'
    *
-   * @generated from field: google.protobuf.Struct metadata = 6;
+   * @generated from field: google.protobuf.Struct metadata = 8;
    */
   metadata?: JsonObject;
+
+  /**
+   * List defines users or teams that can see the label, if empty then anyone can see it
+   *
+   * @generated from field: repeated string visible_for = 9;
+   */
+  visibleFor: string[];
+
+  /**
+   * When the temporary template will become unavailable to be used and will be removed.
+   * If not set - then it's a persistent label (version > 0), when version == 0 then this field must be defined.
+   * When time has come - the label can't be used to run new Application, but will exist until the last Application
+   * which used this label is removed. Then when it's time to remove the label - it will ask driver to post-process
+   * the label definitions as well (driver will decide what to do based on options provided within the definitions).
+   *
+   * @generated from field: optional google.protobuf.Timestamp remove_at = 10;
+   */
+  removeAt?: Timestamp;
 };
 
 /**
@@ -153,16 +184,23 @@ export type LabelDefinition = Message<"aquarium.v2.LabelDefinition"> & {
   driver: string;
 
   /**
+   * Image(s) to use for the environment to startup
+   *
+   * @generated from field: repeated aquarium.v2.Image images = 2;
+   */
+  images: Image[];
+
+  /**
    * Driver-specific options to execute the environment
    *
-   * @generated from field: google.protobuf.Struct options = 2;
+   * @generated from field: google.protobuf.Struct options = 3;
    */
   options?: JsonObject;
 
   /**
    * Resources Driver need to provide for the Label execution
    *
-   * @generated from field: aquarium.v2.Resources resources = 3;
+   * @generated from field: aquarium.v2.Resources resources = 4;
    */
   resources?: Resources;
 
@@ -170,7 +208,7 @@ export type LabelDefinition = Message<"aquarium.v2.LabelDefinition"> & {
    * Authentication information to connect - is used by:
    * * ProxySSH gate to allow access to the resource
    *
-   * @generated from field: optional aquarium.v2.Authentication authentication = 4;
+   * @generated from field: optional aquarium.v2.Authentication authentication = 5;
    */
   authentication?: Authentication;
 };
@@ -229,9 +267,9 @@ export type Resources = Message<"aquarium.v2.Resources"> & {
   /**
    * Which network configuration to use for the environment
    *
-   * @generated from field: string network = 5;
+   * @generated from field: optional string network = 5;
    */
-  network: string;
+  network?: string;
 
   /**
    * The list of the Node identifiers to run resource on, supports path wildcards
@@ -247,23 +285,23 @@ export type Resources = Message<"aquarium.v2.Resources"> & {
   /**
    * Tolerate to run along with the other envs on the same node
    *
-   * @generated from field: bool multitenancy = 7;
+   * @generated from field: optional bool multitenancy = 7;
    */
-  multitenancy: boolean;
+  multitenancy?: boolean;
 
   /**
    * Tolerate to node CPU overbooking when executed together with other envs
    *
-   * @generated from field: bool cpu_overbook = 8;
+   * @generated from field: optional bool cpu_overbook = 8;
    */
-  cpuOverbook: boolean;
+  cpuOverbook?: boolean;
 
   /**
    * Tolerate to RAM overbooking when executed together with other envs
    *
-   * @generated from field: bool ram_overbook = 9;
+   * @generated from field: optional bool ram_overbook = 9;
    */
-  ramOverbook: boolean;
+  ramOverbook?: boolean;
 
   /**
    * Total lifetime of the ApplicationResource in Time Duration (ex. "1h30m30s"). Begins on
@@ -272,9 +310,9 @@ export type Resources = Message<"aquarium.v2.Resources"> & {
    * negative (ex. "-1s") then the ApplicationResource will live forever or until the user
    * requests deallocate.
    *
-   * @generated from field: string lifetime = 10;
+   * @generated from field: optional string lifetime = 10;
    */
-  lifetime: string;
+  lifetime?: string;
 };
 
 /**
@@ -293,37 +331,37 @@ export type ResourcesDisk = Message<"aquarium.v2.ResourcesDisk"> & {
   /**
    * Type of the filesystem to create by Fish - usually handled by the formatter of the image
    *
-   * @generated from field: string type = 1;
+   * @generated from field: optional string type = 1;
    */
-  type: string;
+  type?: string;
 
   /**
    * Volume name will be given to the disk, empty will use the disk key
    *
-   * @generated from field: string label = 2;
+   * @generated from field: optional string label = 2;
    */
-  label: string;
+  label?: string;
 
   /**
    * Amount of disk space in GB for new disk, could not used if clone is set
    *
-   * @generated from field: uint32 size = 3;
+   * @generated from field: optional uint32 size = 3;
    */
-  size: number;
+  size?: number;
 
   /**
    * Do not remove the disk and reuse it for the next resource run
    *
-   * @generated from field: bool reuse = 4;
+   * @generated from field: optional bool reuse = 4;
    */
-  reuse: boolean;
+  reuse?: boolean;
 
   /**
    * Clone the snapshot of existing disk instead of creating the new one
    *
-   * @generated from field: string clone = 5;
+   * @generated from field: optional string clone = 5;
    */
-  clone: string;
+  clone?: string;
 };
 
 /**
@@ -332,6 +370,53 @@ export type ResourcesDisk = Message<"aquarium.v2.ResourcesDisk"> & {
  */
 export const ResourcesDiskSchema: GenMessage<ResourcesDisk> = /*@__PURE__*/
   messageDesc(file_aquarium_v2_label, 3);
+
+/**
+ * @generated from message aquarium.v2.Image
+ */
+export type Image = Message<"aquarium.v2.Image"> & {
+  /**
+   * Name of the image, if not set will use a part of the Url file name prior to last minus ("-") or ext
+   *
+   * @generated from field: optional string name = 1;
+   */
+  name?: string;
+
+  /**
+   * Address of the remote image to download it
+   *
+   * @generated from field: optional string url = 2;
+   */
+  url?: string;
+
+  /**
+   * Checksum of the image in format "<algo>:<checksum>"
+   *
+   * @generated from field: optional string sum = 3;
+   */
+  sum?: string;
+
+  /**
+   * Version of the image, if not set will use a part of the Url file name after the last minus ("-") to ext
+   *
+   * @generated from field: optional string version = 4;
+   */
+  version?: string;
+
+  /**
+   * Identifier used by drivers to make sure the images will be processed properly
+   *
+   * @generated from field: optional string tag = 5;
+   */
+  tag?: string;
+};
+
+/**
+ * Describes the message aquarium.v2.Image.
+ * Use `create(ImageSchema)` to create a new message.
+ */
+export const ImageSchema: GenMessage<Image> = /*@__PURE__*/
+  messageDesc(file_aquarium_v2_label, 4);
 
 /**
  * @generated from message aquarium.v2.LabelServiceListRequest
@@ -357,7 +442,7 @@ export type LabelServiceListRequest = Message<"aquarium.v2.LabelServiceListReque
  * Use `create(LabelServiceListRequestSchema)` to create a new message.
  */
 export const LabelServiceListRequestSchema: GenMessage<LabelServiceListRequest> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_label, 4);
+  messageDesc(file_aquarium_v2_label, 5);
 
 /**
  * @generated from message aquarium.v2.LabelServiceListResponse
@@ -384,7 +469,7 @@ export type LabelServiceListResponse = Message<"aquarium.v2.LabelServiceListResp
  * Use `create(LabelServiceListResponseSchema)` to create a new message.
  */
 export const LabelServiceListResponseSchema: GenMessage<LabelServiceListResponse> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_label, 5);
+  messageDesc(file_aquarium_v2_label, 6);
 
 /**
  * @generated from message aquarium.v2.LabelServiceGetRequest
@@ -401,7 +486,7 @@ export type LabelServiceGetRequest = Message<"aquarium.v2.LabelServiceGetRequest
  * Use `create(LabelServiceGetRequestSchema)` to create a new message.
  */
 export const LabelServiceGetRequestSchema: GenMessage<LabelServiceGetRequest> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_label, 6);
+  messageDesc(file_aquarium_v2_label, 7);
 
 /**
  * @generated from message aquarium.v2.LabelServiceGetResponse
@@ -428,7 +513,7 @@ export type LabelServiceGetResponse = Message<"aquarium.v2.LabelServiceGetRespon
  * Use `create(LabelServiceGetResponseSchema)` to create a new message.
  */
 export const LabelServiceGetResponseSchema: GenMessage<LabelServiceGetResponse> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_label, 7);
+  messageDesc(file_aquarium_v2_label, 8);
 
 /**
  * @generated from message aquarium.v2.LabelServiceCreateRequest
@@ -445,7 +530,7 @@ export type LabelServiceCreateRequest = Message<"aquarium.v2.LabelServiceCreateR
  * Use `create(LabelServiceCreateRequestSchema)` to create a new message.
  */
 export const LabelServiceCreateRequestSchema: GenMessage<LabelServiceCreateRequest> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_label, 8);
+  messageDesc(file_aquarium_v2_label, 9);
 
 /**
  * @generated from message aquarium.v2.LabelServiceCreateResponse
@@ -472,7 +557,51 @@ export type LabelServiceCreateResponse = Message<"aquarium.v2.LabelServiceCreate
  * Use `create(LabelServiceCreateResponseSchema)` to create a new message.
  */
 export const LabelServiceCreateResponseSchema: GenMessage<LabelServiceCreateResponse> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_label, 9);
+  messageDesc(file_aquarium_v2_label, 10);
+
+/**
+ * @generated from message aquarium.v2.LabelServiceUpdateRequest
+ */
+export type LabelServiceUpdateRequest = Message<"aquarium.v2.LabelServiceUpdateRequest"> & {
+  /**
+   * @generated from field: aquarium.v2.Label label = 1;
+   */
+  label?: Label;
+};
+
+/**
+ * Describes the message aquarium.v2.LabelServiceUpdateRequest.
+ * Use `create(LabelServiceUpdateRequestSchema)` to create a new message.
+ */
+export const LabelServiceUpdateRequestSchema: GenMessage<LabelServiceUpdateRequest> = /*@__PURE__*/
+  messageDesc(file_aquarium_v2_label, 11);
+
+/**
+ * @generated from message aquarium.v2.LabelServiceUpdateResponse
+ */
+export type LabelServiceUpdateResponse = Message<"aquarium.v2.LabelServiceUpdateResponse"> & {
+  /**
+   * @generated from field: bool status = 1;
+   */
+  status: boolean;
+
+  /**
+   * @generated from field: string message = 2;
+   */
+  message: string;
+
+  /**
+   * @generated from field: aquarium.v2.Label data = 3;
+   */
+  data?: Label;
+};
+
+/**
+ * Describes the message aquarium.v2.LabelServiceUpdateResponse.
+ * Use `create(LabelServiceUpdateResponseSchema)` to create a new message.
+ */
+export const LabelServiceUpdateResponseSchema: GenMessage<LabelServiceUpdateResponse> = /*@__PURE__*/
+  messageDesc(file_aquarium_v2_label, 12);
 
 /**
  * @generated from message aquarium.v2.LabelServiceRemoveRequest
@@ -489,7 +618,7 @@ export type LabelServiceRemoveRequest = Message<"aquarium.v2.LabelServiceRemoveR
  * Use `create(LabelServiceRemoveRequestSchema)` to create a new message.
  */
 export const LabelServiceRemoveRequestSchema: GenMessage<LabelServiceRemoveRequest> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_label, 10);
+  messageDesc(file_aquarium_v2_label, 13);
 
 /**
  * @generated from message aquarium.v2.LabelServiceRemoveResponse
@@ -511,7 +640,7 @@ export type LabelServiceRemoveResponse = Message<"aquarium.v2.LabelServiceRemove
  * Use `create(LabelServiceRemoveResponseSchema)` to create a new message.
  */
 export const LabelServiceRemoveResponseSchema: GenMessage<LabelServiceRemoveResponse> = /*@__PURE__*/
-  messageDesc(file_aquarium_v2_label, 11);
+  messageDesc(file_aquarium_v2_label, 14);
 
 /**
  * LabelService handles label management operations
@@ -541,6 +670,8 @@ export const LabelService: GenService<{
   },
   /**
    * Create new label
+   * Not only admin users can create labels, but also regular users can create temporary
+   * editable labels.
    *
    * @generated from rpc aquarium.v2.LabelService.Create
    */
@@ -548,6 +679,16 @@ export const LabelService: GenService<{
     methodKind: "unary";
     input: typeof LabelServiceCreateRequestSchema;
     output: typeof LabelServiceCreateResponseSchema;
+  },
+  /**
+   * Update existing label ONLY with version = 0
+   *
+   * @generated from rpc aquarium.v2.LabelService.Update
+   */
+  update: {
+    methodKind: "unary";
+    input: typeof LabelServiceUpdateRequestSchema;
+    output: typeof LabelServiceUpdateResponseSchema;
   },
   /**
    * Remove label by UID

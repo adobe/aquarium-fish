@@ -129,7 +129,7 @@ var {{.TracerVarName}} = otel.Tracer("aquarium-fish/{{.PackageName}}")
 
 {{range .Functions}}
 func {{if .IsMethod}}({{.RecvName}} {{.RecvType}}) {{end}}{{title (trimSuffix .Name "Impl")}}({{range $i, $param := .Params}}{{if $i}}, {{end}}{{if $param.Name}}{{$param.Name}} {{end}}{{$param.Type}}{{end}}) {{if .Results}}({{range $i, $result := .Results}}{{if $i}}, {{end}}{{$result.Type}}{{end}}){{end}} {
-	{{if .Params}}{{if (index .Params 0).Name}}{{(index .Params 0).Name}}{{else}}ctx{{end}}{{else}}ctx{{end}}, span := {{$.TracerVarName}}.Start({{if .Params}}{{if (index .Params 0).Name}}{{(index .Params 0).Name}}{{else}}ctx{{end}}{{else}}ctx{{end}}, "{{$.PackageName}}.{{if .IsMethod}}{{trimPrefix .RecvType "*"}}.{{end}}{{.Name}}")
+	{{if .Params}}{{if (index .Params 0).Name}}{{(index .Params 0).Name}}{{else}}ctx{{end}}{{else}}ctx{{end}}, span := {{$.TracerVarName}}.Start({{if .Params}}{{if (index .Params 0).Name}}{{(index .Params 0).Name}}{{else}}ctx{{end}}{{else}}ctx{{end}}, "{{$.PackageName}}.{{if .IsMethod}}{{trimPrefix .RecvType "*"}}.{{end}}{{ title (trimSuffix .Name "Impl") }}")
 	defer span.End()
 
 	{{if .Results}}{{range $i, $result := .Results}}{{if $i}}, {{end}}{{if eq $result.Type "error"}}err{{$i}}{{else if $result.Name}}{{$result.Name}}{{else}}r{{$i}}{{end}}{{end}} := {{end}}{{if .IsMethod}}{{.RecvName}}.{{end}}{{.Name}}({{range $i, $param := .Params}}{{if $i}}, {{end}}{{if $param.Name}}{{$param.Name}}{{else}}p{{$i}}{{end}}{{end}})

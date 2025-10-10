@@ -32,12 +32,14 @@ interface LabelDefinitionFormProps {
 
 interface LabelDefinitionFormState {
   driver: string;
+  images: any;
   options: Record<string, any>;
   resources: any;
   authentication: any;
 }
 const defaultLabelDefinitionState: LabelDefinitionFormState = {
   driver: '',
+  images: [],
   options: {},
   resources: null,
   authentication: undefined,
@@ -72,6 +74,7 @@ export const LabelDefinitionForm: React.FC<LabelDefinitionFormProps> = ({
     if (initialData) {
       const newFormData: LabelDefinitionFormState = {
         driver: initialData.driver || '',
+        images: initialData.images || [],
         options: initialData.options || {},
         resources: initialData.resources && typeof initialData.resources === 'object' ? initialData.resources : null,
         authentication: initialData.authentication && typeof initialData.authentication === 'object' ? initialData.authentication : undefined,
@@ -146,6 +149,7 @@ const handleToggleYamlView = () => {
     try {
       const data = create(LabelDefinitionSchema, {
         driver: formData.driver,
+        images: formData.images || undefined,
         options: formData.options,
         resources: formData.resources,
         authentication: formData.authentication || undefined,
@@ -179,6 +183,11 @@ const handleYamlApply = () => {
     const newFormData: LabelDefinitionFormState = { ...defaultLabelDefinitionState };
     if (parsedData.driver !== undefined) {
       newFormData.driver = parsedData.driver;
+    }
+    if (parsedData.images !== undefined) {
+      if (Array.isArray(parsedData.images)) {
+        newFormData.images = parsedData.images;
+      }
     }
     if (parsedData.options !== undefined) {
       if (typeof parsedData.options === 'object') {
@@ -214,9 +223,6 @@ const validateForm = (): boolean => {
   if (!formData.driver) {
     errors.driver = 'Driver is required';
   }
-  if (!formData.options) {
-    errors.options = 'Options is required';
-  }
   if (!formData.resources) {
     errors.resources = 'Resources is required';
   }
@@ -238,6 +244,7 @@ const handleSubmit = () => {
     // Convert form data to protobuf message
     const data = create(LabelDefinitionSchema, {
       driver: collectedData.driver,
+      images: collectedData.images || undefined,
       options: collectedData.options,
       resources: collectedData.resources,
       authentication: collectedData.authentication || undefined,
@@ -443,13 +450,114 @@ const isSimpleField = (field: any) => {
   </div>
 </div>
 
+  </div>{/* Images field */}
+  <div>
+    {/* Complex field - traditional layout */}
+    <div className="space-y-2">
+<div className="flex items-center space-x-2">
+  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+    Images
+  </label>
+  <div className="relative group">
+    <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
+    <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
+      <pre className="whitespace-pre-wrap text-xs leading-relaxed">Image(s) to use for the environment to startup</pre>
+    </div>
+  </div>
+</div>
+
+<div className="space-y-3">
+  {formData.images.map((item, index) => (
+    <div key={index} className="relative border-2 border-gray-200 rounded-lg p-3 dark:border-gray-600 bg-gray-50 dark:bg-gray-800">
+      {/* Nested component header */}
+      <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200 dark:border-gray-600">
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          Images {index + 1}
+        </h4>
+        {!isReadOnly && !(mode === 'edit' && false) && (
+          <button
+            type="button"
+            onClick={() => removeArrayItem('images', index)}
+            className="flex items-center justify-center w-6 h-6 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors"
+            title="Remove Images"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+      {(() => {
+        const ComponentName = 'ImageForm';
+        const NestedComponent = (Components as any)[ComponentName];
+
+        if (NestedComponent) {
+          return (
+            <div className="pl-2">
+              <NestedComponent
+                key={index}
+                mode={mode}
+                initialData={item}
+                onSubmit={() => {}}
+                onCancel={() => {}}
+                title={'Images ' + (index + 1)}
+                readonly={isReadOnly || (mode === 'edit' && false)}
+                nested={true}
+                onRegister={(getDataFn: () => any) => registerNestedGetData('images[' + index + ']', getDataFn)}
+              />
+            </div>
+          );
+        }
+
+        // Fallback to textarea for JSON editing
+        return (
+          <div className="pl-2">
+            <div className="text-sm text-gray-500 mb-2">
+              Image (Component not available - using JSON editor)
+            </div>
+            <textarea
+              value={JSON.stringify(item, null, 2)}
+              onChange={(e) => {
+                try {
+                  const parsed = JSON.parse(e.target.value);
+                  handleArrayChange('images', index, parsed);
+                } catch (error) {
+                  // Invalid JSON, keep the text value for user to fix
+                }
+              }}
+              disabled={isReadOnly || (mode === 'edit' && false)}
+              className="w-full h-32 px-3 py-2 border border-gray-300 rounded-md font-mono text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white resize-none"
+              placeholder="Enter JSON object for Image..."
+            />
+          </div>
+        );
+      })()}
+    </div>
+  ))}
+  {!isReadOnly && !(mode === 'edit' && false) && (
+    <button
+      onClick={() => addArrayItem('images', {})}
+      className="w-full px-3 py-2 text-sm border-2 border-dashed border-gray-300 text-gray-600 rounded-md hover:border-green-400 hover:text-green-600 transition-colors"
+    >
+      + Add Images
+    </button>
+  )}
+</div>
+
+{validationErrors.images && (
+  <div className="text-sm text-red-600 dark:text-red-400 mt-1">
+    {validationErrors.images}
+  </div>
+)}
+
+    </div>
   </div>{/* Options field */}
   <div>
     {/* Complex field - traditional layout */}
     <div className="space-y-2">
 <div className="flex items-center space-x-2">
   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-    Options *
+    Options
   </label>
   <div className="relative group">
     <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
