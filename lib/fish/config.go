@@ -28,6 +28,7 @@ import (
 const (
 	DefaultDBCleanupInterval = 10 * time.Minute
 	DefaultDBCompactInterval = time.Hour
+	DefaultLabelRemoveAtMin  = 30 * time.Second
 	DefaultLabelRemoveAtMax  = 3 * 24 * time.Hour
 )
 
@@ -55,6 +56,7 @@ type Config struct {
 
 	DefaultResourceLifetime util.Duration `json:"default_resource_lifetime"` // Sets the lifetime of the resource which will be used if label definition one is not set
 
+	LabelRemoveAtMin util.Duration `json:"label_remove_at_min"` // Minimum duration for temporary labels
 	LabelRemoveAtMax util.Duration `json:"label_remove_at_max"` // Maximum duration for temporary labels
 
 	AllocationRetry     uint  `json:"allocation_retry"`       // How many times to retry the allocation in case error happened, default: 3
@@ -110,6 +112,7 @@ func (c *Config) initDefaults() {
 	c.NodeName, _ = os.Hostname()
 	c.AllocationRetry = 3
 	c.ElectedRoundsToWait = 10
+	c.LabelRemoveAtMin = util.Duration(DefaultLabelRemoveAtMin)
 	c.LabelRemoveAtMax = util.Duration(DefaultLabelRemoveAtMax)
 	c.DBCleanupInterval = util.Duration(DefaultDBCleanupInterval)
 	c.DBCompactInterval = util.Duration(DefaultDBCompactInterval)

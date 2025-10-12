@@ -23,9 +23,11 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/drivers"
 	"github.com/adobe/aquarium-fish/lib/drivers/provider"
 	"github.com/adobe/aquarium-fish/lib/log"
+	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
@@ -647,6 +649,7 @@ func (f *Fish) applicationTimeoutProcess(ctx context.Context) {
 	f.routinesMutex.Unlock()
 	defer f.routines.Done()
 	logger := log.WithFunc("fish", "applicationTimeoutProcess")
+	logger.Info("applicationTimeoutProcess started")
 	defer logger.Info("applicationTimeoutProcess stopped")
 
 	appUID, appTimeout := f.applicationTimeoutNext()
@@ -703,6 +706,247 @@ func (f *Fish) applicationTimeoutNext() (uid typesv2.ApplicationUID, to <-chan t
 	}
 
 	log.WithFunc("fish", "applicationTimeoutNext").Debug("Next timeout for Application at", "app_uid", uid, "timeout", minTime)
+
+	return uid, time.After(time.Until(minTime))
+}
+
+// labelTimeoutSet creates another record in Fish list of timeouts to be handled
+func (f *Fish) labelTimeoutSet(uid typesv2.LabelUID, to time.Time) {
+	f.labelsTimeoutsMutex.Lock()
+	defer f.labelsTimeoutsMutex.Unlock()
+
+	logger := log.WithFunc("fish", "labelTimeoutSet").With("label_uid", uid)
+	logger.Info("Temporary Label will be removed", "in", time.Until(to).Round(time.Second), "timeout", to)
+
+	// Checking if the provided timeout is prior to everything else in the timeouts list
+	// If one of the timeouts in the list is earlier then the new timeout - no need to send update
+	needUpdate := true
+	for _, labelTimeout := range f.labelsTimeouts {
+		if to.After(labelTimeout) {
+			needUpdate = false
+			break
+		}
+	}
+
+	f.labelsTimeouts[uid] = to
+
+	if needUpdate {
+		// Notifying the process on updated in background to not block the process execution
+		go func() {
+			f.labelsTimeoutsUpdated <- struct{}{}
+		}()
+	}
+}
+
+// labelTimeoutRemove clears the timeout event for provided Label from the map
+func (f *Fish) labelTimeoutRemove(uid typesv2.LabelUID) {
+	f.labelsTimeoutsMutex.Lock()
+	defer f.labelsTimeoutsMutex.Unlock()
+
+	to, ok := f.labelsTimeouts[uid]
+	if !ok {
+		// Apparently timeout is not here, so nothing to worry about
+		return
+	}
+
+	delete(f.labelsTimeouts, uid)
+
+	// Checking if the known timeout is prior to everything else in the timeouts list
+	// If one of the timeouts in the list is earlier then the new timeout - no need to send update
+	needUpdate := true
+	for _, labelTimeout := range f.labelsTimeouts {
+		if to.After(labelTimeout) {
+			needUpdate = false
+			break
+		}
+	}
+
+	if needUpdate {
+		// Notifying the process on updated in background to not block the process execution
+		go func() {
+			f.labelsTimeoutsUpdated <- struct{}{}
+		}()
+	}
+}
+
+// labelTemporaryRemoveProcess watches for the temporary Labels to make sure they are removed
+// in time when their remove_at is here.
+// TODO: Cluster: Need to make sure it will work properly within the cluster env, because only
+// one node should actually trigger the label removal. Probably we can use ghost Application
+// which elects just like a regular one (except it needs only capabilities, not resources) and
+// this way reuses the existing election system and distributing tasks across the cluster.
+func (f *Fish) labelTemporaryRemoveProcess(ctx context.Context) {
+	f.routinesMutex.Lock()
+	f.routines.Add(1)
+	f.routinesMutex.Unlock()
+	defer f.routines.Done()
+	logger := log.WithFunc("fish", "labelTemporaryRemoveProcess")
+	logger.Info("labelTemporaryRemoveProces started")
+	defer logger.Info("labelTemporaryRemoveProcess stopped")
+
+	labelUID, labelTimeout := f.labelTemporaryRemoveNext()
+
+	for {
+		select {
+		case <-f.running.Done():
+			return
+		case <-f.labelsTimeoutsUpdated:
+			labelUID, labelTimeout = f.labelTemporaryRemoveNext()
+		case labelEvent := <-f.temporaryLabelChannel:
+			// Managing the list using updates in Labels
+			if labelEvent.Object == nil {
+				continue
+			}
+			switch labelEvent.ChangeType {
+			case aquariumv2.ChangeType_CHANGE_TYPE_CREATED, aquariumv2.ChangeType_CHANGE_TYPE_UPDATED:
+				if labelEvent.Object.RemoveAt != nil && !labelEvent.Object.RemoveAt.IsZero() {
+					f.labelTimeoutSet(labelEvent.Object.Uid, *labelEvent.Object.RemoveAt)
+				}
+			case aquariumv2.ChangeType_CHANGE_TYPE_REMOVED:
+				f.labelTimeoutRemove(labelEvent.Object.Uid)
+			}
+		case <-labelTimeout:
+			labellogger := logger.With("label_uid", labelUID)
+			labellogger.Debug("Reached timeout for temporary Label")
+			if labelUID != uuid.Nil {
+				// We need to check that label is not used by any (even deallocated) Application in the database
+				apps, err := f.db.ApplicationList(ctx)
+				if err != nil {
+					labellogger.Error("Can't list applications", "err", err)
+				}
+
+				isUsed := false
+				for _, app := range apps {
+					if app.LabelUid == labelUID {
+						labellogger.With("app_uid", app.Uid).Debug("The temporary label is used by the Application")
+						isUsed = true
+						break
+					}
+				}
+
+				if !isUsed {
+					labellogger.Debug("Removing temporary Label")
+
+					// Before removing let's get the label to deal with its resources
+					if label, err := f.db.LabelGet(ctx, labelUID); err != nil {
+						labellogger.Error("Can't get label", "err", err)
+					} else {
+						if err := f.db.LabelDelete(ctx, labelUID); err != nil {
+							labellogger.Error("Unable to delete temporary Label", "err", err)
+						}
+						go f.labelDeleteImagesIfNotUsed(ctx, label)
+						// TODO:
+						// go f.labelDeleteSnapshotsIfNotUsed(ctx, label)
+					}
+
+					// Delete of the label from the map will happen using subscription as well
+					f.applicationsTimeoutsMutex.Lock()
+					delete(f.labelsTimeouts, labelUID)
+					f.applicationsTimeoutsMutex.Unlock()
+				} else {
+					f.labelsTimeouts[labelUID] = time.Now().Add(time.Duration(2 * f.cfg.LabelRemoveAtMin))
+					labellogger.Debug("Pushed temporary Label forward", "new_timeout", f.labelsTimeouts[labelUID])
+				}
+			}
+			// Calling for the next patient
+			labelUID, labelTimeout = f.labelTemporaryRemoveNext()
+		}
+	}
+}
+
+// labelRemoveImagesIfNotUsed is sending DeleteImage task to driver to remove if image is not used in cluster anywhere
+func (f *Fish) labelDeleteImagesIfNotUsed(ctx context.Context, label *typesv2.Label) {
+	logger := log.WithFunc("fish", "labelTemporaryRemoveProcess").With("label_uid", label.Uid, "label_name", label.Name)
+	logger.Debug("Processing Label's images")
+
+	// Collect the images from target label definition
+	var targetDrivers []string
+	var targetImages []*typesv2.Image
+	for _, labelDef := range label.Definitions {
+		for _, image := range labelDef.Images {
+			targetImages = append(targetImages, &image)
+			targetDrivers = append(targetDrivers, labelDef.Driver)
+		}
+	}
+
+	if len(targetImages) == 0 {
+		// No need to process further since no images is targeted
+		logger.Debug("No images located to delete")
+		return
+	}
+
+	// Getting all labels to ensure no definitions in the cluster uses the target images
+	labels, err := f.db.LabelList(ctx, database.LabelListParams{})
+	if err != nil {
+		logger.Error("Unable to list the Labels", "err", err)
+		return
+	}
+
+	// Processing all the images to see if they are the same
+	filteredImages := make(map[int]struct{}, len(targetImages)) // Is a Set to keep only unique keys
+	for _, l := range labels {
+		if label.Uid == l.Uid {
+			// Apparently the same label, so skipping
+			continue
+		}
+		for _, lDef := range l.Definitions {
+			for _, lImage := range lDef.Images {
+				for i, targetImage := range targetImages {
+					if targetDrivers[i] != lDef.Driver {
+						continue
+					}
+					if targetImage.GetNameVersion("-") == lImage.GetNameVersion("-") {
+						// Driver & name/version is the same - so this image is used by other labels
+						filteredImages[i] = struct{}{}
+					}
+				}
+			}
+		}
+	}
+
+	if len(filteredImages) == len(targetImages) {
+		// All the images were filtered, so nothing to do
+		logger.Debug("All images seems used by the other labels, skipping removal")
+		return
+	}
+
+	// Locate the required driver for label's definition and executing task to remove the iamge
+	for i, targetImage := range targetImages {
+		logger.Debug("Checking image", "image", targetImage.GetNameVersion("-"))
+		// Skipping filtered images
+		if _, exists := filteredImages[i]; exists {
+			continue
+		}
+		driver := drivers.GetProvider(targetDrivers[i])
+		if driver == nil {
+			logger.Error("Unable to locate driver", "driver", targetDrivers[i])
+			continue
+		}
+		task := driver.GetTask("image_delete", targetImage.ToJSON())
+		if task != nil {
+			logger.Debug("Running image_delete task", "driver", targetDrivers[i], "image_name", targetImage.GetNameVersion("-"))
+			go task.Execute()
+		} else {
+			logger.Error("Unable to create image_delete task for driver", "driver", targetDrivers[i], "image_name", targetImage.GetNameVersion("-"))
+		}
+	}
+}
+
+// labelTemporaryRemoveNext returns next closest remove_at from the list or 1h
+func (f *Fish) labelTemporaryRemoveNext() (uid typesv2.LabelUID, to <-chan time.Time) {
+	f.labelsTimeoutsMutex.Lock()
+	defer f.labelsTimeoutsMutex.Unlock()
+
+	minTime := time.Now().Add(time.Hour)
+
+	for labelUID, timeout := range f.labelsTimeouts {
+		if minTime.After(timeout) {
+			uid = labelUID
+			minTime = timeout
+		}
+	}
+
+	log.WithFunc("fish", "labelTemporaryRemoveNext").Debug("Next timeout for Label at", "label_uid", uid, "timeout", minTime)
 
 	return uid, time.After(time.Until(minTime))
 }

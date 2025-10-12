@@ -165,7 +165,7 @@ func (s *LabelService) labelCheckCommon(ctx context.Context, label *typesv2.Labe
 		if label.Version != 0 {
 			return fmt.Errorf("remove_at can not be set for non-editable label")
 		}
-		removeAtMin := time.Now().Add(30 * time.Second)
+		removeAtMin := time.Now().Add(time.Duration(s.fish.GetCfg().LabelRemoveAtMin))
 		removeAtMax := time.Now().Add(time.Duration(s.fish.GetCfg().LabelRemoveAtMax))
 		if label.RemoveAt.Before(removeAtMin) {
 			return fmt.Errorf("remove_at is below 30 seconds: %v", removeAtMin.Sub(*label.RemoveAt).Round(time.Second))

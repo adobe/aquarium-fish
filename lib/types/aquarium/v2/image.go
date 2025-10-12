@@ -22,6 +22,7 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"hash"
 	"io"
@@ -86,6 +87,15 @@ func (i *Image) GetTag() string {
 		return ""
 	}
 	return *i.Tag
+}
+
+// ToJSON converts image data to json format
+func (i *Image) ToJSON() string {
+	jsonData, err := json.Marshal(i)
+	if err != nil {
+		return ""
+	}
+	return string(jsonData)
 }
 
 // Validate makes sure the image spec is good enough

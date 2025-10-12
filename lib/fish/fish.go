@@ -86,11 +86,18 @@ type Fish struct {
 	// Keeps Applications timeouts Fish watching for
 	applicationsTimeoutsMutex   sync.Mutex
 	applicationsTimeouts        map[typesv2.ApplicationUID]time.Time
-	applicationsTimeoutsUpdated chan struct{} // Notifies about the earlier timeout then exists
+	applicationsTimeoutsUpdated chan struct{} // Notifies about the earlier timeout then the current one
+
+	// Keeps Temp Labels timeouts Fish watching for
+	labelsTimeoutsMutex   sync.Mutex
+	labelsTimeouts        map[typesv2.LabelUID]time.Time
+	labelsTimeoutsUpdated chan struct{} // Notifies about the earlier timeout then the current one
 
 	// When Application changes - fish figures that out through those channels
 	applicationStateChannel chan database.ApplicationStateSubscriptionEvent
 	applicationTaskChannel  chan database.ApplicationTaskSubscriptionEvent
+	// Special subscription to process temporary labels removal operations
+	temporaryLabelChannel chan database.LabelSubscriptionEvent
 
 	// Stores the current usage of the node resources
 	nodeUsageMutex sync.Mutex // Is needed to protect node resources from concurrent allocations
@@ -125,6 +132,10 @@ func (f *Fish) Init() error {
 	f.applicationTaskChannel = make(chan database.ApplicationTaskSubscriptionEvent, 100)
 	f.db.SubscribeApplicationTask(ctx, f.applicationTaskChannel)
 
+	// Init channel for Label changes to process temporary Labels
+	f.temporaryLabelChannel = make(chan database.LabelSubscriptionEvent, 100)
+	f.db.SubscribeLabel(ctx, f.temporaryLabelChannel)
+
 	// Init variables
 	f.activeVotes = make(map[typesv2.ApplicationUID]*typesv2.Vote)
 	f.wonVotes = make(map[typesv2.ApplicationUID]*typesv2.Vote)
@@ -132,6 +143,8 @@ func (f *Fish) Init() error {
 	f.applications = make(map[typesv2.ApplicationUID]*sync.Mutex)
 	f.applicationsTimeouts = make(map[typesv2.ApplicationUID]time.Time)
 	f.applicationsTimeoutsUpdated = make(chan struct{})
+	f.labelsTimeouts = make(map[typesv2.LabelUID]time.Time)
+	f.labelsTimeoutsUpdated = make(chan struct{})
 
 	// Set slots to 0
 	var zeroSlotsValue uint32
@@ -284,6 +297,9 @@ func (f *Fish) Init() error {
 
 	// Running the watcher for running Applications lifetime
 	go f.applicationTimeoutProcess(ctx)
+
+	// Running the watcher for temporary Labels
+	go f.labelTemporaryRemoveProcess(ctx)
 
 	return nil
 }
