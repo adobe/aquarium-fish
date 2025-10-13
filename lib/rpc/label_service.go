@@ -26,7 +26,6 @@ import (
 	"github.com/adobe/aquarium-fish/lib/database"
 	"github.com/adobe/aquarium-fish/lib/fish"
 	aquariumv2 "github.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2"
-	"github.com/adobe/aquarium-fish/lib/rpc/util"
 	rpcutil "github.com/adobe/aquarium-fish/lib/rpc/util"
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 )
@@ -159,7 +158,7 @@ func labelCheckNonAllHolder(ctx context.Context, label *typesv2.Label) error {
 }
 
 // labelCheckCommon validates common rules for label on create/update
-func (s *LabelService) labelCheckCommon(ctx context.Context, label *typesv2.Label) error {
+func (s *LabelService) labelCheckCommon(_ context.Context, label *typesv2.Label) error {
 	// RemoveAt can not be used on versioned labels, should not be less then 30 seconds and not longer then defined in config
 	if label.RemoveAt != nil {
 		if label.Version != 0 {
@@ -296,7 +295,7 @@ func (s *LabelService) Remove(ctx context.Context, req *connect.Request[aquarium
 	}
 
 	// If it's regular user - then only owned labels could be removed
-	if !rpcutil.CheckUserPermission(ctx, auth.LabelServiceUpdateAll) && label.OwnerName != util.GetUserName(ctx) {
+	if !rpcutil.CheckUserPermission(ctx, auth.LabelServiceUpdateAll) && label.OwnerName != rpcutil.GetUserName(ctx) {
 		return connect.NewResponse(&aquariumv2.LabelServiceRemoveResponse{
 			Status: false, Message: "Not allowed to remove the label",
 		}), connect.NewError(connect.CodePermissionDenied, fmt.Errorf("user has no permission to remove label"))

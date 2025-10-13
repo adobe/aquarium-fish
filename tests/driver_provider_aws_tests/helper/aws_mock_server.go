@@ -235,7 +235,7 @@ func (m *MockAWSServer) AddImage(imageID, name, state string) {
 }
 
 // GetImages returns a copy of the images map for testing
-func (m *MockAWSServer) GetImages() map[string]*mockImage {
+func (m *MockAWSServer) GetImages() map[string]*mockImage { // revive:disable-line:unexported-return
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 

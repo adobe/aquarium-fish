@@ -804,6 +804,8 @@ func (f *Fish) labelTemporaryRemoveProcess(ctx context.Context) {
 				}
 			case aquariumv2.ChangeType_CHANGE_TYPE_REMOVED:
 				f.labelTimeoutRemove(labelEvent.Object.Uid)
+			case aquariumv2.ChangeType_CHANGE_TYPE_UNSPECIFIED:
+				// Skipping
 			}
 		case <-labelTimeout:
 			labellogger := logger.With("label_uid", labelUID)
