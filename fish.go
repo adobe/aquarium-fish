@@ -108,7 +108,7 @@ func main() {
 			}
 
 			logger.Info("Fish init DB...")
-			db, err := database.New(filepath.Join(cfg.Directory, cfg.NodeAddress))
+			db, err := database.New(cfg.Directory)
 			if err != nil {
 				return err
 			}
