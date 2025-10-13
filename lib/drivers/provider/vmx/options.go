@@ -36,6 +36,6 @@ func (o *Options) Apply(options util.UnparsedJSON) error {
 }
 
 // Validate makes sure the options have the required defaults & that the required fields are set
-func (_ *Options) Validate() error {
+func (*Options) Validate() error {
 	return nil
 }

@@ -201,6 +201,9 @@ func (s *StreamingService) {{ .RelayMethodName }}(ctx context.Context, subscript
 	// Don't forget to unsubscribe from database when the relay is completed
 	defer func() {
 		s.fish.DB().Unsubscribe{{ .MessageType }}(ctx, dbChannel)
+		// Wait briefly for any in-flight notifications to complete before closing the channel
+		// This prevents data race where notifySubscribersHelper might still be sending
+		time.Sleep(500 * time.Millisecond)
 		// Use recover to prevent panics from closing already closed channel
 		defer func() {
 			if r := recover(); r != nil {

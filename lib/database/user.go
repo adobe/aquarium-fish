@@ -264,7 +264,7 @@ func (d *Database) userGroupListByUserImpl(ctx context.Context, userName string)
 // MergeUserConfigWithGroups merges user configuration with user group configurations
 // Returns a new UserConfig that uses user's config values if set, otherwise uses the
 // maximum value from all user groups' configs, and finally falls back to defaults
-func (d *Database) mergeUserConfigWithGroupsImpl(_ context.Context, user *typesv2.User, groups []*typesv2.UserGroup) *typesv2.UserConfig {
+func (*Database) mergeUserConfigWithGroupsImpl(_ context.Context, user *typesv2.User, groups []*typesv2.UserGroup) *typesv2.UserConfig {
 	// Start with user's existing config or create a new one
 	mergedConfig := &typesv2.UserConfig{}
 	if user.Config != nil {
