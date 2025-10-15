@@ -28,6 +28,7 @@ interface LabelDefinitionFormProps {
   readonly?: boolean;
   nested?: boolean;
   onRegister?: (getData: () => any) => void;
+  onFormChange?: (hasChanges: boolean) => void;
 }
 
 interface LabelDefinitionFormState {
@@ -54,7 +55,8 @@ export const LabelDefinitionForm: React.FC<LabelDefinitionFormProps> = ({
   title,
   readonly,
   nested = false,
-  onRegister
+  onRegister,
+  onFormChange
 }) => {
   const [formData, setFormData] = useState<LabelDefinitionFormState>(defaultLabelDefinitionState);
   const [yamlText, setYamlText] = useState('');
@@ -64,22 +66,25 @@ export const LabelDefinitionForm: React.FC<LabelDefinitionFormProps> = ({
   const [autofillMode, setAutofillMode] = useState<Record<string, 'dropdown' | 'text'>>({});
   const [structFieldText, setStructFieldText] = useState<Record<string, string>>({});
   const [structFieldErrors, setStructFieldErrors] = useState<Record<string, string>>({});
+  const [hasChanges, setHasChanges] = useState(false);
   const { data } = useStreaming();
 
   // Store references to nested component getData functions
   const nestedGetDataFns = useRef<Record<string, () => any>>({});
+  const initialFormDataRef = useRef<LabelDefinitionFormState>(defaultLabelDefinitionState);
 
   // Initialize form data from initialData
   useEffect(() => {
     if (initialData) {
       const newFormData: LabelDefinitionFormState = {
-        driver: initialData.driver || '',
+        driver: initialData.driver !== undefined && initialData.driver !== null ? initialData.driver : '',
         images: initialData.images || [],
         options: initialData.options || {},
         resources: initialData.resources && typeof initialData.resources === 'object' ? initialData.resources : null,
         authentication: initialData.authentication && typeof initialData.authentication === 'object' ? initialData.authentication : undefined,
       };
       setFormData(newFormData);
+      initialFormDataRef.current = newFormData;
 
       // Initialize struct field text
       const newStructText: Record<string, string> = {};
@@ -87,6 +92,23 @@ export const LabelDefinitionForm: React.FC<LabelDefinitionFormProps> = ({
       setStructFieldText(newStructText);
     }
   }, [initialData]);
+
+  // Track form changes
+  useEffect(() => {
+    if (mode === 'view' || readonly) {
+      setHasChanges(false);
+      return;
+    }
+
+    // Compare current form data with initial data
+    const dataChanged = JSON.stringify(formData) !== JSON.stringify(initialFormDataRef.current);
+    setHasChanges(dataChanged);
+
+    // Notify parent if callback provided
+    if (onFormChange) {
+      onFormChange(dataChanged);
+    }
+  }, [formData, mode, readonly, onFormChange]);
 
   // Register getData function with parent if nested
   useEffect(() => {
@@ -220,10 +242,10 @@ const handleCopyYaml = () => {
 // Validate form data
 const validateForm = (): boolean => {
   const errors: Record<string, string> = {};
-  if (!formData.driver) {
+  if (formData.driver === undefined || formData.driver === null || formData.driver === '') {
     errors.driver = 'Driver is required';
   }
-  if (!formData.resources) {
+  if (formData.resources === undefined || formData.resources === null || formData.resources === '') {
     errors.resources = 'Resources is required';
   }
 

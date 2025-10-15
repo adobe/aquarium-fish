@@ -18,6 +18,7 @@ import { useStreaming } from '../../../contexts/StreamingContext/index';
 import { useApplications, useApplicationCreate, useApplicationDeallocate, useApplicationSSH } from '../hooks/useApplications';
 import { StreamingList, type ListColumn, type ListItemAction } from '../../../components/StreamingList';
 import { ApplicationForm, ApplicationResourceForm } from '../../../../gen/components';
+import { Modal } from '../../../components/Modal';
 import { timestampToDate } from '../../../lib/auth';
 import { PermService, PermApplication } from '../../../../gen/permissions/permissions_grpc';
 import type { ApplicationWithDetails } from '../types';
@@ -63,6 +64,7 @@ export function ApplicationsPage() {
   const [selectedApp, setSelectedApp] = useState<ApplicationWithDetails | null>(null);
   const [showSSHModal, setShowSSHModal] = useState(false);
   const [sshCredentials, setSSHCredentials] = useState<any>(null);
+  const [hasCreateFormChanges, setHasCreateFormChanges] = useState(false);
 
   // Fetch data when component mounts
   useEffect(() => {
@@ -221,73 +223,70 @@ export function ApplicationsPage() {
       />
 
       {/* Create Application Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <ApplicationForm
-              mode="create"
-              onSubmit={handleCreateApplication}
-              onCancel={() => setShowCreateModal(false)}
-              title="Create Application"
-            />
-          </div>
-        </div>
-      )}
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        hasUnsavedChanges={hasCreateFormChanges}
+      >
+        <ApplicationForm
+          mode="create"
+          onSubmit={handleCreateApplication}
+          onCancel={() => setShowCreateModal(false)}
+          onFormChange={setHasCreateFormChanges}
+          title="Create Application"
+        />
+      </Modal>
 
       {/* Application Details Modal */}
-      {showDetailsModal && selectedApp && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                Application Details: {selectedApp.uid}
-              </h2>
-              <button
-                onClick={() => setShowDetailsModal(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ×
-              </button>
-            </div>
-            <ApplicationForm
-              mode="view"
-              initialData={selectedApp}
-              onSubmit={() => {}}
-              onCancel={() => setShowDetailsModal(false)}
-            />
-            {/* Show ApplicationState and ApplicationResource if available */}
-            <div className="mt-6">
-              {selectedApp.state && (
-                <div className="mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Current State</h3>
-                  <div className="space-y-1 text-sm">
-                    <div>
-                      <span className="font-medium">Created at:</span> {selectedApp.state?.createdAt ? timestampToDate(selectedApp.state.createdAt).toLocaleString() : 'Unknown'}
-                    </div>
-                    <div>
-                      <span className="font-medium">Status:</span> {getStatusText(selectedApp.state)}
-                    </div>
-                    <div>
-                      <span className="font-medium">Description:</span> {selectedApp.state?.description || '—'}
-                    </div>
+      {selectedApp && (
+        <Modal
+          isOpen={showDetailsModal}
+          onClose={() => setShowDetailsModal(false)}
+          hasUnsavedChanges={false}
+        >
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              Application Details: {selectedApp.uid}
+            </h2>
+          </div>
+          <ApplicationForm
+            mode="view"
+            initialData={selectedApp}
+            onSubmit={() => {}}
+            onCancel={() => setShowDetailsModal(false)}
+          />
+          {/* Show ApplicationState and ApplicationResource if available */}
+          <div className="mt-6">
+            {selectedApp.state && (
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Current State</h3>
+                <div className="space-y-1 text-sm">
+                  <div>
+                    <span className="font-medium">Created at:</span> {selectedApp.state?.createdAt ? timestampToDate(selectedApp.state.createdAt).toLocaleString() : 'Unknown'}
+                  </div>
+                  <div>
+                    <span className="font-medium">Status:</span> {getStatusText(selectedApp.state)}
+                  </div>
+                  <div>
+                    <span className="font-medium">Description:</span> {selectedApp.state?.description || '—'}
                   </div>
                 </div>
-              )}
-              {selectedApp.resource && (
-                <div className="mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Resource</h3>
-                  <ApplicationResourceForm
-                    mode="view"
-                    initialData={selectedApp.resource}
-                    onSubmit={() => {}}
-                    onCancel={() => {}}
-                    title="Application Resource"
-                  />
-                </div>
-              )}
-            </div>
+              </div>
+            )}
+            {selectedApp.resource && (
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Resource</h3>
+                <ApplicationResourceForm
+                  mode="view"
+                  initialData={selectedApp.resource}
+                  onSubmit={() => {}}
+                  onCancel={() => {}}
+                  title="Application Resource"
+                />
+              </div>
+            )}
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* SSH Resource Access Modal */}
@@ -316,7 +315,7 @@ export function ApplicationsPage() {
                   <div>
                     <span className="font-medium text-gray-700 dark:text-gray-300">Command:</span>
                     <div className="mt-1 p-3 bg-gray-100 dark:bg-gray-700 rounded font-mono text-sm">
-                      ssh -p {sshCredentials.address?.split(':')[1] || '22'} {sshCredentials.username}@{sshCredentials.address?.split(':')[0] || 'localhost'}
+                      ssh -p {sshCredentials.address?.split(':')[1] || '22'} -L 3389:localhost:3389 -L 5900:localhost:5900 {sshCredentials.username}@{sshCredentials.address?.split(':')[0] || 'localhost'}
                     </div>
                   </div>
                   <div>

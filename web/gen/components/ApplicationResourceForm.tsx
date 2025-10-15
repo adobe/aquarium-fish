@@ -28,6 +28,7 @@ interface ApplicationResourceFormProps {
   readonly?: boolean;
   nested?: boolean;
   onRegister?: (getData: () => any) => void;
+  onFormChange?: (hasChanges: boolean) => void;
 }
 
 interface ApplicationResourceFormState {
@@ -52,7 +53,7 @@ const defaultApplicationResourceState: ApplicationResourceFormState = {
   applicationUid: '',
   nodeUid: '',
   labelUid: '',
-  definitionIndex: 0,
+  definitionIndex: '',
   identifier: '',
   ipAddr: '',
   hwAddr: '',
@@ -70,7 +71,8 @@ export const ApplicationResourceForm: React.FC<ApplicationResourceFormProps> = (
   title,
   readonly,
   nested = false,
-  onRegister
+  onRegister,
+  onFormChange
 }) => {
   const [formData, setFormData] = useState<ApplicationResourceFormState>(defaultApplicationResourceState);
   const [yamlText, setYamlText] = useState('');
@@ -80,30 +82,33 @@ export const ApplicationResourceForm: React.FC<ApplicationResourceFormProps> = (
   const [autofillMode, setAutofillMode] = useState<Record<string, 'dropdown' | 'text'>>({});
   const [structFieldText, setStructFieldText] = useState<Record<string, string>>({});
   const [structFieldErrors, setStructFieldErrors] = useState<Record<string, string>>({});
+  const [hasChanges, setHasChanges] = useState(false);
   const { data } = useStreaming();
 
   // Store references to nested component getData functions
   const nestedGetDataFns = useRef<Record<string, () => any>>({});
+  const initialFormDataRef = useRef<ApplicationResourceFormState>(defaultApplicationResourceState);
 
   // Initialize form data from initialData
   useEffect(() => {
     if (initialData) {
       const newFormData: ApplicationResourceFormState = {
-        uid: initialData.uid || '',
+        uid: initialData.uid !== undefined && initialData.uid !== null ? initialData.uid : '',
         createdAt: initialData.createdAt ? new Date(Number(initialData.createdAt.seconds) * 1000).toISOString().slice(0, 16) : '',
         updatedAt: initialData.updatedAt ? new Date(Number(initialData.updatedAt.seconds) * 1000).toISOString().slice(0, 16) : '',
-        applicationUid: initialData.applicationUid || '',
-        nodeUid: initialData.nodeUid || '',
-        labelUid: initialData.labelUid || '',
-        definitionIndex: initialData.definitionIndex || 0,
-        identifier: initialData.identifier || '',
-        ipAddr: initialData.ipAddr || '',
-        hwAddr: initialData.hwAddr || '',
+        applicationUid: initialData.applicationUid !== undefined && initialData.applicationUid !== null ? initialData.applicationUid : '',
+        nodeUid: initialData.nodeUid !== undefined && initialData.nodeUid !== null ? initialData.nodeUid : '',
+        labelUid: initialData.labelUid !== undefined && initialData.labelUid !== null ? initialData.labelUid : '',
+        definitionIndex: initialData.definitionIndex !== undefined && initialData.definitionIndex !== null ? initialData.definitionIndex : '',
+        identifier: initialData.identifier !== undefined && initialData.identifier !== null ? initialData.identifier : '',
+        ipAddr: initialData.ipAddr !== undefined && initialData.ipAddr !== null ? initialData.ipAddr : '',
+        hwAddr: initialData.hwAddr !== undefined && initialData.hwAddr !== null ? initialData.hwAddr : '',
         metadata: initialData.metadata || {},
         timeout: initialData.timeout ? new Date(Number(initialData.timeout.seconds) * 1000).toISOString().slice(0, 16) : '',
         authentication: initialData.authentication && typeof initialData.authentication === 'object' ? initialData.authentication : undefined,
       };
       setFormData(newFormData);
+      initialFormDataRef.current = newFormData;
 
       // Initialize struct field text
       const newStructText: Record<string, string> = {};
@@ -111,6 +116,23 @@ export const ApplicationResourceForm: React.FC<ApplicationResourceFormProps> = (
       setStructFieldText(newStructText);
     }
   }, [initialData]);
+
+  // Track form changes
+  useEffect(() => {
+    if (mode === 'view' || readonly) {
+      setHasChanges(false);
+      return;
+    }
+
+    // Compare current form data with initial data
+    const dataChanged = JSON.stringify(formData) !== JSON.stringify(initialFormDataRef.current);
+    setHasChanges(dataChanged);
+
+    // Notify parent if callback provided
+    if (onFormChange) {
+      onFormChange(dataChanged);
+    }
+  }, [formData, mode, readonly, onFormChange]);
 
   // Register getData function with parent if nested
   useEffect(() => {
@@ -280,37 +302,37 @@ const handleCopyYaml = () => {
 // Validate form data
 const validateForm = (): boolean => {
   const errors: Record<string, string> = {};
-  if (mode !== 'create' && (!formData.uid)) {
+  if (mode !== 'create' && (formData.uid === undefined || formData.uid === null || formData.uid === '')) {
     errors.uid = 'Uid is required';
   }
-  if (mode !== 'create' && (!formData.createdAt)) {
+  if (mode !== 'create' && (formData.createdAt === undefined || formData.createdAt === null || formData.createdAt === '')) {
     errors.createdAt = 'Created At is required';
   }
-  if (mode !== 'create' && (!formData.updatedAt)) {
+  if (mode !== 'create' && (formData.updatedAt === undefined || formData.updatedAt === null || formData.updatedAt === '')) {
     errors.updatedAt = 'Updated At is required';
   }
-  if (!formData.applicationUid) {
+  if (formData.applicationUid === undefined || formData.applicationUid === null || formData.applicationUid === '') {
     errors.applicationUid = 'Application Uid is required';
   }
-  if (!formData.nodeUid) {
+  if (formData.nodeUid === undefined || formData.nodeUid === null || formData.nodeUid === '') {
     errors.nodeUid = 'Node Uid is required';
   }
-  if (!formData.labelUid) {
+  if (formData.labelUid === undefined || formData.labelUid === null || formData.labelUid === '') {
     errors.labelUid = 'Label Uid is required';
   }
-  if (!formData.definitionIndex) {
+  if (formData.definitionIndex === undefined || formData.definitionIndex === null || formData.definitionIndex === '') {
     errors.definitionIndex = 'Definition Index is required';
   }
-  if (!formData.identifier) {
+  if (formData.identifier === undefined || formData.identifier === null || formData.identifier === '') {
     errors.identifier = 'Identifier is required';
   }
-  if (!formData.ipAddr) {
+  if (formData.ipAddr === undefined || formData.ipAddr === null || formData.ipAddr === '') {
     errors.ipAddr = 'Ip Addr is required';
   }
-  if (!formData.hwAddr) {
+  if (formData.hwAddr === undefined || formData.hwAddr === null || formData.hwAddr === '') {
     errors.hwAddr = 'Hw Addr is required';
   }
-  if (!formData.metadata) {
+  if (formData.metadata === undefined || formData.metadata === null || formData.metadata === '') {
     errors.metadata = 'Metadata is required';
   }
 
@@ -544,56 +566,56 @@ const isSimpleField = (field: any) => {
   )}{/* Created At field */}
   {!(mode === 'create' && true) && (
     <div>
-      {/* Complex field - traditional layout */}
-      <div className="space-y-2">
-<div className="flex items-center space-x-2">
-  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-    Created At *
-  </label>
+{/* Timestamp field - inline layout */}
+<div className="flex items-center justify-between">
+  <div className="flex items-center space-x-2 min-w-0 flex-1">
+    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+      Created At *
+    </label>
+  </div>
+  <div className="flex-1 max-w-xs ml-4">
+    <input
+      type="datetime-local"
+      value={formData.createdAt}
+      onChange={(e) => handleFieldChange('createdAt', e.target.value)}
+      disabled={isReadOnly || (mode === 'edit' && true)}
+      className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+    />
+    {validationErrors.createdAt && (
+      <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+        {validationErrors.createdAt}
+      </div>
+    )}
+  </div>
 </div>
 
-<input
-  type="datetime-local"
-  value={formData.createdAt}
-  onChange={(e) => handleFieldChange('createdAt', e.target.value)}
-  disabled={isReadOnly || (mode === 'edit' && true)}
-  className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-/>
-
-{validationErrors.createdAt && (
-  <div className="text-sm text-red-600 dark:text-red-400 mt-1">
-    {validationErrors.createdAt}
-  </div>
-)}
-
-      </div>
     </div>
   )}{/* Updated At field */}
   {!(mode === 'create' && true) && (
     <div>
-      {/* Complex field - traditional layout */}
-      <div className="space-y-2">
-<div className="flex items-center space-x-2">
-  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-    Updated At *
-  </label>
+{/* Timestamp field - inline layout */}
+<div className="flex items-center justify-between">
+  <div className="flex items-center space-x-2 min-w-0 flex-1">
+    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+      Updated At *
+    </label>
+  </div>
+  <div className="flex-1 max-w-xs ml-4">
+    <input
+      type="datetime-local"
+      value={formData.updatedAt}
+      onChange={(e) => handleFieldChange('updatedAt', e.target.value)}
+      disabled={isReadOnly || (mode === 'edit' && true)}
+      className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+    />
+    {validationErrors.updatedAt && (
+      <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+        {validationErrors.updatedAt}
+      </div>
+    )}
+  </div>
 </div>
 
-<input
-  type="datetime-local"
-  value={formData.updatedAt}
-  onChange={(e) => handleFieldChange('updatedAt', e.target.value)}
-  disabled={isReadOnly || (mode === 'edit' && true)}
-  className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-/>
-
-{validationErrors.updatedAt && (
-  <div className="text-sm text-red-600 dark:text-red-400 mt-1">
-    {validationErrors.updatedAt}
-  </div>
-)}
-
-      </div>
     </div>
   )}{/* Application Uid field */}
   <div>
@@ -683,7 +705,7 @@ const isSimpleField = (field: any) => {
     <input
       type="number"
       value={formData.definitionIndex}
-      onChange={(e) => handleFieldChange('definitionIndex', parseInt(e.target.value) || 0)}
+      onChange={(e) => handleFieldChange('definitionIndex', e.target.value === '' ? '' : parseInt(e.target.value))}
       disabled={isReadOnly || (mode === 'edit' && false)}
       className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
     />
@@ -838,35 +860,35 @@ const isSimpleField = (field: any) => {
     </div>
   </div>{/* Timeout field */}
   <div>
-    {/* Complex field - traditional layout */}
-    <div className="space-y-2">
-<div className="flex items-center space-x-2">
-  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-    Timeout
-  </label>
-  <div className="relative group">
-    <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
-    <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
-      <pre className="whitespace-pre-wrap text-xs leading-relaxed">Calculated during allocation time of when the Resource have to die anyway</pre>
+{/* Timestamp field - inline layout */}
+<div className="flex items-center justify-between">
+  <div className="flex items-center space-x-2 min-w-0 flex-1">
+    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+      Timeout
+    </label>
+    <div className="relative group">
+      <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
+      <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
+        <pre className="whitespace-pre-wrap text-xs leading-relaxed">Calculated during allocation time of when the Resource have to die anyway</pre>
+      </div>
     </div>
+  </div>
+  <div className="flex-1 max-w-xs ml-4">
+    <input
+      type="datetime-local"
+      value={formData.timeout}
+      onChange={(e) => handleFieldChange('timeout', e.target.value)}
+      disabled={isReadOnly || (mode === 'edit' && false)}
+      className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+    />
+    {validationErrors.timeout && (
+      <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+        {validationErrors.timeout}
+      </div>
+    )}
   </div>
 </div>
 
-<input
-  type="datetime-local"
-  value={formData.timeout}
-  onChange={(e) => handleFieldChange('timeout', e.target.value)}
-  disabled={isReadOnly || (mode === 'edit' && false)}
-  className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-/>
-
-{validationErrors.timeout && (
-  <div className="text-sm text-red-600 dark:text-red-400 mt-1">
-    {validationErrors.timeout}
-  </div>
-)}
-
-    </div>
   </div>{/* Authentication field */}
   <div>
     {/* Complex field - traditional layout */}

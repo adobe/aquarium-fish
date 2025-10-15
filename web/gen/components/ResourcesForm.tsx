@@ -28,6 +28,7 @@ interface ResourcesFormProps {
   readonly?: boolean;
   nested?: boolean;
   onRegister?: (getData: () => any) => void;
+  onFormChange?: (hasChanges: boolean) => void;
 }
 
 interface ResourcesFormState {
@@ -44,8 +45,8 @@ interface ResourcesFormState {
 }
 const defaultResourcesState: ResourcesFormState = {
   slots: undefined,
-  cpu: 0,
-  ram: 0,
+  cpu: '',
+  ram: '',
   disks: {},
   network: undefined,
   nodeFilter: [],
@@ -64,7 +65,8 @@ export const ResourcesForm: React.FC<ResourcesFormProps> = ({
   title,
   readonly,
   nested = false,
-  onRegister
+  onRegister,
+  onFormChange
 }) => {
   const [formData, setFormData] = useState<ResourcesFormState>(defaultResourcesState);
   const [yamlText, setYamlText] = useState('');
@@ -74,18 +76,20 @@ export const ResourcesForm: React.FC<ResourcesFormProps> = ({
   const [autofillMode, setAutofillMode] = useState<Record<string, 'dropdown' | 'text'>>({});
   const [structFieldText, setStructFieldText] = useState<Record<string, string>>({});
   const [structFieldErrors, setStructFieldErrors] = useState<Record<string, string>>({});
+  const [hasChanges, setHasChanges] = useState(false);
   const { data } = useStreaming();
 
   // Store references to nested component getData functions
   const nestedGetDataFns = useRef<Record<string, () => any>>({});
+  const initialFormDataRef = useRef<ResourcesFormState>(defaultResourcesState);
 
   // Initialize form data from initialData
   useEffect(() => {
     if (initialData) {
       const newFormData: ResourcesFormState = {
         slots: initialData.slots ?? undefined,
-        cpu: initialData.cpu || 0,
-        ram: initialData.ram || 0,
+        cpu: initialData.cpu !== undefined && initialData.cpu !== null ? initialData.cpu : '',
+        ram: initialData.ram !== undefined && initialData.ram !== null ? initialData.ram : '',
         disks: initialData.disks && typeof initialData.disks === 'object' ? initialData.disks : {},
         network: initialData.network ?? undefined,
         nodeFilter: initialData.nodeFilter || [],
@@ -95,12 +99,30 @@ export const ResourcesForm: React.FC<ResourcesFormProps> = ({
         lifetime: initialData.lifetime ?? undefined,
       };
       setFormData(newFormData);
+      initialFormDataRef.current = newFormData;
 
       // Initialize struct field text
       const newStructText: Record<string, string> = {};
       setStructFieldText(newStructText);
     }
   }, [initialData]);
+
+  // Track form changes
+  useEffect(() => {
+    if (mode === 'view' || readonly) {
+      setHasChanges(false);
+      return;
+    }
+
+    // Compare current form data with initial data
+    const dataChanged = JSON.stringify(formData) !== JSON.stringify(initialFormDataRef.current);
+    setHasChanges(dataChanged);
+
+    // Notify parent if callback provided
+    if (onFormChange) {
+      onFormChange(dataChanged);
+    }
+  }, [formData, mode, readonly, onFormChange]);
 
   // Register getData function with parent if nested
   useEffect(() => {
@@ -252,10 +274,10 @@ const handleCopyYaml = () => {
 // Validate form data
 const validateForm = (): boolean => {
   const errors: Record<string, string> = {};
-  if (!formData.cpu) {
+  if (formData.cpu === undefined || formData.cpu === null || formData.cpu === '') {
     errors.cpu = 'Cpu is required';
   }
-  if (!formData.ram) {
+  if (formData.ram === undefined || formData.ram === null || formData.ram === '') {
     errors.ram = 'Ram is required';
   }
 
@@ -475,7 +497,7 @@ const isSimpleField = (field: any) => {
     <input
       type="number"
       value={formData.slots}
-      onChange={(e) => handleFieldChange('slots', parseInt(e.target.value) || 0)}
+      onChange={(e) => handleFieldChange('slots', e.target.value === '' ? '' : parseInt(e.target.value))}
       disabled={isReadOnly || (mode === 'edit' && false)}
       className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
     />
@@ -506,7 +528,7 @@ const isSimpleField = (field: any) => {
     <input
       type="number"
       value={formData.cpu}
-      onChange={(e) => handleFieldChange('cpu', parseInt(e.target.value) || 0)}
+      onChange={(e) => handleFieldChange('cpu', e.target.value === '' ? '' : parseInt(e.target.value))}
       disabled={isReadOnly || (mode === 'edit' && false)}
       className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
     />
@@ -537,7 +559,7 @@ const isSimpleField = (field: any) => {
     <input
       type="number"
       value={formData.ram}
-      onChange={(e) => handleFieldChange('ram', parseInt(e.target.value) || 0)}
+      onChange={(e) => handleFieldChange('ram', e.target.value === '' ? '' : parseInt(e.target.value))}
       disabled={isReadOnly || (mode === 'edit' && false)}
       className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
     />

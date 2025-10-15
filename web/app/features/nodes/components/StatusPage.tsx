@@ -17,6 +17,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useStreaming } from '../../../contexts/StreamingContext/index';
 import { useNodes, useThisNode, useNodeMaintenance } from '../hooks/useNodes';
 import { StreamingList, type ListColumn, type ListItemAction } from '../../../components/StreamingList';
+import { Modal } from '../../../components/Modal';
 import { PermService, PermNode } from '../../../../gen/permissions/permissions_grpc';
 import type { Node } from '../../../../gen/aquarium/v2/node_pb';
 
@@ -324,152 +325,150 @@ export function StatusPage() {
       )}
 
       {/* Node Details Modal */}
-      {showDetailsModal && selectedNode && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                Node Details: {selectedNode.name}
-              </h2>
-              <button
-                onClick={() => setShowDetailsModal(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ×
-              </button>
-            </div>
+      {selectedNode && (
+        <Modal
+          isOpen={showDetailsModal}
+          onClose={() => setShowDetailsModal(false)}
+          hasUnsavedChanges={false}
+        >
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              Node Details: {selectedNode.name}
+            </h2>
+          </div>
 
-            <div className="space-y-6">
-              {/* Basic Information */}
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                  Basic Information
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">UID</p>
-                    <p className="text-sm text-gray-900 dark:text-white">{selectedNode.uid}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Name</p>
-                    <p className="text-sm text-gray-900 dark:text-white">{selectedNode.name}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Location</p>
-                    <p className="text-sm text-gray-900 dark:text-white">{selectedNode.location}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Address</p>
-                    <p className="text-sm text-gray-900 dark:text-white">{selectedNode.address}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Created</p>
-                    <p className="text-sm text-gray-900 dark:text-white">
-                      {formatTimestamp(selectedNode.createdAt)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Updated</p>
-                    <p className="text-sm text-gray-900 dark:text-white">
-                      {formatTimestamp(selectedNode.updatedAt)}
-                    </p>
-                  </div>
+          <div className="space-y-6">
+            {/* Basic Information */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                Basic Information
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">UID</p>
+                  <p className="text-sm text-gray-900 dark:text-white">{selectedNode.uid}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Name</p>
+                  <p className="text-sm text-gray-900 dark:text-white">{selectedNode.name}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Location</p>
+                  <p className="text-sm text-gray-900 dark:text-white">{selectedNode.location}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Address</p>
+                  <p className="text-sm text-gray-900 dark:text-white">{selectedNode.address}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Created</p>
+                  <p className="text-sm text-gray-900 dark:text-white">
+                    {formatTimestamp(selectedNode.createdAt)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Updated</p>
+                  <p className="text-sm text-gray-900 dark:text-white">
+                    {formatTimestamp(selectedNode.updatedAt)}
+                  </p>
                 </div>
               </div>
-
-              {/* System Details - Similar structure as Current Node */}
-              {selectedNode.definition && (
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                    System Details
-                  </h3>
-                  {/* Include all the same sections as Current Node here */}
-                </div>
-              )}
             </div>
+
+            {/* System Details - Similar structure as Current Node */}
+            {selectedNode.definition && (
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                  System Details
+                </h3>
+                {/* Include all the same sections as Current Node here */}
+              </div>
+            )}
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Maintenance Mode Modal */}
-      {showMaintenanceModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
-              Maintenance Mode
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
-              Choose whether to enable or disable maintenance mode for this node.
-            </p>
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => setShowMaintenanceModal(false)}
-                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleMaintenanceToggle(false)}
-                disabled={maintenanceLoading}
-                className="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
-              >
-                Disable
-              </button>
-              <button
-                onClick={() => handleMaintenanceToggle(true)}
-                disabled={maintenanceLoading}
-                className="px-4 py-2 text-sm bg-yellow-600 text-white rounded-md hover:bg-yellow-700 disabled:opacity-50"
-              >
-                Enable
-              </button>
-            </div>
-          </div>
+      <Modal
+        isOpen={showMaintenanceModal}
+        onClose={() => setShowMaintenanceModal(false)}
+        hasUnsavedChanges={false}
+        className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md"
+      >
+        <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+          Maintenance Mode
+        </h2>
+        <p className="text-gray-600 dark:text-gray-400 mb-6">
+          Choose whether to enable or disable maintenance mode for this node.
+        </p>
+        <div className="flex justify-end space-x-3">
+          <button
+            onClick={() => setShowMaintenanceModal(false)}
+            className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => handleMaintenanceToggle(false)}
+            disabled={maintenanceLoading}
+            className="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+          >
+            Disable
+          </button>
+          <button
+            onClick={() => handleMaintenanceToggle(true)}
+            disabled={maintenanceLoading}
+            className="px-4 py-2 text-sm bg-yellow-600 text-white rounded-md hover:bg-yellow-700 disabled:opacity-50"
+          >
+            Enable
+          </button>
         </div>
-      )}
+      </Modal>
 
       {/* Shutdown Modal */}
-      {showShutdownModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
-              Shutdown Node
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
-              This will put the node in maintenance mode and then shut it down after the specified delay.
-            </p>
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Shutdown Delay
-              </label>
-              <input
-                type="text"
-                value={shutdownDelay}
-                onChange={(e) => setShutdownDelay(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                placeholder="1m"
-              />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Format: 1h30m (hours, minutes, seconds)
-              </p>
-            </div>
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => setShowShutdownModal(false)}
-                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleShutdown}
-                disabled={maintenanceLoading}
-                className="px-4 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
-              >
-                Shutdown
-              </button>
-            </div>
-          </div>
+      <Modal
+        isOpen={showShutdownModal}
+        onClose={() => setShowShutdownModal(false)}
+        hasUnsavedChanges={false}
+        className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md"
+      >
+        <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+          Shutdown Node
+        </h2>
+        <p className="text-gray-600 dark:text-gray-400 mb-4">
+          This will put the node in maintenance mode and then shut it down after the specified delay.
+        </p>
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Shutdown Delay
+          </label>
+          <input
+            type="text"
+            value={shutdownDelay}
+            onChange={(e) => setShutdownDelay(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            placeholder="1m"
+          />
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Format: 1h30m (hours, minutes, seconds)
+          </p>
         </div>
-      )}
+        <div className="flex justify-end space-x-3">
+          <button
+            onClick={() => setShowShutdownModal(false)}
+            className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleShutdown}
+            disabled={maintenanceLoading}
+            className="px-4 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+          >
+            Shutdown
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

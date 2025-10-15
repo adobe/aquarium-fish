@@ -28,6 +28,7 @@ interface LabelFormProps {
   readonly?: boolean;
   nested?: boolean;
   onRegister?: (getData: () => any) => void;
+  onFormChange?: (hasChanges: boolean) => void;
 }
 
 interface LabelFormState {
@@ -47,7 +48,7 @@ const defaultLabelState: LabelFormState = {
   createdAt: '',
   updatedAt: '',
   name: '',
-  version: 0,
+  version: '',
   ownerName: '',
   definitions: [],
   metadata: {},
@@ -64,7 +65,8 @@ export const LabelForm: React.FC<LabelFormProps> = ({
   title,
   readonly,
   nested = false,
-  onRegister
+  onRegister,
+  onFormChange
 }) => {
   const [formData, setFormData] = useState<LabelFormState>(defaultLabelState);
   const [yamlText, setYamlText] = useState('');
@@ -74,27 +76,30 @@ export const LabelForm: React.FC<LabelFormProps> = ({
   const [autofillMode, setAutofillMode] = useState<Record<string, 'dropdown' | 'text'>>({});
   const [structFieldText, setStructFieldText] = useState<Record<string, string>>({});
   const [structFieldErrors, setStructFieldErrors] = useState<Record<string, string>>({});
+  const [hasChanges, setHasChanges] = useState(false);
   const { data } = useStreaming();
 
   // Store references to nested component getData functions
   const nestedGetDataFns = useRef<Record<string, () => any>>({});
+  const initialFormDataRef = useRef<LabelFormState>(defaultLabelState);
 
   // Initialize form data from initialData
   useEffect(() => {
     if (initialData) {
       const newFormData: LabelFormState = {
-        uid: initialData.uid || '',
+        uid: initialData.uid !== undefined && initialData.uid !== null ? initialData.uid : '',
         createdAt: initialData.createdAt ? new Date(Number(initialData.createdAt.seconds) * 1000).toISOString().slice(0, 16) : '',
         updatedAt: initialData.updatedAt ? new Date(Number(initialData.updatedAt.seconds) * 1000).toISOString().slice(0, 16) : '',
-        name: initialData.name || '',
-        version: initialData.version || 0,
-        ownerName: initialData.ownerName || '',
+        name: initialData.name !== undefined && initialData.name !== null ? initialData.name : '',
+        version: initialData.version !== undefined && initialData.version !== null ? initialData.version : '',
+        ownerName: initialData.ownerName !== undefined && initialData.ownerName !== null ? initialData.ownerName : '',
         definitions: initialData.definitions || [],
         metadata: initialData.metadata || {},
         visibleFor: initialData.visibleFor || [],
         removeAt: initialData.removeAt ? new Date(Number(initialData.removeAt.seconds) * 1000).toISOString().slice(0, 16) : '',
       };
       setFormData(newFormData);
+      initialFormDataRef.current = newFormData;
 
       // Initialize struct field text
       const newStructText: Record<string, string> = {};
@@ -102,6 +107,23 @@ export const LabelForm: React.FC<LabelFormProps> = ({
       setStructFieldText(newStructText);
     }
   }, [initialData]);
+
+  // Track form changes
+  useEffect(() => {
+    if (mode === 'view' || readonly) {
+      setHasChanges(false);
+      return;
+    }
+
+    // Compare current form data with initial data
+    const dataChanged = JSON.stringify(formData) !== JSON.stringify(initialFormDataRef.current);
+    setHasChanges(dataChanged);
+
+    // Notify parent if callback provided
+    if (onFormChange) {
+      onFormChange(dataChanged);
+    }
+  }, [formData, mode, readonly, onFormChange]);
 
   // Register getData function with parent if nested
   useEffect(() => {
@@ -263,25 +285,25 @@ const handleCopyYaml = () => {
 // Validate form data
 const validateForm = (): boolean => {
   const errors: Record<string, string> = {};
-  if (mode !== 'create' && (!formData.uid)) {
+  if (mode !== 'create' && (formData.uid === undefined || formData.uid === null || formData.uid === '')) {
     errors.uid = 'Uid is required';
   }
-  if (mode !== 'create' && (!formData.createdAt)) {
+  if (mode !== 'create' && (formData.createdAt === undefined || formData.createdAt === null || formData.createdAt === '')) {
     errors.createdAt = 'Created At is required';
   }
-  if (mode !== 'create' && (!formData.updatedAt)) {
+  if (mode !== 'create' && (formData.updatedAt === undefined || formData.updatedAt === null || formData.updatedAt === '')) {
     errors.updatedAt = 'Updated At is required';
   }
-  if (mode !== 'create' && (!formData.name)) {
+  if (mode !== 'create' && (formData.name === undefined || formData.name === null || formData.name === '')) {
     errors.name = 'Name is required';
   }
-  if (mode !== 'create' && (!formData.version)) {
+  if (mode !== 'create' && (formData.version === undefined || formData.version === null || formData.version === '')) {
     errors.version = 'Version is required';
   }
-  if (mode !== 'create' && (!formData.ownerName)) {
+  if (mode !== 'create' && (formData.ownerName === undefined || formData.ownerName === null || formData.ownerName === '')) {
     errors.ownerName = 'Owner Name is required';
   }
-  if (!formData.definitions || formData.definitions.length === 0) {
+  if (formData.definitions === undefined || formData.definitions === null || formData.definitions === '' || formData.definitions.length === 0) {
     errors.definitions = 'Definitions is required';
   }
 
@@ -512,56 +534,56 @@ const isSimpleField = (field: any) => {
   )}{/* Created At field */}
   {!(mode === 'create' && true) && (
     <div>
-      {/* Complex field - traditional layout */}
-      <div className="space-y-2">
-<div className="flex items-center space-x-2">
-  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-    Created At *
-  </label>
+{/* Timestamp field - inline layout */}
+<div className="flex items-center justify-between">
+  <div className="flex items-center space-x-2 min-w-0 flex-1">
+    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+      Created At *
+    </label>
+  </div>
+  <div className="flex-1 max-w-xs ml-4">
+    <input
+      type="datetime-local"
+      value={formData.createdAt}
+      onChange={(e) => handleFieldChange('createdAt', e.target.value)}
+      disabled={isReadOnly || (mode === 'edit' && true)}
+      className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+    />
+    {validationErrors.createdAt && (
+      <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+        {validationErrors.createdAt}
+      </div>
+    )}
+  </div>
 </div>
 
-<input
-  type="datetime-local"
-  value={formData.createdAt}
-  onChange={(e) => handleFieldChange('createdAt', e.target.value)}
-  disabled={isReadOnly || (mode === 'edit' && true)}
-  className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-/>
-
-{validationErrors.createdAt && (
-  <div className="text-sm text-red-600 dark:text-red-400 mt-1">
-    {validationErrors.createdAt}
-  </div>
-)}
-
-      </div>
     </div>
   )}{/* Updated At field */}
   {!(mode === 'create' && true) && (
     <div>
-      {/* Complex field - traditional layout */}
-      <div className="space-y-2">
-<div className="flex items-center space-x-2">
-  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-    Updated At *
-  </label>
+{/* Timestamp field - inline layout */}
+<div className="flex items-center justify-between">
+  <div className="flex items-center space-x-2 min-w-0 flex-1">
+    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+      Updated At *
+    </label>
+  </div>
+  <div className="flex-1 max-w-xs ml-4">
+    <input
+      type="datetime-local"
+      value={formData.updatedAt}
+      onChange={(e) => handleFieldChange('updatedAt', e.target.value)}
+      disabled={isReadOnly || (mode === 'edit' && true)}
+      className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+    />
+    {validationErrors.updatedAt && (
+      <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+        {validationErrors.updatedAt}
+      </div>
+    )}
+  </div>
 </div>
 
-<input
-  type="datetime-local"
-  value={formData.updatedAt}
-  onChange={(e) => handleFieldChange('updatedAt', e.target.value)}
-  disabled={isReadOnly || (mode === 'edit' && true)}
-  className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-/>
-
-{validationErrors.updatedAt && (
-  <div className="text-sm text-red-600 dark:text-red-400 mt-1">
-    {validationErrors.updatedAt}
-  </div>
-)}
-
-      </div>
     </div>
   )}{/* Name field */}
   <div>
@@ -613,7 +635,7 @@ const isSimpleField = (field: any) => {
     <input
       type="number"
       value={formData.version}
-      onChange={(e) => handleFieldChange('version', parseInt(e.target.value) || 0)}
+      onChange={(e) => handleFieldChange('version', e.target.value === '' ? '' : parseInt(e.target.value))}
       disabled={isReadOnly || (mode === 'edit' && true)}
       className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
     />
@@ -868,35 +890,35 @@ const isSimpleField = (field: any) => {
     </div>
   </div>{/* Remove At field */}
   <div>
-    {/* Complex field - traditional layout */}
-    <div className="space-y-2">
-<div className="flex items-center space-x-2">
-  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-    Remove At
-  </label>
-  <div className="relative group">
-    <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
-    <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
-      <pre className="whitespace-pre-wrap text-xs leading-relaxed">When the temporary template will become unavailable to be used and will be removed. If not set - then it&#39;s a persistent label (version &gt; 0), when version == 0 then this field must be defined. When time has come - the label can&#39;t be used to run new Application, but will exist until the last Application which used this label is removed. Then when it&#39;s time to remove the label - it will ask driver to post-process the label definitions as well (driver will decide what to do based on options provided within the definitions).</pre>
+{/* Timestamp field - inline layout */}
+<div className="flex items-center justify-between">
+  <div className="flex items-center space-x-2 min-w-0 flex-1">
+    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+      Remove At
+    </label>
+    <div className="relative group">
+      <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
+      <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
+        <pre className="whitespace-pre-wrap text-xs leading-relaxed">When the temporary template will become unavailable to be used and will be removed. If not set - then it&#39;s a persistent label (version &gt; 0), when version == 0 then this field must be defined. When time has come - the label can&#39;t be used to run new Application, but will exist until the last Application which used this label is removed. Then when it&#39;s time to remove the label - it will ask driver to post-process the label definitions as well (driver will decide what to do based on options provided within the definitions).</pre>
+      </div>
     </div>
+  </div>
+  <div className="flex-1 max-w-xs ml-4">
+    <input
+      type="datetime-local"
+      value={formData.removeAt}
+      onChange={(e) => handleFieldChange('removeAt', e.target.value)}
+      disabled={isReadOnly || (mode === 'edit' && false)}
+      className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+    />
+    {validationErrors.removeAt && (
+      <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+        {validationErrors.removeAt}
+      </div>
+    )}
   </div>
 </div>
 
-<input
-  type="datetime-local"
-  value={formData.removeAt}
-  onChange={(e) => handleFieldChange('removeAt', e.target.value)}
-  disabled={isReadOnly || (mode === 'edit' && false)}
-  className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-/>
-
-{validationErrors.removeAt && (
-  <div className="text-sm text-red-600 dark:text-red-400 mt-1">
-    {validationErrors.removeAt}
-  </div>
-)}
-
-    </div>
   </div>
 
         </div>

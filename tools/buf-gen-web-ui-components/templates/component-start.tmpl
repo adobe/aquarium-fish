@@ -7,7 +7,8 @@ export const {{.Name}}Form: React.FC<{{.Name -}}FormProps> = ({
   title,
   readonly,
   nested = false,
-  onRegister
+  onRegister,
+  onFormChange
 }) => {
   const [formData, setFormData] = useState<{{.Name}}FormState>(default{{.Name}}State);
   const [yamlText, setYamlText] = useState('');
@@ -17,10 +18,12 @@ export const {{.Name}}Form: React.FC<{{.Name -}}FormProps> = ({
   const [autofillMode, setAutofillMode] = useState<Record<string, 'dropdown' | 'text'>>({});
   const [structFieldText, setStructFieldText] = useState<Record<string, string>>({});
   const [structFieldErrors, setStructFieldErrors] = useState<Record<string, string>>({});
+  const [hasChanges, setHasChanges] = useState(false);
   const { data } = useStreaming();
 
   // Store references to nested component getData functions
   const nestedGetDataFns = useRef<Record<string, () => any>>({});
+  const initialFormDataRef = useRef<{{.Name}}FormState>(default{{.Name}}State);
 
   // Initialize form data from initialData
   useEffect(() => {
@@ -38,11 +41,12 @@ export const {{.Name}}Form: React.FC<{{.Name -}}FormProps> = ({
 {{- else if .IsOptional }}
         {{.JSONName}}: initialData.{{.JSONName}} ?? {{.DefaultValue}},
 {{- else }}
-        {{.JSONName}}: initialData.{{.JSONName}} || {{.DefaultValue}},
+        {{.JSONName}}: initialData.{{.JSONName}} !== undefined && initialData.{{.JSONName}} !== null ? initialData.{{.JSONName}} : {{.DefaultValue}},
 {{- end }}
 {{- end }}
       };
       setFormData(newFormData);
+      initialFormDataRef.current = newFormData;
 
       // Initialize struct field text
       const newStructText: Record<string, string> = {};
@@ -54,6 +58,23 @@ export const {{.Name}}Form: React.FC<{{.Name -}}FormProps> = ({
       setStructFieldText(newStructText);
     }
   }, [initialData]);
+
+  // Track form changes
+  useEffect(() => {
+    if (mode === 'view' || readonly) {
+      setHasChanges(false);
+      return;
+    }
+
+    // Compare current form data with initial data
+    const dataChanged = JSON.stringify(formData) !== JSON.stringify(initialFormDataRef.current);
+    setHasChanges(dataChanged);
+
+    // Notify parent if callback provided
+    if (onFormChange) {
+      onFormChange(dataChanged);
+    }
+  }, [formData, mode, readonly, onFormChange]);
 
   // Register getData function with parent if nested
   useEffect(() => {

@@ -87,11 +87,11 @@ const validateForm = (): boolean => {
 {{- range .Fields }}
 {{- if not .IsOptional }}
   {{- if .NoEdit }}
-  if (mode !== 'create' && (!formData.{{.JSONName}}{{if .IsRepeated}} || formData.{{.JSONName}}.length === 0{{end}})) {
+  if (mode !== 'create' && (formData.{{.JSONName}} === undefined || formData.{{.JSONName}} === null || formData.{{.JSONName}} === ''{{if .IsRepeated}} || formData.{{.JSONName}}.length === 0{{end}})) {
     errors.{{.JSONName}} = '{{.DisplayName}} is required';
   }
   {{- else }}
-  if (!formData.{{.JSONName}}{{if .IsRepeated}} || formData.{{.JSONName}}.length === 0{{end}}) {
+  if (formData.{{.JSONName}} === undefined || formData.{{.JSONName}} === null || formData.{{.JSONName}} === ''{{if .IsRepeated}} || formData.{{.JSONName}}.length === 0{{end}}) {
     errors.{{.JSONName}} = '{{.DisplayName}} is required';
   }
   {{- end }}

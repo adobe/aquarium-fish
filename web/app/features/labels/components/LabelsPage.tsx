@@ -18,6 +18,7 @@ import { useStreaming } from '../../../contexts/StreamingContext/index';
 import { useLabels, useLabelCreate, useLabelUpdate, useLabelRemove } from '../hooks/useLabels';
 import { StreamingList, type ListColumn, type ListItemAction } from '../../../components/StreamingList';
 import { LabelForm } from '../../../../gen/components';
+import { Modal } from '../../../components/Modal';
 import { PermService, PermLabel } from '../../../../gen/permissions/permissions_grpc';
 import type { Label } from '../../../../gen/aquarium/v2/label_pb';
 
@@ -44,6 +45,9 @@ export function LabelsPage() {
   const [pendingLabelData, setPendingLabelData] = useState<Label | null>(null);
   const [selectedLabel, setSelectedLabel] = useState<Label | null>(null);
   const [labelToCopy, setLabelToCopy] = useState<Label | null>(null);
+  const [hasCreateFormChanges, setHasCreateFormChanges] = useState(false);
+  const [hasEditFormChanges, setHasEditFormChanges] = useState(false);
+  const [hasCopyFormChanges, setHasCopyFormChanges] = useState(false);
 
   // Fetch data when component mounts
   useEffect(() => {
@@ -249,69 +253,84 @@ export function LabelsPage() {
       />
 
       {/* Create Label Modal */}
-      {showCreateLabelModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <LabelForm
-              mode="create"
-              onSubmit={handleCreateLabel}
-              onCancel={() => setShowCreateLabelModal(false)}
-              title="Create Label"
-            />
-          </div>
-        </div>
-      )}
+      <Modal
+        isOpen={showCreateLabelModal}
+        onClose={() => setShowCreateLabelModal(false)}
+        hasUnsavedChanges={hasCreateFormChanges}
+      >
+        <LabelForm
+          mode="create"
+          onSubmit={handleCreateLabel}
+          onCancel={() => setShowCreateLabelModal(false)}
+          onFormChange={setHasCreateFormChanges}
+          title="Create Label"
+        />
+      </Modal>
 
       {/* Label Details Modal */}
-      {showLabelDetailsModal && selectedLabel && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <LabelForm
-              mode="view"
-              initialData={selectedLabel}
-              onSubmit={() => {}}
-              onCancel={() => setShowLabelDetailsModal(false)}
-              title={`Label Details: ${selectedLabel.name}:${selectedLabel.version}`}
-              readonly={true}
-            />
-          </div>
-        </div>
+      {selectedLabel && (
+        <Modal
+          isOpen={showLabelDetailsModal}
+          onClose={() => setShowLabelDetailsModal(false)}
+          hasUnsavedChanges={false}
+        >
+          <LabelForm
+            mode="view"
+            initialData={selectedLabel}
+            onSubmit={() => {}}
+            onCancel={() => setShowLabelDetailsModal(false)}
+            title={`Label Details: ${selectedLabel.name}:${selectedLabel.version}`}
+            readonly={true}
+          />
+        </Modal>
       )}
 
       {/* Edit Label Modal */}
-      {showEditLabelModal && selectedLabel && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <LabelForm
-              mode="edit"
-              initialData={selectedLabel}
-              onSubmit={handleUpdateLabel}
-              onCancel={() => {
-                setShowEditLabelModal(false);
-                setSelectedLabel(null);
-              }}
-              title={`Edit Label: ${selectedLabel.name}:${selectedLabel.version}`}
-            />
-          </div>
-        </div>
+      {selectedLabel && (
+        <Modal
+          isOpen={showEditLabelModal}
+          onClose={() => {
+            setShowEditLabelModal(false);
+            setSelectedLabel(null);
+          }}
+          hasUnsavedChanges={hasEditFormChanges}
+        >
+          <LabelForm
+            mode="edit"
+            initialData={selectedLabel}
+            onSubmit={handleUpdateLabel}
+            onCancel={() => {
+              setShowEditLabelModal(false);
+              setSelectedLabel(null);
+            }}
+            onFormChange={setHasEditFormChanges}
+            title={`Edit Label: ${selectedLabel.name}:${selectedLabel.version}`}
+          />
+        </Modal>
       )}
 
       {/* Copy Label Modal */}
-      {showCopyLabelModal && labelToCopy && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <LabelForm
-              mode="create"
-              initialData={labelToCopy}
-              onSubmit={handleCopyLabel}
-              onCancel={() => {
-                setShowCopyLabelModal(false);
-                setLabelToCopy(null);
-              }}
-              title={`Copy Label: ${labelToCopy.name}:${labelToCopy.version}`}
-            />
-          </div>
-        </div>
+      {labelToCopy && (
+        <Modal
+          isOpen={showCopyLabelModal}
+          onClose={() => {
+            setShowCopyLabelModal(false);
+            setLabelToCopy(null);
+          }}
+          hasUnsavedChanges={hasCopyFormChanges}
+        >
+          <LabelForm
+            mode="create"
+            initialData={labelToCopy}
+            onSubmit={handleCopyLabel}
+            onCancel={() => {
+              setShowCopyLabelModal(false);
+              setLabelToCopy(null);
+            }}
+            onFormChange={setHasCopyFormChanges}
+            title={`Copy Label: ${labelToCopy.name}:${labelToCopy.version}`}
+          />
+        </Modal>
       )}
 
       {/* Version Zero Confirmation Modal */}

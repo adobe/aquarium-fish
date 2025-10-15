@@ -28,6 +28,7 @@ interface UserGroupFormProps {
   readonly?: boolean;
   nested?: boolean;
   onRegister?: (getData: () => any) => void;
+  onFormChange?: (hasChanges: boolean) => void;
 }
 
 interface UserGroupFormState {
@@ -54,7 +55,8 @@ export const UserGroupForm: React.FC<UserGroupFormProps> = ({
   title,
   readonly,
   nested = false,
-  onRegister
+  onRegister,
+  onFormChange
 }) => {
   const [formData, setFormData] = useState<UserGroupFormState>(defaultUserGroupState);
   const [yamlText, setYamlText] = useState('');
@@ -64,28 +66,48 @@ export const UserGroupForm: React.FC<UserGroupFormProps> = ({
   const [autofillMode, setAutofillMode] = useState<Record<string, 'dropdown' | 'text'>>({});
   const [structFieldText, setStructFieldText] = useState<Record<string, string>>({});
   const [structFieldErrors, setStructFieldErrors] = useState<Record<string, string>>({});
+  const [hasChanges, setHasChanges] = useState(false);
   const { data } = useStreaming();
 
   // Store references to nested component getData functions
   const nestedGetDataFns = useRef<Record<string, () => any>>({});
+  const initialFormDataRef = useRef<UserGroupFormState>(defaultUserGroupState);
 
   // Initialize form data from initialData
   useEffect(() => {
     if (initialData) {
       const newFormData: UserGroupFormState = {
-        name: initialData.name || '',
+        name: initialData.name !== undefined && initialData.name !== null ? initialData.name : '',
         createdAt: initialData.createdAt ? new Date(Number(initialData.createdAt.seconds) * 1000).toISOString().slice(0, 16) : '',
         updatedAt: initialData.updatedAt ? new Date(Number(initialData.updatedAt.seconds) * 1000).toISOString().slice(0, 16) : '',
         users: initialData.users || [],
         config: initialData.config && typeof initialData.config === 'object' ? initialData.config : undefined,
       };
       setFormData(newFormData);
+      initialFormDataRef.current = newFormData;
 
       // Initialize struct field text
       const newStructText: Record<string, string> = {};
       setStructFieldText(newStructText);
     }
   }, [initialData]);
+
+  // Track form changes
+  useEffect(() => {
+    if (mode === 'view' || readonly) {
+      setHasChanges(false);
+      return;
+    }
+
+    // Compare current form data with initial data
+    const dataChanged = JSON.stringify(formData) !== JSON.stringify(initialFormDataRef.current);
+    setHasChanges(dataChanged);
+
+    // Notify parent if callback provided
+    if (onFormChange) {
+      onFormChange(dataChanged);
+    }
+  }, [formData, mode, readonly, onFormChange]);
 
   // Register getData function with parent if nested
   useEffect(() => {
@@ -221,16 +243,16 @@ const handleCopyYaml = () => {
 // Validate form data
 const validateForm = (): boolean => {
   const errors: Record<string, string> = {};
-  if (mode !== 'create' && (!formData.name)) {
+  if (mode !== 'create' && (formData.name === undefined || formData.name === null || formData.name === '')) {
     errors.name = 'Name is required';
   }
-  if (mode !== 'create' && (!formData.createdAt)) {
+  if (mode !== 'create' && (formData.createdAt === undefined || formData.createdAt === null || formData.createdAt === '')) {
     errors.createdAt = 'Created At is required';
   }
-  if (mode !== 'create' && (!formData.updatedAt)) {
+  if (mode !== 'create' && (formData.updatedAt === undefined || formData.updatedAt === null || formData.updatedAt === '')) {
     errors.updatedAt = 'Updated At is required';
   }
-  if (!formData.users || formData.users.length === 0) {
+  if (formData.users === undefined || formData.users === null || formData.users === '' || formData.users.length === 0) {
     errors.users = 'Users is required';
   }
 
@@ -454,116 +476,121 @@ const isSimpleField = (field: any) => {
   </div>{/* Created At field */}
   {!(mode === 'create' && true) && (
     <div>
-      {/* Complex field - traditional layout */}
-      <div className="space-y-2">
-<div className="flex items-center space-x-2">
-  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-    Created At *
-  </label>
+{/* Timestamp field - inline layout */}
+<div className="flex items-center justify-between">
+  <div className="flex items-center space-x-2 min-w-0 flex-1">
+    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+      Created At *
+    </label>
+  </div>
+  <div className="flex-1 max-w-xs ml-4">
+    <input
+      type="datetime-local"
+      value={formData.createdAt}
+      onChange={(e) => handleFieldChange('createdAt', e.target.value)}
+      disabled={isReadOnly || (mode === 'edit' && true)}
+      className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+    />
+    {validationErrors.createdAt && (
+      <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+        {validationErrors.createdAt}
+      </div>
+    )}
+  </div>
 </div>
 
-<input
-  type="datetime-local"
-  value={formData.createdAt}
-  onChange={(e) => handleFieldChange('createdAt', e.target.value)}
-  disabled={isReadOnly || (mode === 'edit' && true)}
-  className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-/>
-
-{validationErrors.createdAt && (
-  <div className="text-sm text-red-600 dark:text-red-400 mt-1">
-    {validationErrors.createdAt}
-  </div>
-)}
-
-      </div>
     </div>
   )}{/* Updated At field */}
   {!(mode === 'create' && true) && (
     <div>
-      {/* Complex field - traditional layout */}
-      <div className="space-y-2">
-<div className="flex items-center space-x-2">
-  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-    Updated At *
-  </label>
+{/* Timestamp field - inline layout */}
+<div className="flex items-center justify-between">
+  <div className="flex items-center space-x-2 min-w-0 flex-1">
+    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+      Updated At *
+    </label>
+  </div>
+  <div className="flex-1 max-w-xs ml-4">
+    <input
+      type="datetime-local"
+      value={formData.updatedAt}
+      onChange={(e) => handleFieldChange('updatedAt', e.target.value)}
+      disabled={isReadOnly || (mode === 'edit' && true)}
+      className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+    />
+    {validationErrors.updatedAt && (
+      <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+        {validationErrors.updatedAt}
+      </div>
+    )}
+  </div>
 </div>
 
-<input
-  type="datetime-local"
-  value={formData.updatedAt}
-  onChange={(e) => handleFieldChange('updatedAt', e.target.value)}
-  disabled={isReadOnly || (mode === 'edit' && true)}
-  className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-/>
-
-{validationErrors.updatedAt && (
-  <div className="text-sm text-red-600 dark:text-red-400 mt-1">
-    {validationErrors.updatedAt}
-  </div>
-)}
-
-      </div>
     </div>
   )}{/* Users field */}
   <div>
-    {/* Complex field - traditional layout */}
-    <div className="space-y-2">
-<div className="flex items-center space-x-2">
-  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-    Users *
-  </label>
-  <div className="relative group">
-    <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
-    <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
-      <pre className="whitespace-pre-wrap text-xs leading-relaxed">List of user names participating in the group</pre>
-    </div>
-  </div>
-</div>
-
-<div className="space-y-3">
-  {formData.users.map((item, index) => (
-    <div key={index} className="relative border-2 border-gray-200 rounded-lg p-3 dark:border-gray-600 bg-gray-50 dark:bg-gray-800">
-      <div className="flex items-center justify-between">
-        <input
-          type="text"
-          value={item}
-          onChange={(e) => handleArrayChange('users', index, e.target.value)}
-          disabled={isReadOnly || (mode === 'edit' && false)}
-          className="flex-1 mr-3 px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-        />
-        {!isReadOnly && !(mode === 'edit' && false) && (
-          <button
-            type="button"
-            onClick={() => removeArrayItem('users', index)}
-            className="flex items-center justify-center w-6 h-6 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors"
-            title="Remove item"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        )}
+{/* Autofill field - inline layout */}
+<div className="flex items-center justify-between">
+  <div className="flex items-center space-x-2 min-w-0 flex-1">
+    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+      Users *
+    </label>
+    <div className="relative group">
+      <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
+      <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
+        <pre className="whitespace-pre-wrap text-xs leading-relaxed">List of user names participating in the group</pre>
       </div>
     </div>
-  ))}
-  {!isReadOnly && !(mode === 'edit' && false) && (
-    <button
-      onClick={() => addArrayItem('users', '')}
-      className="w-full px-3 py-2 text-sm border-2 border-dashed border-gray-300 text-gray-600 rounded-md hover:border-green-400 hover:text-green-600 transition-colors"
-    >
-      + Add Users
-    </button>
-  )}
+  </div>
+  <div className="flex-1 max-w-xs ml-4">
+    <div className="flex space-x-2">
+      {autofillMode.users === 'text' ? (
+        <input
+          type="text"
+          value={formData.users}
+          onChange={(e) => handleFieldChange('users', e.target.value)}
+          disabled={isReadOnly || (mode === 'edit' && false)}
+          className="flex-1 px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+          placeholder="Enter User UID..."
+        />
+      ) : (
+        <select
+          value={formData.users}
+          onChange={(e) => handleFieldChange('users', e.target.value)}
+          disabled={isReadOnly || (mode === 'edit' && false)}
+          className="flex-1 px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+        >
+          <option value="">Select User...</option>
+          {getAutofillOptions('User').map((item: any) => {
+            const key = item.uid || item.name || item.id || JSON.stringify(item);
+            const label = item.name ? (item.name + (item.version ? (':' + item.version) : '')) : key;
+            return (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            );
+          })}
+        </select>
+      )}
+      {!isReadOnly && !(mode === 'edit' && false) && (
+        <button
+          type="button"
+          onClick={() => setAutofillMode(prev => ({ ...prev, users: prev.users === 'text' ? 'dropdown' : 'text' }))}
+          className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
+          title={autofillMode.users === 'text' ? 'Switch to dropdown' : 'Switch to text input'}
+        >
+          {autofillMode.users === 'text' ? '📋' : '✏️'}
+        </button>
+      )}
+    </div>
+    {validationErrors.users && (
+      <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+        {validationErrors.users}
+      </div>
+    )}
+  </div>
 </div>
 
-{validationErrors.users && (
-  <div className="text-sm text-red-600 dark:text-red-400 mt-1">
-    {validationErrors.users}
-  </div>
-)}
-
-    </div>
   </div>{/* Config field */}
   <div>
     {/* Complex field - traditional layout */}

@@ -20,6 +20,7 @@ import { useRoles, useRoleCreate, useRoleUpdate, useRoleRemove } from '../../rol
 import { useUserGroups, useUserGroupCreate, useUserGroupUpdate, useUserGroupRemove } from '../../usergroups/hooks/useUserGroups';
 import { StreamingList, type ListColumn, type ListItemAction } from '../../../components/StreamingList';
 import { UserForm, RoleForm, UserGroupForm } from '../../../../gen/components';
+import { Modal } from '../../../components/Modal';
 import type { User, UserGroup } from '../../../../gen/aquarium/v2/user_pb';
 import type { Role } from '../../../../gen/aquarium/v2/role_pb';
 import { PermService, PermUser, PermRole } from '../../../../gen/permissions/permissions_grpc';
@@ -49,16 +50,22 @@ export function ManagePage() {
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
   const [showUserDetailsModal, setShowUserDetailsModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [hasUserCreateChanges, setHasUserCreateChanges] = useState(false);
+  const [hasUserEditChanges, setHasUserEditChanges] = useState(false);
 
   // Roles state
   const [showCreateRoleModal, setShowCreateRoleModal] = useState(false);
   const [showRoleDetailsModal, setShowRoleDetailsModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+  const [hasRoleCreateChanges, setHasRoleCreateChanges] = useState(false);
+  const [hasRoleEditChanges, setHasRoleEditChanges] = useState(false);
 
   // User Groups state
   const [showCreateUserGroupModal, setShowCreateUserGroupModal] = useState(false);
   const [showUserGroupDetailsModal, setShowUserGroupDetailsModal] = useState(false);
   const [selectedUserGroup, setSelectedUserGroup] = useState<UserGroup | null>(null);
+  const [hasUserGroupCreateChanges, setHasUserGroupCreateChanges] = useState(false);
+  const [hasUserGroupEditChanges, setHasUserGroupEditChanges] = useState(false);
 
   // Fetch data when component mounts
   useEffect(() => {
@@ -422,99 +429,120 @@ export function ManagePage() {
       )}
 
       {/* Create Role Modal */}
-      {showCreateRoleModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <RoleForm
-              mode="create"
-              onSubmit={handleCreateRole}
-              onCancel={() => setShowCreateRoleModal(false)}
-              title="Create Role"
-            />
-          </div>
-        </div>
-      )}
+      <Modal
+        isOpen={showCreateRoleModal}
+        onClose={() => setShowCreateRoleModal(false)}
+        hasUnsavedChanges={hasRoleCreateChanges}
+      >
+        <RoleForm
+          mode="create"
+          onSubmit={handleCreateRole}
+          onCancel={() => setShowCreateRoleModal(false)}
+          onFormChange={setHasRoleCreateChanges}
+          title="Create Role"
+        />
+      </Modal>
 
       {/* Edit Role Modal */}
-      {showRoleDetailsModal && selectedRole && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <RoleForm
-              mode="edit"
-              initialData={selectedRole}
-              onSubmit={handleUpdateRole}
-              onCancel={() => {
-                setShowRoleDetailsModal(false);
-                setSelectedRole(null);
-              }}
-              title={`Edit Role: ${selectedRole.name}`}
-            />
-          </div>
-        </div>
+      {selectedRole && (
+        <Modal
+          isOpen={showRoleDetailsModal}
+          onClose={() => {
+            setShowRoleDetailsModal(false);
+            setSelectedRole(null);
+          }}
+          hasUnsavedChanges={hasRoleEditChanges}
+        >
+          <RoleForm
+            mode="edit"
+            initialData={selectedRole}
+            onSubmit={handleUpdateRole}
+            onCancel={() => {
+              setShowRoleDetailsModal(false);
+              setSelectedRole(null);
+            }}
+            onFormChange={setHasRoleEditChanges}
+            title={`Edit Role: ${selectedRole.name}`}
+          />
+        </Modal>
       )}
 
       {/* Create User Modal */}
-      {showCreateUserModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <UserForm
-              mode="create"
-              onSubmit={handleCreateUser}
-              onCancel={() => setShowCreateUserModal(false)}
-              title="Create User"
-            />
-          </div>
-        </div>
-      )}
+      <Modal
+        isOpen={showCreateUserModal}
+        onClose={() => setShowCreateUserModal(false)}
+        hasUnsavedChanges={hasUserCreateChanges}
+      >
+        <UserForm
+          mode="create"
+          onSubmit={handleCreateUser}
+          onCancel={() => setShowCreateUserModal(false)}
+          onFormChange={setHasUserCreateChanges}
+          title="Create User"
+        />
+      </Modal>
 
       {/* Edit User Modal */}
-      {showUserDetailsModal && selectedUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <UserForm
-              mode="edit"
-              initialData={selectedUser}
-              onSubmit={handleUpdateUser}
-              onCancel={() => {
-                setShowUserDetailsModal(false);
-                setSelectedUser(null);
-              }}
-              title={`Edit User: ${selectedUser.name}`}
-            />
-          </div>
-        </div>
+      {selectedUser && (
+        <Modal
+          isOpen={showUserDetailsModal}
+          onClose={() => {
+            setShowUserDetailsModal(false);
+            setSelectedUser(null);
+          }}
+          hasUnsavedChanges={hasUserEditChanges}
+        >
+          <UserForm
+            mode="edit"
+            initialData={selectedUser}
+            onSubmit={handleUpdateUser}
+            onCancel={() => {
+              setShowUserDetailsModal(false);
+              setSelectedUser(null);
+            }}
+            onFormChange={setHasUserEditChanges}
+            title={`Edit User: ${selectedUser.name}`}
+          />
+        </Modal>
       )}
 
       {/* Create User Group Modal */}
-      {showCreateUserGroupModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <UserGroupForm
-              mode="create"
-              onSubmit={handleCreateUserGroup}
-              onCancel={() => setShowCreateUserGroupModal(false)}
-              title="Create User Group"
-            />
-          </div>
-        </div>
-      )}
+      <Modal
+        isOpen={showCreateUserGroupModal}
+        onClose={() => setShowCreateUserGroupModal(false)}
+        hasUnsavedChanges={hasUserGroupCreateChanges}
+      >
+        <UserGroupForm
+          mode="create"
+          onSubmit={handleCreateUserGroup}
+          onCancel={() => setShowCreateUserGroupModal(false)}
+          onFormChange={setHasUserGroupCreateChanges}
+          title="Create User Group"
+        />
+      </Modal>
 
       {/* Edit User Group Modal */}
-      {showUserGroupDetailsModal && selectedUserGroup && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <UserGroupForm
-              mode="edit"
-              initialData={selectedUserGroup}
-              onSubmit={handleUpdateUserGroup}
-              onCancel={() => {
-                setShowUserGroupDetailsModal(false);
-                setSelectedUserGroup(null);
-              }}
-              title={`Edit User Group: ${selectedUserGroup.name}`}
-            />
-          </div>
-        </div>
+      {selectedUserGroup && (
+        <Modal
+          isOpen={showUserGroupDetailsModal}
+          onClose={() => {
+            setShowUserGroupDetailsModal(false);
+            setSelectedUserGroup(null);
+          }}
+          hasUnsavedChanges={hasUserGroupEditChanges}
+        >
+          <UserGroupForm
+            mode="edit"
+            initialData={selectedUserGroup}
+            onSubmit={handleUpdateUserGroup}
+            onCancel={() => {
+              setShowUserGroupDetailsModal(false);
+              setSelectedUserGroup(null);
+            }}
+            onFormChange={setHasUserGroupEditChanges}
+            title={`Edit User Group: ${selectedUserGroup.name}`}
+          />
+        </Modal>
       )}
     </div>
   );

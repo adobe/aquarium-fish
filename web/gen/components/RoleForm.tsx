@@ -28,6 +28,7 @@ interface RoleFormProps {
   readonly?: boolean;
   nested?: boolean;
   onRegister?: (getData: () => any) => void;
+  onFormChange?: (hasChanges: boolean) => void;
 }
 
 interface RoleFormState {
@@ -52,7 +53,8 @@ export const RoleForm: React.FC<RoleFormProps> = ({
   title,
   readonly,
   nested = false,
-  onRegister
+  onRegister,
+  onFormChange
 }) => {
   const [formData, setFormData] = useState<RoleFormState>(defaultRoleState);
   const [yamlText, setYamlText] = useState('');
@@ -62,27 +64,47 @@ export const RoleForm: React.FC<RoleFormProps> = ({
   const [autofillMode, setAutofillMode] = useState<Record<string, 'dropdown' | 'text'>>({});
   const [structFieldText, setStructFieldText] = useState<Record<string, string>>({});
   const [structFieldErrors, setStructFieldErrors] = useState<Record<string, string>>({});
+  const [hasChanges, setHasChanges] = useState(false);
   const { data } = useStreaming();
 
   // Store references to nested component getData functions
   const nestedGetDataFns = useRef<Record<string, () => any>>({});
+  const initialFormDataRef = useRef<RoleFormState>(defaultRoleState);
 
   // Initialize form data from initialData
   useEffect(() => {
     if (initialData) {
       const newFormData: RoleFormState = {
-        name: initialData.name || '',
+        name: initialData.name !== undefined && initialData.name !== null ? initialData.name : '',
         createdAt: initialData.createdAt ? new Date(Number(initialData.createdAt.seconds) * 1000).toISOString().slice(0, 16) : '',
         updatedAt: initialData.updatedAt ? new Date(Number(initialData.updatedAt.seconds) * 1000).toISOString().slice(0, 16) : '',
         permissions: initialData.permissions || [],
       };
       setFormData(newFormData);
+      initialFormDataRef.current = newFormData;
 
       // Initialize struct field text
       const newStructText: Record<string, string> = {};
       setStructFieldText(newStructText);
     }
   }, [initialData]);
+
+  // Track form changes
+  useEffect(() => {
+    if (mode === 'view' || readonly) {
+      setHasChanges(false);
+      return;
+    }
+
+    // Compare current form data with initial data
+    const dataChanged = JSON.stringify(formData) !== JSON.stringify(initialFormDataRef.current);
+    setHasChanges(dataChanged);
+
+    // Notify parent if callback provided
+    if (onFormChange) {
+      onFormChange(dataChanged);
+    }
+  }, [formData, mode, readonly, onFormChange]);
 
   // Register getData function with parent if nested
   useEffect(() => {
@@ -214,16 +236,16 @@ const handleCopyYaml = () => {
 // Validate form data
 const validateForm = (): boolean => {
   const errors: Record<string, string> = {};
-  if (!formData.name) {
+  if (formData.name === undefined || formData.name === null || formData.name === '') {
     errors.name = 'Name is required';
   }
-  if (mode !== 'create' && (!formData.createdAt)) {
+  if (mode !== 'create' && (formData.createdAt === undefined || formData.createdAt === null || formData.createdAt === '')) {
     errors.createdAt = 'Created At is required';
   }
-  if (mode !== 'create' && (!formData.updatedAt)) {
+  if (mode !== 'create' && (formData.updatedAt === undefined || formData.updatedAt === null || formData.updatedAt === '')) {
     errors.updatedAt = 'Updated At is required';
   }
-  if (!formData.permissions || formData.permissions.length === 0) {
+  if (formData.permissions === undefined || formData.permissions === null || formData.permissions === '' || formData.permissions.length === 0) {
     errors.permissions = 'Permissions is required';
   }
 
@@ -452,56 +474,56 @@ const isSimpleField = (field: any) => {
   </div>{/* Created At field */}
   {!(mode === 'create' && true) && (
     <div>
-      {/* Complex field - traditional layout */}
-      <div className="space-y-2">
-<div className="flex items-center space-x-2">
-  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-    Created At *
-  </label>
+{/* Timestamp field - inline layout */}
+<div className="flex items-center justify-between">
+  <div className="flex items-center space-x-2 min-w-0 flex-1">
+    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+      Created At *
+    </label>
+  </div>
+  <div className="flex-1 max-w-xs ml-4">
+    <input
+      type="datetime-local"
+      value={formData.createdAt}
+      onChange={(e) => handleFieldChange('createdAt', e.target.value)}
+      disabled={isReadOnly || (mode === 'edit' && true)}
+      className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+    />
+    {validationErrors.createdAt && (
+      <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+        {validationErrors.createdAt}
+      </div>
+    )}
+  </div>
 </div>
 
-<input
-  type="datetime-local"
-  value={formData.createdAt}
-  onChange={(e) => handleFieldChange('createdAt', e.target.value)}
-  disabled={isReadOnly || (mode === 'edit' && true)}
-  className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-/>
-
-{validationErrors.createdAt && (
-  <div className="text-sm text-red-600 dark:text-red-400 mt-1">
-    {validationErrors.createdAt}
-  </div>
-)}
-
-      </div>
     </div>
   )}{/* Updated At field */}
   {!(mode === 'create' && true) && (
     <div>
-      {/* Complex field - traditional layout */}
-      <div className="space-y-2">
-<div className="flex items-center space-x-2">
-  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-    Updated At *
-  </label>
+{/* Timestamp field - inline layout */}
+<div className="flex items-center justify-between">
+  <div className="flex items-center space-x-2 min-w-0 flex-1">
+    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+      Updated At *
+    </label>
+  </div>
+  <div className="flex-1 max-w-xs ml-4">
+    <input
+      type="datetime-local"
+      value={formData.updatedAt}
+      onChange={(e) => handleFieldChange('updatedAt', e.target.value)}
+      disabled={isReadOnly || (mode === 'edit' && true)}
+      className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+    />
+    {validationErrors.updatedAt && (
+      <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+        {validationErrors.updatedAt}
+      </div>
+    )}
+  </div>
 </div>
 
-<input
-  type="datetime-local"
-  value={formData.updatedAt}
-  onChange={(e) => handleFieldChange('updatedAt', e.target.value)}
-  disabled={isReadOnly || (mode === 'edit' && true)}
-  className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-/>
-
-{validationErrors.updatedAt && (
-  <div className="text-sm text-red-600 dark:text-red-400 mt-1">
-    {validationErrors.updatedAt}
-  </div>
-)}
-
-      </div>
     </div>
   )}{/* Permissions field */}
   <div>

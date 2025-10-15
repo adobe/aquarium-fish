@@ -28,6 +28,7 @@ interface ApplicationFormProps {
   readonly?: boolean;
   nested?: boolean;
   onRegister?: (getData: () => any) => void;
+  onFormChange?: (hasChanges: boolean) => void;
 }
 
 interface ApplicationFormState {
@@ -54,7 +55,8 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
   title,
   readonly,
   nested = false,
-  onRegister
+  onRegister,
+  onFormChange
 }) => {
   const [formData, setFormData] = useState<ApplicationFormState>(defaultApplicationState);
   const [yamlText, setYamlText] = useState('');
@@ -64,22 +66,25 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
   const [autofillMode, setAutofillMode] = useState<Record<string, 'dropdown' | 'text'>>({});
   const [structFieldText, setStructFieldText] = useState<Record<string, string>>({});
   const [structFieldErrors, setStructFieldErrors] = useState<Record<string, string>>({});
+  const [hasChanges, setHasChanges] = useState(false);
   const { data } = useStreaming();
 
   // Store references to nested component getData functions
   const nestedGetDataFns = useRef<Record<string, () => any>>({});
+  const initialFormDataRef = useRef<ApplicationFormState>(defaultApplicationState);
 
   // Initialize form data from initialData
   useEffect(() => {
     if (initialData) {
       const newFormData: ApplicationFormState = {
-        uid: initialData.uid || '',
+        uid: initialData.uid !== undefined && initialData.uid !== null ? initialData.uid : '',
         createdAt: initialData.createdAt ? new Date(Number(initialData.createdAt.seconds) * 1000).toISOString().slice(0, 16) : '',
-        ownerName: initialData.ownerName || '',
-        labelUid: initialData.labelUid || '',
+        ownerName: initialData.ownerName !== undefined && initialData.ownerName !== null ? initialData.ownerName : '',
+        labelUid: initialData.labelUid !== undefined && initialData.labelUid !== null ? initialData.labelUid : '',
         metadata: initialData.metadata || {},
       };
       setFormData(newFormData);
+      initialFormDataRef.current = newFormData;
 
       // Initialize struct field text
       const newStructText: Record<string, string> = {};
@@ -87,6 +92,23 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
       setStructFieldText(newStructText);
     }
   }, [initialData]);
+
+  // Track form changes
+  useEffect(() => {
+    if (mode === 'view' || readonly) {
+      setHasChanges(false);
+      return;
+    }
+
+    // Compare current form data with initial data
+    const dataChanged = JSON.stringify(formData) !== JSON.stringify(initialFormDataRef.current);
+    setHasChanges(dataChanged);
+
+    // Notify parent if callback provided
+    if (onFormChange) {
+      onFormChange(dataChanged);
+    }
+  }, [formData, mode, readonly, onFormChange]);
 
   // Register getData function with parent if nested
   useEffect(() => {
@@ -220,16 +242,16 @@ const handleCopyYaml = () => {
 // Validate form data
 const validateForm = (): boolean => {
   const errors: Record<string, string> = {};
-  if (mode !== 'create' && (!formData.uid)) {
+  if (mode !== 'create' && (formData.uid === undefined || formData.uid === null || formData.uid === '')) {
     errors.uid = 'Uid is required';
   }
-  if (mode !== 'create' && (!formData.createdAt)) {
+  if (mode !== 'create' && (formData.createdAt === undefined || formData.createdAt === null || formData.createdAt === '')) {
     errors.createdAt = 'Created At is required';
   }
-  if (mode !== 'create' && (!formData.ownerName)) {
+  if (mode !== 'create' && (formData.ownerName === undefined || formData.ownerName === null || formData.ownerName === '')) {
     errors.ownerName = 'Owner Name is required';
   }
-  if (!formData.labelUid) {
+  if (formData.labelUid === undefined || formData.labelUid === null || formData.labelUid === '') {
     errors.labelUid = 'Label is required';
   }
 
@@ -455,29 +477,29 @@ const isSimpleField = (field: any) => {
   )}{/* Created At field */}
   {!(mode === 'create' && true) && (
     <div>
-      {/* Complex field - traditional layout */}
-      <div className="space-y-2">
-<div className="flex items-center space-x-2">
-  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-    Created At *
-  </label>
+{/* Timestamp field - inline layout */}
+<div className="flex items-center justify-between">
+  <div className="flex items-center space-x-2 min-w-0 flex-1">
+    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+      Created At *
+    </label>
+  </div>
+  <div className="flex-1 max-w-xs ml-4">
+    <input
+      type="datetime-local"
+      value={formData.createdAt}
+      onChange={(e) => handleFieldChange('createdAt', e.target.value)}
+      disabled={isReadOnly || (mode === 'edit' && true)}
+      className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+    />
+    {validationErrors.createdAt && (
+      <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+        {validationErrors.createdAt}
+      </div>
+    )}
+  </div>
 </div>
 
-<input
-  type="datetime-local"
-  value={formData.createdAt}
-  onChange={(e) => handleFieldChange('createdAt', e.target.value)}
-  disabled={isReadOnly || (mode === 'edit' && true)}
-  className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-/>
-
-{validationErrors.createdAt && (
-  <div className="text-sm text-red-600 dark:text-red-400 mt-1">
-    {validationErrors.createdAt}
-  </div>
-)}
-
-      </div>
     </div>
   )}{/* Owner Name field */}
   {!(mode === 'create' && true) && (
@@ -508,62 +530,62 @@ const isSimpleField = (field: any) => {
     </div>
   )}{/* Label field */}
   <div>
-    {/* Complex field - traditional layout */}
-    <div className="space-y-2">
-<div className="flex items-center space-x-2">
-  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-    Label *
-  </label>
-</div>
-
-<div className="flex space-x-2">
-  {autofillMode.labelUid === 'text' ? (
-    <input
-      type="text"
-      value={formData.labelUid}
-      onChange={(e) => handleFieldChange('labelUid', e.target.value)}
-      disabled={isReadOnly || (mode === 'edit' && false)}
-      className="flex-1 px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-      placeholder="Enter Label UID..."
-    />
-  ) : (
-    <select
-      value={formData.labelUid}
-      onChange={(e) => handleFieldChange('labelUid', e.target.value)}
-      disabled={isReadOnly || (mode === 'edit' && false)}
-      className="flex-1 px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-    >
-      <option value="">Select Label...</option>
-      {getAutofillOptions('Label').map((item: any) => {
-        const key = item.uid || item.name || item.id || JSON.stringify(item);
-        const label = item.name ? (item.name + (item.version ? (':' + item.version) : '')) : key;
-        return (
-          <option key={key} value={key}>
-            {label}
-          </option>
-        );
-      })}
-    </select>
-  )}
-  {!isReadOnly && !(mode === 'edit' && false) && (
-    <button
-      type="button"
-      onClick={() => setAutofillMode(prev => ({ ...prev, labelUid: prev.labelUid === 'text' ? 'dropdown' : 'text' }))}
-      className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
-      title={autofillMode.labelUid === 'text' ? 'Switch to dropdown' : 'Switch to text input'}
-    >
-      {autofillMode.labelUid === 'text' ? '📋' : '✏️'}
-    </button>
-  )}
-</div>
-
-{validationErrors.labelUid && (
-  <div className="text-sm text-red-600 dark:text-red-400 mt-1">
-    {validationErrors.labelUid}
+{/* Autofill field - inline layout */}
+<div className="flex items-center justify-between">
+  <div className="flex items-center space-x-2 min-w-0 flex-1">
+    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+      Label *
+    </label>
   </div>
-)}
-
+  <div className="flex-1 max-w-xs ml-4">
+    <div className="flex space-x-2">
+      {autofillMode.labelUid === 'text' ? (
+        <input
+          type="text"
+          value={formData.labelUid}
+          onChange={(e) => handleFieldChange('labelUid', e.target.value)}
+          disabled={isReadOnly || (mode === 'edit' && false)}
+          className="flex-1 px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+          placeholder="Enter Label UID..."
+        />
+      ) : (
+        <select
+          value={formData.labelUid}
+          onChange={(e) => handleFieldChange('labelUid', e.target.value)}
+          disabled={isReadOnly || (mode === 'edit' && false)}
+          className="flex-1 px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+        >
+          <option value="">Select Label...</option>
+          {getAutofillOptions('Label').map((item: any) => {
+            const key = item.uid || item.name || item.id || JSON.stringify(item);
+            const label = item.name ? (item.name + (item.version ? (':' + item.version) : '')) : key;
+            return (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            );
+          })}
+        </select>
+      )}
+      {!isReadOnly && !(mode === 'edit' && false) && (
+        <button
+          type="button"
+          onClick={() => setAutofillMode(prev => ({ ...prev, labelUid: prev.labelUid === 'text' ? 'dropdown' : 'text' }))}
+          className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
+          title={autofillMode.labelUid === 'text' ? 'Switch to dropdown' : 'Switch to text input'}
+        >
+          {autofillMode.labelUid === 'text' ? '📋' : '✏️'}
+        </button>
+      )}
     </div>
+    {validationErrors.labelUid && (
+      <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+        {validationErrors.labelUid}
+      </div>
+    )}
+  </div>
+</div>
+
   </div>{/* Metadata field */}
   <div>
     {/* Complex field - traditional layout */}

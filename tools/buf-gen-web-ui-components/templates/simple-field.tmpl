@@ -51,7 +51,7 @@
     <input
       type="number"
       value={formData.{{.JSONName}}}
-      onChange={(e) => handleFieldChange('{{.JSONName}}', parseInt(e.target.value) || 0)}
+      onChange={(e) => handleFieldChange('{{.JSONName}}', e.target.value === '' ? '' : parseInt(e.target.value))}
       disabled={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
       className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
     />

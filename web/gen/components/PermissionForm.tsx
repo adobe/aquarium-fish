@@ -28,6 +28,7 @@ interface PermissionFormProps {
   readonly?: boolean;
   nested?: boolean;
   onRegister?: (getData: () => any) => void;
+  onFormChange?: (hasChanges: boolean) => void;
 }
 
 interface PermissionFormState {
@@ -48,7 +49,8 @@ export const PermissionForm: React.FC<PermissionFormProps> = ({
   title,
   readonly,
   nested = false,
-  onRegister
+  onRegister,
+  onFormChange
 }) => {
   const [formData, setFormData] = useState<PermissionFormState>(defaultPermissionState);
   const [yamlText, setYamlText] = useState('');
@@ -58,25 +60,45 @@ export const PermissionForm: React.FC<PermissionFormProps> = ({
   const [autofillMode, setAutofillMode] = useState<Record<string, 'dropdown' | 'text'>>({});
   const [structFieldText, setStructFieldText] = useState<Record<string, string>>({});
   const [structFieldErrors, setStructFieldErrors] = useState<Record<string, string>>({});
+  const [hasChanges, setHasChanges] = useState(false);
   const { data } = useStreaming();
 
   // Store references to nested component getData functions
   const nestedGetDataFns = useRef<Record<string, () => any>>({});
+  const initialFormDataRef = useRef<PermissionFormState>(defaultPermissionState);
 
   // Initialize form data from initialData
   useEffect(() => {
     if (initialData) {
       const newFormData: PermissionFormState = {
-        resource: initialData.resource || '',
-        action: initialData.action || '',
+        resource: initialData.resource !== undefined && initialData.resource !== null ? initialData.resource : '',
+        action: initialData.action !== undefined && initialData.action !== null ? initialData.action : '',
       };
       setFormData(newFormData);
+      initialFormDataRef.current = newFormData;
 
       // Initialize struct field text
       const newStructText: Record<string, string> = {};
       setStructFieldText(newStructText);
     }
   }, [initialData]);
+
+  // Track form changes
+  useEffect(() => {
+    if (mode === 'view' || readonly) {
+      setHasChanges(false);
+      return;
+    }
+
+    // Compare current form data with initial data
+    const dataChanged = JSON.stringify(formData) !== JSON.stringify(initialFormDataRef.current);
+    setHasChanges(dataChanged);
+
+    // Notify parent if callback provided
+    if (onFormChange) {
+      onFormChange(dataChanged);
+    }
+  }, [formData, mode, readonly, onFormChange]);
 
   // Register getData function with parent if nested
   useEffect(() => {
@@ -194,10 +216,10 @@ const handleCopyYaml = () => {
 // Validate form data
 const validateForm = (): boolean => {
   const errors: Record<string, string> = {};
-  if (!formData.resource) {
+  if (formData.resource === undefined || formData.resource === null || formData.resource === '') {
     errors.resource = 'Resource is required';
   }
-  if (!formData.action) {
+  if (formData.action === undefined || formData.action === null || formData.action === '') {
     errors.action = 'Action is required';
   }
 

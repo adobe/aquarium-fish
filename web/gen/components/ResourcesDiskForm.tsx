@@ -28,6 +28,7 @@ interface ResourcesDiskFormProps {
   readonly?: boolean;
   nested?: boolean;
   onRegister?: (getData: () => any) => void;
+  onFormChange?: (hasChanges: boolean) => void;
 }
 
 interface ResourcesDiskFormState {
@@ -54,7 +55,8 @@ export const ResourcesDiskForm: React.FC<ResourcesDiskFormProps> = ({
   title,
   readonly,
   nested = false,
-  onRegister
+  onRegister,
+  onFormChange
 }) => {
   const [formData, setFormData] = useState<ResourcesDiskFormState>(defaultResourcesDiskState);
   const [yamlText, setYamlText] = useState('');
@@ -64,10 +66,12 @@ export const ResourcesDiskForm: React.FC<ResourcesDiskFormProps> = ({
   const [autofillMode, setAutofillMode] = useState<Record<string, 'dropdown' | 'text'>>({});
   const [structFieldText, setStructFieldText] = useState<Record<string, string>>({});
   const [structFieldErrors, setStructFieldErrors] = useState<Record<string, string>>({});
+  const [hasChanges, setHasChanges] = useState(false);
   const { data } = useStreaming();
 
   // Store references to nested component getData functions
   const nestedGetDataFns = useRef<Record<string, () => any>>({});
+  const initialFormDataRef = useRef<ResourcesDiskFormState>(defaultResourcesDiskState);
 
   // Initialize form data from initialData
   useEffect(() => {
@@ -80,12 +84,30 @@ export const ResourcesDiskForm: React.FC<ResourcesDiskFormProps> = ({
         clone: initialData.clone ?? undefined,
       };
       setFormData(newFormData);
+      initialFormDataRef.current = newFormData;
 
       // Initialize struct field text
       const newStructText: Record<string, string> = {};
       setStructFieldText(newStructText);
     }
   }, [initialData]);
+
+  // Track form changes
+  useEffect(() => {
+    if (mode === 'view' || readonly) {
+      setHasChanges(false);
+      return;
+    }
+
+    // Compare current form data with initial data
+    const dataChanged = JSON.stringify(formData) !== JSON.stringify(initialFormDataRef.current);
+    setHasChanges(dataChanged);
+
+    // Notify parent if callback provided
+    if (onFormChange) {
+      onFormChange(dataChanged);
+    }
+  }, [formData, mode, readonly, onFormChange]);
 
   // Register getData function with parent if nested
   useEffect(() => {
@@ -489,7 +511,7 @@ const isSimpleField = (field: any) => {
     <input
       type="number"
       value={formData.size}
-      onChange={(e) => handleFieldChange('size', parseInt(e.target.value) || 0)}
+      onChange={(e) => handleFieldChange('size', e.target.value === '' ? '' : parseInt(e.target.value))}
       disabled={isReadOnly || (mode === 'edit' && false)}
       className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
     />

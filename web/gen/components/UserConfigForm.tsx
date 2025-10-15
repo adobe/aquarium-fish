@@ -28,6 +28,7 @@ interface UserConfigFormProps {
   readonly?: boolean;
   nested?: boolean;
   onRegister?: (getData: () => any) => void;
+  onFormChange?: (hasChanges: boolean) => void;
 }
 
 interface UserConfigFormState {
@@ -48,7 +49,8 @@ export const UserConfigForm: React.FC<UserConfigFormProps> = ({
   title,
   readonly,
   nested = false,
-  onRegister
+  onRegister,
+  onFormChange
 }) => {
   const [formData, setFormData] = useState<UserConfigFormState>(defaultUserConfigState);
   const [yamlText, setYamlText] = useState('');
@@ -58,10 +60,12 @@ export const UserConfigForm: React.FC<UserConfigFormProps> = ({
   const [autofillMode, setAutofillMode] = useState<Record<string, 'dropdown' | 'text'>>({});
   const [structFieldText, setStructFieldText] = useState<Record<string, string>>({});
   const [structFieldErrors, setStructFieldErrors] = useState<Record<string, string>>({});
+  const [hasChanges, setHasChanges] = useState(false);
   const { data } = useStreaming();
 
   // Store references to nested component getData functions
   const nestedGetDataFns = useRef<Record<string, () => any>>({});
+  const initialFormDataRef = useRef<UserConfigFormState>(defaultUserConfigState);
 
   // Initialize form data from initialData
   useEffect(() => {
@@ -71,12 +75,30 @@ export const UserConfigForm: React.FC<UserConfigFormProps> = ({
         streamsLimit: initialData.streamsLimit ?? undefined,
       };
       setFormData(newFormData);
+      initialFormDataRef.current = newFormData;
 
       // Initialize struct field text
       const newStructText: Record<string, string> = {};
       setStructFieldText(newStructText);
     }
   }, [initialData]);
+
+  // Track form changes
+  useEffect(() => {
+    if (mode === 'view' || readonly) {
+      setHasChanges(false);
+      return;
+    }
+
+    // Compare current form data with initial data
+    const dataChanged = JSON.stringify(formData) !== JSON.stringify(initialFormDataRef.current);
+    setHasChanges(dataChanged);
+
+    // Notify parent if callback provided
+    if (onFormChange) {
+      onFormChange(dataChanged);
+    }
+  }, [formData, mode, readonly, onFormChange]);
 
   // Register getData function with parent if nested
   useEffect(() => {
@@ -403,7 +425,7 @@ const isSimpleField = (field: any) => {
     <input
       type="number"
       value={formData.rateLimit}
-      onChange={(e) => handleFieldChange('rateLimit', parseInt(e.target.value) || 0)}
+      onChange={(e) => handleFieldChange('rateLimit', e.target.value === '' ? '' : parseInt(e.target.value))}
       disabled={isReadOnly || (mode === 'edit' && false)}
       className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
     />
@@ -434,7 +456,7 @@ const isSimpleField = (field: any) => {
     <input
       type="number"
       value={formData.streamsLimit}
-      onChange={(e) => handleFieldChange('streamsLimit', parseInt(e.target.value) || 0)}
+      onChange={(e) => handleFieldChange('streamsLimit', e.target.value === '' ? '' : parseInt(e.target.value))}
       disabled={isReadOnly || (mode === 'edit' && false)}
       className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
     />

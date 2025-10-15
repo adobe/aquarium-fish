@@ -28,6 +28,7 @@ interface AuthenticationFormProps {
   readonly?: boolean;
   nested?: boolean;
   onRegister?: (getData: () => any) => void;
+  onFormChange?: (hasChanges: boolean) => void;
 }
 
 interface AuthenticationFormState {
@@ -40,7 +41,7 @@ const defaultAuthenticationState: AuthenticationFormState = {
   username: '',
   password: '',
   key: '',
-  port: 0,
+  port: '',
 };
 
 
@@ -52,7 +53,8 @@ export const AuthenticationForm: React.FC<AuthenticationFormProps> = ({
   title,
   readonly,
   nested = false,
-  onRegister
+  onRegister,
+  onFormChange
 }) => {
   const [formData, setFormData] = useState<AuthenticationFormState>(defaultAuthenticationState);
   const [yamlText, setYamlText] = useState('');
@@ -62,27 +64,47 @@ export const AuthenticationForm: React.FC<AuthenticationFormProps> = ({
   const [autofillMode, setAutofillMode] = useState<Record<string, 'dropdown' | 'text'>>({});
   const [structFieldText, setStructFieldText] = useState<Record<string, string>>({});
   const [structFieldErrors, setStructFieldErrors] = useState<Record<string, string>>({});
+  const [hasChanges, setHasChanges] = useState(false);
   const { data } = useStreaming();
 
   // Store references to nested component getData functions
   const nestedGetDataFns = useRef<Record<string, () => any>>({});
+  const initialFormDataRef = useRef<AuthenticationFormState>(defaultAuthenticationState);
 
   // Initialize form data from initialData
   useEffect(() => {
     if (initialData) {
       const newFormData: AuthenticationFormState = {
-        username: initialData.username || '',
-        password: initialData.password || '',
-        key: initialData.key || '',
-        port: initialData.port || 0,
+        username: initialData.username !== undefined && initialData.username !== null ? initialData.username : '',
+        password: initialData.password !== undefined && initialData.password !== null ? initialData.password : '',
+        key: initialData.key !== undefined && initialData.key !== null ? initialData.key : '',
+        port: initialData.port !== undefined && initialData.port !== null ? initialData.port : '',
       };
       setFormData(newFormData);
+      initialFormDataRef.current = newFormData;
 
       // Initialize struct field text
       const newStructText: Record<string, string> = {};
       setStructFieldText(newStructText);
     }
   }, [initialData]);
+
+  // Track form changes
+  useEffect(() => {
+    if (mode === 'view' || readonly) {
+      setHasChanges(false);
+      return;
+    }
+
+    // Compare current form data with initial data
+    const dataChanged = JSON.stringify(formData) !== JSON.stringify(initialFormDataRef.current);
+    setHasChanges(dataChanged);
+
+    // Notify parent if callback provided
+    if (onFormChange) {
+      onFormChange(dataChanged);
+    }
+  }, [formData, mode, readonly, onFormChange]);
 
   // Register getData function with parent if nested
   useEffect(() => {
@@ -208,16 +230,16 @@ const handleCopyYaml = () => {
 // Validate form data
 const validateForm = (): boolean => {
   const errors: Record<string, string> = {};
-  if (!formData.username) {
+  if (formData.username === undefined || formData.username === null || formData.username === '') {
     errors.username = 'Username is required';
   }
-  if (!formData.password) {
+  if (formData.password === undefined || formData.password === null || formData.password === '') {
     errors.password = 'Password is required';
   }
-  if (!formData.key) {
+  if (formData.key === undefined || formData.key === null || formData.key === '') {
     errors.key = 'Key is required';
   }
-  if (!formData.port) {
+  if (formData.port === undefined || formData.port === null || formData.port === '') {
     errors.port = 'Port is required';
   }
 
@@ -524,7 +546,7 @@ const isSimpleField = (field: any) => {
     <input
       type="number"
       value={formData.port}
-      onChange={(e) => handleFieldChange('port', parseInt(e.target.value) || 0)}
+      onChange={(e) => handleFieldChange('port', e.target.value === '' ? '' : parseInt(e.target.value))}
       disabled={isReadOnly || (mode === 'edit' && false)}
       className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
     />

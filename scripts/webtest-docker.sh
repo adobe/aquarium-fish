@@ -34,7 +34,7 @@ fi
 
 [ "x$CI" != x ] || opts=-it
 
-docker run -v $PWD:/ws -v $HOME/go/pkg:/go/pkg -w /ws --rm $opts aquarium-fish-webtests-playwright sh -exc "
+docker run -v $PWD:/ws -v $HOME/go/pkg:/go/pkg -w /ws --rm $opts aquarium-fish-webtests-playwright sh -xc "
 git config --global --add safe.directory /ws
 [ 'x$NOBUILD' != 'x' ] || ONLYBUILD=1 NO_WEB=1 ./build.sh
 
@@ -44,6 +44,7 @@ go test -json -v -parallel 4 -count=1 -race $TEST | \
     go run ./tools/go-test-formatter/go-test-formatter.go -stdout_timestamp test -stdout_color -stdout_filter failed
 
 if [ x\$? != x0 ]; then
+    echo Running bash for debugging
     ([ 'x$CI' != x ] || bash)
     exit 1
 fi
