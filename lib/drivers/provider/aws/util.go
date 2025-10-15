@@ -248,13 +248,16 @@ func (d *Driver) getSubnetID(conn *ec2.Client, idTag, zone string) (string, int6
 }
 
 // Will verify and return image id
+// Supports only image name or image id - does not support tags, because that
+// will ruin reproducibility of the environments. If tags will be required in
+// the future - another function must be created to not ruin the internal interface
 func (d *Driver) getImageID(conn *ec2.Client, idName string) (string, error) {
 	if strings.HasPrefix(idName, "ami-") {
 		return idName, nil
 	}
 
-	logger := log.WithFunc("aws", "getImageID").With("provider.name", d.name)
-	logger.Debug("Looking for image name", "image_name", idName)
+	logger := log.WithFunc("aws", "getImageID").With("provider.name", d.name, "image_name", idName)
+	logger.Debug("Looking for image name")
 
 	// Look for image with the defined name
 	req := ec2.DescribeImagesInput{
@@ -270,23 +273,19 @@ func (d *Driver) getImageID(conn *ec2.Client, idName string) (string, error) {
 		},
 		Owners: d.cfg.AccountIDs,
 	}
-	p := ec2.NewDescribeImagesPaginator(conn, &req)
-	resp, err := conn.DescribeImages(context.TODO(), &req)
-	if err != nil || len(resp.Images) == 0 {
-		return "", fmt.Errorf("AWS: %s: Unable to locate image with specified name: %s, err: %v", d.name, idName, err)
-	}
-	idName = aws.ToString(resp.Images[0].ImageId)
 
 	// Getting the images and find the latest one
+	p := ec2.NewDescribeImagesPaginator(conn, &req)
+
 	var foundID string
 	var foundTime time.Time
 	for p.HasMorePages() {
 		resp, err := p.NextPage(context.TODO())
 		if err != nil {
-			return "", fmt.Errorf("AWS: %s: Error during requesting snapshot: %v", d.name, err)
+			return "", fmt.Errorf("AWS: %s: Error during requesting image %q: %v", d.name, idName, err)
 		}
 		if len(resp.Images) > 100 {
-			logger.Warn("Over 100 images was found for the name, could be slow", "image_name", idName)
+			logger.Warn("Over 100 images was found for the name, could be slow")
 		}
 		for _, r := range resp.Images {
 			// Converting from RFC-3339/ISO-8601 format "2024-03-07T15:53:03.000Z"
@@ -295,7 +294,8 @@ func (d *Driver) getImageID(conn *ec2.Client, idName string) (string, error) {
 				logger.Warn("Error during parsing image create time", "err", err)
 				continue
 			}
-			if foundTime.Before(t) {
+			// Looking for the latest one
+			if t.After(foundTime) {
 				foundID = aws.ToString(r.ImageId)
 				foundTime = t
 			}
@@ -303,7 +303,7 @@ func (d *Driver) getImageID(conn *ec2.Client, idName string) (string, error) {
 	}
 
 	if foundID == "" {
-		return "", fmt.Errorf("AWS: %s: Unable to locate snapshot with specified tag: %s", d.name, idName)
+		return "", fmt.Errorf("AWS: %s: Unable to locate image with specified name: %s", d.name, idName)
 	}
 
 	return foundID, nil

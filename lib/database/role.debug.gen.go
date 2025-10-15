@@ -27,7 +27,7 @@ import (
 var debugTracerDatabaseRole = otel.Tracer("aquarium-fish/database")
 
 func (d *Database) SubscribeRole(ctx context.Context, ch chan RoleSubscriptionEvent) {
-	ctx, span := debugTracerDatabaseRole.Start(ctx, "database.Database.subscribeRoleImpl")
+	ctx, span := debugTracerDatabaseRole.Start(ctx, "database.Database.SubscribeRole")
 	defer span.End()
 
 	d.subscribeRoleImpl(ctx, ch)
@@ -35,7 +35,7 @@ func (d *Database) SubscribeRole(ctx context.Context, ch chan RoleSubscriptionEv
 }
 
 func (d *Database) UnsubscribeRole(ctx context.Context, ch chan RoleSubscriptionEvent) {
-	ctx, span := debugTracerDatabaseRole.Start(ctx, "database.Database.unsubscribeRoleImpl")
+	ctx, span := debugTracerDatabaseRole.Start(ctx, "database.Database.UnsubscribeRole")
 	defer span.End()
 
 	d.unsubscribeRoleImpl(ctx, ch)
@@ -43,7 +43,7 @@ func (d *Database) UnsubscribeRole(ctx context.Context, ch chan RoleSubscription
 }
 
 func (d *Database) RoleList(ctx context.Context) ([]typesv2.Role, error) {
-	ctx, span := debugTracerDatabaseRole.Start(ctx, "database.Database.roleListImpl")
+	ctx, span := debugTracerDatabaseRole.Start(ctx, "database.Database.RoleList")
 	defer span.End()
 
 	rs, err1 := d.roleListImpl(ctx)
@@ -58,7 +58,7 @@ func (d *Database) RoleList(ctx context.Context) ([]typesv2.Role, error) {
 }
 
 func (d *Database) RoleGet(ctx context.Context, name string) (*typesv2.Role, error) {
-	ctx, span := debugTracerDatabaseRole.Start(ctx, "database.Database.roleGetImpl")
+	ctx, span := debugTracerDatabaseRole.Start(ctx, "database.Database.RoleGet")
 	defer span.End()
 
 	r, err1 := d.roleGetImpl(ctx, name)
@@ -73,7 +73,7 @@ func (d *Database) RoleGet(ctx context.Context, name string) (*typesv2.Role, err
 }
 
 func (d *Database) RoleCreate(ctx context.Context, r *typesv2.Role) error {
-	ctx, span := debugTracerDatabaseRole.Start(ctx, "database.Database.roleCreateImpl")
+	ctx, span := debugTracerDatabaseRole.Start(ctx, "database.Database.RoleCreate")
 	defer span.End()
 
 	err0 := d.roleCreateImpl(ctx, r)
@@ -88,7 +88,7 @@ func (d *Database) RoleCreate(ctx context.Context, r *typesv2.Role) error {
 }
 
 func (d *Database) RoleSave(ctx context.Context, r *typesv2.Role) error {
-	ctx, span := debugTracerDatabaseRole.Start(ctx, "database.Database.roleSaveImpl")
+	ctx, span := debugTracerDatabaseRole.Start(ctx, "database.Database.RoleSave")
 	defer span.End()
 
 	err0 := d.roleSaveImpl(ctx, r)
@@ -103,7 +103,7 @@ func (d *Database) RoleSave(ctx context.Context, r *typesv2.Role) error {
 }
 
 func (d *Database) RoleDelete(ctx context.Context, name string) error {
-	ctx, span := debugTracerDatabaseRole.Start(ctx, "database.Database.roleDeleteImpl")
+	ctx, span := debugTracerDatabaseRole.Start(ctx, "database.Database.RoleDelete")
 	defer span.End()
 
 	err0 := d.roleDeleteImpl(ctx, name)

@@ -7,7 +7,7 @@
   <div className="relative group">
     <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
     <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
-      <pre className="whitespace-pre-wrap text-xs leading-relaxed">{{.Comment}}</pre>
+      <pre className="whitespace-pre-wrap text-xs leading-relaxed">{{ .Comment | htmlEscape }}</pre>
     </div>
   </div>
   {{- end }}

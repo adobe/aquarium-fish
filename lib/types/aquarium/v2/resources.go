@@ -12,7 +12,6 @@
 
 // Author: Sergei Parshev (@sparshev)
 
-// TODO: Combine with lib/proto/aquarium/v2/resources.go
 package aquariumv2
 
 import (
@@ -36,10 +35,10 @@ func (r *Resources) Validate(diskTypes []string, checkNet bool) error {
 		if name == "" {
 			return fmt.Errorf("Resources: Disk name can't be empty")
 		}
-		if len(diskTypes) > 0 && !util.Contains(diskTypes, disk.Type) {
+		if len(diskTypes) > 0 && disk.Type != nil && !util.Contains(diskTypes, *disk.Type) {
 			return fmt.Errorf("Resources: Type of disk must be one of: %+q", diskTypes)
 		}
-		if disk.Clone == "" && disk.Size < 1 {
+		if (disk.Clone == nil || *disk.Clone == "") && disk.Size != nil && *disk.Size < 1 {
 			return fmt.Errorf("Resources: Size of the disk can't be less than 1GB")
 		}
 	}
@@ -53,12 +52,14 @@ func (r *Resources) Validate(diskTypes []string, checkNet bool) error {
 		}
 	}
 
-	_, err := time.ParseDuration(r.Lifetime)
-	if r.Lifetime != "" && err != nil {
-		return fmt.Errorf("Resources: Unable to parse lifetime: %v", err)
+	if r.Lifetime != nil {
+		_, err := time.ParseDuration(*r.Lifetime)
+		if *r.Lifetime != "" && err != nil {
+			return fmt.Errorf("Resources: Unable to parse lifetime: %v", err)
+		}
 	}
 
-	if checkNet && r.Network != "" && r.Network != "nat" {
+	if checkNet && r.Network != nil && *r.Network != "" && *r.Network != "nat" {
 		return fmt.Errorf("Resources: The network configuration must be either '' (empty for hostonly) or 'nat'")
 	}
 

@@ -42,8 +42,9 @@ label:
   version: '$new_version'
   definitions:
     - driver: aws
+      images:
+        - name: ami-0aab355e1bfa1e72e
       options:
-        image: ami-0aab355e1bfa1e72e
         instance_type: c6a.4xlarge
         security_group: test-sec-group
         userdata_format: env

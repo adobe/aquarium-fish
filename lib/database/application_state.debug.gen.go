@@ -27,7 +27,7 @@ import (
 var debugTracerDatabaseApplication_state = otel.Tracer("aquarium-fish/database")
 
 func (d *Database) SubscribeApplicationState(ctx context.Context, ch chan ApplicationStateSubscriptionEvent) {
-	ctx, span := debugTracerDatabaseApplication_state.Start(ctx, "database.Database.subscribeApplicationStateImpl")
+	ctx, span := debugTracerDatabaseApplication_state.Start(ctx, "database.Database.SubscribeApplicationState")
 	defer span.End()
 
 	d.subscribeApplicationStateImpl(ctx, ch)
@@ -35,7 +35,7 @@ func (d *Database) SubscribeApplicationState(ctx context.Context, ch chan Applic
 }
 
 func (d *Database) UnsubscribeApplicationState(ctx context.Context, ch chan ApplicationStateSubscriptionEvent) {
-	ctx, span := debugTracerDatabaseApplication_state.Start(ctx, "database.Database.unsubscribeApplicationStateImpl")
+	ctx, span := debugTracerDatabaseApplication_state.Start(ctx, "database.Database.UnsubscribeApplicationState")
 	defer span.End()
 
 	d.unsubscribeApplicationStateImpl(ctx, ch)
@@ -43,7 +43,7 @@ func (d *Database) UnsubscribeApplicationState(ctx context.Context, ch chan Appl
 }
 
 func (d *Database) ApplicationStateList(ctx context.Context) ([]typesv2.ApplicationState, error) {
-	ctx, span := debugTracerDatabaseApplication_state.Start(ctx, "database.Database.applicationStateListImpl")
+	ctx, span := debugTracerDatabaseApplication_state.Start(ctx, "database.Database.ApplicationStateList")
 	defer span.End()
 
 	ass, err1 := d.applicationStateListImpl(ctx)
@@ -58,7 +58,7 @@ func (d *Database) ApplicationStateList(ctx context.Context) ([]typesv2.Applicat
 }
 
 func (d *Database) ApplicationStateCreate(ctx context.Context, as *typesv2.ApplicationState) error {
-	ctx, span := debugTracerDatabaseApplication_state.Start(ctx, "database.Database.applicationStateCreateImpl")
+	ctx, span := debugTracerDatabaseApplication_state.Start(ctx, "database.Database.ApplicationStateCreate")
 	defer span.End()
 
 	err0 := d.applicationStateCreateImpl(ctx, as)
@@ -73,7 +73,7 @@ func (d *Database) ApplicationStateCreate(ctx context.Context, as *typesv2.Appli
 }
 
 func (d *Database) ApplicationStateGet(ctx context.Context, uid typesv2.ApplicationStateUID) (*typesv2.ApplicationState, error) {
-	ctx, span := debugTracerDatabaseApplication_state.Start(ctx, "database.Database.applicationStateGetImpl")
+	ctx, span := debugTracerDatabaseApplication_state.Start(ctx, "database.Database.ApplicationStateGet")
 	defer span.End()
 
 	as, err1 := d.applicationStateGetImpl(ctx, uid)
@@ -88,7 +88,7 @@ func (d *Database) ApplicationStateGet(ctx context.Context, uid typesv2.Applicat
 }
 
 func (d *Database) ApplicationStateDelete(ctx context.Context, uid typesv2.ApplicationStateUID) error {
-	ctx, span := debugTracerDatabaseApplication_state.Start(ctx, "database.Database.applicationStateDeleteImpl")
+	ctx, span := debugTracerDatabaseApplication_state.Start(ctx, "database.Database.ApplicationStateDelete")
 	defer span.End()
 
 	err0 := d.applicationStateDeleteImpl(ctx, uid)
@@ -103,7 +103,7 @@ func (d *Database) ApplicationStateDelete(ctx context.Context, uid typesv2.Appli
 }
 
 func (d *Database) ApplicationStateListByApplication(ctx context.Context, appUID typesv2.ApplicationUID) ([]typesv2.ApplicationState, error) {
-	ctx, span := debugTracerDatabaseApplication_state.Start(ctx, "database.Database.applicationStateListByApplicationImpl")
+	ctx, span := debugTracerDatabaseApplication_state.Start(ctx, "database.Database.ApplicationStateListByApplication")
 	defer span.End()
 
 	states, err1 := d.applicationStateListByApplicationImpl(ctx, appUID)
@@ -118,7 +118,7 @@ func (d *Database) ApplicationStateListByApplication(ctx context.Context, appUID
 }
 
 func (d *Database) ApplicationStateNewCount(ctx context.Context, appUID typesv2.ApplicationUID) uint {
-	ctx, span := debugTracerDatabaseApplication_state.Start(ctx, "database.Database.applicationStateNewCountImpl")
+	ctx, span := debugTracerDatabaseApplication_state.Start(ctx, "database.Database.ApplicationStateNewCount")
 	defer span.End()
 
 	count := d.applicationStateNewCountImpl(ctx, appUID)
@@ -128,7 +128,7 @@ func (d *Database) ApplicationStateNewCount(ctx context.Context, appUID typesv2.
 }
 
 func (d *Database) ApplicationStateListLatest(ctx context.Context) ([]typesv2.ApplicationState, error) {
-	ctx, span := debugTracerDatabaseApplication_state.Start(ctx, "database.Database.applicationStateListLatestImpl")
+	ctx, span := debugTracerDatabaseApplication_state.Start(ctx, "database.Database.ApplicationStateListLatest")
 	defer span.End()
 
 	out, err1 := d.applicationStateListLatestImpl(ctx)
@@ -143,7 +143,7 @@ func (d *Database) ApplicationStateListLatest(ctx context.Context) ([]typesv2.Ap
 }
 
 func (d *Database) ApplicationStateListNewElected(ctx context.Context) ([]typesv2.ApplicationState, error) {
-	ctx, span := debugTracerDatabaseApplication_state.Start(ctx, "database.Database.applicationStateListNewElectedImpl")
+	ctx, span := debugTracerDatabaseApplication_state.Start(ctx, "database.Database.ApplicationStateListNewElected")
 	defer span.End()
 
 	ass, err1 := d.applicationStateListNewElectedImpl(ctx)
@@ -158,7 +158,7 @@ func (d *Database) ApplicationStateListNewElected(ctx context.Context) ([]typesv
 }
 
 func (d *Database) ApplicationStateGetByApplication(ctx context.Context, appUID typesv2.ApplicationUID) (*typesv2.ApplicationState, error) {
-	ctx, span := debugTracerDatabaseApplication_state.Start(ctx, "database.Database.applicationStateGetByApplicationImpl")
+	ctx, span := debugTracerDatabaseApplication_state.Start(ctx, "database.Database.ApplicationStateGetByApplication")
 	defer span.End()
 
 	state, err1 := d.applicationStateGetByApplicationImpl(ctx, appUID)

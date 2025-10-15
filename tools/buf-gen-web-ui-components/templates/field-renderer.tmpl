@@ -10,15 +10,17 @@
 {{template "simple-number-field" .}}
       {{- else if eq .TypeScript "boolean" }}
 {{template "simple-boolean-field" .}}
-      {{- else }}
+      {{- else if .IsEnum }}
+{{template "enum-field" .}}
+      {{- else if .IsTimestamp }}
+{{template "timestamp-field" .}}
+      {{- else if .AutofillType }}
+{{template "autofill-field" .}}
+      {{- else if or .IsStruct .IsRepeated .IsMap .IsMessage }}
       {/* Complex field - traditional layout */}
       <div className="space-y-2">
 {{template "field-label" .}}
-        {{- if .IsEnum }}
-{{template "enum-field" .}}
-        {{- else if .IsTimestamp }}
-{{template "timestamp-field" .}}
-        {{- else if .IsStruct }}
+        {{- if .IsStruct }}
 {{template "struct-field" .}}
         {{- else if .IsRepeated }}
 {{template "array-field" .}}
@@ -26,13 +28,11 @@
 {{template "map-field" .}}
         {{- else if .IsMessage }}
 {{template "message-field" .}}
-        {{- else if .AutofillType }}
-{{template "autofill-field" .}}
-        {{- else }}
-{{template "basic-input-field" .}}
         {{- end }}
 {{template "validation-error" .}}
       </div>
+      {{- else }}
+{{template "basic-input-field" .}}
       {{- end }}
     </div>
   )}
@@ -44,15 +44,17 @@
 {{template "simple-number-field" .}}
     {{- else if eq .TypeScript "boolean" }}
 {{template "simple-boolean-field" .}}
-    {{- else }}
+    {{- else if .IsEnum }}
+{{template "enum-field" .}}
+    {{- else if .IsTimestamp }}
+{{template "timestamp-field" .}}
+    {{- else if .AutofillType }}
+{{template "autofill-field" .}}
+    {{- else if or .IsStruct .IsRepeated .IsMap .IsMessage }}
     {/* Complex field - traditional layout */}
     <div className="space-y-2">
 {{template "field-label" .}}
-      {{- if .IsEnum }}
-{{template "enum-field" .}}
-      {{- else if .IsTimestamp }}
-{{template "timestamp-field" .}}
-      {{- else if .IsStruct }}
+      {{- if .IsStruct }}
 {{template "struct-field" .}}
       {{- else if .IsRepeated }}
 {{template "array-field" .}}
@@ -60,13 +62,11 @@
 {{template "map-field" .}}
       {{- else if .IsMessage }}
 {{template "message-field" .}}
-      {{- else if .AutofillType }}
-{{template "autofill-field" .}}
-      {{- else }}
-{{template "basic-input-field" .}}
       {{- end }}
 {{template "validation-error" .}}
     </div>
+    {{- else }}
+{{template "basic-input-field" .}}
     {{- end }}
   </div>
   {{- end }}

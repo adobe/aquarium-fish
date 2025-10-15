@@ -111,18 +111,18 @@ func (*Driver) ValidateDefinition(def typesv2.LabelDefinition) error {
 		return err
 	}
 	// Validate image tags are available in the disk names
-	for _, img := range opts.Images {
+	for _, img := range def.Images {
 		// Empty name means user home which is always exists
-		if img.Tag != "" {
+		if img.GetTag() != "" {
 			found := false
 			for dName := range def.Resources.Disks {
-				if dName == img.Tag {
+				if dName == img.GetTag() {
 					found = true
 					break
 				}
 			}
 			if !found {
-				return fmt.Errorf("Unable to find disk with name in the image tag: %q", img.Tag)
+				return fmt.Errorf("Unable to find disk with name in the image tag: %q", img.GetTag())
 			}
 		}
 	}
@@ -157,12 +157,12 @@ func (d *Driver) AvailableCapacity(nodeUsage typesv2.Resources, req typesv2.Labe
 		nodeUsage.CpuOverbook = req.Resources.CpuOverbook
 		nodeUsage.RamOverbook = req.Resources.RamOverbook
 	}
-	if nodeUsage.Multitenancy && req.Resources.Multitenancy {
+	if nodeUsage.Multitenancy != nil && *nodeUsage.Multitenancy && req.Resources.Multitenancy != nil && *req.Resources.Multitenancy {
 		// Ok we can run more tenants, let's calculate how much
-		if nodeUsage.CpuOverbook && req.Resources.CpuOverbook {
+		if nodeUsage.CpuOverbook != nil && *nodeUsage.CpuOverbook && req.Resources.CpuOverbook != nil && *req.Resources.CpuOverbook {
 			availCPU += d.cfg.CPUOverbook
 		}
-		if nodeUsage.RamOverbook && req.Resources.RamOverbook {
+		if nodeUsage.RamOverbook != nil && *nodeUsage.RamOverbook && req.Resources.RamOverbook != nil && *req.Resources.RamOverbook {
 			availRAM += d.cfg.RAMOverbook
 		}
 	}
@@ -213,7 +213,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 	diskPaths[""] = homedir
 
 	// Loading images and unpack them to home/disks according
-	if err := d.loadImages(user, opts.Images, diskPaths); err != nil {
+	if err := d.loadImages(user, def.Images, diskPaths); err != nil {
 		d.disksDelete(user)
 		d.userDelete(user)
 		logger.Error("Unable to load and unpack images", "err", err)

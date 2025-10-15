@@ -25,7 +25,6 @@ import (
 
 	"github.com/hpcloud/tail"
 
-	"github.com/adobe/aquarium-fish/lib/drivers/provider"
 	"github.com/adobe/aquarium-fish/lib/log"
 	typesv2 "github.com/adobe/aquarium-fish/lib/types/aquarium/v2"
 	"github.com/adobe/aquarium-fish/lib/util"
@@ -49,7 +48,7 @@ func (d *Driver) getAvailResources() (availCPU, availRAM uint32) {
 }
 
 // Load images and returns the target image path for cloning
-func (d *Driver) loadImages(vmxPath string, opts *Options, vmImagesDir string) (string, error) {
+func (d *Driver) loadImages(vmxPath string, images []typesv2.Image, vmImagesDir string) (string, error) {
 	logger := log.WithFunc("vmx", "loadImages").With("driver.name", d.name, "vm_name", vmxPath)
 	if err := os.MkdirAll(vmImagesDir, 0o755); err != nil {
 		logger.Error("Unable to create the VM images dir", "images_dir", vmImagesDir, "err", err)
@@ -58,30 +57,30 @@ func (d *Driver) loadImages(vmxPath string, opts *Options, vmImagesDir string) (
 
 	targetPath := ""
 	var wg sync.WaitGroup
-	for imageIndex, image := range opts.Images {
-		imglogger := logger.With("image_name", image.Name, "image_version", image.Version, "image_url", image.URL)
+	for imageIndex, image := range images {
+		imglogger := logger.With("image_name", image.Name, "image_version", image.Version, "image_url", image.Url)
 		imglogger.Info("Loading the required image")
 
 		// Running the background routine to download, unpack and process the image
 		// Success will be checked later by existence of the copied image in the vm directory
 		wg.Add(1)
-		go func(image provider.Image, index int) error {
+		go func(image typesv2.Image, index int) error {
 			defer wg.Done()
 			if err := image.DownloadUnpack(d.cfg.ImagesPath, d.cfg.DownloadUser, d.cfg.DownloadPassword); err != nil {
 				imglogger.Error("Unable to download and unpack the image", "err", err)
-				return fmt.Errorf("VMX: %s: Unable to download and unpack the image: %s %s: %v", d.name, image.Name, image.URL, err)
+				return fmt.Errorf("VMX: %s: Unable to download and unpack the image: %s %s: %v", d.name, image.GetName(), image.GetURL(), err)
 			}
 
 			// Getting the image subdir name in the unpacked dir
 			subdir := ""
-			imageUnpacked := filepath.Join(d.cfg.ImagesPath, image.Name+"-"+image.Version)
+			imageUnpacked := filepath.Join(d.cfg.ImagesPath, image.GetNameVersion("-"))
 			items, err := os.ReadDir(imageUnpacked)
 			if err != nil {
 				imglogger.Error("Unable to read the unpacked directory", "image_unpacked", imageUnpacked, "err", err)
 				return fmt.Errorf("VMX: %s: Unable to read the unpacked directory %q: %v", d.name, imageUnpacked, err)
 			}
 			for _, f := range items {
-				if strings.HasPrefix(f.Name(), image.Name) {
+				if strings.HasPrefix(f.Name(), image.GetName()) {
 					if f.Type()&fs.ModeSymlink != 0 {
 						// Potentially it can be a symlink (like used in local tests)
 						if _, err := os.Stat(filepath.Join(imageUnpacked, f.Name())); err != nil {
@@ -95,7 +94,7 @@ func (d *Driver) loadImages(vmxPath string, opts *Options, vmImagesDir string) (
 			}
 			if subdir == "" {
 				imglogger.Error("Unpacked image has no subfolder", "image_unpacked", imageUnpacked, "items", items)
-				return fmt.Errorf("VMX: %s: Unpacked image '%s' has no subfolder '%s', only: %q", d.name, imageUnpacked, image.Name, items)
+				return fmt.Errorf("VMX: %s: Unpacked image '%s' has no subfolder '%s', only: %q", d.name, imageUnpacked, image.GetName(), items)
 			}
 
 			// The VMware clone operation modifies the image snapshots description so
@@ -103,9 +102,9 @@ func (d *Driver) loadImages(vmxPath string, opts *Options, vmImagesDir string) (
 			// the files (except for vmdk bins) with path to the workspace images dir
 			rootDir := filepath.Join(imageUnpacked, subdir)
 			outDir := filepath.Join(vmImagesDir, subdir)
-			if index+1 == len(opts.Images) {
+			if index+1 == len(images) {
 				// It's the last image in the list so the target one
-				targetPath = filepath.Join(outDir, image.Name+".vmx")
+				targetPath = filepath.Join(outDir, image.GetName()+".vmx")
 			}
 			if err := os.MkdirAll(outDir, 0o755); err != nil {
 				imglogger.Error("Unable to create the VM image dir", "dir", outDir, "err", err)
@@ -152,7 +151,7 @@ func (d *Driver) loadImages(vmxPath string, opts *Options, vmImagesDir string) (
 
 	// Check all the images are in place just by number of them
 	vmImages, _ := os.ReadDir(vmImagesDir)
-	if len(opts.Images) != len(vmImages) {
+	if len(images) != len(vmImages) {
 		logger.Error("The image processes gone wrong, please check log for the errors")
 		return "", fmt.Errorf("VMX: %s: The image processes gone wrong, please check log for the errors", d.name)
 	}
@@ -185,7 +184,7 @@ func (d *Driver) disksCreate(vmxPath string, disks map[string]typesv2.ResourcesD
 	var diskPaths []string
 	for dName, disk := range disks {
 		diskPath := filepath.Join(filepath.Dir(vmxPath), dName)
-		if disk.Reuse {
+		if disk.Reuse != nil && *disk.Reuse {
 			diskPath = filepath.Join(d.cfg.WorkspacePath, "disk-"+dName, dName)
 			if err := os.MkdirAll(filepath.Dir(diskPath), 0o755); err != nil {
 				return err
@@ -209,36 +208,42 @@ func (d *Driver) disksCreate(vmxPath string, disks map[string]typesv2.ResourcesD
 		// TODO: Ensure failures doesn't leave the changes behind (like mounted disks or files)
 
 		// Create virtual disk
-		var diskType string
-		switch disk.Type {
-		case "hfs+":
-			diskType = "HFS+"
-		case "fat32":
-			diskType = "FAT32"
-		case "exfat":
-			diskType = "ExFAT"
-		default:
-			diskType = "raw"
+		diskType := "raw"
+		if disk.Type != nil {
+			switch *disk.Type {
+			case "hfs+":
+				diskType = "HFS+"
+			case "fat32":
+				diskType = "FAT32"
+			case "exfat":
+				diskType = "ExFAT"
+			}
+		}
+
+		if disk.Size == nil {
+			logger.Error("Unable to create disk because size is unset", "disk_type", diskType, "disk_path", diskPath+".vmdk")
+			return fmt.Errorf("VMX: %s: Unable to create disk because size is unset", d.name)
 		}
 
 		if diskType == "raw" {
 			// Create a simple raw vmdk so it could be used by the image to format & mount properly
-			_, _, err := util.RunAndLog("vmx", 10*time.Minute, nil, d.cfg.VdiskmanagerPath, "-c", "-s", fmt.Sprintf("%dGB", disk.Size), "-t", "0", diskPath+".vmdk")
+			_, _, err := util.RunAndLog("vmx", 10*time.Minute, nil, d.cfg.VdiskmanagerPath, "-c", "-s", fmt.Sprintf("%dGB", *disk.Size), "-t", "0", diskPath+".vmdk")
 			if err != nil {
 				logger.Error("Unable to create vmdk disk", "disk_type", diskType, "disk_path", diskPath+".vmdk", "err", err)
 				return fmt.Errorf("VMX: %s: Unable to create %s vmdk disk %q: %v", d.name, diskType, diskPath+".vmdk", err)
 			}
 		} else {
 			label := dName
-			if disk.Label != "" {
-				label = disk.Label
+			if disk.Label != nil && *disk.Label != "" {
+				label = *disk.Label
 			}
 			dmgPath := diskPath + ".dmg"
-			args := []string{"create", dmgPath,
+			args := []string{
+				"create", dmgPath,
 				"-fs", diskType,
 				"-layout", "NONE",
 				"-volname", label,
-				"-size", fmt.Sprintf("%dm", disk.Size*1024),
+				"-size", fmt.Sprintf("%dm", *disk.Size*1024),
 			}
 			if _, _, err := util.RunAndLog("vmx", 10*time.Minute, nil, "/usr/bin/hdiutil", args...); err != nil {
 				logger.Error("Unable to create dmg disk", "disk_path", dmgPath, "err", err)
@@ -295,7 +300,7 @@ func (d *Driver) disksCreate(vmxPath string, disks map[string]typesv2.ResourcesD
 				// Format: http://sanbarrow.com/vmdk/disktypes.html
 				// <access type> <size> <vmdk-type> <path to datachunk> <offset>
 				// size, offset - number in amount of sectors
-				fmt.Sprintf(`RW %d FLAT %q 0`, disk.Size*1024*1024*2, dmgPath),
+				fmt.Sprintf(`RW %d FLAT %q 0`, *disk.Size*1024*1024*2, dmgPath),
 				``,
 				`# The Disk Data Base`,
 				`#DDB`,

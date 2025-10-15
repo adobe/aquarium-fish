@@ -33,6 +33,17 @@ func (d *Database) unsubscribeUserImpl(_ context.Context, ch chan UserSubscripti
 	unsubscribeHelper(d, &d.subsUser, ch)
 }
 
+// UserGroup subscription methods
+
+func (d *Database) subscribeUserGroupImpl(_ context.Context, ch chan UserGroupSubscriptionEvent) {
+	subscribeHelper(d, &d.subsUserGroup, ch)
+}
+
+// unsubscribeUserGroupImpl removes a channel from the subscription list
+func (d *Database) unsubscribeUserGroupImpl(_ context.Context, ch chan UserGroupSubscriptionEvent) {
+	unsubscribeHelper(d, &d.subsUserGroup, ch)
+}
+
 // userListImpl returns list of users
 func (d *Database) userListImpl(_ context.Context) (us []typesv2.User, err error) {
 	d.beMu.RLock()
@@ -143,4 +154,214 @@ func (*Database) userNewImpl(ctx context.Context, name string, password string) 
 	}
 
 	return password, user, nil
+}
+
+// UserGroup database operations
+
+// userGroupListImpl returns list of user groups
+func (d *Database) userGroupListImpl(_ context.Context) (groups []typesv2.UserGroup, err error) {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
+	err = d.be.Collection(ObjectUserGroup).List(&groups)
+	return groups, err
+}
+
+// userGroupCreateImpl makes new UserGroup
+func (d *Database) userGroupCreateImpl(_ context.Context, g *typesv2.UserGroup) error {
+	if g.Name == "" {
+		return fmt.Errorf("user group name can't be empty")
+	}
+
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
+	g.CreatedAt = time.Now()
+	g.UpdatedAt = g.CreatedAt
+	err := d.be.Collection(ObjectUserGroup).Add(g.Name, g)
+
+	if err == nil {
+		// Notify subscribers about the new UserGroup
+		notifySubscribersHelper(d, &d.subsUserGroup, NewCreateEvent(g), ObjectUserGroup)
+	}
+
+	return err
+}
+
+// userGroupSaveImpl stores UserGroup
+func (d *Database) userGroupSaveImpl(_ context.Context, g *typesv2.UserGroup) error {
+	g.UpdatedAt = time.Now()
+
+	d.beMu.RLock()
+	err := d.be.Collection(ObjectUserGroup).Add(g.Name, g)
+	d.beMu.RUnlock()
+
+	if err == nil {
+		// Notify subscribers about the updated UserGroup
+		notifySubscribersHelper(d, &d.subsUserGroup, NewUpdateEvent(g), ObjectUserGroup)
+	}
+
+	return err
+}
+
+// userGroupGetImpl returns UserGroup by unique name
+func (d *Database) userGroupGetImpl(_ context.Context, name string) (g *typesv2.UserGroup, err error) {
+	d.beMu.RLock()
+	defer d.beMu.RUnlock()
+
+	err = d.be.Collection(ObjectUserGroup).Get(name, &g)
+	return g, err
+}
+
+// userGroupDeleteImpl removes UserGroup
+func (d *Database) userGroupDeleteImpl(ctx context.Context, name string) error {
+	// Get the object before deleting it for notification
+	g, getErr := d.UserGroupGet(ctx, name)
+	if getErr != nil {
+		return getErr
+	}
+
+	d.beMu.RLock()
+	err := d.be.Collection(ObjectUserGroup).Delete(name)
+	d.beMu.RUnlock()
+
+	if err == nil && g != nil {
+		// Notify subscribers about the removed UserGroup
+		notifySubscribersHelper(d, &d.subsUserGroup, NewRemoveEvent(g), ObjectUserGroup)
+	}
+
+	return err
+}
+
+// GetUserGroups Finds all groups of the user
+func (d *Database) userGroupListByUserImpl(ctx context.Context, userName string) ([]*typesv2.UserGroup, error) {
+	// Get all user groups and find the ones this user belongs to
+	var userGroups []*typesv2.UserGroup
+	groups, err := d.UserGroupList(ctx)
+	if err != nil {
+		return userGroups, err
+	}
+
+	// Collect configs from groups that contain this user
+	for _, group := range groups {
+		// Check if user is in this group
+		userInGroup := false
+		for _, groupUser := range group.Users {
+			if groupUser == userName {
+				userInGroup = true
+				break
+			}
+		}
+
+		if userInGroup {
+			userGroups = append(userGroups, &group)
+		}
+	}
+
+	return userGroups, nil
+}
+
+// MergeUserConfigWithGroups merges user configuration with user group configurations
+// Returns a new UserConfig that uses user's config values if set, otherwise uses the
+// maximum value from all user groups' configs, and finally falls back to defaults
+func (*Database) mergeUserConfigWithGroupsImpl(_ context.Context, user *typesv2.User, groups []*typesv2.UserGroup) *typesv2.UserConfig {
+	// Start with user's existing config or create a new one
+	mergedConfig := &typesv2.UserConfig{}
+	if user.Config != nil {
+		// Copy user's config
+		if user.Config.RateLimit != nil {
+			val := *user.Config.RateLimit
+			mergedConfig.RateLimit = &val
+		}
+		if user.Config.StreamsLimit != nil {
+			val := *user.Config.StreamsLimit
+			mergedConfig.StreamsLimit = &val
+		}
+	}
+
+	// Collect configs from groups that contain this user
+	var groupConfigs []*typesv2.UserConfig
+	for _, group := range groups {
+		if group.Config != nil {
+			groupConfigs = append(groupConfigs, group.Config)
+		}
+	}
+
+	if len(groupConfigs) == 0 {
+		return mergedConfig
+	}
+
+	// Merge RateLimit: use user's value if set, otherwise use max from groups
+	if mergedConfig.RateLimit == nil {
+		var maxRateLimit *int32
+		for _, gc := range groupConfigs {
+			if gc.RateLimit != nil {
+				if maxRateLimit == nil || *gc.RateLimit > *maxRateLimit {
+					val := *gc.RateLimit
+					maxRateLimit = &val
+				}
+			}
+		}
+		if maxRateLimit != nil {
+			mergedConfig.RateLimit = maxRateLimit
+		}
+	}
+
+	// Merge StreamsLimit: use user's value if set, otherwise use max from groups
+	if mergedConfig.StreamsLimit == nil {
+		var maxStreamsLimit *int32
+		for _, gc := range groupConfigs {
+			if gc.StreamsLimit != nil {
+				if maxStreamsLimit == nil || *gc.StreamsLimit > *maxStreamsLimit {
+					val := *gc.StreamsLimit
+					maxStreamsLimit = &val
+				}
+			}
+		}
+		if maxStreamsLimit != nil {
+			mergedConfig.StreamsLimit = maxStreamsLimit
+		}
+	}
+
+	return mergedConfig
+}
+
+// EnrichUserWithGroupConfig enriches a user object with merged configuration from user groups
+// This modifies the user object in place
+func (d *Database) enrichUserWithGroupConfigImpl(ctx context.Context, user *typesv2.User) {
+	if user == nil {
+		return
+	}
+
+	userGroups, err := d.UserGroupListByUser(ctx, user.Name)
+	if err != nil {
+		log.WithFunc("database", "EnrichUserWithGroupConfig").Error("Unable to get ")
+		return
+	}
+	if len(userGroups) > 0 {
+		// Set user groups list
+		var groupNames []string
+		for _, group := range userGroups {
+			groupNames = append(groupNames, group.Name)
+		}
+		user.SetGroups(groupNames)
+
+		// Merge user config with the groups
+		mergedConfig := d.MergeUserConfigWithGroups(ctx, user, userGroups)
+
+		// Only update if we got some config values from groups
+		if mergedConfig.RateLimit != nil || mergedConfig.StreamsLimit != nil {
+			if user.Config == nil {
+				user.Config = mergedConfig
+			} else {
+				// Merge into existing config
+				if user.Config.RateLimit == nil && mergedConfig.RateLimit != nil {
+					user.Config.RateLimit = mergedConfig.RateLimit
+				}
+				if user.Config.StreamsLimit == nil && mergedConfig.StreamsLimit != nil {
+					user.Config.StreamsLimit = mergedConfig.StreamsLimit
+				}
+			}
+		}
+	}
 }

@@ -36,7 +36,10 @@
           {!isReadOnly && !(mode === 'edit' && {{.NoEdit}}) && (
             <button
               type="button"
-              onClick={() => handleFieldChange('{{.JSONName}}', null)}
+              onClick={() => {
+                handleFieldChange('{{.JSONName}}', null);
+                unregisterNestedGetData('{{.JSONName}}');
+              }}
               className="flex items-center justify-center w-6 h-6 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors"
               title="Remove {{.DisplayName}}"
             >
@@ -49,13 +52,15 @@
         {{- end }}
         <div className="pl-2">
           <NestedComponent
+            key={JSON.stringify(formData.{{.JSONName}})}
             mode={mode}
             initialData={formData.{{.JSONName}}}
-            onSubmit={(data: any) => handleFieldChange('{{.JSONName}}', data)}
+            onSubmit={() => {}}
             onCancel={() => {}}
             title={'{{.DisplayName}}'}
             readonly={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
             nested={true}
+            onRegister={(getDataFn: () => any) => registerNestedGetData('{{.JSONName}}', getDataFn)}
           />
         </div>
       </div>

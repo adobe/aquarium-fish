@@ -50,6 +50,8 @@ const (
 	LabelServiceGetProcedure = "/aquarium.v2.LabelService/Get"
 	// LabelServiceCreateProcedure is the fully-qualified name of the LabelService's Create RPC.
 	LabelServiceCreateProcedure = "/aquarium.v2.LabelService/Create"
+	// LabelServiceUpdateProcedure is the fully-qualified name of the LabelService's Update RPC.
+	LabelServiceUpdateProcedure = "/aquarium.v2.LabelService/Update"
 	// LabelServiceRemoveProcedure is the fully-qualified name of the LabelService's Remove RPC.
 	LabelServiceRemoveProcedure = "/aquarium.v2.LabelService/Remove"
 )
@@ -61,7 +63,11 @@ type LabelServiceClient interface {
 	// Get label by UID
 	Get(context.Context, *connect.Request[v2.LabelServiceGetRequest]) (*connect.Response[v2.LabelServiceGetResponse], error)
 	// Create new label
+	// Not only admin users can create labels, but also regular users can create temporary
+	// editable labels.
 	Create(context.Context, *connect.Request[v2.LabelServiceCreateRequest]) (*connect.Response[v2.LabelServiceCreateResponse], error)
+	// Update existing label ONLY with version = 0
+	Update(context.Context, *connect.Request[v2.LabelServiceUpdateRequest]) (*connect.Response[v2.LabelServiceUpdateResponse], error)
 	// Remove label by UID
 	Remove(context.Context, *connect.Request[v2.LabelServiceRemoveRequest]) (*connect.Response[v2.LabelServiceRemoveResponse], error)
 }
@@ -95,6 +101,12 @@ func NewLabelServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(labelServiceMethods.ByName("Create")),
 			connect.WithClientOptions(opts...),
 		),
+		update: connect.NewClient[v2.LabelServiceUpdateRequest, v2.LabelServiceUpdateResponse](
+			httpClient,
+			baseURL+LabelServiceUpdateProcedure,
+			connect.WithSchema(labelServiceMethods.ByName("Update")),
+			connect.WithClientOptions(opts...),
+		),
 		remove: connect.NewClient[v2.LabelServiceRemoveRequest, v2.LabelServiceRemoveResponse](
 			httpClient,
 			baseURL+LabelServiceRemoveProcedure,
@@ -109,6 +121,7 @@ type labelServiceClient struct {
 	list   *connect.Client[v2.LabelServiceListRequest, v2.LabelServiceListResponse]
 	get    *connect.Client[v2.LabelServiceGetRequest, v2.LabelServiceGetResponse]
 	create *connect.Client[v2.LabelServiceCreateRequest, v2.LabelServiceCreateResponse]
+	update *connect.Client[v2.LabelServiceUpdateRequest, v2.LabelServiceUpdateResponse]
 	remove *connect.Client[v2.LabelServiceRemoveRequest, v2.LabelServiceRemoveResponse]
 }
 
@@ -127,6 +140,11 @@ func (c *labelServiceClient) Create(ctx context.Context, req *connect.Request[v2
 	return c.create.CallUnary(ctx, req)
 }
 
+// Update calls aquarium.v2.LabelService.Update.
+func (c *labelServiceClient) Update(ctx context.Context, req *connect.Request[v2.LabelServiceUpdateRequest]) (*connect.Response[v2.LabelServiceUpdateResponse], error) {
+	return c.update.CallUnary(ctx, req)
+}
+
 // Remove calls aquarium.v2.LabelService.Remove.
 func (c *labelServiceClient) Remove(ctx context.Context, req *connect.Request[v2.LabelServiceRemoveRequest]) (*connect.Response[v2.LabelServiceRemoveResponse], error) {
 	return c.remove.CallUnary(ctx, req)
@@ -139,7 +157,11 @@ type LabelServiceHandler interface {
 	// Get label by UID
 	Get(context.Context, *connect.Request[v2.LabelServiceGetRequest]) (*connect.Response[v2.LabelServiceGetResponse], error)
 	// Create new label
+	// Not only admin users can create labels, but also regular users can create temporary
+	// editable labels.
 	Create(context.Context, *connect.Request[v2.LabelServiceCreateRequest]) (*connect.Response[v2.LabelServiceCreateResponse], error)
+	// Update existing label ONLY with version = 0
+	Update(context.Context, *connect.Request[v2.LabelServiceUpdateRequest]) (*connect.Response[v2.LabelServiceUpdateResponse], error)
 	// Remove label by UID
 	Remove(context.Context, *connect.Request[v2.LabelServiceRemoveRequest]) (*connect.Response[v2.LabelServiceRemoveResponse], error)
 }
@@ -169,6 +191,12 @@ func NewLabelServiceHandler(svc LabelServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(labelServiceMethods.ByName("Create")),
 		connect.WithHandlerOptions(opts...),
 	)
+	labelServiceUpdateHandler := connect.NewUnaryHandler(
+		LabelServiceUpdateProcedure,
+		svc.Update,
+		connect.WithSchema(labelServiceMethods.ByName("Update")),
+		connect.WithHandlerOptions(opts...),
+	)
 	labelServiceRemoveHandler := connect.NewUnaryHandler(
 		LabelServiceRemoveProcedure,
 		svc.Remove,
@@ -183,6 +211,8 @@ func NewLabelServiceHandler(svc LabelServiceHandler, opts ...connect.HandlerOpti
 			labelServiceGetHandler.ServeHTTP(w, r)
 		case LabelServiceCreateProcedure:
 			labelServiceCreateHandler.ServeHTTP(w, r)
+		case LabelServiceUpdateProcedure:
+			labelServiceUpdateHandler.ServeHTTP(w, r)
 		case LabelServiceRemoveProcedure:
 			labelServiceRemoveHandler.ServeHTTP(w, r)
 		default:
@@ -204,6 +234,10 @@ func (UnimplementedLabelServiceHandler) Get(context.Context, *connect.Request[v2
 
 func (UnimplementedLabelServiceHandler) Create(context.Context, *connect.Request[v2.LabelServiceCreateRequest]) (*connect.Response[v2.LabelServiceCreateResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.LabelService.Create is not implemented"))
+}
+
+func (UnimplementedLabelServiceHandler) Update(context.Context, *connect.Request[v2.LabelServiceUpdateRequest]) (*connect.Response[v2.LabelServiceUpdateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.LabelService.Update is not implemented"))
 }
 
 func (UnimplementedLabelServiceHandler) Remove(context.Context, *connect.Request[v2.LabelServiceRemoveRequest]) (*connect.Response[v2.LabelServiceRemoveResponse], error) {

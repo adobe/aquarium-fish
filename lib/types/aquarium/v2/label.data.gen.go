@@ -33,14 +33,79 @@ import (
 
 type LabelUID = uuid.UUID
 
+// Image is a data for Image without internal locks
+type Image struct {
+	Name    *string `json:"name,omitempty"`
+	Sum     *string `json:"sum,omitempty"`
+	Tag     *string `json:"tag,omitempty"`
+	Url     *string `json:"url,omitempty"`
+	Version *string `json:"version,omitempty"`
+}
+
+// FromImage creates a Image from Image
+func FromImage(src *pbTypes.Image) Image {
+	if src == nil {
+		return Image{}
+	}
+
+	result := Image{}
+	if src.Name != nil {
+		val := src.GetName()
+		result.Name = &val
+	}
+	if src.Sum != nil {
+		val := src.GetSum()
+		result.Sum = &val
+	}
+	if src.Tag != nil {
+		val := src.GetTag()
+		result.Tag = &val
+	}
+	if src.Url != nil {
+		val := src.GetUrl()
+		result.Url = &val
+	}
+	if src.Version != nil {
+		val := src.GetVersion()
+		result.Version = &val
+	}
+	return result
+}
+
+// ToImage converts Image to Image
+func (i Image) ToImage() *pbTypes.Image {
+	result := &pbTypes.Image{}
+
+	if i.Name != nil {
+		result.Name = i.Name
+	}
+	if i.Sum != nil {
+		result.Sum = i.Sum
+	}
+	if i.Tag != nil {
+		result.Tag = i.Tag
+	}
+	if i.Url != nil {
+		result.Url = i.Url
+	}
+	if i.Version != nil {
+		result.Version = i.Version
+	}
+	return result
+}
+
 // Label is a data for Label without internal locks
 type Label struct {
 	CreatedAt   time.Time         `json:"created_at,omitempty"`
 	Definitions []LabelDefinition `json:"definitions,omitempty"`
 	Metadata    util.UnparsedJSON `json:"metadata,omitempty"`
 	Name        string            `json:"name,omitempty"`
+	OwnerName   string            `json:"owner_name,omitempty"`
+	RemoveAt    *time.Time        `json:"remove_at,omitempty"`
 	Uid         uuid.UUID         `json:"uid,omitempty"`
+	UpdatedAt   time.Time         `json:"updated_at,omitempty"`
 	Version     int32             `json:"version,omitempty"`
+	VisibleFor  []string          `json:"visible_for,omitempty"`
 }
 
 // FromLabel creates a Label from Label
@@ -66,10 +131,19 @@ func FromLabel(src *pbTypes.Label) Label {
 		result.Metadata = util.UnparsedJSON("{}")
 	}
 	result.Name = src.GetName()
+	result.OwnerName = src.GetOwnerName()
+	if src.GetRemoveAt() != nil {
+		t := src.GetRemoveAt().AsTime()
+		result.RemoveAt = &t
+	}
 	if uid, err := uuid.Parse(src.GetUid()); err == nil {
 		result.Uid = uid
 	}
+	if src.GetUpdatedAt() != nil {
+		result.UpdatedAt = src.GetUpdatedAt().AsTime()
+	}
 	result.Version = src.GetVersion()
+	result.VisibleFor = src.GetVisibleFor()
 	return result
 }
 
@@ -89,8 +163,14 @@ func (l Label) ToLabel() *pbTypes.Label {
 		}
 	}
 	result.Name = l.Name
+	result.OwnerName = l.OwnerName
+	if l.RemoveAt != nil {
+		result.RemoveAt = timestamppb.New(*l.RemoveAt)
+	}
 	result.Uid = l.Uid.String()
+	result.UpdatedAt = timestamppb.New(l.UpdatedAt)
 	result.Version = l.Version
+	result.VisibleFor = l.VisibleFor
 	return result
 }
 
@@ -98,6 +178,7 @@ func (l Label) ToLabel() *pbTypes.Label {
 type LabelDefinition struct {
 	Authentication *Authentication   `json:"authentication,omitempty"`
 	Driver         string            `json:"driver,omitempty"`
+	Images         []Image           `json:"images,omitempty"`
 	Options        util.UnparsedJSON `json:"options,omitempty"`
 	Resources      Resources         `json:"resources,omitempty"`
 }
@@ -114,6 +195,11 @@ func FromLabelDefinition(src *pbTypes.LabelDefinition) LabelDefinition {
 		result.Authentication = &data
 	}
 	result.Driver = src.GetDriver()
+	for _, item := range src.GetImages() {
+		if item != nil {
+			result.Images = append(result.Images, FromImage(item))
+		}
+	}
 	if src.GetOptions() != nil {
 		if data, err := protojson.Marshal(src.GetOptions()); err == nil {
 			result.Options = util.UnparsedJSON(data)
@@ -135,6 +221,9 @@ func (l LabelDefinition) ToLabelDefinition() *pbTypes.LabelDefinition {
 		result.Authentication = l.Authentication.ToAuthentication()
 	}
 	result.Driver = l.Driver
+	for _, item := range l.Images {
+		result.Images = append(result.Images, item.ToImage())
+	}
 	var mapData map[string]any
 	mapData = make(map[string]any)
 	if err := json.Unmarshal([]byte(l.Options), &mapData); err == nil {
@@ -149,14 +238,14 @@ func (l LabelDefinition) ToLabelDefinition() *pbTypes.LabelDefinition {
 // Resources is a data for Resources without internal locks
 type Resources struct {
 	Cpu          uint32                   `json:"cpu,omitempty"`
-	CpuOverbook  bool                     `json:"cpu_overbook,omitempty"`
+	CpuOverbook  *bool                    `json:"cpu_overbook,omitempty"`
 	Disks        map[string]ResourcesDisk `json:"disks,omitempty"`
-	Lifetime     string                   `json:"lifetime,omitempty"`
-	Multitenancy bool                     `json:"multitenancy,omitempty"`
-	Network      string                   `json:"network,omitempty"`
+	Lifetime     *string                  `json:"lifetime,omitempty"`
+	Multitenancy *bool                    `json:"multitenancy,omitempty"`
+	Network      *string                  `json:"network,omitempty"`
 	NodeFilter   []string                 `json:"node_filter,omitempty"`
 	Ram          uint32                   `json:"ram,omitempty"`
-	RamOverbook  bool                     `json:"ram_overbook,omitempty"`
+	RamOverbook  *bool                    `json:"ram_overbook,omitempty"`
 	Slots        *uint32                  `json:"slots,omitempty"`
 }
 
@@ -168,7 +257,10 @@ func FromResources(src *pbTypes.Resources) Resources {
 
 	result := Resources{}
 	result.Cpu = src.GetCpu()
-	result.CpuOverbook = src.GetCpuOverbook()
+	if src.CpuOverbook != nil {
+		val := src.GetCpuOverbook()
+		result.CpuOverbook = &val
+	}
 	// Convert map field disks
 	if src.GetDisks() != nil {
 		result.Disks = make(map[string]ResourcesDisk)
@@ -178,12 +270,24 @@ func FromResources(src *pbTypes.Resources) Resources {
 			}
 		}
 	}
-	result.Lifetime = src.GetLifetime()
-	result.Multitenancy = src.GetMultitenancy()
-	result.Network = src.GetNetwork()
+	if src.Lifetime != nil {
+		val := src.GetLifetime()
+		result.Lifetime = &val
+	}
+	if src.Multitenancy != nil {
+		val := src.GetMultitenancy()
+		result.Multitenancy = &val
+	}
+	if src.Network != nil {
+		val := src.GetNetwork()
+		result.Network = &val
+	}
 	result.NodeFilter = src.GetNodeFilter()
 	result.Ram = src.GetRam()
-	result.RamOverbook = src.GetRamOverbook()
+	if src.RamOverbook != nil {
+		val := src.GetRamOverbook()
+		result.RamOverbook = &val
+	}
 	if src.Slots != nil {
 		val := src.GetSlots()
 		result.Slots = &val
@@ -196,7 +300,9 @@ func (r Resources) ToResources() *pbTypes.Resources {
 	result := &pbTypes.Resources{}
 
 	result.Cpu = r.Cpu
-	result.CpuOverbook = r.CpuOverbook
+	if r.CpuOverbook != nil {
+		result.CpuOverbook = r.CpuOverbook
+	}
 	// Convert map field disks
 	if r.Disks != nil {
 		result.Disks = make(map[string]*pbTypes.ResourcesDisk)
@@ -204,12 +310,20 @@ func (r Resources) ToResources() *pbTypes.Resources {
 			result.Disks[k] = v.ToResourcesDisk()
 		}
 	}
-	result.Lifetime = r.Lifetime
-	result.Multitenancy = r.Multitenancy
-	result.Network = r.Network
+	if r.Lifetime != nil {
+		result.Lifetime = r.Lifetime
+	}
+	if r.Multitenancy != nil {
+		result.Multitenancy = r.Multitenancy
+	}
+	if r.Network != nil {
+		result.Network = r.Network
+	}
 	result.NodeFilter = r.NodeFilter
 	result.Ram = r.Ram
-	result.RamOverbook = r.RamOverbook
+	if r.RamOverbook != nil {
+		result.RamOverbook = r.RamOverbook
+	}
 	if r.Slots != nil {
 		result.Slots = r.Slots
 	}
@@ -218,11 +332,11 @@ func (r Resources) ToResources() *pbTypes.Resources {
 
 // ResourcesDisk is a data for ResourcesDisk without internal locks
 type ResourcesDisk struct {
-	Clone string `json:"clone,omitempty"`
-	Label string `json:"label,omitempty"`
-	Reuse bool   `json:"reuse,omitempty"`
-	Size  uint32 `json:"size,omitempty"`
-	Type  string `json:"type,omitempty"`
+	Clone *string `json:"clone,omitempty"`
+	Label *string `json:"label,omitempty"`
+	Reuse *bool   `json:"reuse,omitempty"`
+	Size  *uint32 `json:"size,omitempty"`
+	Type  *string `json:"type,omitempty"`
 }
 
 // FromResourcesDisk creates a ResourcesDisk from ResourcesDisk
@@ -232,11 +346,26 @@ func FromResourcesDisk(src *pbTypes.ResourcesDisk) ResourcesDisk {
 	}
 
 	result := ResourcesDisk{}
-	result.Clone = src.GetClone()
-	result.Label = src.GetLabel()
-	result.Reuse = src.GetReuse()
-	result.Size = src.GetSize()
-	result.Type = src.GetType()
+	if src.Clone != nil {
+		val := src.GetClone()
+		result.Clone = &val
+	}
+	if src.Label != nil {
+		val := src.GetLabel()
+		result.Label = &val
+	}
+	if src.Reuse != nil {
+		val := src.GetReuse()
+		result.Reuse = &val
+	}
+	if src.Size != nil {
+		val := src.GetSize()
+		result.Size = &val
+	}
+	if src.Type != nil {
+		val := src.GetType()
+		result.Type = &val
+	}
 	return result
 }
 
@@ -244,10 +373,20 @@ func FromResourcesDisk(src *pbTypes.ResourcesDisk) ResourcesDisk {
 func (r ResourcesDisk) ToResourcesDisk() *pbTypes.ResourcesDisk {
 	result := &pbTypes.ResourcesDisk{}
 
-	result.Clone = r.Clone
-	result.Label = r.Label
-	result.Reuse = r.Reuse
-	result.Size = r.Size
-	result.Type = r.Type
+	if r.Clone != nil {
+		result.Clone = r.Clone
+	}
+	if r.Label != nil {
+		result.Label = r.Label
+	}
+	if r.Reuse != nil {
+		result.Reuse = r.Reuse
+	}
+	if r.Size != nil {
+		result.Size = r.Size
+	}
+	if r.Type != nil {
+		result.Type = r.Type
+	}
 	return result
 }

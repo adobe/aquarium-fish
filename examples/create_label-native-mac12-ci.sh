@@ -29,7 +29,7 @@ curr_version="$(echo "$curr_label" | grep -o '"version": *[0-9]\+' | tr -dc '0-9
 echo "Current label '$label:$curr_version': $curr_label"
 
 [ "x$curr_version" != "x" ] || curr_version=0
-new_version=$(($curr_version+1))
+new_version=$(($curr_version + 1))
 
 echo
 echo "Create the new version of Label '$label:$new_version' ?"
@@ -42,12 +42,12 @@ label:
   version: '$new_version'
   definitions:
     - driver: native
+      images:  # For test purposes images are used as symlink to aquarium-bait/out so does not need checksum
+        - url: https://artifact-storage/aquarium/image/native/mac/mac-VERSION.tar.xz
+          tag: ws
+        - url: https://artifact-storage/aquarium/image/native/mac-ci/mac-ci-VERSION.tar.xz
+          tag: ws
       options:
-        images:  # For test purposes images are used as symlink to aquarium-bait/out so does not need checksum
-          - url: https://artifact-storage/aquarium/image/native/mac/mac-VERSION.tar.xz
-            tag: ws
-          - url: https://artifact-storage/aquarium/image/native/mac-ci/mac-ci-VERSION.tar.xz
-            tag: ws
         groups:
           - staff
         entry: "{{ .Disks.ws }}/init.sh"

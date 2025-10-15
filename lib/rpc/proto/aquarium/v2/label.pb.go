@@ -58,18 +58,21 @@ type Label struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	Uid       string                 `protobuf:"bytes,1,opt,name=uid,proto3" json:"uid,omitempty"`
 	CreatedAt *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	// Simple name to identify the Label
 	// example: macos1405-xcode161-ci_aws
-	Name string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Name string `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
 	// In order to update the labels freely and save the previous Label state for the past builds.
-	Version int32 `protobuf:"varint,4,opt,name=version,proto3" json:"version,omitempty"`
+	// Editable labels has version 0 and could be updated. Those labls has to have remove_at defined.
+	// The regular labels starting with 1 and goes until int32 is over and you can't edit those, only add new ones.
+	Version int32 `protobuf:"varint,5,opt,name=version,proto3" json:"version,omitempty"`
+	// User who owns this label, if empty - then admin
+	OwnerName string `protobuf:"bytes,6,opt,name=owner_name,json=ownerName,proto3" json:"owner_name,omitempty"`
 	// List of label definitions that describes required resources, driver and it's options.
 	// The order is sequential - so the priority is to the first driver and if it's not
 	// available than the next definitions will be used.
 	// example:
 	//   - driver: vmx
-	//     options:
-	//     image: winserver2019-vs2019-ci
 	//     images:
 	//   - url: 'https://artifact-storage/aquarium/image/vmx/winserver2019/winserver2019-VERSION.tar.xz'
 	//   - url: 'https://artifact-storage/aquarium/image/vmx/winserver2019-vs2019/winserver2019-vs2019-VERSION.tar.xz'
@@ -83,8 +86,9 @@ type Label struct {
 	//     reuse: true
 	//     network: nat
 	//   - driver: aws
+	//     images:
+	//   - name: aquarium/winserver2019-vs2019-ci-VERSION
 	//     options:
-	//     image: aquarium/winserver2019-vs2019-ci-VERSION
 	//     instance_type: c6a.4xlarge
 	//     security_groups:
 	//   - jenkins-worker
@@ -96,12 +100,20 @@ type Label struct {
 	//     xvdb:
 	//     size: 100
 	//     network: Name:build-vpc
-	Definitions []*LabelDefinition `protobuf:"bytes,5,rep,name=definitions,proto3" json:"definitions,omitempty"`
+	Definitions []*LabelDefinition `protobuf:"bytes,7,rep,name=definitions,proto3" json:"definitions,omitempty"`
 	// Basic metadata to pass to the ApplicationResource
 	// example:
 	//
 	//	JENKINS_AGENT_WORKSPACE: 'D:\'
-	Metadata      *structpb.Struct `protobuf:"bytes,6,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Metadata *structpb.Struct `protobuf:"bytes,8,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	// List defines users or teams that can see the label, if empty then anyone can see it
+	VisibleFor []string `protobuf:"bytes,9,rep,name=visible_for,json=visibleFor,proto3" json:"visible_for,omitempty"`
+	// When the temporary template will become unavailable to be used and will be removed.
+	// If not set - then it's a persistent label (version > 0), when version == 0 then this field must be defined.
+	// When time has come - the label can't be used to run new Application, but will exist until the last Application
+	// which used this label is removed. Then when it's time to remove the label - it will ask driver to post-process
+	// the label definitions as well (driver will decide what to do based on options provided within the definitions).
+	RemoveAt      *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=remove_at,json=removeAt,proto3,oneof" json:"remove_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -150,6 +162,13 @@ func (x *Label) GetCreatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *Label) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
 func (x *Label) GetName() string {
 	if x != nil {
 		return x.Name
@@ -162,6 +181,13 @@ func (x *Label) GetVersion() int32 {
 		return x.Version
 	}
 	return 0
+}
+
+func (x *Label) GetOwnerName() string {
+	if x != nil {
+		return x.OwnerName
+	}
+	return ""
 }
 
 func (x *Label) GetDefinitions() []*LabelDefinition {
@@ -178,6 +204,20 @@ func (x *Label) GetMetadata() *structpb.Struct {
 	return nil
 }
 
+func (x *Label) GetVisibleFor() []string {
+	if x != nil {
+		return x.VisibleFor
+	}
+	return nil
+}
+
+func (x *Label) GetRemoveAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.RemoveAt
+	}
+	return nil
+}
+
 // LabelDefinition describes how to provide resources
 //
 // Describes Label's ways to provide aa ApplicationResource - it contains name of the driver,
@@ -186,13 +226,15 @@ type LabelDefinition struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Name of the driver to execute
 	Driver string `protobuf:"bytes,1,opt,name=driver,proto3" json:"driver,omitempty"`
+	// Image(s) to use for the environment to startup
+	Images []*Image `protobuf:"bytes,2,rep,name=images,proto3" json:"images,omitempty"`
 	// Driver-specific options to execute the environment
-	Options *structpb.Struct `protobuf:"bytes,2,opt,name=options,proto3" json:"options,omitempty"`
+	Options *structpb.Struct `protobuf:"bytes,3,opt,name=options,proto3" json:"options,omitempty"`
 	// Resources Driver need to provide for the Label execution
-	Resources *Resources `protobuf:"bytes,3,opt,name=resources,proto3" json:"resources,omitempty"`
+	Resources *Resources `protobuf:"bytes,4,opt,name=resources,proto3" json:"resources,omitempty"`
 	// Authentication information to connect - is used by:
 	// * ProxySSH gate to allow access to the resource
-	Authentication *Authentication `protobuf:"bytes,4,opt,name=authentication,proto3,oneof" json:"authentication,omitempty"`
+	Authentication *Authentication `protobuf:"bytes,5,opt,name=authentication,proto3,oneof" json:"authentication,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -232,6 +274,13 @@ func (x *LabelDefinition) GetDriver() string {
 		return x.Driver
 	}
 	return ""
+}
+
+func (x *LabelDefinition) GetImages() []*Image {
+	if x != nil {
+		return x.Images
+	}
+	return nil
 }
 
 func (x *LabelDefinition) GetOptions() *structpb.Struct {
@@ -277,7 +326,7 @@ type Resources struct {
 	// Defines disks to attach/clone...
 	Disks map[string]*ResourcesDisk `protobuf:"bytes,4,rep,name=disks,proto3" json:"disks,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Which network configuration to use for the environment
-	Network string `protobuf:"bytes,5,opt,name=network,proto3" json:"network,omitempty"`
+	Network *string `protobuf:"bytes,5,opt,name=network,proto3,oneof" json:"network,omitempty"`
 	// The list of the Node identifiers to run resource on, supports path wildcards
 	// example:
 	//   - OS:darwin
@@ -285,17 +334,17 @@ type Resources struct {
 	//   - Arch:x86_64
 	NodeFilter []string `protobuf:"bytes,6,rep,name=node_filter,json=nodeFilter,proto3" json:"node_filter,omitempty"`
 	// Tolerate to run along with the other envs on the same node
-	Multitenancy bool `protobuf:"varint,7,opt,name=multitenancy,proto3" json:"multitenancy,omitempty"`
+	Multitenancy *bool `protobuf:"varint,7,opt,name=multitenancy,proto3,oneof" json:"multitenancy,omitempty"`
 	// Tolerate to node CPU overbooking when executed together with other envs
-	CpuOverbook bool `protobuf:"varint,8,opt,name=cpu_overbook,json=cpuOverbook,proto3" json:"cpu_overbook,omitempty"`
+	CpuOverbook *bool `protobuf:"varint,8,opt,name=cpu_overbook,json=cpuOverbook,proto3,oneof" json:"cpu_overbook,omitempty"`
 	// Tolerate to RAM overbooking when executed together with other envs
-	RamOverbook bool `protobuf:"varint,9,opt,name=ram_overbook,json=ramOverbook,proto3" json:"ram_overbook,omitempty"`
+	RamOverbook *bool `protobuf:"varint,9,opt,name=ram_overbook,json=ramOverbook,proto3,oneof" json:"ram_overbook,omitempty"`
 	// Total lifetime of the ApplicationResource in Time Duration (ex. "1h30m30s"). Begins on
 	// ApplicationResource create time till deallocate by user or auto deallocate by timeout.
 	// If it's empty or "0" then default value from fish node config will be used. If it's
 	// negative (ex. "-1s") then the ApplicationResource will live forever or until the user
 	// requests deallocate.
-	Lifetime      string `protobuf:"bytes,10,opt,name=lifetime,proto3" json:"lifetime,omitempty"`
+	Lifetime      *string `protobuf:"bytes,10,opt,name=lifetime,proto3,oneof" json:"lifetime,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -359,8 +408,8 @@ func (x *Resources) GetDisks() map[string]*ResourcesDisk {
 }
 
 func (x *Resources) GetNetwork() string {
-	if x != nil {
-		return x.Network
+	if x != nil && x.Network != nil {
+		return *x.Network
 	}
 	return ""
 }
@@ -373,29 +422,29 @@ func (x *Resources) GetNodeFilter() []string {
 }
 
 func (x *Resources) GetMultitenancy() bool {
-	if x != nil {
-		return x.Multitenancy
+	if x != nil && x.Multitenancy != nil {
+		return *x.Multitenancy
 	}
 	return false
 }
 
 func (x *Resources) GetCpuOverbook() bool {
-	if x != nil {
-		return x.CpuOverbook
+	if x != nil && x.CpuOverbook != nil {
+		return *x.CpuOverbook
 	}
 	return false
 }
 
 func (x *Resources) GetRamOverbook() bool {
-	if x != nil {
-		return x.RamOverbook
+	if x != nil && x.RamOverbook != nil {
+		return *x.RamOverbook
 	}
 	return false
 }
 
 func (x *Resources) GetLifetime() string {
-	if x != nil {
-		return x.Lifetime
+	if x != nil && x.Lifetime != nil {
+		return *x.Lifetime
 	}
 	return ""
 }
@@ -404,15 +453,15 @@ func (x *Resources) GetLifetime() string {
 type ResourcesDisk struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Type of the filesystem to create by Fish - usually handled by the formatter of the image
-	Type string `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	Type *string `protobuf:"bytes,1,opt,name=type,proto3,oneof" json:"type,omitempty"`
 	// Volume name will be given to the disk, empty will use the disk key
-	Label string `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
+	Label *string `protobuf:"bytes,2,opt,name=label,proto3,oneof" json:"label,omitempty"`
 	// Amount of disk space in GB for new disk, could not used if clone is set
-	Size uint32 `protobuf:"varint,3,opt,name=size,proto3" json:"size,omitempty"`
+	Size *uint32 `protobuf:"varint,3,opt,name=size,proto3,oneof" json:"size,omitempty"`
 	// Do not remove the disk and reuse it for the next resource run
-	Reuse bool `protobuf:"varint,4,opt,name=reuse,proto3" json:"reuse,omitempty"`
+	Reuse *bool `protobuf:"varint,4,opt,name=reuse,proto3,oneof" json:"reuse,omitempty"`
 	// Clone the snapshot of existing disk instead of creating the new one
-	Clone         string `protobuf:"bytes,5,opt,name=clone,proto3" json:"clone,omitempty"`
+	Clone         *string `protobuf:"bytes,5,opt,name=clone,proto3,oneof" json:"clone,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -448,36 +497,117 @@ func (*ResourcesDisk) Descriptor() ([]byte, []int) {
 }
 
 func (x *ResourcesDisk) GetType() string {
-	if x != nil {
-		return x.Type
+	if x != nil && x.Type != nil {
+		return *x.Type
 	}
 	return ""
 }
 
 func (x *ResourcesDisk) GetLabel() string {
-	if x != nil {
-		return x.Label
+	if x != nil && x.Label != nil {
+		return *x.Label
 	}
 	return ""
 }
 
 func (x *ResourcesDisk) GetSize() uint32 {
-	if x != nil {
-		return x.Size
+	if x != nil && x.Size != nil {
+		return *x.Size
 	}
 	return 0
 }
 
 func (x *ResourcesDisk) GetReuse() bool {
-	if x != nil {
-		return x.Reuse
+	if x != nil && x.Reuse != nil {
+		return *x.Reuse
 	}
 	return false
 }
 
 func (x *ResourcesDisk) GetClone() string {
+	if x != nil && x.Clone != nil {
+		return *x.Clone
+	}
+	return ""
+}
+
+type Image struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Name of the image, if not set will use a part of the Url file name prior to last minus ("-") or ext
+	Name *string `protobuf:"bytes,1,opt,name=name,proto3,oneof" json:"name,omitempty"`
+	// Address of the remote image to download it
+	Url *string `protobuf:"bytes,2,opt,name=url,proto3,oneof" json:"url,omitempty"`
+	// Checksum of the image in format "<algo>:<checksum>"
+	Sum *string `protobuf:"bytes,3,opt,name=sum,proto3,oneof" json:"sum,omitempty"`
+	// Version of the image, if not set will use a part of the Url file name after the last minus ("-") to ext
+	Version *string `protobuf:"bytes,4,opt,name=version,proto3,oneof" json:"version,omitempty"`
+	// Identifier used by drivers to make sure the images will be processed properly
+	Tag           *string `protobuf:"bytes,5,opt,name=tag,proto3,oneof" json:"tag,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Image) Reset() {
+	*x = Image{}
+	mi := &file_aquarium_v2_label_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Image) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Image) ProtoMessage() {}
+
+func (x *Image) ProtoReflect() protoreflect.Message {
+	mi := &file_aquarium_v2_label_proto_msgTypes[4]
 	if x != nil {
-		return x.Clone
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Image.ProtoReflect.Descriptor instead.
+func (*Image) Descriptor() ([]byte, []int) {
+	return file_aquarium_v2_label_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *Image) GetName() string {
+	if x != nil && x.Name != nil {
+		return *x.Name
+	}
+	return ""
+}
+
+func (x *Image) GetUrl() string {
+	if x != nil && x.Url != nil {
+		return *x.Url
+	}
+	return ""
+}
+
+func (x *Image) GetSum() string {
+	if x != nil && x.Sum != nil {
+		return *x.Sum
+	}
+	return ""
+}
+
+func (x *Image) GetVersion() string {
+	if x != nil && x.Version != nil {
+		return *x.Version
+	}
+	return ""
+}
+
+func (x *Image) GetTag() string {
+	if x != nil && x.Tag != nil {
+		return *x.Tag
 	}
 	return ""
 }
@@ -494,7 +624,7 @@ type LabelServiceListRequest struct {
 
 func (x *LabelServiceListRequest) Reset() {
 	*x = LabelServiceListRequest{}
-	mi := &file_aquarium_v2_label_proto_msgTypes[4]
+	mi := &file_aquarium_v2_label_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -506,7 +636,7 @@ func (x *LabelServiceListRequest) String() string {
 func (*LabelServiceListRequest) ProtoMessage() {}
 
 func (x *LabelServiceListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_label_proto_msgTypes[4]
+	mi := &file_aquarium_v2_label_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -519,7 +649,7 @@ func (x *LabelServiceListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LabelServiceListRequest.ProtoReflect.Descriptor instead.
 func (*LabelServiceListRequest) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_label_proto_rawDescGZIP(), []int{4}
+	return file_aquarium_v2_label_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *LabelServiceListRequest) GetName() string {
@@ -547,7 +677,7 @@ type LabelServiceListResponse struct {
 
 func (x *LabelServiceListResponse) Reset() {
 	*x = LabelServiceListResponse{}
-	mi := &file_aquarium_v2_label_proto_msgTypes[5]
+	mi := &file_aquarium_v2_label_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -559,7 +689,7 @@ func (x *LabelServiceListResponse) String() string {
 func (*LabelServiceListResponse) ProtoMessage() {}
 
 func (x *LabelServiceListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_label_proto_msgTypes[5]
+	mi := &file_aquarium_v2_label_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -572,7 +702,7 @@ func (x *LabelServiceListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LabelServiceListResponse.ProtoReflect.Descriptor instead.
 func (*LabelServiceListResponse) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_label_proto_rawDescGZIP(), []int{5}
+	return file_aquarium_v2_label_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *LabelServiceListResponse) GetStatus() bool {
@@ -605,7 +735,7 @@ type LabelServiceGetRequest struct {
 
 func (x *LabelServiceGetRequest) Reset() {
 	*x = LabelServiceGetRequest{}
-	mi := &file_aquarium_v2_label_proto_msgTypes[6]
+	mi := &file_aquarium_v2_label_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -617,7 +747,7 @@ func (x *LabelServiceGetRequest) String() string {
 func (*LabelServiceGetRequest) ProtoMessage() {}
 
 func (x *LabelServiceGetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_label_proto_msgTypes[6]
+	mi := &file_aquarium_v2_label_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -630,7 +760,7 @@ func (x *LabelServiceGetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LabelServiceGetRequest.ProtoReflect.Descriptor instead.
 func (*LabelServiceGetRequest) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_label_proto_rawDescGZIP(), []int{6}
+	return file_aquarium_v2_label_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *LabelServiceGetRequest) GetLabelUid() string {
@@ -651,7 +781,7 @@ type LabelServiceGetResponse struct {
 
 func (x *LabelServiceGetResponse) Reset() {
 	*x = LabelServiceGetResponse{}
-	mi := &file_aquarium_v2_label_proto_msgTypes[7]
+	mi := &file_aquarium_v2_label_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -663,7 +793,7 @@ func (x *LabelServiceGetResponse) String() string {
 func (*LabelServiceGetResponse) ProtoMessage() {}
 
 func (x *LabelServiceGetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_label_proto_msgTypes[7]
+	mi := &file_aquarium_v2_label_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -676,7 +806,7 @@ func (x *LabelServiceGetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LabelServiceGetResponse.ProtoReflect.Descriptor instead.
 func (*LabelServiceGetResponse) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_label_proto_rawDescGZIP(), []int{7}
+	return file_aquarium_v2_label_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *LabelServiceGetResponse) GetStatus() bool {
@@ -709,7 +839,7 @@ type LabelServiceCreateRequest struct {
 
 func (x *LabelServiceCreateRequest) Reset() {
 	*x = LabelServiceCreateRequest{}
-	mi := &file_aquarium_v2_label_proto_msgTypes[8]
+	mi := &file_aquarium_v2_label_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -721,7 +851,7 @@ func (x *LabelServiceCreateRequest) String() string {
 func (*LabelServiceCreateRequest) ProtoMessage() {}
 
 func (x *LabelServiceCreateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_label_proto_msgTypes[8]
+	mi := &file_aquarium_v2_label_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -734,7 +864,7 @@ func (x *LabelServiceCreateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LabelServiceCreateRequest.ProtoReflect.Descriptor instead.
 func (*LabelServiceCreateRequest) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_label_proto_rawDescGZIP(), []int{8}
+	return file_aquarium_v2_label_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *LabelServiceCreateRequest) GetLabel() *Label {
@@ -755,7 +885,7 @@ type LabelServiceCreateResponse struct {
 
 func (x *LabelServiceCreateResponse) Reset() {
 	*x = LabelServiceCreateResponse{}
-	mi := &file_aquarium_v2_label_proto_msgTypes[9]
+	mi := &file_aquarium_v2_label_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -767,7 +897,7 @@ func (x *LabelServiceCreateResponse) String() string {
 func (*LabelServiceCreateResponse) ProtoMessage() {}
 
 func (x *LabelServiceCreateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_label_proto_msgTypes[9]
+	mi := &file_aquarium_v2_label_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -780,7 +910,7 @@ func (x *LabelServiceCreateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LabelServiceCreateResponse.ProtoReflect.Descriptor instead.
 func (*LabelServiceCreateResponse) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_label_proto_rawDescGZIP(), []int{9}
+	return file_aquarium_v2_label_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *LabelServiceCreateResponse) GetStatus() bool {
@@ -804,6 +934,110 @@ func (x *LabelServiceCreateResponse) GetData() *Label {
 	return nil
 }
 
+type LabelServiceUpdateRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Label         *Label                 `protobuf:"bytes,1,opt,name=label,proto3" json:"label,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LabelServiceUpdateRequest) Reset() {
+	*x = LabelServiceUpdateRequest{}
+	mi := &file_aquarium_v2_label_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LabelServiceUpdateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LabelServiceUpdateRequest) ProtoMessage() {}
+
+func (x *LabelServiceUpdateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aquarium_v2_label_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LabelServiceUpdateRequest.ProtoReflect.Descriptor instead.
+func (*LabelServiceUpdateRequest) Descriptor() ([]byte, []int) {
+	return file_aquarium_v2_label_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *LabelServiceUpdateRequest) GetLabel() *Label {
+	if x != nil {
+		return x.Label
+	}
+	return nil
+}
+
+type LabelServiceUpdateResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        bool                   `protobuf:"varint,1,opt,name=status,proto3" json:"status,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Data          *Label                 `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LabelServiceUpdateResponse) Reset() {
+	*x = LabelServiceUpdateResponse{}
+	mi := &file_aquarium_v2_label_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LabelServiceUpdateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LabelServiceUpdateResponse) ProtoMessage() {}
+
+func (x *LabelServiceUpdateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aquarium_v2_label_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LabelServiceUpdateResponse.ProtoReflect.Descriptor instead.
+func (*LabelServiceUpdateResponse) Descriptor() ([]byte, []int) {
+	return file_aquarium_v2_label_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *LabelServiceUpdateResponse) GetStatus() bool {
+	if x != nil {
+		return x.Status
+	}
+	return false
+}
+
+func (x *LabelServiceUpdateResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *LabelServiceUpdateResponse) GetData() *Label {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
 type LabelServiceRemoveRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	LabelUid      string                 `protobuf:"bytes,1,opt,name=label_uid,json=labelUid,proto3" json:"label_uid,omitempty"`
@@ -813,7 +1047,7 @@ type LabelServiceRemoveRequest struct {
 
 func (x *LabelServiceRemoveRequest) Reset() {
 	*x = LabelServiceRemoveRequest{}
-	mi := &file_aquarium_v2_label_proto_msgTypes[10]
+	mi := &file_aquarium_v2_label_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -825,7 +1059,7 @@ func (x *LabelServiceRemoveRequest) String() string {
 func (*LabelServiceRemoveRequest) ProtoMessage() {}
 
 func (x *LabelServiceRemoveRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_label_proto_msgTypes[10]
+	mi := &file_aquarium_v2_label_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -838,7 +1072,7 @@ func (x *LabelServiceRemoveRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LabelServiceRemoveRequest.ProtoReflect.Descriptor instead.
 func (*LabelServiceRemoveRequest) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_label_proto_rawDescGZIP(), []int{10}
+	return file_aquarium_v2_label_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *LabelServiceRemoveRequest) GetLabelUid() string {
@@ -858,7 +1092,7 @@ type LabelServiceRemoveResponse struct {
 
 func (x *LabelServiceRemoveResponse) Reset() {
 	*x = LabelServiceRemoveResponse{}
-	mi := &file_aquarium_v2_label_proto_msgTypes[11]
+	mi := &file_aquarium_v2_label_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -870,7 +1104,7 @@ func (x *LabelServiceRemoveResponse) String() string {
 func (*LabelServiceRemoveResponse) ProtoMessage() {}
 
 func (x *LabelServiceRemoveResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aquarium_v2_label_proto_msgTypes[11]
+	mi := &file_aquarium_v2_label_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -883,7 +1117,7 @@ func (x *LabelServiceRemoveResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LabelServiceRemoveResponse.ProtoReflect.Descriptor instead.
 func (*LabelServiceRemoveResponse) Descriptor() ([]byte, []int) {
-	return file_aquarium_v2_label_proto_rawDescGZIP(), []int{11}
+	return file_aquarium_v2_label_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *LabelServiceRemoveResponse) GetStatus() bool {
@@ -904,46 +1138,80 @@ var File_aquarium_v2_label_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_label_proto_rawDesc = "" +
 	"\n" +
-	"\x17aquarium/v2/label.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x18aquarium/v2/common.proto\x1a\x1eaquarium/v2/options_rbac.proto\x1a#aquarium/v2/options_streaming.proto\x1a\x1caquarium/v2/options_ui.proto\"\xa8\x02\n" +
+	"\x17aquarium/v2/label.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x18aquarium/v2/common.proto\x1a\x1eaquarium/v2/options_rbac.proto\x1a#aquarium/v2/options_streaming.proto\x1a\x1caquarium/v2/options_ui.proto\"\x97\x04\n" +
 	"\x05Label\x12\x1a\n" +
 	"\x03uid\x18\x01 \x01(\tB\b\x9a\xb5\x18\x04\b\x01\x10\x01R\x03uid\x12C\n" +
 	"\n" +
-	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\b\x9a\xb5\x18\x04\b\x01\x10\x01R\tcreatedAt\x12\x12\n" +
-	"\x04name\x18\x03 \x01(\tR\x04name\x12\x18\n" +
-	"\aversion\x18\x04 \x01(\x05R\aversion\x12>\n" +
-	"\vdefinitions\x18\x05 \x03(\v2\x1c.aquarium.v2.LabelDefinitionR\vdefinitions\x123\n" +
-	"\bmetadata\x18\x06 \x01(\v2\x17.google.protobuf.StructR\bmetadata:\x1b\x8a\xb5\x18\x11\n" +
-	"\x0fLabelServiceGet\x92\xb5\x18\x02\b\x01\"\xf7\x01\n" +
+	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\b\x9a\xb5\x18\x04\b\x01\x10\x01R\tcreatedAt\x12C\n" +
+	"\n" +
+	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\b\x9a\xb5\x18\x04\b\x01\x10\x01R\tupdatedAt\x12\x1a\n" +
+	"\x04name\x18\x04 \x01(\tB\x06\x9a\xb5\x18\x02\x10\x01R\x04name\x12 \n" +
+	"\aversion\x18\x05 \x01(\x05B\x06\x9a\xb5\x18\x02\x10\x01R\aversion\x12'\n" +
+	"\n" +
+	"owner_name\x18\x06 \x01(\tB\b\x9a\xb5\x18\x04\b\x01\x10\x01R\townerName\x12>\n" +
+	"\vdefinitions\x18\a \x03(\v2\x1c.aquarium.v2.LabelDefinitionR\vdefinitions\x12;\n" +
+	"\bmetadata\x18\b \x01(\v2\x17.google.protobuf.StructB\x06\x9a\xb5\x18\x02(\x00R\bmetadata\x12'\n" +
+	"\vvisible_for\x18\t \x03(\tB\x06\x9a\xb5\x18\x02(\x00R\n" +
+	"visibleFor\x12<\n" +
+	"\tremove_at\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampH\x00R\bremoveAt\x88\x01\x01:\x0f\x8a\xb5\x18\x05\n" +
+	"\x03Get\x92\xb5\x18\x02\b\x01B\f\n" +
+	"\n" +
+	"_remove_at\"\xb3\x02\n" +
 	"\x0fLabelDefinition\x12\x16\n" +
-	"\x06driver\x18\x01 \x01(\tR\x06driver\x121\n" +
-	"\aoptions\x18\x02 \x01(\v2\x17.google.protobuf.StructR\aoptions\x124\n" +
-	"\tresources\x18\x03 \x01(\v2\x16.aquarium.v2.ResourcesR\tresources\x12H\n" +
-	"\x0eauthentication\x18\x04 \x01(\v2\x1b.aquarium.v2.AuthenticationH\x00R\x0eauthentication\x88\x01\x01:\x06\x92\xb5\x18\x02\b\x01B\x11\n" +
-	"\x0f_authentication\"\xac\x03\n" +
+	"\x06driver\x18\x01 \x01(\tR\x06driver\x122\n" +
+	"\x06images\x18\x02 \x03(\v2\x12.aquarium.v2.ImageB\x06\x9a\xb5\x18\x02(\x00R\x06images\x129\n" +
+	"\aoptions\x18\x03 \x01(\v2\x17.google.protobuf.StructB\x06\x9a\xb5\x18\x02(\x00R\aoptions\x124\n" +
+	"\tresources\x18\x04 \x01(\v2\x16.aquarium.v2.ResourcesR\tresources\x12H\n" +
+	"\x0eauthentication\x18\x05 \x01(\v2\x1b.aquarium.v2.AuthenticationH\x00R\x0eauthentication\x88\x01\x01:\x06\x92\xb5\x18\x02\b\x01B\x11\n" +
+	"\x0f_authentication\"\xa9\x04\n" +
 	"\tResources\x12\x19\n" +
 	"\x05slots\x18\x01 \x01(\rH\x00R\x05slots\x88\x01\x01\x12\x10\n" +
 	"\x03cpu\x18\x02 \x01(\rR\x03cpu\x12\x10\n" +
-	"\x03ram\x18\x03 \x01(\rR\x03ram\x127\n" +
-	"\x05disks\x18\x04 \x03(\v2!.aquarium.v2.Resources.DisksEntryR\x05disks\x12\x18\n" +
-	"\anetwork\x18\x05 \x01(\tR\anetwork\x12\x1f\n" +
-	"\vnode_filter\x18\x06 \x03(\tR\n" +
-	"nodeFilter\x12\"\n" +
-	"\fmultitenancy\x18\a \x01(\bR\fmultitenancy\x12!\n" +
-	"\fcpu_overbook\x18\b \x01(\bR\vcpuOverbook\x12!\n" +
-	"\fram_overbook\x18\t \x01(\bR\vramOverbook\x12\x1a\n" +
+	"\x03ram\x18\x03 \x01(\rR\x03ram\x12?\n" +
+	"\x05disks\x18\x04 \x03(\v2!.aquarium.v2.Resources.DisksEntryB\x06\x9a\xb5\x18\x02(\x00R\x05disks\x12%\n" +
+	"\anetwork\x18\x05 \x01(\tB\x06\x9a\xb5\x18\x02(\x00H\x01R\anetwork\x88\x01\x01\x12'\n" +
+	"\vnode_filter\x18\x06 \x03(\tB\x06\x9a\xb5\x18\x02(\x00R\n" +
+	"nodeFilter\x12'\n" +
+	"\fmultitenancy\x18\a \x01(\bH\x02R\fmultitenancy\x88\x01\x01\x12&\n" +
+	"\fcpu_overbook\x18\b \x01(\bH\x03R\vcpuOverbook\x88\x01\x01\x12&\n" +
+	"\fram_overbook\x18\t \x01(\bH\x04R\vramOverbook\x88\x01\x01\x12\x1f\n" +
 	"\blifetime\x18\n" +
-	" \x01(\tR\blifetime\x1aT\n" +
+	" \x01(\tH\x05R\blifetime\x88\x01\x01\x1aT\n" +
 	"\n" +
 	"DisksEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x120\n" +
 	"\x05value\x18\x02 \x01(\v2\x1a.aquarium.v2.ResourcesDiskR\x05value:\x028\x01:\x06\x92\xb5\x18\x02\b\x01B\b\n" +
-	"\x06_slots\"\x81\x01\n" +
-	"\rResourcesDisk\x12\x12\n" +
-	"\x04type\x18\x01 \x01(\tR\x04type\x12\x14\n" +
-	"\x05label\x18\x02 \x01(\tR\x05label\x12\x12\n" +
-	"\x04size\x18\x03 \x01(\rR\x04size\x12\x14\n" +
-	"\x05reuse\x18\x04 \x01(\bR\x05reuse\x12\x14\n" +
-	"\x05clone\x18\x05 \x01(\tR\x05clone:\x06\x92\xb5\x18\x02\b\x01\"f\n" +
+	"\x06_slotsB\n" +
+	"\n" +
+	"\b_networkB\x0f\n" +
+	"\r_multitenancyB\x0f\n" +
+	"\r_cpu_overbookB\x0f\n" +
+	"\r_ram_overbookB\v\n" +
+	"\t_lifetime\"\xca\x01\n" +
+	"\rResourcesDisk\x12\x17\n" +
+	"\x04type\x18\x01 \x01(\tH\x00R\x04type\x88\x01\x01\x12\x19\n" +
+	"\x05label\x18\x02 \x01(\tH\x01R\x05label\x88\x01\x01\x12\x17\n" +
+	"\x04size\x18\x03 \x01(\rH\x02R\x04size\x88\x01\x01\x12\x19\n" +
+	"\x05reuse\x18\x04 \x01(\bH\x03R\x05reuse\x88\x01\x01\x12\x19\n" +
+	"\x05clone\x18\x05 \x01(\tH\x04R\x05clone\x88\x01\x01:\x06\x92\xb5\x18\x02\b\x01B\a\n" +
+	"\x05_typeB\b\n" +
+	"\x06_labelB\a\n" +
+	"\x05_sizeB\b\n" +
+	"\x06_reuseB\b\n" +
+	"\x06_clone\"\xb9\x01\n" +
+	"\x05Image\x12\x17\n" +
+	"\x04name\x18\x01 \x01(\tH\x00R\x04name\x88\x01\x01\x12\x15\n" +
+	"\x03url\x18\x02 \x01(\tH\x01R\x03url\x88\x01\x01\x12\x15\n" +
+	"\x03sum\x18\x03 \x01(\tH\x02R\x03sum\x88\x01\x01\x12\x1d\n" +
+	"\aversion\x18\x04 \x01(\tH\x03R\aversion\x88\x01\x01\x12\x15\n" +
+	"\x03tag\x18\x05 \x01(\tH\x04R\x03tag\x88\x01\x01:\x06\x92\xb5\x18\x02\b\x01B\a\n" +
+	"\x05_nameB\x06\n" +
+	"\x04_urlB\x06\n" +
+	"\x04_sumB\n" +
+	"\n" +
+	"\b_versionB\x06\n" +
+	"\x04_tag\"f\n" +
 	"\x17LabelServiceListRequest\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tH\x00R\x04name\x88\x01\x01\x12\x1d\n" +
 	"\aversion\x18\x02 \x01(\tH\x01R\aversion\x88\x01\x01B\a\n" +
@@ -965,18 +1233,24 @@ const file_aquarium_v2_label_proto_rawDesc = "" +
 	"\x1aLabelServiceCreateResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12&\n" +
+	"\x04data\x18\x03 \x01(\v2\x12.aquarium.v2.LabelR\x04data\"E\n" +
+	"\x19LabelServiceUpdateRequest\x12(\n" +
+	"\x05label\x18\x01 \x01(\v2\x12.aquarium.v2.LabelR\x05label\"v\n" +
+	"\x1aLabelServiceUpdateResponse\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12&\n" +
 	"\x04data\x18\x03 \x01(\v2\x12.aquarium.v2.LabelR\x04data\"8\n" +
 	"\x19LabelServiceRemoveRequest\x12\x1b\n" +
 	"\tlabel_uid\x18\x01 \x01(\tR\blabelUid\"N\n" +
 	"\x1aLabelServiceRemoveResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage2\xfd\x02\n" +
-	"\fLabelService\x12_\n" +
-	"\x04List\x12$.aquarium.v2.LabelServiceListRequest\x1a%.aquarium.v2.LabelServiceListResponse\"\n" +
-	"\x82\xb5\x18\x06\x1a\x04User\x12R\n" +
-	"\x03Get\x12#.aquarium.v2.LabelServiceGetRequest\x1a$.aquarium.v2.LabelServiceGetResponse\"\x00\x12[\n" +
-	"\x06Create\x12&.aquarium.v2.LabelServiceCreateRequest\x1a'.aquarium.v2.LabelServiceCreateResponse\"\x00\x12[\n" +
-	"\x06Remove\x12&.aquarium.v2.LabelServiceRemoveRequest\x1a'.aquarium.v2.LabelServiceRemoveResponse\"\x00BEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"
+	"\amessage\x18\x02 \x01(\tR\amessage2\xb4\x04\n" +
+	"\fLabelService\x12h\n" +
+	"\x04List\x12$.aquarium.v2.LabelServiceListRequest\x1a%.aquarium.v2.LabelServiceListResponse\"\x13\x82\xb5\x18\x0f\x1a\x04User\"\aListAll\x12d\n" +
+	"\x03Get\x12#.aquarium.v2.LabelServiceGetRequest\x1a$.aquarium.v2.LabelServiceGetResponse\"\x12\x82\xb5\x18\x0e\x1a\x04User\"\x06GetAll\x12p\n" +
+	"\x06Create\x12&.aquarium.v2.LabelServiceCreateRequest\x1a'.aquarium.v2.LabelServiceCreateResponse\"\x15\x82\xb5\x18\x11\x1a\x04User\"\tCreateAll\x12p\n" +
+	"\x06Update\x12&.aquarium.v2.LabelServiceUpdateRequest\x1a'.aquarium.v2.LabelServiceUpdateResponse\"\x15\x82\xb5\x18\x11\x1a\x04User\"\tUpdateAll\x12p\n" +
+	"\x06Remove\x12&.aquarium.v2.LabelServiceRemoveRequest\x1a'.aquarium.v2.LabelServiceRemoveResponse\"\x15\x82\xb5\x18\x11\x1a\x04User\"\tRemoveAllBEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"
 
 var (
 	file_aquarium_v2_label_proto_rawDescOnce sync.Once
@@ -990,51 +1264,61 @@ func file_aquarium_v2_label_proto_rawDescGZIP() []byte {
 	return file_aquarium_v2_label_proto_rawDescData
 }
 
-var file_aquarium_v2_label_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_aquarium_v2_label_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_aquarium_v2_label_proto_goTypes = []any{
 	(*Label)(nil),                      // 0: aquarium.v2.Label
 	(*LabelDefinition)(nil),            // 1: aquarium.v2.LabelDefinition
 	(*Resources)(nil),                  // 2: aquarium.v2.Resources
 	(*ResourcesDisk)(nil),              // 3: aquarium.v2.ResourcesDisk
-	(*LabelServiceListRequest)(nil),    // 4: aquarium.v2.LabelServiceListRequest
-	(*LabelServiceListResponse)(nil),   // 5: aquarium.v2.LabelServiceListResponse
-	(*LabelServiceGetRequest)(nil),     // 6: aquarium.v2.LabelServiceGetRequest
-	(*LabelServiceGetResponse)(nil),    // 7: aquarium.v2.LabelServiceGetResponse
-	(*LabelServiceCreateRequest)(nil),  // 8: aquarium.v2.LabelServiceCreateRequest
-	(*LabelServiceCreateResponse)(nil), // 9: aquarium.v2.LabelServiceCreateResponse
-	(*LabelServiceRemoveRequest)(nil),  // 10: aquarium.v2.LabelServiceRemoveRequest
-	(*LabelServiceRemoveResponse)(nil), // 11: aquarium.v2.LabelServiceRemoveResponse
-	nil,                                // 12: aquarium.v2.Resources.DisksEntry
-	(*timestamppb.Timestamp)(nil),      // 13: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),            // 14: google.protobuf.Struct
-	(*Authentication)(nil),             // 15: aquarium.v2.Authentication
+	(*Image)(nil),                      // 4: aquarium.v2.Image
+	(*LabelServiceListRequest)(nil),    // 5: aquarium.v2.LabelServiceListRequest
+	(*LabelServiceListResponse)(nil),   // 6: aquarium.v2.LabelServiceListResponse
+	(*LabelServiceGetRequest)(nil),     // 7: aquarium.v2.LabelServiceGetRequest
+	(*LabelServiceGetResponse)(nil),    // 8: aquarium.v2.LabelServiceGetResponse
+	(*LabelServiceCreateRequest)(nil),  // 9: aquarium.v2.LabelServiceCreateRequest
+	(*LabelServiceCreateResponse)(nil), // 10: aquarium.v2.LabelServiceCreateResponse
+	(*LabelServiceUpdateRequest)(nil),  // 11: aquarium.v2.LabelServiceUpdateRequest
+	(*LabelServiceUpdateResponse)(nil), // 12: aquarium.v2.LabelServiceUpdateResponse
+	(*LabelServiceRemoveRequest)(nil),  // 13: aquarium.v2.LabelServiceRemoveRequest
+	(*LabelServiceRemoveResponse)(nil), // 14: aquarium.v2.LabelServiceRemoveResponse
+	nil,                                // 15: aquarium.v2.Resources.DisksEntry
+	(*timestamppb.Timestamp)(nil),      // 16: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),            // 17: google.protobuf.Struct
+	(*Authentication)(nil),             // 18: aquarium.v2.Authentication
 }
 var file_aquarium_v2_label_proto_depIdxs = []int32{
-	13, // 0: aquarium.v2.Label.created_at:type_name -> google.protobuf.Timestamp
-	1,  // 1: aquarium.v2.Label.definitions:type_name -> aquarium.v2.LabelDefinition
-	14, // 2: aquarium.v2.Label.metadata:type_name -> google.protobuf.Struct
-	14, // 3: aquarium.v2.LabelDefinition.options:type_name -> google.protobuf.Struct
-	2,  // 4: aquarium.v2.LabelDefinition.resources:type_name -> aquarium.v2.Resources
-	15, // 5: aquarium.v2.LabelDefinition.authentication:type_name -> aquarium.v2.Authentication
-	12, // 6: aquarium.v2.Resources.disks:type_name -> aquarium.v2.Resources.DisksEntry
-	0,  // 7: aquarium.v2.LabelServiceListResponse.data:type_name -> aquarium.v2.Label
-	0,  // 8: aquarium.v2.LabelServiceGetResponse.data:type_name -> aquarium.v2.Label
-	0,  // 9: aquarium.v2.LabelServiceCreateRequest.label:type_name -> aquarium.v2.Label
-	0,  // 10: aquarium.v2.LabelServiceCreateResponse.data:type_name -> aquarium.v2.Label
-	3,  // 11: aquarium.v2.Resources.DisksEntry.value:type_name -> aquarium.v2.ResourcesDisk
-	4,  // 12: aquarium.v2.LabelService.List:input_type -> aquarium.v2.LabelServiceListRequest
-	6,  // 13: aquarium.v2.LabelService.Get:input_type -> aquarium.v2.LabelServiceGetRequest
-	8,  // 14: aquarium.v2.LabelService.Create:input_type -> aquarium.v2.LabelServiceCreateRequest
-	10, // 15: aquarium.v2.LabelService.Remove:input_type -> aquarium.v2.LabelServiceRemoveRequest
-	5,  // 16: aquarium.v2.LabelService.List:output_type -> aquarium.v2.LabelServiceListResponse
-	7,  // 17: aquarium.v2.LabelService.Get:output_type -> aquarium.v2.LabelServiceGetResponse
-	9,  // 18: aquarium.v2.LabelService.Create:output_type -> aquarium.v2.LabelServiceCreateResponse
-	11, // 19: aquarium.v2.LabelService.Remove:output_type -> aquarium.v2.LabelServiceRemoveResponse
-	16, // [16:20] is the sub-list for method output_type
-	12, // [12:16] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	16, // 0: aquarium.v2.Label.created_at:type_name -> google.protobuf.Timestamp
+	16, // 1: aquarium.v2.Label.updated_at:type_name -> google.protobuf.Timestamp
+	1,  // 2: aquarium.v2.Label.definitions:type_name -> aquarium.v2.LabelDefinition
+	17, // 3: aquarium.v2.Label.metadata:type_name -> google.protobuf.Struct
+	16, // 4: aquarium.v2.Label.remove_at:type_name -> google.protobuf.Timestamp
+	4,  // 5: aquarium.v2.LabelDefinition.images:type_name -> aquarium.v2.Image
+	17, // 6: aquarium.v2.LabelDefinition.options:type_name -> google.protobuf.Struct
+	2,  // 7: aquarium.v2.LabelDefinition.resources:type_name -> aquarium.v2.Resources
+	18, // 8: aquarium.v2.LabelDefinition.authentication:type_name -> aquarium.v2.Authentication
+	15, // 9: aquarium.v2.Resources.disks:type_name -> aquarium.v2.Resources.DisksEntry
+	0,  // 10: aquarium.v2.LabelServiceListResponse.data:type_name -> aquarium.v2.Label
+	0,  // 11: aquarium.v2.LabelServiceGetResponse.data:type_name -> aquarium.v2.Label
+	0,  // 12: aquarium.v2.LabelServiceCreateRequest.label:type_name -> aquarium.v2.Label
+	0,  // 13: aquarium.v2.LabelServiceCreateResponse.data:type_name -> aquarium.v2.Label
+	0,  // 14: aquarium.v2.LabelServiceUpdateRequest.label:type_name -> aquarium.v2.Label
+	0,  // 15: aquarium.v2.LabelServiceUpdateResponse.data:type_name -> aquarium.v2.Label
+	3,  // 16: aquarium.v2.Resources.DisksEntry.value:type_name -> aquarium.v2.ResourcesDisk
+	5,  // 17: aquarium.v2.LabelService.List:input_type -> aquarium.v2.LabelServiceListRequest
+	7,  // 18: aquarium.v2.LabelService.Get:input_type -> aquarium.v2.LabelServiceGetRequest
+	9,  // 19: aquarium.v2.LabelService.Create:input_type -> aquarium.v2.LabelServiceCreateRequest
+	11, // 20: aquarium.v2.LabelService.Update:input_type -> aquarium.v2.LabelServiceUpdateRequest
+	13, // 21: aquarium.v2.LabelService.Remove:input_type -> aquarium.v2.LabelServiceRemoveRequest
+	6,  // 22: aquarium.v2.LabelService.List:output_type -> aquarium.v2.LabelServiceListResponse
+	8,  // 23: aquarium.v2.LabelService.Get:output_type -> aquarium.v2.LabelServiceGetResponse
+	10, // 24: aquarium.v2.LabelService.Create:output_type -> aquarium.v2.LabelServiceCreateResponse
+	12, // 25: aquarium.v2.LabelService.Update:output_type -> aquarium.v2.LabelServiceUpdateResponse
+	14, // 26: aquarium.v2.LabelService.Remove:output_type -> aquarium.v2.LabelServiceRemoveResponse
+	22, // [22:27] is the sub-list for method output_type
+	17, // [17:22] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_aquarium_v2_label_proto_init() }
@@ -1046,16 +1330,19 @@ func file_aquarium_v2_label_proto_init() {
 	file_aquarium_v2_options_rbac_proto_init()
 	file_aquarium_v2_options_streaming_proto_init()
 	file_aquarium_v2_options_ui_proto_init()
+	file_aquarium_v2_label_proto_msgTypes[0].OneofWrappers = []any{}
 	file_aquarium_v2_label_proto_msgTypes[1].OneofWrappers = []any{}
 	file_aquarium_v2_label_proto_msgTypes[2].OneofWrappers = []any{}
+	file_aquarium_v2_label_proto_msgTypes[3].OneofWrappers = []any{}
 	file_aquarium_v2_label_proto_msgTypes[4].OneofWrappers = []any{}
+	file_aquarium_v2_label_proto_msgTypes[5].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aquarium_v2_label_proto_rawDesc), len(file_aquarium_v2_label_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

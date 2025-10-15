@@ -26,13 +26,11 @@ import (
 //
 // Example:
 //
-//	image: ami-abcdef123456
 //	instance_type: c6a.4xlarge
 //	security_group: sg-abcdef123456
 //	tags:
 //	  somekey: somevalue
 type Options struct {
-	Image          string            `json:"image"`           // ID/Name of the image you want to use (name that contains * is usually a bad idea for reproducibility)
 	InstanceType   string            `json:"instance_type"`   // Type of the instance from aws available list
 	SecurityGroups []string          `json:"security_groups"` // IDs/Names of the security groups to use for the instance
 	SecurityGroup  string            `json:"security_group"`  // ID/Name of the security group to use for the instance (DEPRECATED)
@@ -60,11 +58,6 @@ func (o *Options) Apply(options util.UnparsedJSON) error {
 
 // Validate makes sure the options have the required defaults & that the required fields are set
 func (o *Options) Validate() error {
-	// Check image
-	if o.Image == "" {
-		return fmt.Errorf("AWS: No EC2 image is specified")
-	}
-
 	// Check instance type
 	if o.InstanceType == "" {
 		return fmt.Errorf("AWS: No EC2 instance type is specified")

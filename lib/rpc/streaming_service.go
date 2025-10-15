@@ -664,8 +664,8 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 
 	// Check the requested subscriptions and if user has access to those by rbac permissions
 	for _, subType := range req.Msg.GetSubscriptionTypes() {
-		rbacMethod := s.getSubscriptionPermissionMethod(subType)
-		rbacCtx := s.setServiceMethodContext(ctx, auth.ApplicationService, rbacMethod)
+		rbacService, rbacMethod := s.getSubscriptionPermission(subType)
+		rbacCtx := s.setServiceMethodContext(ctx, rbacService, rbacMethod)
 		if !rpcutil.CheckUserPermission(rbacCtx, rbacMethod) {
 			logger.Warn("Rejecting new subscription due to lack of permission", "sub_type", subType)
 			return connect.NewError(connect.CodeUnavailable, fmt.Errorf("no permission to subscribe to %s", subType))
@@ -867,6 +867,12 @@ func (*StreamingService) shouldSendLabelObject(_ *subscription, _ *typesv2.Label
 // shouldSendUserObject returns true since subscribers already have required permission
 func (*StreamingService) shouldSendUserObject(_ *subscription, _ *typesv2.User, _ /*method*/ string) bool {
 	// We checking user get access during subscription, so if user has one - no need to filter out anything
+	return true
+}
+
+// shouldSendUserGroupObject returns true since subscribers already have required permission
+func (*StreamingService) shouldSendUserGroupObject(_ *subscription, _ *typesv2.UserGroup, _ /*method*/ string) bool {
+	// We checking user group get access during subscription, so if user has one - no need to filter out anything
 	return true
 }
 

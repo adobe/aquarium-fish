@@ -12,7 +12,7 @@
 
 // Author: Sergei Parshev (@sparshev)
 
-package provider
+package aquariumv2
 
 import (
 	"archive/tar"
@@ -22,6 +22,7 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"hash"
 	"io"
@@ -37,71 +38,125 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
-// Image definition
-type Image struct {
-	URL string `json:"url"` // Address of the remote image to download it
-	Sum string `json:"sum"` // Optional checksum of the image in format "<algo>:<checksum>"
+// GetName returns a nice image name as a string or empty one if not set
+func (i *Image) GetName() string {
+	if i.Name == nil {
+		return ""
+	}
+	return *i.Name
+}
 
-	Name    string `json:"name"`    // Optional name of the image, if not set will use a part of the Url file name prior to last minus ("-") or ext
-	Version string `json:"version"` // Optional version of the image, if not set will use a part of the Url file name after the last minus ("-") to ext
+// GetVersion returns a nice image name as a string or empty one if not set
+func (i *Image) GetVersion() string {
+	if i.Version == nil {
+		return ""
+	}
+	return *i.Version
+}
 
-	Tag string `json:"tag"` // Optional identifier used by drivers to make sure the images will be processed properly
+// GetNameVersion returns the full name with version if it's defined
+func (i *Image) GetNameVersion(separator string) string {
+	if i.Name == nil {
+		return ""
+	}
+	if i.Version != nil {
+		return fmt.Sprintf("%s%s%s", *i.Name, separator, *i.Version)
+	}
+	return *i.Name
+}
+
+// GetURL returns a nice image url as a string or empty one if not set
+func (i *Image) GetURL() string {
+	if i.Url == nil {
+		return ""
+	}
+	return *i.Url
+}
+
+// GetSum returns a nice image name as a string or empty one if not set
+func (i *Image) GetSum() string {
+	if i.Sum == nil {
+		return ""
+	}
+	return *i.Sum
+}
+
+// GetTag returns a nice image name as a string or empty one if not set
+func (i *Image) GetTag() string {
+	if i.Tag == nil {
+		return ""
+	}
+	return *i.Tag
+}
+
+// ToJSON converts image data to json format
+func (i *Image) ToJSON() string {
+	jsonData, err := json.Marshal(i)
+	if err != nil {
+		return ""
+	}
+	return string(jsonData)
 }
 
 // Validate makes sure the image spec is good enough
 func (i *Image) Validate() error {
 	// Check url is defined
-	if i.URL == "" {
-		return fmt.Errorf("Image: Url is not provided")
-	}
-
-	// Check url schema is supported
-	if !(strings.HasPrefix(i.URL, "http://") || strings.HasPrefix(i.URL, "https://")) {
-		return fmt.Errorf("Image: Url schema is not supported: %q", i.URL)
-	}
-
-	// Fill name out of image url
-	if i.Name == "" {
-		i.Name = path.Base(i.URL)
-		minusLoc := strings.LastIndexByte(i.Name, '-')
-		if minusLoc != -1 {
-			// Use the part from beginning to last minus ('-') - useful to separate version part
-			i.Name = i.Name[0:minusLoc]
-		} else if strings.LastIndexByte(i.Name, '.') != -1 {
-			// Split by extension - need to take into account dual extension of tar archives (ex. ".tar.xz")
-			nameSplit := strings.Split(i.Name, ".")
-			if nameSplit[len(nameSplit)-2] == "tar" {
-				i.Name = strings.Join(nameSplit[0:len(nameSplit)-2], ".")
-			} else {
-				i.Name = strings.Join(nameSplit[0:len(nameSplit)-1], ".")
-			}
+	if i.Url != nil && *i.Url != "" {
+		// Ensure url schema is supported
+		if !(strings.HasPrefix(*i.Url, "http://") || strings.HasPrefix(*i.Url, "https://")) {
+			return fmt.Errorf("Image: Url schema is not supported: %q", *i.Url)
 		}
-	}
 
-	// Fill version out of image url
-	if i.Version == "" {
-		i.Version = path.Base(i.URL)
-		minusLoc := strings.LastIndexByte(i.Version, '-')
-		if minusLoc != -1 {
-			// Use the part from the last minus ('-') to the end
-			i.Version = i.Version[minusLoc+1:]
-		}
-		if strings.LastIndexByte(i.Version, '.') != -1 {
-			// Split by extension - need to take into account dual extension of tar archives (ex. ".tar.xz")
-			versionSplit := strings.Split(i.Version, ".")
-			if versionSplit[len(versionSplit)-2] == "tar" {
-				i.Version = strings.Join(versionSplit[0:len(versionSplit)-2], ".")
-			} else {
-				i.Version = strings.Join(versionSplit[0:len(versionSplit)-1], ".")
+		// Fill name out of image url
+		if i.Name == nil || *i.Name == "" {
+			name := path.Base(*i.Url)
+			minusLoc := strings.LastIndexByte(name, '-')
+			if minusLoc != -1 {
+				// Use the part from beginning to last minus ('-') - useful to separate version part
+				name = name[0:minusLoc]
+			} else if strings.LastIndexByte(name, '.') != -1 {
+				// Split by extension - need to take into account dual extension of tar archives (ex. ".tar.xz")
+				nameSplit := strings.Split(name, ".")
+				if nameSplit[len(nameSplit)-2] == "tar" {
+					name = strings.Join(nameSplit[0:len(nameSplit)-2], ".")
+				} else {
+					name = strings.Join(nameSplit[0:len(nameSplit)-1], ".")
+				}
 			}
+			i.Name = &name
+		}
+
+		// Fill version out of image url
+		if i.Version == nil || *i.Version == "" {
+			version := path.Base(*i.Url)
+			minusLoc := strings.LastIndexByte(version, '-')
+			if minusLoc != -1 {
+				// Use the part from the last minus ('-') to the end
+				version = version[minusLoc+1:]
+			}
+			if strings.LastIndexByte(version, '.') != -1 {
+				// Split by extension - need to take into account dual extension of tar archives (ex. ".tar.xz")
+				versionSplit := strings.Split(version, ".")
+				if versionSplit[len(versionSplit)-2] == "tar" {
+					version = strings.Join(versionSplit[0:len(versionSplit)-2], ".")
+				} else {
+					version = strings.Join(versionSplit[0:len(versionSplit)-1], ".")
+				}
+			}
+			i.Version = &version
+		}
+	} else {
+		// If URL is not provided - name should be here for sure
+		if i.Name == nil || *i.Name == "" {
+			return fmt.Errorf("Image: Url or Name should be provided")
 		}
 	}
 
 	// Check sum format
-	if i.Sum != "" {
-		sumSplit := strings.SplitN(i.Sum, ":", 2)
-		if len(i.Sum) > 0 && len(sumSplit) != 2 {
-			return fmt.Errorf("Image: Checksum should be in format '<algo>:<checksum>': %q", i.Sum)
+	if i.Sum != nil && *i.Sum != "" {
+		sumSplit := strings.SplitN(*i.Sum, ":", 2)
+		if len(sumSplit) != 2 {
+			return fmt.Errorf("Image: Checksum should be in format '<algo>:<checksum>': %q", *i.Sum)
 		}
 		algo := sumSplit[0]
 		if algo != "md5" && algo != "sha1" && algo != "sha256" && algo != "sha512" {
@@ -121,8 +176,11 @@ func (i *Image) Validate() error {
 // -> user, password - credentials for HTTP Basic auth
 func (i *Image) DownloadUnpack(outDir, user, password string) error {
 	logger := log.WithFunc("provider", "DownloadUnpack")
-	imgPath := filepath.Join(outDir, i.Name+"-"+i.Version)
-	logger.Debug("Downloading & Unpacking image", "img_url", i.URL, "img_path", imgPath)
+	if i.Name == nil || i.Version == nil || i.Url == nil {
+		return fmt.Errorf("Image: Name, Version or URL of Image are not set")
+	}
+	imgPath := filepath.Join(outDir, fmt.Sprintf("%s-%s", *i.Name, *i.Version))
+	logger.Debug("Downloading & Unpacking image", "img_url", *i.Url, "img_path", imgPath)
 	lockPath := imgPath + ".lock"
 
 	// Wait for another process to download and unpack the archive
@@ -144,20 +202,20 @@ func (i *Image) DownloadUnpack(outDir, user, password string) error {
 	defer os.Remove(lockPath)
 
 	client := &http.Client{}
-	req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, i.URL, nil)
+	req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, *i.Url, nil)
 	if user != "" && password != "" {
 		req.SetBasicAuth(user, password)
 	}
 	resp, err := client.Do(req)
 	if err != nil {
 		os.RemoveAll(imgPath)
-		return fmt.Errorf("Image: Unable to request url %q: %v", i.URL, err)
+		return fmt.Errorf("Image: Unable to request url %q: %v", *i.Url, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		os.RemoveAll(imgPath)
-		return fmt.Errorf("Image: Unable to download file %q: %s", i.URL, resp.Status)
+		return fmt.Errorf("Image: Unable to download file %q: %s", *i.Url, resp.Status)
 	}
 
 	// Printing the download progress
@@ -170,11 +228,11 @@ func (i *Image) DownloadUnpack(outDir, user, password string) error {
 	// Process checksum
 	var dataReader io.Reader
 	var hasher hash.Hash
-	if i.Sum == "" {
+	if i.Sum == nil || *i.Sum == "" {
 		// Just use the passthrough body as the source
 		dataReader = bodypt
 	} else {
-		algoSum := strings.SplitN(i.Sum, ":", 2)
+		algoSum := strings.SplitN(*i.Sum, ":", 2)
 
 		// Calculating checksum during reading from the body
 		switch algoSum[0] {
@@ -201,7 +259,7 @@ func (i *Image) DownloadUnpack(outDir, user, password string) error {
 			if remoteSum != algoSum[1] {
 				os.RemoveAll(imgPath)
 				return fmt.Errorf("Image: The remote checksum (from header X-Checksum-%s) doesn't equal the desired one: %q != %q for %q",
-					strings.Title(algoSum[0]), remoteSum, algoSum[1], i.URL) //nolint:staticcheck // SA1019 Strictly ASCII here
+					strings.Title(algoSum[0]), remoteSum, algoSum[1], *i.Url) //nolint:staticcheck // SA1019 Strictly ASCII here
 			}
 		}
 	}
@@ -275,16 +333,16 @@ func (i *Image) DownloadUnpack(outDir, user, password string) error {
 	}
 
 	// Compare the calculated checksum to the desired one
-	if i.Sum != "" {
+	if i.Sum != nil && *i.Sum != "" {
 		// Completing read of the stream to calculate the hash properly (tar will not do that)
 		io.ReadAll(dataReader)
 
-		algoSum := strings.SplitN(i.Sum, ":", 2)
+		algoSum := strings.SplitN(*i.Sum, ":", 2)
 		calculatedSum := hex.EncodeToString(hasher.Sum(nil))
 		if calculatedSum != algoSum[1] {
 			os.RemoveAll(imgPath)
 			return fmt.Errorf("Image: The calculated checksum doesn't equal the desired one: %q != %q for %q",
-				calculatedSum, algoSum[1], i.URL)
+				calculatedSum, algoSum[1], *i.Url)
 		}
 	}
 

@@ -29,7 +29,7 @@ curr_version="$(echo "$curr_label" | grep -o '"version": *[0-9]\+' | tr -dc '0-9
 echo "Current label '$label:$curr_version': $curr_label"
 
 [ "x$curr_version" != "x" ] || curr_version=0
-new_version=$(($curr_version+1))
+new_version=$(($curr_version + 1))
 
 echo
 echo "Create the new version of Label '$label:$new_version' ?"
@@ -42,11 +42,10 @@ label:
   version: '$new_version'
   definitions:
     - driver: docker
-      options:
-        images:  # For test purposes images are used as symlink to aquarium-bait/out so does not need checksum
-          - url: https://artifact-storage/aquarium/image/docker/ubuntu2004/ubuntu2004-VERSION.tar.xz
-          - url: https://artifact-storage/aquarium/image/docker/ubuntu2004-python3/ubuntu2004-python3-VERSION.tar.xz
-          - url: https://artifact-storage/aquarium/image/docker/ubuntu2004-python3-ci/ubuntu2004-python3-ci-VERSION.tar.xz
+      images:  # For test purposes images are used as symlink to aquarium-bait/out so does not need checksum
+        - url: https://artifact-storage/aquarium/image/docker/ubuntu2004/ubuntu2004-VERSION.tar.xz
+        - url: https://artifact-storage/aquarium/image/docker/ubuntu2004-python3/ubuntu2004-python3-VERSION.tar.xz
+        - url: https://artifact-storage/aquarium/image/docker/ubuntu2004-python3-ci/ubuntu2004-python3-ci-VERSION.tar.xz
       resources:
         cpu: 4
         ram: 8

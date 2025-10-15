@@ -26,6 +26,7 @@ const (
 	ObjectFieldUiConfig          = "FieldUiConfig"
 	ObjectGateProxySSHAccess     = "GateProxySSHAccess"
 	ObjectHostInfo               = "HostInfo"
+	ObjectImage                  = "Image"
 	ObjectJWTToken               = "JWTToken"
 	ObjectLabel                  = "Label"
 	ObjectLabelDefinition        = "LabelDefinition"
@@ -44,6 +45,7 @@ const (
 	ObjectUiConfig               = "UiConfig"
 	ObjectUser                   = "User"
 	ObjectUserConfig             = "UserConfig"
+	ObjectUserGroup              = "UserGroup"
 	ObjectUserSession            = "UserSession"
 	ObjectVote                   = "Vote"
 )

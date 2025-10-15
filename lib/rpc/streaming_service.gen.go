@@ -44,6 +44,7 @@ type subChannels struct {
 	labelChannel               chan database.LabelSubscriptionEvent
 	nodeChannel                chan database.NodeSubscriptionEvent
 	userChannel                chan database.UserSubscriptionEvent
+	userGroupChannel           chan database.UserGroupSubscriptionEvent
 }
 
 // requestTypeMapping maps request types to service and method names for RBAC
@@ -68,6 +69,7 @@ var requestTypeMapping = map[string]serviceMethodInfo{
 	"LabelServiceGetRequest":                {auth.LabelService, auth.LabelServiceGet},
 	"LabelServiceListRequest":               {auth.LabelService, auth.LabelServiceList},
 	"LabelServiceRemoveRequest":             {auth.LabelService, auth.LabelServiceRemove},
+	"LabelServiceUpdateRequest":             {auth.LabelService, auth.LabelServiceUpdate},
 	"NodeServiceGetRequest":                 {auth.NodeService, auth.NodeServiceGet},
 	"NodeServiceGetThisRequest":             {auth.NodeService, auth.NodeServiceGetThis},
 	"NodeServiceListRequest":                {auth.NodeService, auth.NodeServiceList},
@@ -78,11 +80,16 @@ var requestTypeMapping = map[string]serviceMethodInfo{
 	"RoleServiceRemoveRequest":              {auth.RoleService, auth.RoleServiceRemove},
 	"RoleServiceUpdateRequest":              {auth.RoleService, auth.RoleServiceUpdate},
 	"UserServiceCreateRequest":              {auth.UserService, auth.UserServiceCreate},
+	"UserServiceCreateGroupRequest":         {auth.UserService, auth.UserServiceCreateGroup},
 	"UserServiceGetRequest":                 {auth.UserService, auth.UserServiceGet},
+	"UserServiceGetGroupRequest":            {auth.UserService, auth.UserServiceGetGroup},
 	"UserServiceGetMeRequest":               {auth.UserService, auth.UserServiceGetMe},
 	"UserServiceListRequest":                {auth.UserService, auth.UserServiceList},
+	"UserServiceListGroupRequest":           {auth.UserService, auth.UserServiceListGroup},
 	"UserServiceRemoveRequest":              {auth.UserService, auth.UserServiceRemove},
+	"UserServiceRemoveGroupRequest":         {auth.UserService, auth.UserServiceRemoveGroup},
 	"UserServiceUpdateRequest":              {auth.UserService, auth.UserServiceUpdate},
+	"UserServiceUpdateGroupRequest":         {auth.UserService, auth.UserServiceUpdateGroup},
 }
 
 // routeApplicationServiceRequest routes applicationService service requests
@@ -269,6 +276,17 @@ func (s *StreamingService) routeLabelServiceRequest(ctx context.Context, request
 		}
 
 		return anypb.New(resp.Msg)
+	case "LabelServiceUpdateRequest":
+		var req aquariumv2.LabelServiceUpdateRequest
+		if err := requestData.UnmarshalTo(&req); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		resp, err := s.labelService.Update(ctx, connect.NewRequest(&req))
+		if err != nil {
+			return nil, err
+		}
+
+		return anypb.New(resp.Msg)
 	default:
 		return nil, connect.NewError(connect.CodeUnimplemented, fmt.Errorf("unsupported labelService request type: %s", requestType))
 	}
@@ -403,12 +421,34 @@ func (s *StreamingService) routeUserServiceRequest(ctx context.Context, requestT
 		}
 
 		return anypb.New(resp.Msg)
+	case "UserServiceCreateGroupRequest":
+		var req aquariumv2.UserServiceCreateGroupRequest
+		if err := requestData.UnmarshalTo(&req); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		resp, err := s.userService.CreateGroup(ctx, connect.NewRequest(&req))
+		if err != nil {
+			return nil, err
+		}
+
+		return anypb.New(resp.Msg)
 	case "UserServiceGetRequest":
 		var req aquariumv2.UserServiceGetRequest
 		if err := requestData.UnmarshalTo(&req); err != nil {
 			return nil, connect.NewError(connect.CodeInvalidArgument, err)
 		}
 		resp, err := s.userService.Get(ctx, connect.NewRequest(&req))
+		if err != nil {
+			return nil, err
+		}
+
+		return anypb.New(resp.Msg)
+	case "UserServiceGetGroupRequest":
+		var req aquariumv2.UserServiceGetGroupRequest
+		if err := requestData.UnmarshalTo(&req); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		resp, err := s.userService.GetGroup(ctx, connect.NewRequest(&req))
 		if err != nil {
 			return nil, err
 		}
@@ -436,6 +476,17 @@ func (s *StreamingService) routeUserServiceRequest(ctx context.Context, requestT
 		}
 
 		return anypb.New(resp.Msg)
+	case "UserServiceListGroupRequest":
+		var req aquariumv2.UserServiceListGroupRequest
+		if err := requestData.UnmarshalTo(&req); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		resp, err := s.userService.ListGroup(ctx, connect.NewRequest(&req))
+		if err != nil {
+			return nil, err
+		}
+
+		return anypb.New(resp.Msg)
 	case "UserServiceRemoveRequest":
 		var req aquariumv2.UserServiceRemoveRequest
 		if err := requestData.UnmarshalTo(&req); err != nil {
@@ -447,12 +498,34 @@ func (s *StreamingService) routeUserServiceRequest(ctx context.Context, requestT
 		}
 
 		return anypb.New(resp.Msg)
+	case "UserServiceRemoveGroupRequest":
+		var req aquariumv2.UserServiceRemoveGroupRequest
+		if err := requestData.UnmarshalTo(&req); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		resp, err := s.userService.RemoveGroup(ctx, connect.NewRequest(&req))
+		if err != nil {
+			return nil, err
+		}
+
+		return anypb.New(resp.Msg)
 	case "UserServiceUpdateRequest":
 		var req aquariumv2.UserServiceUpdateRequest
 		if err := requestData.UnmarshalTo(&req); err != nil {
 			return nil, connect.NewError(connect.CodeInvalidArgument, err)
 		}
 		resp, err := s.userService.Update(ctx, connect.NewRequest(&req))
+		if err != nil {
+			return nil, err
+		}
+
+		return anypb.New(resp.Msg)
+	case "UserServiceUpdateGroupRequest":
+		var req aquariumv2.UserServiceUpdateGroupRequest
+		if err := requestData.UnmarshalTo(&req); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		resp, err := s.userService.UpdateGroup(ctx, connect.NewRequest(&req))
 		if err != nil {
 			return nil, err
 		}
@@ -501,6 +574,9 @@ func (s *StreamingService) relayApplicationNotifications(ctx context.Context, su
 	// Don't forget to unsubscribe from database when the relay is completed
 	defer func() {
 		s.fish.DB().UnsubscribeApplication(ctx, dbChannel)
+		// Wait briefly for any in-flight notifications to complete before closing the channel
+		// This prevents data race where notifySubscribersHelper might still be sending
+		time.Sleep(500 * time.Millisecond)
 		// Use recover to prevent panics from closing already closed channel
 		defer func() {
 			if r := recover(); r != nil {
@@ -559,6 +635,9 @@ func (s *StreamingService) relayApplicationStateNotifications(ctx context.Contex
 	// Don't forget to unsubscribe from database when the relay is completed
 	defer func() {
 		s.fish.DB().UnsubscribeApplicationState(ctx, dbChannel)
+		// Wait briefly for any in-flight notifications to complete before closing the channel
+		// This prevents data race where notifySubscribersHelper might still be sending
+		time.Sleep(500 * time.Millisecond)
 		// Use recover to prevent panics from closing already closed channel
 		defer func() {
 			if r := recover(); r != nil {
@@ -617,6 +696,9 @@ func (s *StreamingService) relayApplicationResourceNotifications(ctx context.Con
 	// Don't forget to unsubscribe from database when the relay is completed
 	defer func() {
 		s.fish.DB().UnsubscribeApplicationResource(ctx, dbChannel)
+		// Wait briefly for any in-flight notifications to complete before closing the channel
+		// This prevents data race where notifySubscribersHelper might still be sending
+		time.Sleep(500 * time.Millisecond)
 		// Use recover to prevent panics from closing already closed channel
 		defer func() {
 			if r := recover(); r != nil {
@@ -675,6 +757,9 @@ func (s *StreamingService) relayApplicationTaskNotifications(ctx context.Context
 	// Don't forget to unsubscribe from database when the relay is completed
 	defer func() {
 		s.fish.DB().UnsubscribeApplicationTask(ctx, dbChannel)
+		// Wait briefly for any in-flight notifications to complete before closing the channel
+		// This prevents data race where notifySubscribersHelper might still be sending
+		time.Sleep(500 * time.Millisecond)
 		// Use recover to prevent panics from closing already closed channel
 		defer func() {
 			if r := recover(); r != nil {
@@ -733,6 +818,9 @@ func (s *StreamingService) relayRoleNotifications(ctx context.Context, subscript
 	// Don't forget to unsubscribe from database when the relay is completed
 	defer func() {
 		s.fish.DB().UnsubscribeRole(ctx, dbChannel)
+		// Wait briefly for any in-flight notifications to complete before closing the channel
+		// This prevents data race where notifySubscribersHelper might still be sending
+		time.Sleep(500 * time.Millisecond)
 		// Use recover to prevent panics from closing already closed channel
 		defer func() {
 			if r := recover(); r != nil {
@@ -791,6 +879,9 @@ func (s *StreamingService) relayLabelNotifications(ctx context.Context, subscrip
 	// Don't forget to unsubscribe from database when the relay is completed
 	defer func() {
 		s.fish.DB().UnsubscribeLabel(ctx, dbChannel)
+		// Wait briefly for any in-flight notifications to complete before closing the channel
+		// This prevents data race where notifySubscribersHelper might still be sending
+		time.Sleep(500 * time.Millisecond)
 		// Use recover to prevent panics from closing already closed channel
 		defer func() {
 			if r := recover(); r != nil {
@@ -849,6 +940,9 @@ func (s *StreamingService) relayNodeNotifications(ctx context.Context, subscript
 	// Don't forget to unsubscribe from database when the relay is completed
 	defer func() {
 		s.fish.DB().UnsubscribeNode(ctx, dbChannel)
+		// Wait briefly for any in-flight notifications to complete before closing the channel
+		// This prevents data race where notifySubscribersHelper might still be sending
+		time.Sleep(500 * time.Millisecond)
 		// Use recover to prevent panics from closing already closed channel
 		defer func() {
 			if r := recover(); r != nil {
@@ -907,6 +1001,9 @@ func (s *StreamingService) relayUserNotifications(ctx context.Context, subscript
 	// Don't forget to unsubscribe from database when the relay is completed
 	defer func() {
 		s.fish.DB().UnsubscribeUser(ctx, dbChannel)
+		// Wait briefly for any in-flight notifications to complete before closing the channel
+		// This prevents data race where notifySubscribersHelper might still be sending
+		time.Sleep(500 * time.Millisecond)
 		// Use recover to prevent panics from closing already closed channel
 		defer func() {
 			if r := recover(); r != nil {
@@ -950,6 +1047,67 @@ func (s *StreamingService) relayUserNotifications(ctx context.Context, subscript
 	}
 }
 
+// relayUserGroupNotifications relays userGroup notifications with immediate disconnect on overflow
+func (s *StreamingService) relayUserGroupNotifications(ctx context.Context, subscriptionID string, sub *subscription, dbChannel chan database.UserGroupSubscriptionEvent) {
+	// Signal completion when this goroutine exits
+	defer sub.relayWg.Done()
+	logger := log.WithFunc("rpc", "relayUserGroupNotifications").With("subs_uid", subscriptionID)
+
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("UserGroup relay goroutine panic", "panic", r)
+		}
+	}()
+
+	// Don't forget to unsubscribe from database when the relay is completed
+	defer func() {
+		s.fish.DB().UnsubscribeUserGroup(ctx, dbChannel)
+		// Wait briefly for any in-flight notifications to complete before closing the channel
+		// This prevents data race where notifySubscribersHelper might still be sending
+		time.Sleep(500 * time.Millisecond)
+		// Use recover to prevent panics from closing already closed channel
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Debug("Recovered from panic while closing database channel", "panic", r)
+			}
+		}()
+		close(dbChannel) // Close the channel we created
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Debug("UserGroup relay stopping due to context cancellation")
+			return
+		case event, ok := <-dbChannel:
+			if !ok {
+				logger.Debug("UserGroup relay stopping due to closed database channel")
+				return
+			}
+
+			// Try to send with a short timeout - disconnect if client can't keep up
+			// Use a function with recover to handle any panic from sending to closed channel
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Debug("Recovered from panic while sending to subscription channel", "panic", r)
+						sub.cancel() // Cancel subscription if channel is closed
+					}
+				}()
+
+				select {
+				case sub.channels.userGroupChannel <- event:
+					// Successfully sent notification
+				case <-time.After(200 * time.Millisecond):
+					logger.Error("UserGroup channel send timeout - client cannot keep up, disconnecting")
+					sub.cancel() // This will cause the main subscription loop to exit
+					return
+				}
+			}()
+		}
+	}
+}
+
 // setupChannels sets the channels for the database changes
 func (s *StreamingService) setupChannels() *subChannels {
 	return &subChannels{
@@ -961,6 +1119,7 @@ func (s *StreamingService) setupChannels() *subChannels {
 		labelChannel:               make(chan database.LabelSubscriptionEvent, 100),
 		nodeChannel:                make(chan database.NodeSubscriptionEvent, 100),
 		userChannel:                make(chan database.UserSubscriptionEvent, 100),
+		userGroupChannel:           make(chan database.UserGroupSubscriptionEvent, 100),
 	}
 }
 
@@ -1056,6 +1215,15 @@ func (s *StreamingService) listenChannels(sub *subscription, ctx, subCtx context
 			} else {
 				logger.Debug("Skipping User notification for user", "user", sub.userName)
 			}
+		case event := <-sub.channels.userGroupChannel:
+			if s.shouldSendObject(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_USER_GROUP, event.Object) {
+				logger.Debug("Sending UserGroup notification", "change_type", event.ChangeType, "name", event.Object.Name)
+				if err := s.sendSubscriptionResponse(sub, aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_USER_GROUP, event.ChangeType, event.Object.ToUserGroup()); err != nil {
+					logger.Error("Error sending UserGroup update", "err", err)
+				}
+			} else {
+				logger.Debug("Skipping UserGroup notification for user", "user", sub.userName)
+			}
 		}
 	}
 }
@@ -1133,6 +1301,15 @@ func (s *subChannels) Close() {
 			}
 		}()
 		close(s.userChannel)
+	}()
+	// Use recover to handle potential double-close panics
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				// Channel was already closed, ignore the panic
+			}
+		}()
+		close(s.userGroupChannel)
 	}()
 }
 
@@ -1221,6 +1398,16 @@ func (s *StreamingService) setupSubscriptions(subCtx context.Context, subscripti
 			sub.relayWg.Add(1)
 			// Start goroutine to safely relay notifications to subscription
 			go s.relayUserNotifications(subCtx, subscriptionID, sub, dbChannel)
+		case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_USER_GROUP:
+			// Create a safe wrapper channel for database notifications
+			dbChannel := make(chan database.UserGroupSubscriptionEvent, 100)
+			s.fish.DB().SubscribeUserGroup(subCtx, dbChannel)
+			logger.Debug("Subscribed to UserGroup changes")
+
+			// Add to WaitGroup before starting goroutine
+			sub.relayWg.Add(1)
+			// Start goroutine to safely relay notifications to subscription
+			go s.relayUserGroupNotifications(subCtx, subscriptionID, sub, dbChannel)
 		}
 	}
 }
@@ -1272,6 +1459,10 @@ func (s *StreamingService) shouldSendObject(sub *subscription, objectType aquari
 	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_USER:
 		if typedObj, ok := obj.(*typesv2.User); ok {
 			return s.shouldSendUserObject(sub, typedObj, auth.UserServiceGet)
+		}
+	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_USER_GROUP:
+		if typedObj, ok := obj.(*typesv2.UserGroup); ok {
+			return s.shouldSendUserGroupObject(sub, typedObj, auth.UserServiceGetGroup)
 		}
 	}
 
@@ -1358,26 +1549,38 @@ func (s *StreamingService) shouldSendUser(sub *subscription) bool {
 	return false
 }
 
-// getSubscriptionPermissionMethod returns the RBAC permission method for a subscription type
-func (s *StreamingService) getSubscriptionPermissionMethod(subscriptionType aquariumv2.SubscriptionType) string {
+// shouldSendUserGroup checks if userGroup should be sent to subscriber
+func (s *StreamingService) shouldSendUserGroup(sub *subscription) bool {
+	for _, subType := range sub.subscriptions {
+		if subType == aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_USER_GROUP {
+			return true
+		}
+	}
+	return false
+}
+
+// getSubscriptionPermission returns the RBAC permission service & method for a subscription type
+func (s *StreamingService) getSubscriptionPermission(subscriptionType aquariumv2.SubscriptionType) (string, string) {
 	switch subscriptionType {
 	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION:
-		return auth.ApplicationServiceGet
+		return auth.ApplicationService, auth.ApplicationServiceGet
 	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_STATE:
-		return auth.ApplicationServiceGetState
+		return auth.ApplicationService, auth.ApplicationServiceGetState
 	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_RESOURCE:
-		return auth.ApplicationServiceGetResource
+		return auth.ApplicationService, auth.ApplicationServiceGetResource
 	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_APPLICATION_TASK:
-		return auth.ApplicationServiceGetTask
+		return auth.ApplicationService, auth.ApplicationServiceGetTask
 	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_ROLE:
-		return auth.RoleServiceGet
+		return auth.RoleService, auth.RoleServiceGet
 	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_LABEL:
-		return auth.LabelServiceGet
+		return auth.LabelService, auth.LabelServiceGet
 	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_NODE:
-		return auth.NodeServiceGet
+		return auth.NodeService, auth.NodeServiceGet
 	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_USER:
-		return auth.UserServiceGet
+		return auth.UserService, auth.UserServiceGet
+	case aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_USER_GROUP:
+		return auth.UserService, auth.UserServiceGetGroup
 	default:
-		return ""
+		return "", ""
 	}
 }

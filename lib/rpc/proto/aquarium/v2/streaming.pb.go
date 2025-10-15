@@ -48,6 +48,7 @@ const (
 	SubscriptionType_SUBSCRIPTION_TYPE_NODE                 SubscriptionType = 6
 	SubscriptionType_SUBSCRIPTION_TYPE_USER                 SubscriptionType = 7
 	SubscriptionType_SUBSCRIPTION_TYPE_ROLE                 SubscriptionType = 8
+	SubscriptionType_SUBSCRIPTION_TYPE_USER_GROUP           SubscriptionType = 9
 )
 
 // Enum value maps for SubscriptionType.
@@ -62,6 +63,7 @@ var (
 		6: "SUBSCRIPTION_TYPE_NODE",
 		7: "SUBSCRIPTION_TYPE_USER",
 		8: "SUBSCRIPTION_TYPE_ROLE",
+		9: "SUBSCRIPTION_TYPE_USER_GROUP",
 	}
 	SubscriptionType_value = map[string]int32{
 		"SUBSCRIPTION_TYPE_UNSPECIFIED":          0,
@@ -73,6 +75,7 @@ var (
 		"SUBSCRIPTION_TYPE_NODE":                 6,
 		"SUBSCRIPTION_TYPE_USER":                 7,
 		"SUBSCRIPTION_TYPE_ROLE":                 8,
+		"SUBSCRIPTION_TYPE_USER_GROUP":           9,
 	}
 )
 
@@ -545,7 +548,7 @@ const file_aquarium_v2_streaming_proto_rawDesc = "" +
 	"objectData\".\n" +
 	"\rStreamCreated\x12\x1d\n" +
 	"\n" +
-	"stream_uid\x18\x01 \x01(\tR\tstreamUid*\xc6\x02\n" +
+	"stream_uid\x18\x01 \x01(\tR\tstreamUid*\xe8\x02\n" +
 	"\x10SubscriptionType\x12!\n" +
 	"\x1dSUBSCRIPTION_TYPE_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dSUBSCRIPTION_TYPE_APPLICATION\x10\x01\x12'\n" +
@@ -555,7 +558,8 @@ const file_aquarium_v2_streaming_proto_rawDesc = "" +
 	"\x17SUBSCRIPTION_TYPE_LABEL\x10\x05\x12\x1a\n" +
 	"\x16SUBSCRIPTION_TYPE_NODE\x10\x06\x12\x1a\n" +
 	"\x16SUBSCRIPTION_TYPE_USER\x10\a\x12\x1a\n" +
-	"\x16SUBSCRIPTION_TYPE_ROLE\x10\b*t\n" +
+	"\x16SUBSCRIPTION_TYPE_ROLE\x10\b\x12 \n" +
+	"\x1cSUBSCRIPTION_TYPE_USER_GROUP\x10\t*t\n" +
 	"\n" +
 	"ChangeType\x12\x1b\n" +
 	"\x17CHANGE_TYPE_UNSPECIFIED\x10\x00\x12\x17\n" +

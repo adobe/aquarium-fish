@@ -99,6 +99,14 @@ var file_aquarium_v2_options_streaming_proto_extTypes = []protoimpl.ExtensionInf
 		Tag:           "bytes,50001,opt,name=subscribe_config",
 		Filename:      "aquarium/v2/options_streaming.proto",
 	},
+	{
+		ExtendedType:  (*descriptorpb.ServiceOptions)(nil),
+		ExtensionType: (*bool)(nil),
+		Field:         50002,
+		Name:          "aquarium.v2.skip_service_streaming",
+		Tag:           "varint,50002,opt,name=skip_service_streaming",
+		Filename:      "aquarium/v2/options_streaming.proto",
+	},
 }
 
 // Extension fields to descriptorpb.MessageOptions.
@@ -109,6 +117,14 @@ var (
 	E_SubscribeConfig = &file_aquarium_v2_options_streaming_proto_extTypes[0]
 )
 
+// Extension fields to descriptorpb.ServiceOptions.
+var (
+	// Streaming configuration for the service
+	//
+	// optional bool skip_service_streaming = 50002;
+	E_SkipServiceStreaming = &file_aquarium_v2_options_streaming_proto_extTypes[1]
+)
+
 var File_aquarium_v2_options_streaming_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_options_streaming_proto_rawDesc = "" +
@@ -117,7 +133,8 @@ const file_aquarium_v2_options_streaming_proto_rawDesc = "" +
 	"\x0fSubscribeConfig\x12.\n" +
 	"\x10permission_check\x18\x01 \x01(\tH\x00R\x0fpermissionCheck\x88\x01\x01B\x13\n" +
 	"\x11_permission_check:m\n" +
-	"\x10subscribe_config\x12\x1f.google.protobuf.MessageOptions\x18ц\x03 \x01(\v2\x1c.aquarium.v2.SubscribeConfigR\x0fsubscribeConfig\x88\x01\x01BEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"
+	"\x10subscribe_config\x12\x1f.google.protobuf.MessageOptions\x18ц\x03 \x01(\v2\x1c.aquarium.v2.SubscribeConfigR\x0fsubscribeConfig\x88\x01\x01:Z\n" +
+	"\x16skip_service_streaming\x12\x1f.google.protobuf.ServiceOptions\x18҆\x03 \x01(\bR\x14skipServiceStreaming\x88\x01\x01BEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"
 
 var (
 	file_aquarium_v2_options_streaming_proto_rawDescOnce sync.Once
@@ -135,14 +152,16 @@ var file_aquarium_v2_options_streaming_proto_msgTypes = make([]protoimpl.Message
 var file_aquarium_v2_options_streaming_proto_goTypes = []any{
 	(*SubscribeConfig)(nil),             // 0: aquarium.v2.SubscribeConfig
 	(*descriptorpb.MessageOptions)(nil), // 1: google.protobuf.MessageOptions
+	(*descriptorpb.ServiceOptions)(nil), // 2: google.protobuf.ServiceOptions
 }
 var file_aquarium_v2_options_streaming_proto_depIdxs = []int32{
 	1, // 0: aquarium.v2.subscribe_config:extendee -> google.protobuf.MessageOptions
-	0, // 1: aquarium.v2.subscribe_config:type_name -> aquarium.v2.SubscribeConfig
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	1, // [1:2] is the sub-list for extension type_name
-	0, // [0:1] is the sub-list for extension extendee
+	2, // 1: aquarium.v2.skip_service_streaming:extendee -> google.protobuf.ServiceOptions
+	0, // 2: aquarium.v2.subscribe_config:type_name -> aquarium.v2.SubscribeConfig
+	3, // [3:3] is the sub-list for method output_type
+	3, // [3:3] is the sub-list for method input_type
+	2, // [2:3] is the sub-list for extension type_name
+	0, // [0:2] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
 }
 
@@ -159,7 +178,7 @@ func file_aquarium_v2_options_streaming_proto_init() {
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aquarium_v2_options_streaming_proto_rawDesc), len(file_aquarium_v2_options_streaming_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   1,
-			NumExtensions: 1,
+			NumExtensions: 2,
 			NumServices:   0,
 		},
 		GoTypes:           file_aquarium_v2_options_streaming_proto_goTypes,

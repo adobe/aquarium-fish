@@ -15,14 +15,12 @@
             {formTitle}
           </h2>
           <div className="flex space-x-2">
-            {!isReadOnly && (
-              <button
-                onClick={() => setShowYamlInput(!showYamlInput)}
-                className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
-              >
-                {showYamlInput ? 'Hide YAML' : 'Load from YAML'}
-              </button>
-            )}
+            <button
+              onClick={handleToggleYamlView}
+              className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded-md hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-200"
+            >
+              {showYamlInput ? 'Hide YAML' : 'View YAML'}
+            </button>
           </div>
         </div>
       )}
@@ -31,27 +29,36 @@
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              YAML Configuration
+              YAML View
             </label>
             <textarea
               value={yamlText}
               onChange={(e) => setYamlText(e.target.value)}
-              className="w-full h-32 px-3 py-2 border border-gray-300 rounded-md font-mono text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-              placeholder="Enter YAML configuration here..."
+              disabled={isReadOnly}
+              className="w-full h-96 px-3 py-2 border border-gray-300 rounded-md font-mono text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              placeholder="YAML configuration..."
             />
           </div>
           <div className="flex space-x-2">
             <button
-              onClick={handleYamlLoad}
-              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              onClick={handleCopyYaml}
+              className="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700"
             >
-              Load from YAML
+              Copy to Clipboard
             </button>
+            {!isReadOnly && (
+              <button
+                onClick={handleYamlApply}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Apply Changes
+              </button>
+            )}
             <button
               onClick={() => setShowYamlInput(false)}
-              className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+              className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300"
             >
-              Cancel
+              Close
             </button>
           </div>
           {yamlError && (

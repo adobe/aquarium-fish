@@ -53,11 +53,12 @@ type MethodInfo struct {
 
 // SubscriptionInfo represents a subscribable message type
 type SubscriptionInfo struct {
-	MessageType      string // Message name (e.g., "ApplicationState")
-	PrimaryIDField   string // First field that represent ID of the object
-	SubscriptionType string // Subscription type enum (e.g., "SUBSCRIPTION_TYPE_APPLICATION_STATE")
-	PermissionMethod string // RBAC permission method (e.g., "ApplicationServiceGetState")
-	CustomHandler    string // Custom handler method if any
+	MessageType       string // Message name (e.g., "ApplicationState")
+	PrimaryIDField    string // First field that represent ID of the object
+	SubscriptionType  string // Subscription type enum (e.g., "SUBSCRIPTION_TYPE_APPLICATION_STATE")
+	PermissionService string // RBAC permission service (e.g., "ApplicationService")
+	PermissionMethod  string // RBAC permission method (e.g., "GetState")
+	CustomHandler     string // Custom handler method if any
 
 	// Additional fields for code generation
 	TypesPackageType string // Full type name (e.g., "*typesv2.ApplicationState")
@@ -200,6 +201,9 @@ func (s *StreamingService) {{ .RelayMethodName }}(ctx context.Context, subscript
 	// Don't forget to unsubscribe from database when the relay is completed
 	defer func() {
 		s.fish.DB().Unsubscribe{{ .MessageType }}(ctx, dbChannel)
+		// Wait briefly for any in-flight notifications to complete before closing the channel
+		// This prevents data race where notifySubscribersHelper might still be sending
+		time.Sleep(500 * time.Millisecond)
 		// Use recover to prevent panics from closing already closed channel
 		defer func() {
 			if r := recover(); r != nil {
@@ -346,7 +350,7 @@ func (s *StreamingService) shouldSendObject(sub *subscription, objectType aquari
 {{- range .Subscriptions }}
 	case aquariumv2.{{ .SubscriptionType }}:
 		if typedObj, ok := obj.({{ .TypesPackageType }}); ok {
-			return s.shouldSend{{ .MessageType }}Object(sub, typedObj, auth.{{ .PermissionMethod }})
+			return s.shouldSend{{ .MessageType }}Object(sub, typedObj, auth.{{ .PermissionService }}{{ .PermissionMethod }})
 		}
 {{- end }}
 	}
@@ -369,15 +373,15 @@ func (s *StreamingService) shouldSend{{ .MessageType }}(sub *subscription) bool 
 
 
 
-// getSubscriptionPermissionMethod returns the RBAC permission method for a subscription type
-func (s *StreamingService) getSubscriptionPermissionMethod(subscriptionType aquariumv2.SubscriptionType) string {
+// getSubscriptionPermission returns the RBAC permission service & method for a subscription type
+func (s *StreamingService) getSubscriptionPermission(subscriptionType aquariumv2.SubscriptionType) (string, string) {
 	switch subscriptionType {
 {{- range .Subscriptions }}
 	case aquariumv2.{{ .SubscriptionType }}:
-		return auth.{{ .PermissionMethod }}
+		return auth.{{ .PermissionService }}, auth.{{ .PermissionService }}{{ .PermissionMethod }}
 {{- end }}
 	default:
-    	return ""
+    	return "", ""
 	}
 }
 `
@@ -406,24 +410,6 @@ var templateFuncs = template.FuncMap{
 	},
 }
 
-// isStreamingService checks if a service should be included in streaming generation
-func isStreamingService(serviceName string) bool {
-	// Only include services that have corresponding fields in StreamingService
-	supportedServices := []string{
-		"ApplicationService",
-		"LabelService",
-		"NodeService",
-		"UserService",
-		"RoleService",
-	}
-	for _, supported := range supportedServices {
-		if serviceName == supported {
-			return true
-		}
-	}
-	return false
-}
-
 // generateVariableName creates a variable name from service name
 func generateVariableName(serviceName string) string {
 	if len(serviceName) == 0 {
@@ -432,64 +418,113 @@ func generateVariableName(serviceName string) string {
 	return strings.ToLower(serviceName[:1]) + serviceName[1:]
 }
 
-// processServices processes protobuf services to extract streaming information
-func processServices(plugin *protogen.Plugin) []ServiceInfo {
+// processProto processes protobuf services to extract streaming information & messages to extract subscription information from extensions
+func processProto(plugin *protogen.Plugin) ([]ServiceInfo, []SubscriptionInfo, error) {
 	var services []ServiceInfo
+	var subscriptions []SubscriptionInfo
 
 	for _, f := range plugin.Files {
 		if !f.Generate {
 			continue
 		}
 
-		for _, service := range f.Services {
-			serviceName := service.GoName
+		if len(f.Services) > 1 {
+			return services, subscriptions, fmt.Errorf("found more than one service in proto file %q", f.Desc.Path())
+		} else if len(f.Services) < 1 {
+			continue
+		}
 
-			// Skip services that shouldn't be included in streaming
-			if !isStreamingService(serviceName) {
+		service := f.Services[0]
+		serviceName := service.GoName
+		fmt.Fprintf(os.Stderr, "buf-gen-streaming: Processing proto service: %s\n", serviceName)
+
+		var methods []MethodInfo
+
+		opts, ok := service.Desc.Options().(*descriptorpb.ServiceOptions)
+		if ok {
+			ext := proto.GetExtension(opts, aquariumv2.E_SkipServiceStreaming)
+			ac, ok := ext.(bool)
+			if ok && ac == true {
+				// Skipping the current file processing due to service excluded from streaming generation
+				fmt.Fprintf(os.Stderr, "buf-gen-streaming:   skipped\n")
+				continue
+			}
+		}
+
+		// Processing service's methods
+		for _, method := range service.Methods {
+			// Skip streaming methods (bidirectional, server stream, client stream)
+			if method.Desc.IsStreamingClient() || method.Desc.IsStreamingServer() {
 				continue
 			}
 
-			var methods []MethodInfo
+			methodName := method.GoName
+			requestTypeName := method.Input.GoIdent.GoName
+			responseTypeName := method.Output.GoIdent.GoName
 
-			for _, method := range service.Methods {
-				// Skip streaming methods (bidirectional, server stream, client stream)
-				if method.Desc.IsStreamingClient() || method.Desc.IsStreamingServer() {
-					continue
-				}
+			// TODO: Add support for custom routing options via protobuf extensions
+			var hasPostProcessor bool
+			var cachePermissions bool
 
-				methodName := method.GoName
-				requestTypeName := method.Input.GoIdent.GoName
-				responseTypeName := method.Output.GoIdent.GoName
-
-				// TODO: Add support for custom routing options via protobuf extensions
-				var hasPostProcessor bool
-				var cachePermissions bool
-
-				// For now, detect special cases based on method names
-				if methodName == "Create" && serviceName == "ApplicationService" {
-					cachePermissions = true
-				}
-
-				methods = append(methods, MethodInfo{
-					Name:             methodName,
-					RequestType:      requestTypeName,
-					ResponseType:     responseTypeName,
-					HasPostProcessor: hasPostProcessor,
-					CachePermissions: cachePermissions,
-				})
+			// For now, detect special cases based on method names
+			if methodName == "Create" && serviceName == "ApplicationService" {
+				cachePermissions = true
 			}
 
-			if len(methods) > 0 {
-				// Sort methods for consistent output
-				sort.Slice(methods, func(i, j int) bool {
-					return methods[i].Name < methods[j].Name
-				})
+			fmt.Fprintf(os.Stderr, "buf-gen-streaming:   method: %s\n", methodName)
+			methods = append(methods, MethodInfo{
+				Name:             methodName,
+				RequestType:      requestTypeName,
+				ResponseType:     responseTypeName,
+				HasPostProcessor: hasPostProcessor,
+				CachePermissions: cachePermissions,
+			})
+		}
 
-				services = append(services, ServiceInfo{
-					Name:     serviceName,
-					Methods:  methods,
-					Variable: generateVariableName(serviceName),
-				})
+		if len(methods) > 0 {
+			// Sort methods for consistent output
+			sort.Slice(methods, func(i, j int) bool {
+				return methods[i].Name < methods[j].Name
+			})
+
+			services = append(services, ServiceInfo{
+				Name:     serviceName,
+				Methods:  methods,
+				Variable: generateVariableName(serviceName),
+			})
+		}
+
+		// Processing messages to create subscriptions
+		for _, message := range f.Messages {
+			messageName := string(message.Desc.Name())
+
+			opts, ok := message.Desc.Options().(*descriptorpb.MessageOptions)
+			if ok {
+				ext := proto.GetExtension(opts, aquariumv2.E_SubscribeConfig)
+				ac, ok := ext.(*aquariumv2.SubscribeConfig)
+
+				primaryFieldName := ""
+				for _, field := range message.Fields {
+					primaryFieldName = string(field.Desc.Name())
+					break
+				}
+
+				if ok && ac != nil {
+					fmt.Fprintf(os.Stderr, "buf-gen-streaming:   message: %s\n", messageName)
+					subscriptions = append(subscriptions, SubscriptionInfo{
+						MessageType:       messageName,
+						PrimaryIDField:    primaryFieldName,
+						SubscriptionType:  "SubscriptionType_SUBSCRIPTION_TYPE_" + strings.ToUpper(toSnake(messageName)),
+						PermissionService: serviceName,
+						PermissionMethod:  ac.GetPermissionCheck(),
+						TypesPackageType:  "*typesv2." + messageName,
+						ChannelFieldName:  toLowerFirst(messageName) + "Channel",
+						SafeSendMethod:    "safeSendTo" + messageName + "Channel",
+						ConversionMethod:  "To" + messageName,
+						DatabaseMethod:    "Subscribe" + messageName,
+						RelayMethodName:   "relay" + messageName + "Notifications",
+					})
+				}
 			}
 		}
 	}
@@ -499,7 +534,7 @@ func processServices(plugin *protogen.Plugin) []ServiceInfo {
 		return services[i].Name < services[j].Name
 	})
 
-	return services
+	return services, subscriptions, nil
 }
 
 func toSnake(camel string) (snake string) {
@@ -527,54 +562,12 @@ func toLowerFirst(s string) string {
 	return s
 }
 
-// processSubscriptions processes protobuf messages to extract subscription information from extensions
-func processSubscriptions(plugin *protogen.Plugin) []SubscriptionInfo {
-	var subscriptions []SubscriptionInfo
-
-	for _, file := range plugin.Files {
-		if !file.Generate {
-			continue
-		}
-
-		for _, message := range file.Messages {
-			messageName := string(message.Desc.Name())
-
-			opts, ok := message.Desc.Options().(*descriptorpb.MessageOptions)
-			if ok {
-				ext := proto.GetExtension(opts, aquariumv2.E_SubscribeConfig)
-				ac, ok := ext.(*aquariumv2.SubscribeConfig)
-
-				primaryFieldName := ""
-				for _, field := range message.Fields {
-					primaryFieldName = string(field.Desc.Name())
-					break
-				}
-
-				if ok && ac != nil {
-					subscriptions = append(subscriptions, SubscriptionInfo{
-						MessageType:      messageName,
-						PrimaryIDField:   primaryFieldName,
-						SubscriptionType: "SubscriptionType_SUBSCRIPTION_TYPE_" + strings.ToUpper(toSnake(messageName)),
-						PermissionMethod: ac.GetPermissionCheck(),
-						TypesPackageType: "*typesv2." + messageName,
-						ChannelFieldName: toLowerFirst(messageName) + "Channel",
-						SafeSendMethod:   "safeSendTo" + messageName + "Channel",
-						ConversionMethod: "To" + messageName,
-						DatabaseMethod:   "Subscribe" + messageName,
-						RelayMethodName:  "relay" + messageName + "Notifications",
-					})
-				}
-			}
-		}
-	}
-
-	return subscriptions
-}
-
 // generateStreamingService generates the streaming service code
 func generateStreamingService(plugin *protogen.Plugin) error {
-	services := processServices(plugin)
-	subscriptions := processSubscriptions(plugin)
+	services, subscriptions, err := processProto(plugin)
+	if err != nil {
+		return err
+	}
 
 	// Prepare template data
 	templateData := TemplateData{

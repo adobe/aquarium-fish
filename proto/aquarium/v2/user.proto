@@ -49,6 +49,22 @@ service UserService {
 
   // Remove user
   rpc Remove(UserServiceRemoveRequest) returns (UserServiceRemoveResponse) {}
+
+
+  // Get list of user groups
+  rpc ListGroup(UserServiceListGroupRequest) returns (UserServiceListGroupResponse) {}
+
+  // Get user group by name
+  rpc GetGroup(UserServiceGetGroupRequest) returns (UserServiceGetGroupResponse) {}
+
+  // Create new user group
+  rpc CreateGroup(UserServiceCreateGroupRequest) returns (UserServiceCreateGroupResponse) {}
+
+  // Update existing user group
+  rpc UpdateGroup(UserServiceUpdateGroupRequest) returns (UserServiceUpdateGroupResponse) {}
+
+  // Remove user group
+  rpc RemoveGroup(UserServiceRemoveGroupRequest) returns (UserServiceRemoveGroupResponse) {}
 }
 
 // User represents a user in the system
@@ -59,7 +75,7 @@ service UserService {
 // Can be created by any node and updated by any node with appropriate permissions.
 message User {
   option (ui_config) = { generate_ui: true };
-  option (subscribe_config) = { permission_check: "UserServiceGet" };
+  option (subscribe_config) = { permission_check: "Get" };
 
   string name = 1 [(field_ui_config) = { noedit: true }];
   google.protobuf.Timestamp created_at = 2 [(field_ui_config) = { nocreate: true, noedit: true }];
@@ -135,6 +151,72 @@ message UserServiceRemoveRequest {
 }
 
 message UserServiceRemoveResponse {
+  bool status = 1;
+  string message = 2;
+}
+
+// UserGroup makes a team of users
+//
+// Contains a list of users and their common configuration options, very useful to share Labels
+// and make changes that affecting everyone in the team.
+message UserGroup {
+  option (ui_config) = { generate_ui: true };
+  option (subscribe_config) = { permission_check: "GetGroup" };
+
+  string name = 1 [(field_ui_config) = { noedit: true }];
+  google.protobuf.Timestamp created_at = 2 [(field_ui_config) = { nocreate: true, noedit: true }];
+  google.protobuf.Timestamp updated_at = 3 [(field_ui_config) = { nocreate: true, noedit: true }];
+
+  // List of user names participating in the group
+  repeated string users = 4 [(field_ui_config) = { name: "Users", autofill: "User" }];
+
+  // Common User configuration settings
+  optional UserConfig config = 5;
+}
+
+message UserServiceListGroupRequest {}
+
+message UserServiceListGroupResponse {
+  bool status = 1;
+  string message = 2;
+  repeated UserGroup data = 3;
+}
+
+message UserServiceGetGroupRequest {
+  string group_name = 1;
+}
+
+message UserServiceGetGroupResponse {
+  bool status = 1;
+  string message = 2;
+  UserGroup data = 3;
+}
+
+message UserServiceCreateGroupRequest {
+  UserGroup usergroup = 1;
+}
+
+message UserServiceCreateGroupResponse {
+  bool status = 1;
+  string message = 2;
+  UserGroup data = 3;
+}
+
+message UserServiceUpdateGroupRequest {
+  UserGroup usergroup = 1;
+}
+
+message UserServiceUpdateGroupResponse {
+  bool status = 1;
+  string message = 2;
+  UserGroup data = 3;
+}
+
+message UserServiceRemoveGroupRequest {
+  string group_name = 1;
+}
+
+message UserServiceRemoveGroupResponse {
   bool status = 1;
   string message = 2;
 }
