@@ -753,68 +753,63 @@ const isSimpleField = (field: any) => {
     </div>
   </div>{/* Roles field */}
   <div>
-{/* Autofill field - inline layout */}
-<div className="flex items-center justify-between">
-  <div className="flex items-center space-x-2 min-w-0 flex-1">
-    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-      Roles *
-    </label>
-    <div className="relative group">
-      <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
-      <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
-        <pre className="whitespace-pre-wrap text-xs leading-relaxed">List of role names assigned to the user</pre>
-      </div>
+    {/* Complex field - traditional layout */}
+    <div className="space-y-2">
+<div className="flex items-center space-x-2">
+  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+    Roles *
+  </label>
+  <div className="relative group">
+    <span className="cursor-help text-gray-400 hover:text-gray-600">(?)</span>
+    <div className="absolute left-0 bottom-6 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none max-w-sm w-max p-3 min-w-64 max-h-48 overflow-y-auto">
+      <pre className="whitespace-pre-wrap text-xs leading-relaxed">List of role names assigned to the user</pre>
     </div>
-  </div>
-  <div className="flex-1 max-w-xs ml-4">
-    <div className="flex space-x-2">
-      {autofillMode.roles === 'text' ? (
-        <input
-          type="text"
-          value={formData.roles}
-          onChange={(e) => handleFieldChange('roles', e.target.value)}
-          disabled={isReadOnly || (mode === 'edit' && false)}
-          className="flex-1 px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-          placeholder="Enter Role UID..."
-        />
-      ) : (
-        <select
-          value={formData.roles}
-          onChange={(e) => handleFieldChange('roles', e.target.value)}
-          disabled={isReadOnly || (mode === 'edit' && false)}
-          className="flex-1 px-3 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-        >
-          <option value="">Select Role...</option>
-          {getAutofillOptions('Role').map((item: any) => {
-            const key = item.uid || item.name || item.id || JSON.stringify(item);
-            const label = item.name ? (item.name + (item.version ? (':' + item.version) : '')) : key;
-            return (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            );
-          })}
-        </select>
-      )}
-      {!isReadOnly && !(mode === 'edit' && false) && (
-        <button
-          type="button"
-          onClick={() => setAutofillMode(prev => ({ ...prev, roles: prev.roles === 'text' ? 'dropdown' : 'text' }))}
-          className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
-          title={autofillMode.roles === 'text' ? 'Switch to dropdown' : 'Switch to text input'}
-        >
-          {autofillMode.roles === 'text' ? '📋' : '✏️'}
-        </button>
-      )}
-    </div>
-    {validationErrors.roles && (
-      <div className="text-xs text-red-600 dark:text-red-400 mt-1">
-        {validationErrors.roles}
-      </div>
-    )}
   </div>
 </div>
 
+<div className="space-y-3">
+  {formData.roles.map((item, index) => (
+    <div key={index} className="relative border-2 border-gray-200 rounded-lg p-3 dark:border-gray-600 bg-gray-50 dark:bg-gray-800">
+      <div className="flex items-center justify-between">
+        <input
+          type="text"
+          value={item}
+          onChange={(e) => handleArrayChange('roles', index, e.target.value)}
+          disabled={isReadOnly || (mode === 'edit' && false)}
+          className="flex-1 mr-3 px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+        />
+        {!isReadOnly && !(mode === 'edit' && false) && (
+          <button
+            type="button"
+            onClick={() => removeArrayItem('roles', index)}
+            className="flex items-center justify-center w-6 h-6 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors"
+            title="Remove item"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+    </div>
+  ))}
+  {!isReadOnly && !(mode === 'edit' && false) && (
+    <button
+      onClick={() => addArrayItem('roles', '')}
+      className="w-full px-3 py-2 text-sm border-2 border-dashed border-gray-300 text-gray-600 rounded-md hover:border-green-400 hover:text-green-600 transition-colors"
+    >
+      + Add Roles
+    </button>
+  )}
+</div>
+
+{validationErrors.roles && (
+  <div className="text-sm text-red-600 dark:text-red-400 mt-1">
+    {validationErrors.roles}
+  </div>
+)}
+
+    </div>
   </div>
 
         </div>

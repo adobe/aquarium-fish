@@ -4,19 +4,7 @@
   {{- if .NoCreate }}
   {!(mode === 'create' && {{.NoCreate}}) && (
     <div>
-      {{- if eq .TypeScript "string" | and (not .AutofillType) | and (not .IsRepeated) | and (not .IsMap) | and (not .IsMessage) | and (not .IsStruct) | and (not .IsTimestamp) }}
-{{template "simple-string-field" .}}
-      {{- else if eq .TypeScript "number" | and (not .IsRepeated) | and (not .IsMap) }}
-{{template "simple-number-field" .}}
-      {{- else if eq .TypeScript "boolean" }}
-{{template "simple-boolean-field" .}}
-      {{- else if .IsEnum }}
-{{template "enum-field" .}}
-      {{- else if .IsTimestamp }}
-{{template "timestamp-field" .}}
-      {{- else if .AutofillType }}
-{{template "autofill-field" .}}
-      {{- else if or .IsStruct .IsRepeated .IsMap .IsMessage }}
+      {{- if or .IsStruct .IsRepeated .IsMap .IsMessage | and (not .IsTimestamp) }}
       {/* Complex field - traditional layout */}
       <div className="space-y-2">
 {{template "field-label" .}}
@@ -31,6 +19,18 @@
         {{- end }}
 {{template "validation-error" .}}
       </div>
+      {{- else if .IsEnum }}
+{{template "enum-field" .}}
+      {{- else if .IsTimestamp }}
+{{template "timestamp-field" .}}
+      {{- else if .AutofillType }}
+{{template "autofill-field" .}}
+      {{- else if eq .TypeScript "number" }}
+{{template "simple-number-field" .}}
+      {{- else if eq .TypeScript "boolean" }}
+{{template "simple-boolean-field" .}}
+      {{- else if eq .TypeScript "string" }}
+{{template "simple-string-field" .}}
       {{- else }}
 {{template "basic-input-field" .}}
       {{- end }}
@@ -38,19 +38,7 @@
   )}
   {{- else }}
   <div>
-    {{- if eq .TypeScript "string" | and (not .AutofillType) | and (not .IsRepeated) | and (not .IsMap) | and (not .IsMessage) | and (not .IsStruct) | and (not .IsTimestamp) }}
-{{template "simple-string-field" .}}
-    {{- else if eq .TypeScript "number" | and (not .IsRepeated) | and (not .IsMap) }}
-{{template "simple-number-field" .}}
-    {{- else if eq .TypeScript "boolean" }}
-{{template "simple-boolean-field" .}}
-    {{- else if .IsEnum }}
-{{template "enum-field" .}}
-    {{- else if .IsTimestamp }}
-{{template "timestamp-field" .}}
-    {{- else if .AutofillType }}
-{{template "autofill-field" .}}
-    {{- else if or .IsStruct .IsRepeated .IsMap .IsMessage }}
+    {{- if or .IsStruct .IsRepeated .IsMap .IsMessage | and (not .IsTimestamp) }}
     {/* Complex field - traditional layout */}
     <div className="space-y-2">
 {{template "field-label" .}}
@@ -65,6 +53,18 @@
       {{- end }}
 {{template "validation-error" .}}
     </div>
+    {{- else if .IsEnum }}
+{{template "enum-field" .}}
+    {{- else if .IsTimestamp }}
+{{template "timestamp-field" .}}
+    {{- else if .AutofillType }}
+{{template "autofill-field" .}}
+    {{- else if eq .TypeScript "number" }}
+{{template "simple-number-field" .}}
+    {{- else if eq .TypeScript "boolean" }}
+{{template "simple-boolean-field" .}}
+    {{- else if eq .TypeScript "string" }}
+{{template "simple-string-field" .}}
     {{- else }}
 {{template "basic-input-field" .}}
     {{- end }}
