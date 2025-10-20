@@ -77,6 +77,7 @@ export function ManagePage() {
   // Role operations
   const handleCreateRole = async (roleData: Role) => {
     try {
+      console.debug('Creating:', roleData);
       await createRole(roleData);
       setShowCreateRoleModal(false);
     } catch (error) {
@@ -87,6 +88,7 @@ export function ManagePage() {
   const handleUpdateRole = async (roleData: Role) => {
     if (!selectedRole) return;
     try {
+      console.debug('Updating:', roleData);
       await updateRole(roleData);
       setShowRoleDetailsModal(false);
       setSelectedRole(null);
@@ -107,6 +109,7 @@ export function ManagePage() {
   // User operations
   const handleCreateUser = async (userData: User) => {
     try {
+      console.debug('Creating:', userData);
       await createUser(userData);
       setShowCreateUserModal(false);
     } catch (error) {
@@ -117,6 +120,7 @@ export function ManagePage() {
   const handleUpdateUser = async (userData: User) => {
     if (!selectedUser) return;
     try {
+      console.debug('Updating:', userData);
       await updateUser(userData);
       setShowUserDetailsModal(false);
       setSelectedUser(null);
@@ -137,6 +141,7 @@ export function ManagePage() {
   // User Group operations
   const handleCreateUserGroup = async (groupData: UserGroup) => {
     try {
+      console.debug('Creating:', groupData);
       await createUserGroup(groupData);
       setShowCreateUserGroupModal(false);
     } catch (error) {
@@ -147,6 +152,7 @@ export function ManagePage() {
   const handleUpdateUserGroup = async (groupData: UserGroup) => {
     if (!selectedUserGroup) return;
     try {
+      console.debug('Updating:', groupData);
       await updateUserGroup(groupData);
       setShowUserGroupDetailsModal(false);
       setSelectedUserGroup(null);
@@ -237,7 +243,7 @@ export function ManagePage() {
       label: 'Remove',
       onClick: handleRemoveRole,
       className: 'px-3 py-1 text-sm bg-red-100 text-red-800 rounded-md hover:bg-red-200',
-      condition: (role: Role) => role.name !== 'admin',
+      condition: (role: Role) => role.name !== 'Administrator',
       permission: { resource: PermService.Role, action: PermRole.Remove },
     },
   ];

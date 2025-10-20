@@ -130,12 +130,12 @@ func CreateLabel(t *testing.T, page pw.Page, labelName string) string {
 		t.Fatalf("ERROR: Create Label modal did not appear: %v", err)
 	}
 
-	// Click Load from YAML button in modal
-	err = page.GetByRole(*pw.AriaRoleButton, pw.PageGetByRoleOptions{Name: "Load from YAML"}).
+	// Click "View YAML" button in modal
+	err = page.GetByRole(*pw.AriaRoleButton, pw.PageGetByRoleOptions{Name: "View YAML"}).
 		First().
 		Click()
 	if err != nil {
-		t.Fatalf("ERROR: Could not click Load from YAML button in modal: %v", err)
+		t.Fatalf("ERROR: Could not click View YAML button in modal: %v", err)
 	}
 
 	// Create basic label definition
@@ -148,7 +148,7 @@ definitions:
       cpu: 1
       ram: 2
 `
-	err = page.Locator("label:has-text('YAML Configuration')").
+	err = page.Locator("label:has-text('YAML View')").
 		Locator("..").
 		Locator("textarea").
 		Fill(definitionYAML)
@@ -156,12 +156,12 @@ definitions:
 		t.Fatalf("ERROR: Could not fill Definitions field: %v", err)
 	}
 
-	// Click Load from YAML button in modal to confirm loading
-	err = page.GetByRole(*pw.AriaRoleButton, pw.PageGetByRoleOptions{Name: "Load from YAML"}).
+	// Click "Apply Changes" button in modal to confirm loading
+	err = page.GetByRole(*pw.AriaRoleButton, pw.PageGetByRoleOptions{Name: "Apply Changes"}).
 		First().
 		Click()
 	if err != nil {
-		t.Fatalf("ERROR: Could not click Load from YAML button in modal to confirm load: %v", err)
+		t.Fatalf("ERROR: Could not click Apply Changes button in modal to confirm YAML load: %v", err)
 	}
 
 	// Fill Name field
@@ -205,10 +205,10 @@ definitions:
 		t.Fatalf("ERROR: Label %s did not appear in list: %v", labelName, err)
 	}
 
-	err = labelItem.GetByRole(*pw.AriaRoleButton, pw.LocatorGetByRoleOptions{Name: "View Details"}).
+	err = labelItem.GetByRole(*pw.AriaRoleButton, pw.LocatorGetByRoleOptions{Name: "View"}).
 		Click()
 	if err != nil {
-		t.Fatalf("ERROR: Could not click Label %s View Details button: %v", labelName, err)
+		t.Fatalf("ERROR: Could not click Label %s View button: %v", labelName, err)
 	}
 
 	// Wait for modal to appear
@@ -221,19 +221,22 @@ definitions:
 
 	// Getting the UID field in the Label Details
 	var labelUID string
-	labelUID, err = page.Locator("p:below(p:text('UID'))").
+	labelUID, err = page.Locator("label:has-text('Uid *')").
 		First().
-		InnerText()
-	if err != nil {
-		t.Errorf("ERROR: No Label UID found in Label Details modal: %v", err)
+		Locator("..").
+		Locator("..").
+		Locator("input").
+		InputValue()
+	if err != nil || labelUID == "" {
+		t.Errorf("ERROR: No Label UID found or empty in Label Details modal: %v", err)
 	}
 
 	// Close label details popup
-	err = page.GetByRole(*pw.AriaRoleButton, pw.PageGetByRoleOptions{Name: "×"}).
+	err = page.GetByRole(*pw.AriaRoleButton, pw.PageGetByRoleOptions{Name: "Close"}).
 		First().
 		Click()
 	if err != nil {
-		t.Fatalf("ERROR: Could not click Close modal button ×: %v", err)
+		t.Fatalf("ERROR: Could not click Close modal button: %v", err)
 	}
 
 	t.Logf("INFO: Successfully created label %s: %s", labelName, labelUID)
@@ -264,6 +267,7 @@ func CreateApplication(t *testing.T, page pw.Page, labelUID string, metadata map
 	}
 
 	// Select Label from available options
+	t.Logf("INFO: Selecting label for new Application: %q", labelUID)
 	_, err = page.GetByRole(*pw.AriaRoleCombobox).
 		SelectOption(pw.SelectOptionValues{Values: pw.StringSlice(labelUID)})
 	if err != nil {
@@ -284,6 +288,7 @@ func CreateApplication(t *testing.T, page pw.Page, labelUID string, metadata map
 		metadataJSON += "}"
 
 		err = page.Locator("label:has-text('Metadata')").
+			Locator("..").
 			Locator("..").
 			Locator("textarea").
 			Fill(metadataJSON)

@@ -81,17 +81,18 @@ const handleCopyYaml = () => {
 };
 
 // Validate form data
-const validateForm = (): boolean => {
+const validateForm = (dataToValidate?: any): boolean => {
+  const data = dataToValidate || formData;
   const errors: Record<string, string> = {};
 
 {{- range .Fields }}
 {{- if not .IsOptional }}
   {{- if .NoEdit }}
-  if (mode !== 'create' && (formData.{{.JSONName}} === undefined || formData.{{.JSONName}} === null || formData.{{.JSONName}} === ''{{if .IsRepeated}} || formData.{{.JSONName}}.length === 0{{end}})) {
+  if (mode !== 'create' && (data.{{.JSONName}} === undefined || data.{{.JSONName}} === null || data.{{.JSONName}} === ''{{if .IsRepeated}} || data.{{.JSONName}}.length === 0{{end}})) {
     errors.{{.JSONName}} = '{{.DisplayName}} is required';
   }
   {{- else }}
-  if (formData.{{.JSONName}} === undefined || formData.{{.JSONName}} === null || formData.{{.JSONName}} === ''{{if .IsRepeated}} || formData.{{.JSONName}}.length === 0{{end}}) {
+  if (data.{{.JSONName}} === undefined || data.{{.JSONName}} === null || data.{{.JSONName}} === ''{{if .IsRepeated}} || data.{{.JSONName}}.length === 0{{end}}) {
     errors.{{.JSONName}} = '{{.DisplayName}} is required';
   }
   {{- end }}
@@ -99,20 +100,36 @@ const validateForm = (): boolean => {
 {{- end }}
 
   setValidationErrors(errors);
-  return Object.keys(errors).length === 0;
+
+  // Validate all nested components
+  let allNestedValid = true;
+  Object.keys(nestedValidateFns.current).forEach(key => {
+    const nestedValidate = nestedValidateFns.current[key];
+    if (nestedValidate) {
+      const isValid = nestedValidate();
+      if (!isValid) {
+        allNestedValid = false;
+      }
+    }
+  });
+
+  return Object.keys(errors).length === 0 && allNestedValid;
 };
 
 // Handle form submission
 const handleSubmit = () => {
-  if (!validateForm()) {
+  // First, collect data from nested components to ensure we have the latest values
+  // This fixes race conditions where nested components haven't updated the parent yet
+  const collectedData = getData();
+  console.debug("Form data:", collectedData);
+
+  // Validate using the collected data, not the stale formData state
+  if (!validateForm(collectedData)) {
     return;
   }
 
   try {
-    // Collect data from this component and all nested components
-    const collectedData = getData();
-
-    // Convert form data to protobuf message
+    // Convert form data to protobuf message using collected data
     const data = create({{.TypeName}}Schema, {
 {{- range .Fields }}
 {{- if .IsTimestamp }}

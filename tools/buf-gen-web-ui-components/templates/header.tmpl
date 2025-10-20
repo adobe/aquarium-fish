@@ -28,7 +28,7 @@ interface {{.Name}}FormProps {
   title?: string;
   readonly?: boolean;
   nested?: boolean;
-  onRegister?: (getData: () => any) => void;
+  onRegister?: (getData: () => any, validateFn: () => boolean) => void;
   onFormChange?: (hasChanges: boolean) => void;
 }
 

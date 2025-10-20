@@ -60,7 +60,7 @@
             title={'{{.DisplayName}}'}
             readonly={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
             nested={true}
-            onRegister={(getDataFn: () => any) => registerNestedGetData('{{.JSONName}}', getDataFn)}
+            onRegister={(getDataFn: () => any, validateFn: () => boolean) => registerNestedGetData('{{.JSONName}}', getDataFn, validateFn)}
           />
         </div>
       </div>

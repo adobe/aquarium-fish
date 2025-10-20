@@ -57,7 +57,7 @@
                   title={key}
                   readonly={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
                   nested={true}
-                  onRegister={(getDataFn: () => any) => registerNestedGetData('{{.JSONName}}.' + key, getDataFn)}
+                  onRegister={(getDataFn: () => any, validateFn: () => boolean) => registerNestedGetData('{{.JSONName}}.' + key, getDataFn, validateFn)}
                 />
               );
             }

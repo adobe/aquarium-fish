@@ -21,8 +21,9 @@ export const {{.Name}}Form: React.FC<{{.Name -}}FormProps> = ({
   const [hasChanges, setHasChanges] = useState(false);
   const { data } = useStreaming();
 
-  // Store references to nested component getData functions
+  // Store references to nested component getData and validate functions
   const nestedGetDataFns = useRef<Record<string, () => any>>({});
+  const nestedValidateFns = useRef<Record<string, () => boolean>>({});
   const initialFormDataRef = useRef<{{.Name}}FormState>(default{{.Name}}State);
 
   // Initialize form data from initialData
@@ -76,12 +77,12 @@ export const {{.Name}}Form: React.FC<{{.Name -}}FormProps> = ({
     }
   }, [formData, mode, readonly, onFormChange]);
 
-  // Register getData function with parent if nested
+  // Register getData and validate functions with parent if nested
   useEffect(() => {
     if (nested && onRegister) {
-      onRegister(getData);
+      onRegister(getData, validateForm);
     }
-  }, [nested, onRegister]);
+  }, [nested, onRegister, formData]);
 
   // Function to collect data from this component and all nested components
   const getData = () => {
@@ -91,6 +92,8 @@ export const {{.Name}}Form: React.FC<{{.Name -}}FormProps> = ({
     Object.keys(nestedGetDataFns.current).forEach(key => {
       const nestedGetData = nestedGetDataFns.current[key];
       if (nestedGetData) {
+        const nestedData = nestedGetData();
+
         // Handle array items: key format is "fieldName[index]"
         const arrayMatch = key.match(/^(.+?)\[(\d+)\]$/);
         if (arrayMatch) {
@@ -99,7 +102,7 @@ export const {{.Name}}Form: React.FC<{{.Name -}}FormProps> = ({
           if (!Array.isArray(currentFormData[fieldName as keyof {{.Name}}FormState])) {
             currentFormData[fieldName as keyof {{.Name}}FormState] = [] as any;
           }
-          (currentFormData[fieldName as keyof {{.Name}}FormState] as any[])[index] = nestedGetData();
+          (currentFormData[fieldName as keyof {{.Name}}FormState] as any[])[index] = nestedData;
         } else if (key.includes('.')) {
           // Handle map items: key format is "fieldName.mapKey"
           const dotIndex = key.indexOf('.');
@@ -108,10 +111,10 @@ export const {{.Name}}Form: React.FC<{{.Name -}}FormProps> = ({
           if (!currentFormData[fieldName as keyof {{.Name}}FormState] || typeof currentFormData[fieldName as keyof {{.Name}}FormState] !== 'object') {
             currentFormData[fieldName as keyof {{.Name}}FormState] = {} as any;
           }
-          (currentFormData[fieldName as keyof {{.Name}}FormState] as any)[mapKey] = nestedGetData();
+          (currentFormData[fieldName as keyof {{.Name}}FormState] as any)[mapKey] = nestedData;
         } else {
           // Regular nested field
-          currentFormData[key as keyof {{.Name}}FormState] = nestedGetData();
+          currentFormData[key as keyof {{.Name}}FormState] = nestedData;
         }
       }
     });
@@ -119,13 +122,17 @@ export const {{.Name}}Form: React.FC<{{.Name -}}FormProps> = ({
     return currentFormData;
   };
 
-  // Register a nested component's getData function
-  const registerNestedGetData = (fieldName: string, getDataFn: () => any) => {
+  // Register a nested component's getData and validate functions
+  const registerNestedGetData = (fieldName: string, getDataFn: () => any, validateFn?: () => boolean) => {
     nestedGetDataFns.current[fieldName] = getDataFn;
+    if (validateFn) {
+      nestedValidateFns.current[fieldName] = validateFn;
+    }
   };
 
-  // Unregister a nested component's getData function
+  // Unregister a nested component's getData and validate functions
   const unregisterNestedGetData = (fieldName: string) => {
     delete nestedGetDataFns.current[fieldName];
+    delete nestedValidateFns.current[fieldName];
   };
 {{end}}

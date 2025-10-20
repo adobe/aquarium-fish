@@ -27,7 +27,7 @@ interface ApplicationResourceFormProps {
   title?: string;
   readonly?: boolean;
   nested?: boolean;
-  onRegister?: (getData: () => any) => void;
+  onRegister?: (getData: () => any, validateFn: () => boolean) => void;
   onFormChange?: (hasChanges: boolean) => void;
 }
 
@@ -85,8 +85,9 @@ export const ApplicationResourceForm: React.FC<ApplicationResourceFormProps> = (
   const [hasChanges, setHasChanges] = useState(false);
   const { data } = useStreaming();
 
-  // Store references to nested component getData functions
+  // Store references to nested component getData and validate functions
   const nestedGetDataFns = useRef<Record<string, () => any>>({});
+  const nestedValidateFns = useRef<Record<string, () => boolean>>({});
   const initialFormDataRef = useRef<ApplicationResourceFormState>(defaultApplicationResourceState);
 
   // Initialize form data from initialData
@@ -134,12 +135,12 @@ export const ApplicationResourceForm: React.FC<ApplicationResourceFormProps> = (
     }
   }, [formData, mode, readonly, onFormChange]);
 
-  // Register getData function with parent if nested
+  // Register getData and validate functions with parent if nested
   useEffect(() => {
     if (nested && onRegister) {
-      onRegister(getData);
+      onRegister(getData, validateForm);
     }
-  }, [nested, onRegister]);
+  }, [nested, onRegister, formData]);
 
   // Function to collect data from this component and all nested components
   const getData = () => {
@@ -149,6 +150,8 @@ export const ApplicationResourceForm: React.FC<ApplicationResourceFormProps> = (
     Object.keys(nestedGetDataFns.current).forEach(key => {
       const nestedGetData = nestedGetDataFns.current[key];
       if (nestedGetData) {
+        const nestedData = nestedGetData();
+
         // Handle array items: key format is "fieldName[index]"
         const arrayMatch = key.match(/^(.+?)\[(\d+)\]$/);
         if (arrayMatch) {
@@ -157,7 +160,7 @@ export const ApplicationResourceForm: React.FC<ApplicationResourceFormProps> = (
           if (!Array.isArray(currentFormData[fieldName as keyof ApplicationResourceFormState])) {
             currentFormData[fieldName as keyof ApplicationResourceFormState] = [] as any;
           }
-          (currentFormData[fieldName as keyof ApplicationResourceFormState] as any[])[index] = nestedGetData();
+          (currentFormData[fieldName as keyof ApplicationResourceFormState] as any[])[index] = nestedData;
         } else if (key.includes('.')) {
           // Handle map items: key format is "fieldName.mapKey"
           const dotIndex = key.indexOf('.');
@@ -166,10 +169,10 @@ export const ApplicationResourceForm: React.FC<ApplicationResourceFormProps> = (
           if (!currentFormData[fieldName as keyof ApplicationResourceFormState] || typeof currentFormData[fieldName as keyof ApplicationResourceFormState] !== 'object') {
             currentFormData[fieldName as keyof ApplicationResourceFormState] = {} as any;
           }
-          (currentFormData[fieldName as keyof ApplicationResourceFormState] as any)[mapKey] = nestedGetData();
+          (currentFormData[fieldName as keyof ApplicationResourceFormState] as any)[mapKey] = nestedData;
         } else {
           // Regular nested field
-          currentFormData[key as keyof ApplicationResourceFormState] = nestedGetData();
+          currentFormData[key as keyof ApplicationResourceFormState] = nestedData;
         }
       }
     });
@@ -177,14 +180,18 @@ export const ApplicationResourceForm: React.FC<ApplicationResourceFormProps> = (
     return currentFormData;
   };
 
-  // Register a nested component's getData function
-  const registerNestedGetData = (fieldName: string, getDataFn: () => any) => {
+  // Register a nested component's getData and validate functions
+  const registerNestedGetData = (fieldName: string, getDataFn: () => any, validateFn?: () => boolean) => {
     nestedGetDataFns.current[fieldName] = getDataFn;
+    if (validateFn) {
+      nestedValidateFns.current[fieldName] = validateFn;
+    }
   };
 
-  // Unregister a nested component's getData function
+  // Unregister a nested component's getData and validate functions
   const unregisterNestedGetData = (fieldName: string) => {
     delete nestedGetDataFns.current[fieldName];
+    delete nestedValidateFns.current[fieldName];
   };
 
 
@@ -300,57 +307,74 @@ const handleCopyYaml = () => {
 };
 
 // Validate form data
-const validateForm = (): boolean => {
+const validateForm = (dataToValidate?: any): boolean => {
+  const data = dataToValidate || formData;
   const errors: Record<string, string> = {};
-  if (mode !== 'create' && (formData.uid === undefined || formData.uid === null || formData.uid === '')) {
+  if (mode !== 'create' && (data.uid === undefined || data.uid === null || data.uid === '')) {
     errors.uid = 'Uid is required';
   }
-  if (mode !== 'create' && (formData.createdAt === undefined || formData.createdAt === null || formData.createdAt === '')) {
+  if (mode !== 'create' && (data.createdAt === undefined || data.createdAt === null || data.createdAt === '')) {
     errors.createdAt = 'Created At is required';
   }
-  if (mode !== 'create' && (formData.updatedAt === undefined || formData.updatedAt === null || formData.updatedAt === '')) {
+  if (mode !== 'create' && (data.updatedAt === undefined || data.updatedAt === null || data.updatedAt === '')) {
     errors.updatedAt = 'Updated At is required';
   }
-  if (formData.applicationUid === undefined || formData.applicationUid === null || formData.applicationUid === '') {
+  if (data.applicationUid === undefined || data.applicationUid === null || data.applicationUid === '') {
     errors.applicationUid = 'Application Uid is required';
   }
-  if (formData.nodeUid === undefined || formData.nodeUid === null || formData.nodeUid === '') {
+  if (data.nodeUid === undefined || data.nodeUid === null || data.nodeUid === '') {
     errors.nodeUid = 'Node Uid is required';
   }
-  if (formData.labelUid === undefined || formData.labelUid === null || formData.labelUid === '') {
+  if (data.labelUid === undefined || data.labelUid === null || data.labelUid === '') {
     errors.labelUid = 'Label Uid is required';
   }
-  if (formData.definitionIndex === undefined || formData.definitionIndex === null || formData.definitionIndex === '') {
+  if (data.definitionIndex === undefined || data.definitionIndex === null || data.definitionIndex === '') {
     errors.definitionIndex = 'Definition Index is required';
   }
-  if (formData.identifier === undefined || formData.identifier === null || formData.identifier === '') {
+  if (data.identifier === undefined || data.identifier === null || data.identifier === '') {
     errors.identifier = 'Identifier is required';
   }
-  if (formData.ipAddr === undefined || formData.ipAddr === null || formData.ipAddr === '') {
+  if (data.ipAddr === undefined || data.ipAddr === null || data.ipAddr === '') {
     errors.ipAddr = 'Ip Addr is required';
   }
-  if (formData.hwAddr === undefined || formData.hwAddr === null || formData.hwAddr === '') {
+  if (data.hwAddr === undefined || data.hwAddr === null || data.hwAddr === '') {
     errors.hwAddr = 'Hw Addr is required';
   }
-  if (formData.metadata === undefined || formData.metadata === null || formData.metadata === '') {
+  if (data.metadata === undefined || data.metadata === null || data.metadata === '') {
     errors.metadata = 'Metadata is required';
   }
 
   setValidationErrors(errors);
-  return Object.keys(errors).length === 0;
+
+  // Validate all nested components
+  let allNestedValid = true;
+  Object.keys(nestedValidateFns.current).forEach(key => {
+    const nestedValidate = nestedValidateFns.current[key];
+    if (nestedValidate) {
+      const isValid = nestedValidate();
+      if (!isValid) {
+        allNestedValid = false;
+      }
+    }
+  });
+
+  return Object.keys(errors).length === 0 && allNestedValid;
 };
 
 // Handle form submission
 const handleSubmit = () => {
-  if (!validateForm()) {
+  // First, collect data from nested components to ensure we have the latest values
+  // This fixes race conditions where nested components haven't updated the parent yet
+  const collectedData = getData();
+  console.debug("Form data:", collectedData);
+
+  // Validate using the collected data, not the stale formData state
+  if (!validateForm(collectedData)) {
     return;
   }
 
   try {
-    // Collect data from this component and all nested components
-    const collectedData = getData();
-
-    // Convert form data to protobuf message
+    // Convert form data to protobuf message using collected data
     const data = create(ApplicationResourceSchema, {
       uid: collectedData.uid,
       createdAt: collectedData.createdAt ? { seconds: BigInt(Math.floor(new Date(collectedData.createdAt).getTime() / 1000)) } : undefined,
@@ -961,7 +985,7 @@ const isSimpleField = (field: any) => {
             title={'Authentication'}
             readonly={isReadOnly || (mode === 'edit' && false)}
             nested={true}
-            onRegister={(getDataFn: () => any) => registerNestedGetData('authentication', getDataFn)}
+            onRegister={(getDataFn: () => any, validateFn: () => boolean) => registerNestedGetData('authentication', getDataFn, validateFn)}
           />
         </div>
       </div>

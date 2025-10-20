@@ -73,6 +73,7 @@ export function ApplicationsPage() {
 
   const handleCreateApplication = async (applicationData: any) => {
     try {
+      console.debug('Creating:', applicationData);
       await create(applicationData);
       setShowCreateModal(false);
     } catch (error) {

@@ -27,7 +27,7 @@ interface UserFormProps {
   title?: string;
   readonly?: boolean;
   nested?: boolean;
-  onRegister?: (getData: () => any) => void;
+  onRegister?: (getData: () => any, validateFn: () => boolean) => void;
   onFormChange?: (hasChanges: boolean) => void;
 }
 
@@ -73,8 +73,9 @@ export const UserForm: React.FC<UserFormProps> = ({
   const [hasChanges, setHasChanges] = useState(false);
   const { data } = useStreaming();
 
-  // Store references to nested component getData functions
+  // Store references to nested component getData and validate functions
   const nestedGetDataFns = useRef<Record<string, () => any>>({});
+  const nestedValidateFns = useRef<Record<string, () => boolean>>({});
   const initialFormDataRef = useRef<UserFormState>(defaultUserState);
 
   // Initialize form data from initialData
@@ -116,12 +117,12 @@ export const UserForm: React.FC<UserFormProps> = ({
     }
   }, [formData, mode, readonly, onFormChange]);
 
-  // Register getData function with parent if nested
+  // Register getData and validate functions with parent if nested
   useEffect(() => {
     if (nested && onRegister) {
-      onRegister(getData);
+      onRegister(getData, validateForm);
     }
-  }, [nested, onRegister]);
+  }, [nested, onRegister, formData]);
 
   // Function to collect data from this component and all nested components
   const getData = () => {
@@ -131,6 +132,8 @@ export const UserForm: React.FC<UserFormProps> = ({
     Object.keys(nestedGetDataFns.current).forEach(key => {
       const nestedGetData = nestedGetDataFns.current[key];
       if (nestedGetData) {
+        const nestedData = nestedGetData();
+
         // Handle array items: key format is "fieldName[index]"
         const arrayMatch = key.match(/^(.+?)\[(\d+)\]$/);
         if (arrayMatch) {
@@ -139,7 +142,7 @@ export const UserForm: React.FC<UserFormProps> = ({
           if (!Array.isArray(currentFormData[fieldName as keyof UserFormState])) {
             currentFormData[fieldName as keyof UserFormState] = [] as any;
           }
-          (currentFormData[fieldName as keyof UserFormState] as any[])[index] = nestedGetData();
+          (currentFormData[fieldName as keyof UserFormState] as any[])[index] = nestedData;
         } else if (key.includes('.')) {
           // Handle map items: key format is "fieldName.mapKey"
           const dotIndex = key.indexOf('.');
@@ -148,10 +151,10 @@ export const UserForm: React.FC<UserFormProps> = ({
           if (!currentFormData[fieldName as keyof UserFormState] || typeof currentFormData[fieldName as keyof UserFormState] !== 'object') {
             currentFormData[fieldName as keyof UserFormState] = {} as any;
           }
-          (currentFormData[fieldName as keyof UserFormState] as any)[mapKey] = nestedGetData();
+          (currentFormData[fieldName as keyof UserFormState] as any)[mapKey] = nestedData;
         } else {
           // Regular nested field
-          currentFormData[key as keyof UserFormState] = nestedGetData();
+          currentFormData[key as keyof UserFormState] = nestedData;
         }
       }
     });
@@ -159,14 +162,18 @@ export const UserForm: React.FC<UserFormProps> = ({
     return currentFormData;
   };
 
-  // Register a nested component's getData function
-  const registerNestedGetData = (fieldName: string, getDataFn: () => any) => {
+  // Register a nested component's getData and validate functions
+  const registerNestedGetData = (fieldName: string, getDataFn: () => any, validateFn?: () => boolean) => {
     nestedGetDataFns.current[fieldName] = getDataFn;
+    if (validateFn) {
+      nestedValidateFns.current[fieldName] = validateFn;
+    }
   };
 
-  // Unregister a nested component's getData function
+  // Unregister a nested component's getData and validate functions
   const unregisterNestedGetData = (fieldName: string) => {
     delete nestedGetDataFns.current[fieldName];
+    delete nestedValidateFns.current[fieldName];
   };
 
 
@@ -258,36 +265,53 @@ const handleCopyYaml = () => {
 };
 
 // Validate form data
-const validateForm = (): boolean => {
+const validateForm = (dataToValidate?: any): boolean => {
+  const data = dataToValidate || formData;
   const errors: Record<string, string> = {};
-  if (mode !== 'create' && (formData.name === undefined || formData.name === null || formData.name === '')) {
+  if (mode !== 'create' && (data.name === undefined || data.name === null || data.name === '')) {
     errors.name = 'Name is required';
   }
-  if (mode !== 'create' && (formData.createdAt === undefined || formData.createdAt === null || formData.createdAt === '')) {
+  if (mode !== 'create' && (data.createdAt === undefined || data.createdAt === null || data.createdAt === '')) {
     errors.createdAt = 'Created At is required';
   }
-  if (mode !== 'create' && (formData.updatedAt === undefined || formData.updatedAt === null || formData.updatedAt === '')) {
+  if (mode !== 'create' && (data.updatedAt === undefined || data.updatedAt === null || data.updatedAt === '')) {
     errors.updatedAt = 'Updated At is required';
   }
-  if (formData.roles === undefined || formData.roles === null || formData.roles === '' || formData.roles.length === 0) {
+  if (data.roles === undefined || data.roles === null || data.roles === '' || data.roles.length === 0) {
     errors.roles = 'Roles is required';
   }
 
   setValidationErrors(errors);
-  return Object.keys(errors).length === 0;
+
+  // Validate all nested components
+  let allNestedValid = true;
+  Object.keys(nestedValidateFns.current).forEach(key => {
+    const nestedValidate = nestedValidateFns.current[key];
+    if (nestedValidate) {
+      const isValid = nestedValidate();
+      if (!isValid) {
+        allNestedValid = false;
+      }
+    }
+  });
+
+  return Object.keys(errors).length === 0 && allNestedValid;
 };
 
 // Handle form submission
 const handleSubmit = () => {
-  if (!validateForm()) {
+  // First, collect data from nested components to ensure we have the latest values
+  // This fixes race conditions where nested components haven't updated the parent yet
+  const collectedData = getData();
+  console.debug("Form data:", collectedData);
+
+  // Validate using the collected data, not the stale formData state
+  if (!validateForm(collectedData)) {
     return;
   }
 
   try {
-    // Collect data from this component and all nested components
-    const collectedData = getData();
-
-    // Convert form data to protobuf message
+    // Convert form data to protobuf message using collected data
     const data = create(UserSchema, {
       name: collectedData.name,
       createdAt: collectedData.createdAt ? { seconds: BigInt(Math.floor(new Date(collectedData.createdAt).getTime() / 1000)) } : undefined,
@@ -699,7 +723,7 @@ const isSimpleField = (field: any) => {
             title={'Config'}
             readonly={isReadOnly || (mode === 'edit' && false)}
             nested={true}
-            onRegister={(getDataFn: () => any) => registerNestedGetData('config', getDataFn)}
+            onRegister={(getDataFn: () => any, validateFn: () => boolean) => registerNestedGetData('config', getDataFn, validateFn)}
           />
         </div>
       </div>

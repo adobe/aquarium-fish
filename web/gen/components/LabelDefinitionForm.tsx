@@ -27,7 +27,7 @@ interface LabelDefinitionFormProps {
   title?: string;
   readonly?: boolean;
   nested?: boolean;
-  onRegister?: (getData: () => any) => void;
+  onRegister?: (getData: () => any, validateFn: () => boolean) => void;
   onFormChange?: (hasChanges: boolean) => void;
 }
 
@@ -69,8 +69,9 @@ export const LabelDefinitionForm: React.FC<LabelDefinitionFormProps> = ({
   const [hasChanges, setHasChanges] = useState(false);
   const { data } = useStreaming();
 
-  // Store references to nested component getData functions
+  // Store references to nested component getData and validate functions
   const nestedGetDataFns = useRef<Record<string, () => any>>({});
+  const nestedValidateFns = useRef<Record<string, () => boolean>>({});
   const initialFormDataRef = useRef<LabelDefinitionFormState>(defaultLabelDefinitionState);
 
   // Initialize form data from initialData
@@ -110,12 +111,12 @@ export const LabelDefinitionForm: React.FC<LabelDefinitionFormProps> = ({
     }
   }, [formData, mode, readonly, onFormChange]);
 
-  // Register getData function with parent if nested
+  // Register getData and validate functions with parent if nested
   useEffect(() => {
     if (nested && onRegister) {
-      onRegister(getData);
+      onRegister(getData, validateForm);
     }
-  }, [nested, onRegister]);
+  }, [nested, onRegister, formData]);
 
   // Function to collect data from this component and all nested components
   const getData = () => {
@@ -125,6 +126,8 @@ export const LabelDefinitionForm: React.FC<LabelDefinitionFormProps> = ({
     Object.keys(nestedGetDataFns.current).forEach(key => {
       const nestedGetData = nestedGetDataFns.current[key];
       if (nestedGetData) {
+        const nestedData = nestedGetData();
+
         // Handle array items: key format is "fieldName[index]"
         const arrayMatch = key.match(/^(.+?)\[(\d+)\]$/);
         if (arrayMatch) {
@@ -133,7 +136,7 @@ export const LabelDefinitionForm: React.FC<LabelDefinitionFormProps> = ({
           if (!Array.isArray(currentFormData[fieldName as keyof LabelDefinitionFormState])) {
             currentFormData[fieldName as keyof LabelDefinitionFormState] = [] as any;
           }
-          (currentFormData[fieldName as keyof LabelDefinitionFormState] as any[])[index] = nestedGetData();
+          (currentFormData[fieldName as keyof LabelDefinitionFormState] as any[])[index] = nestedData;
         } else if (key.includes('.')) {
           // Handle map items: key format is "fieldName.mapKey"
           const dotIndex = key.indexOf('.');
@@ -142,10 +145,10 @@ export const LabelDefinitionForm: React.FC<LabelDefinitionFormProps> = ({
           if (!currentFormData[fieldName as keyof LabelDefinitionFormState] || typeof currentFormData[fieldName as keyof LabelDefinitionFormState] !== 'object') {
             currentFormData[fieldName as keyof LabelDefinitionFormState] = {} as any;
           }
-          (currentFormData[fieldName as keyof LabelDefinitionFormState] as any)[mapKey] = nestedGetData();
+          (currentFormData[fieldName as keyof LabelDefinitionFormState] as any)[mapKey] = nestedData;
         } else {
           // Regular nested field
-          currentFormData[key as keyof LabelDefinitionFormState] = nestedGetData();
+          currentFormData[key as keyof LabelDefinitionFormState] = nestedData;
         }
       }
     });
@@ -153,14 +156,18 @@ export const LabelDefinitionForm: React.FC<LabelDefinitionFormProps> = ({
     return currentFormData;
   };
 
-  // Register a nested component's getData function
-  const registerNestedGetData = (fieldName: string, getDataFn: () => any) => {
+  // Register a nested component's getData and validate functions
+  const registerNestedGetData = (fieldName: string, getDataFn: () => any, validateFn?: () => boolean) => {
     nestedGetDataFns.current[fieldName] = getDataFn;
+    if (validateFn) {
+      nestedValidateFns.current[fieldName] = validateFn;
+    }
   };
 
-  // Unregister a nested component's getData function
+  // Unregister a nested component's getData and validate functions
   const unregisterNestedGetData = (fieldName: string) => {
     delete nestedGetDataFns.current[fieldName];
+    delete nestedValidateFns.current[fieldName];
   };
 
 
@@ -240,30 +247,47 @@ const handleCopyYaml = () => {
 };
 
 // Validate form data
-const validateForm = (): boolean => {
+const validateForm = (dataToValidate?: any): boolean => {
+  const data = dataToValidate || formData;
   const errors: Record<string, string> = {};
-  if (formData.driver === undefined || formData.driver === null || formData.driver === '') {
+  if (data.driver === undefined || data.driver === null || data.driver === '') {
     errors.driver = 'Driver is required';
   }
-  if (formData.resources === undefined || formData.resources === null || formData.resources === '') {
+  if (data.resources === undefined || data.resources === null || data.resources === '') {
     errors.resources = 'Resources is required';
   }
 
   setValidationErrors(errors);
-  return Object.keys(errors).length === 0;
+
+  // Validate all nested components
+  let allNestedValid = true;
+  Object.keys(nestedValidateFns.current).forEach(key => {
+    const nestedValidate = nestedValidateFns.current[key];
+    if (nestedValidate) {
+      const isValid = nestedValidate();
+      if (!isValid) {
+        allNestedValid = false;
+      }
+    }
+  });
+
+  return Object.keys(errors).length === 0 && allNestedValid;
 };
 
 // Handle form submission
 const handleSubmit = () => {
-  if (!validateForm()) {
+  // First, collect data from nested components to ensure we have the latest values
+  // This fixes race conditions where nested components haven't updated the parent yet
+  const collectedData = getData();
+  console.debug("Form data:", collectedData);
+
+  // Validate using the collected data, not the stale formData state
+  if (!validateForm(collectedData)) {
     return;
   }
 
   try {
-    // Collect data from this component and all nested components
-    const collectedData = getData();
-
-    // Convert form data to protobuf message
+    // Convert form data to protobuf message using collected data
     const data = create(LabelDefinitionSchema, {
       driver: collectedData.driver,
       images: collectedData.images || undefined,
@@ -525,7 +549,7 @@ const isSimpleField = (field: any) => {
                 title={'Images ' + (index + 1)}
                 readonly={isReadOnly || (mode === 'edit' && false)}
                 nested={true}
-                onRegister={(getDataFn: () => any) => registerNestedGetData('images[' + index + ']', getDataFn)}
+                onRegister={(getDataFn: () => any, validateFn: () => boolean) => registerNestedGetData('images[' + index + ']', getDataFn, validateFn)}
               />
             </div>
           );
@@ -654,7 +678,7 @@ const isSimpleField = (field: any) => {
             title={'Resources'}
             readonly={isReadOnly || (mode === 'edit' && false)}
             nested={true}
-            onRegister={(getDataFn: () => any) => registerNestedGetData('resources', getDataFn)}
+            onRegister={(getDataFn: () => any, validateFn: () => boolean) => registerNestedGetData('resources', getDataFn, validateFn)}
           />
         </div>
       </div>
@@ -764,7 +788,7 @@ const isSimpleField = (field: any) => {
             title={'Authentication'}
             readonly={isReadOnly || (mode === 'edit' && false)}
             nested={true}
-            onRegister={(getDataFn: () => any) => registerNestedGetData('authentication', getDataFn)}
+            onRegister={(getDataFn: () => any, validateFn: () => boolean) => registerNestedGetData('authentication', getDataFn, validateFn)}
           />
         </div>
       </div>

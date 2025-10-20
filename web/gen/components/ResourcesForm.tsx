@@ -27,7 +27,7 @@ interface ResourcesFormProps {
   title?: string;
   readonly?: boolean;
   nested?: boolean;
-  onRegister?: (getData: () => any) => void;
+  onRegister?: (getData: () => any, validateFn: () => boolean) => void;
   onFormChange?: (hasChanges: boolean) => void;
 }
 
@@ -79,8 +79,9 @@ export const ResourcesForm: React.FC<ResourcesFormProps> = ({
   const [hasChanges, setHasChanges] = useState(false);
   const { data } = useStreaming();
 
-  // Store references to nested component getData functions
+  // Store references to nested component getData and validate functions
   const nestedGetDataFns = useRef<Record<string, () => any>>({});
+  const nestedValidateFns = useRef<Record<string, () => boolean>>({});
   const initialFormDataRef = useRef<ResourcesFormState>(defaultResourcesState);
 
   // Initialize form data from initialData
@@ -124,12 +125,12 @@ export const ResourcesForm: React.FC<ResourcesFormProps> = ({
     }
   }, [formData, mode, readonly, onFormChange]);
 
-  // Register getData function with parent if nested
+  // Register getData and validate functions with parent if nested
   useEffect(() => {
     if (nested && onRegister) {
-      onRegister(getData);
+      onRegister(getData, validateForm);
     }
-  }, [nested, onRegister]);
+  }, [nested, onRegister, formData]);
 
   // Function to collect data from this component and all nested components
   const getData = () => {
@@ -139,6 +140,8 @@ export const ResourcesForm: React.FC<ResourcesFormProps> = ({
     Object.keys(nestedGetDataFns.current).forEach(key => {
       const nestedGetData = nestedGetDataFns.current[key];
       if (nestedGetData) {
+        const nestedData = nestedGetData();
+
         // Handle array items: key format is "fieldName[index]"
         const arrayMatch = key.match(/^(.+?)\[(\d+)\]$/);
         if (arrayMatch) {
@@ -147,7 +150,7 @@ export const ResourcesForm: React.FC<ResourcesFormProps> = ({
           if (!Array.isArray(currentFormData[fieldName as keyof ResourcesFormState])) {
             currentFormData[fieldName as keyof ResourcesFormState] = [] as any;
           }
-          (currentFormData[fieldName as keyof ResourcesFormState] as any[])[index] = nestedGetData();
+          (currentFormData[fieldName as keyof ResourcesFormState] as any[])[index] = nestedData;
         } else if (key.includes('.')) {
           // Handle map items: key format is "fieldName.mapKey"
           const dotIndex = key.indexOf('.');
@@ -156,10 +159,10 @@ export const ResourcesForm: React.FC<ResourcesFormProps> = ({
           if (!currentFormData[fieldName as keyof ResourcesFormState] || typeof currentFormData[fieldName as keyof ResourcesFormState] !== 'object') {
             currentFormData[fieldName as keyof ResourcesFormState] = {} as any;
           }
-          (currentFormData[fieldName as keyof ResourcesFormState] as any)[mapKey] = nestedGetData();
+          (currentFormData[fieldName as keyof ResourcesFormState] as any)[mapKey] = nestedData;
         } else {
           // Regular nested field
-          currentFormData[key as keyof ResourcesFormState] = nestedGetData();
+          currentFormData[key as keyof ResourcesFormState] = nestedData;
         }
       }
     });
@@ -167,14 +170,18 @@ export const ResourcesForm: React.FC<ResourcesFormProps> = ({
     return currentFormData;
   };
 
-  // Register a nested component's getData function
-  const registerNestedGetData = (fieldName: string, getDataFn: () => any) => {
+  // Register a nested component's getData and validate functions
+  const registerNestedGetData = (fieldName: string, getDataFn: () => any, validateFn?: () => boolean) => {
     nestedGetDataFns.current[fieldName] = getDataFn;
+    if (validateFn) {
+      nestedValidateFns.current[fieldName] = validateFn;
+    }
   };
 
-  // Unregister a nested component's getData function
+  // Unregister a nested component's getData and validate functions
   const unregisterNestedGetData = (fieldName: string) => {
     delete nestedGetDataFns.current[fieldName];
+    delete nestedValidateFns.current[fieldName];
   };
 
 
@@ -272,30 +279,47 @@ const handleCopyYaml = () => {
 };
 
 // Validate form data
-const validateForm = (): boolean => {
+const validateForm = (dataToValidate?: any): boolean => {
+  const data = dataToValidate || formData;
   const errors: Record<string, string> = {};
-  if (formData.cpu === undefined || formData.cpu === null || formData.cpu === '') {
+  if (data.cpu === undefined || data.cpu === null || data.cpu === '') {
     errors.cpu = 'Cpu is required';
   }
-  if (formData.ram === undefined || formData.ram === null || formData.ram === '') {
+  if (data.ram === undefined || data.ram === null || data.ram === '') {
     errors.ram = 'Ram is required';
   }
 
   setValidationErrors(errors);
-  return Object.keys(errors).length === 0;
+
+  // Validate all nested components
+  let allNestedValid = true;
+  Object.keys(nestedValidateFns.current).forEach(key => {
+    const nestedValidate = nestedValidateFns.current[key];
+    if (nestedValidate) {
+      const isValid = nestedValidate();
+      if (!isValid) {
+        allNestedValid = false;
+      }
+    }
+  });
+
+  return Object.keys(errors).length === 0 && allNestedValid;
 };
 
 // Handle form submission
 const handleSubmit = () => {
-  if (!validateForm()) {
+  // First, collect data from nested components to ensure we have the latest values
+  // This fixes race conditions where nested components haven't updated the parent yet
+  const collectedData = getData();
+  console.debug("Form data:", collectedData);
+
+  // Validate using the collected data, not the stale formData state
+  if (!validateForm(collectedData)) {
     return;
   }
 
   try {
-    // Collect data from this component and all nested components
-    const collectedData = getData();
-
-    // Convert form data to protobuf message
+    // Convert form data to protobuf message using collected data
     const data = create(ResourcesSchema, {
       slots: collectedData.slots || undefined,
       cpu: collectedData.cpu,
@@ -644,7 +668,7 @@ const isSimpleField = (field: any) => {
                   title={key}
                   readonly={isReadOnly || (mode === 'edit' && false)}
                   nested={true}
-                  onRegister={(getDataFn: () => any) => registerNestedGetData('disks.' + key, getDataFn)}
+                  onRegister={(getDataFn: () => any, validateFn: () => boolean) => registerNestedGetData('disks.' + key, getDataFn, validateFn)}
                 />
               );
             }
