@@ -18,25 +18,12 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/adobe/aquarium-fish/lib/drivers/provider"
 	"github.com/adobe/aquarium-fish/lib/log"
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
 // Options for label definition
-//
-// Example:
-//
-//	images:
-//	  - url: https://artifact-storage/aquarium/image/docker/ubuntu2004/ubuntu2004-VERSION.tar.xz
-//	    sum: sha256:1234567890abcdef1234567890abcdef1
-//	  - url: https://artifact-storage/aquarium/image/docker/ubuntu2004-python3/ubuntu2004-python3-VERSION.tar.xz
-//	    sum: sha256:1234567890abcdef1234567890abcdef2
-//	  - url: https://artifact-storage/aquarium/image/docker/ubuntu2004-python3-ci/ubuntu2004-python3-ci-VERSION.tar.xz
-//	    sum: sha256:1234567890abcdef1234567890abcdef3
 type Options struct {
-	Images []provider.Image `json:"images"` // List of image dependencies, last one is running one
-
 	// TaskImage options
 	TaskImageName string `json:"task_image_name"` // Create new image with defined name and "image-DATE.TIME" version
 }
@@ -52,18 +39,6 @@ func (o *Options) Apply(options util.UnparsedJSON) error {
 }
 
 // Validate makes sure the options have the required defaults & that the required fields are set
-func (o *Options) Validate() error {
-	// Check images
-	var imgErr error
-	for index := range o.Images {
-		if err := o.Images[index].Validate(); err != nil {
-			log.WithFunc("docker", "Validate").Error("Error during image validation", "err", err)
-			imgErr = fmt.Errorf("DOCKER: Error during image validation: %v", err)
-		}
-	}
-	if imgErr != nil {
-		return imgErr
-	}
-
+func (*Options) Validate() error {
 	return nil
 }

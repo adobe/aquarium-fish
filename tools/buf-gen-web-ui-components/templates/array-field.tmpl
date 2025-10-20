@@ -29,15 +29,15 @@
           return (
             <div className="pl-2">
               <NestedComponent
+                key={index}
                 mode={mode}
                 initialData={item}
-                onSubmit={(data: any) => {
-                  handleArrayChange('{{.JSONName}}', index, data);
-                }}
+                onSubmit={() => {}}
                 onCancel={() => {}}
                 title={'{{.DisplayName}} ' + (index + 1)}
                 readonly={isReadOnly || (mode === 'edit' && {{.NoEdit}})}
                 nested={true}
+                onRegister={(getDataFn: () => any, validateFn: () => boolean) => registerNestedGetData('{{.JSONName}}[' + index + ']', getDataFn, validateFn)}
               />
             </div>
           );

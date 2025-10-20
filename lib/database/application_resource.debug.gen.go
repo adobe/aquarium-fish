@@ -27,7 +27,7 @@ import (
 var debugTracerDatabaseApplication_resource = otel.Tracer("aquarium-fish/database")
 
 func (d *Database) ApplicationResourceList(ctx context.Context) ([]typesv2.ApplicationResource, error) {
-	ctx, span := debugTracerDatabaseApplication_resource.Start(ctx, "database.Database.applicationResourceListImpl")
+	ctx, span := debugTracerDatabaseApplication_resource.Start(ctx, "database.Database.ApplicationResourceList")
 	defer span.End()
 
 	rs, err1 := d.applicationResourceListImpl(ctx)
@@ -42,7 +42,7 @@ func (d *Database) ApplicationResourceList(ctx context.Context) ([]typesv2.Appli
 }
 
 func (d *Database) ApplicationResourceListNode(ctx context.Context, nodeUID typesv2.NodeUID) ([]typesv2.ApplicationResource, error) {
-	ctx, span := debugTracerDatabaseApplication_resource.Start(ctx, "database.Database.applicationResourceListNodeImpl")
+	ctx, span := debugTracerDatabaseApplication_resource.Start(ctx, "database.Database.ApplicationResourceListNode")
 	defer span.End()
 
 	rs, err1 := d.applicationResourceListNodeImpl(ctx, nodeUID)
@@ -57,7 +57,7 @@ func (d *Database) ApplicationResourceListNode(ctx context.Context, nodeUID type
 }
 
 func (d *Database) ApplicationResourceCreate(ctx context.Context, r *typesv2.ApplicationResource) error {
-	ctx, span := debugTracerDatabaseApplication_resource.Start(ctx, "database.Database.applicationResourceCreateImpl")
+	ctx, span := debugTracerDatabaseApplication_resource.Start(ctx, "database.Database.ApplicationResourceCreate")
 	defer span.End()
 
 	err0 := d.applicationResourceCreateImpl(ctx, r)
@@ -72,7 +72,7 @@ func (d *Database) ApplicationResourceCreate(ctx context.Context, r *typesv2.App
 }
 
 func (d *Database) ApplicationResourceDelete(ctx context.Context, uid typesv2.ApplicationResourceUID) error {
-	ctx, span := debugTracerDatabaseApplication_resource.Start(ctx, "database.Database.applicationResourceDeleteImpl")
+	ctx, span := debugTracerDatabaseApplication_resource.Start(ctx, "database.Database.ApplicationResourceDelete")
 	defer span.End()
 
 	err0 := d.applicationResourceDeleteImpl(ctx, uid)
@@ -87,7 +87,7 @@ func (d *Database) ApplicationResourceDelete(ctx context.Context, uid typesv2.Ap
 }
 
 func (d *Database) ApplicationResourceSave(ctx context.Context, res *typesv2.ApplicationResource) error {
-	ctx, span := debugTracerDatabaseApplication_resource.Start(ctx, "database.Database.applicationResourceSaveImpl")
+	ctx, span := debugTracerDatabaseApplication_resource.Start(ctx, "database.Database.ApplicationResourceSave")
 	defer span.End()
 
 	err0 := d.applicationResourceSaveImpl(ctx, res)
@@ -102,7 +102,7 @@ func (d *Database) ApplicationResourceSave(ctx context.Context, res *typesv2.App
 }
 
 func (d *Database) ApplicationResourceGet(ctx context.Context, uid typesv2.ApplicationResourceUID) (*typesv2.ApplicationResource, error) {
-	ctx, span := debugTracerDatabaseApplication_resource.Start(ctx, "database.Database.applicationResourceGetImpl")
+	ctx, span := debugTracerDatabaseApplication_resource.Start(ctx, "database.Database.ApplicationResourceGet")
 	defer span.End()
 
 	res, err1 := d.applicationResourceGetImpl(ctx, uid)
@@ -117,7 +117,7 @@ func (d *Database) ApplicationResourceGet(ctx context.Context, uid typesv2.Appli
 }
 
 func (d *Database) ApplicationResourceGetByIP(ctx context.Context, ip string) (*typesv2.ApplicationResource, error) {
-	ctx, span := debugTracerDatabaseApplication_resource.Start(ctx, "database.Database.applicationResourceGetByIPImpl")
+	ctx, span := debugTracerDatabaseApplication_resource.Start(ctx, "database.Database.ApplicationResourceGetByIP")
 	defer span.End()
 
 	res, err1 := d.applicationResourceGetByIPImpl(ctx, ip)
@@ -132,7 +132,7 @@ func (d *Database) ApplicationResourceGetByIP(ctx context.Context, ip string) (*
 }
 
 func (d *Database) ApplicationResourceGetByApplication(ctx context.Context, appUID typesv2.ApplicationUID) (*typesv2.ApplicationResource, error) {
-	ctx, span := debugTracerDatabaseApplication_resource.Start(ctx, "database.Database.applicationResourceGetByApplicationImpl")
+	ctx, span := debugTracerDatabaseApplication_resource.Start(ctx, "database.Database.ApplicationResourceGetByApplication")
 	defer span.End()
 
 	res, err1 := d.applicationResourceGetByApplicationImpl(ctx, appUID)
@@ -147,7 +147,7 @@ func (d *Database) ApplicationResourceGetByApplication(ctx context.Context, appU
 }
 
 func (d *Database) SubscribeApplicationResource(ctx context.Context, ch chan ApplicationResourceSubscriptionEvent) {
-	ctx, span := debugTracerDatabaseApplication_resource.Start(ctx, "database.Database.subscribeApplicationResourceImpl")
+	ctx, span := debugTracerDatabaseApplication_resource.Start(ctx, "database.Database.SubscribeApplicationResource")
 	defer span.End()
 
 	d.subscribeApplicationResourceImpl(ctx, ch)
@@ -155,7 +155,7 @@ func (d *Database) SubscribeApplicationResource(ctx context.Context, ch chan App
 }
 
 func (d *Database) UnsubscribeApplicationResource(ctx context.Context, ch chan ApplicationResourceSubscriptionEvent) {
-	ctx, span := debugTracerDatabaseApplication_resource.Start(ctx, "database.Database.unsubscribeApplicationResourceImpl")
+	ctx, span := debugTracerDatabaseApplication_resource.Start(ctx, "database.Database.UnsubscribeApplicationResource")
 	defer span.End()
 
 	d.unsubscribeApplicationResourceImpl(ctx, ch)

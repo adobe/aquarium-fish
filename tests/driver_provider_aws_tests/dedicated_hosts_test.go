@@ -65,7 +65,6 @@ drivers:
 	var labelUID string
 	t.Run("Create Mac Label with Dedicated Pool", func(t *testing.T) {
 		options, _ := structpb.NewStruct(map[string]any{
-			"image":         "ami-mac123456",
 			"instance_type": "mac2.metal",
 			"pool":          "mac_pool",
 		})
@@ -77,12 +76,15 @@ drivers:
 					Name:    "mac-dedicated-label",
 					Version: 1,
 					Definitions: []*aquariumv2.LabelDefinition{{
-						Driver:  "aws",
+						Driver: "aws",
+						Images: []*aquariumv2.Image{{
+							Name: func() *string { val := "ami-mac123456"; return &val }(),
+						}},
 						Options: options,
 						Resources: &aquariumv2.Resources{
 							Cpu:     8,
 							Ram:     32,
-							Network: "subnet-12345678",
+							Network: func() *string { val := "subnet-12345678"; return &val }(),
 						},
 					}},
 				},
@@ -161,7 +163,6 @@ drivers:
 
 	t.Run("Check Available Capacity", func(t *testing.T) {
 		options, _ := structpb.NewStruct(map[string]any{
-			"image":         "ami-123456",
 			"instance_type": "c5.xlarge",
 			"pool":          "compute_pool",
 		})
@@ -174,12 +175,15 @@ drivers:
 					Name:    "capacity-test-label",
 					Version: 1,
 					Definitions: []*aquariumv2.LabelDefinition{{
-						Driver:  "aws",
+						Driver: "aws",
+						Images: []*aquariumv2.Image{{
+							Name: func() *string { val := "ami-123456"; return &val }(),
+						}},
 						Options: options,
 						Resources: &aquariumv2.Resources{
 							Cpu:     4,
 							Ram:     16,
-							Network: "subnet-12345678",
+							Network: func() *string { val := "subnet-12345678"; return &val }(),
 						},
 					}},
 				},
@@ -234,7 +238,6 @@ drivers:
 	var labelUID string
 	t.Run("Create Label for Limited Pool", func(t *testing.T) {
 		options, _ := structpb.NewStruct(map[string]any{
-			"image":         "ami-123456",
 			"instance_type": "x1e.xlarge",
 			"pool":          "limited_pool",
 		})
@@ -246,12 +249,16 @@ drivers:
 					Name:    "limited-pool-label",
 					Version: 1,
 					Definitions: []*aquariumv2.LabelDefinition{{
-						Driver:  "aws",
+						Driver: "aws",
+						Images: []*aquariumv2.Image{{
+							Name:    func() *string { val := "ami"; return &val }(),
+							Version: func() *string { val := "123456"; return &val }(),
+						}},
 						Options: options,
 						Resources: &aquariumv2.Resources{
 							Cpu:     4,
 							Ram:     32,
-							Network: "subnet-12345678",
+							Network: func() *string { val := "subnet-12345678"; return &val }(),
 						},
 					}},
 				},
@@ -353,7 +360,6 @@ drivers:
 	t.Run("Create Mac Label Definition", func(t *testing.T) {
 		// Create label with Mac driver options
 		options, _ := structpb.NewStruct(map[string]any{
-			"image":           "ami-mac123456",
 			"instance_type":   "mac1.metal",
 			"security_groups": []any{"sg-12345678"},
 			"placement": map[string]any{
@@ -369,10 +375,13 @@ drivers:
 					Version: 1,
 					Definitions: []*aquariumv2.LabelDefinition{{
 						Driver: "aws",
+						Images: []*aquariumv2.Image{{
+							Name: func() *string { val := "ami-mac123456"; return &val }(),
+						}},
 						Resources: &aquariumv2.Resources{
 							Cpu:     4,
 							Ram:     8,
-							Network: "subnet-12345678",
+							Network: func() *string { val := "subnet-12345678"; return &val }(),
 						},
 						Options: options,
 					}},
@@ -595,7 +604,6 @@ drivers:
 		// Verify that the Fish node is still running and responsive
 		// by creating a simple label to test API connectivity
 		testOptions, _ := structpb.NewStruct(map[string]any{
-			"image":           "ami-12345678",
 			"instance_type":   "t3.micro",
 			"security_groups": []any{"sg-12345678"},
 		})
@@ -608,10 +616,13 @@ drivers:
 					Version: 1,
 					Definitions: []*aquariumv2.LabelDefinition{{
 						Driver: "aws",
+						Images: []*aquariumv2.Image{{
+							Name: func() *string { val := "ami-12345678"; return &val }(),
+						}},
 						Resources: &aquariumv2.Resources{
 							Cpu:     1,
 							Ram:     1,
-							Network: "subnet-12345678",
+							Network: func() *string { val := "subnet-12345678"; return &val }(),
 						},
 						Options: testOptions,
 					}},
@@ -668,7 +679,6 @@ drivers:
 
 	t.Run("Create Label for Specific Dedicated Host", func(t *testing.T) {
 		options, _ := structpb.NewStruct(map[string]any{
-			"image":           "ami-12345678",
 			"instance_type":   "c5.metal",
 			"security_groups": []any{"sg-12345678"},
 			"placement": map[string]any{
@@ -684,10 +694,13 @@ drivers:
 					Version: 1,
 					Definitions: []*aquariumv2.LabelDefinition{{
 						Driver: "aws",
+						Images: []*aquariumv2.Image{{
+							Name: func() *string { val := "ami-12345678"; return &val }(),
+						}},
 						Resources: &aquariumv2.Resources{
 							Cpu:     8,
 							Ram:     16,
-							Network: "subnet-12345678",
+							Network: func() *string { val := "subnet-12345678"; return &val }(),
 						},
 						Options: options,
 					}},
@@ -706,7 +719,6 @@ drivers:
 		mockServer.SetAllocateHostsError("InsufficientHostCapacity", "Insufficient capacity")
 
 		options, _ := structpb.NewStruct(map[string]any{
-			"image":           "ami-12345678",
 			"instance_type":   "x1e.xlarge",
 			"security_groups": []any{"sg-12345678"},
 			"placement": map[string]any{
@@ -722,12 +734,15 @@ drivers:
 					Version: 1,
 					Definitions: []*aquariumv2.LabelDefinition{{
 						Driver: "aws",
+						Images: []*aquariumv2.Image{{
+							Name: func() *string { val := "ami-12345678"; return &val }(),
+						}},
+						Options: options,
 						Resources: &aquariumv2.Resources{
 							Cpu:     4,
 							Ram:     8,
-							Network: "subnet-12345678",
+							Network: func() *string { val := "subnet-12345678"; return &val }(),
 						},
-						Options: options,
 					}},
 				},
 			}),

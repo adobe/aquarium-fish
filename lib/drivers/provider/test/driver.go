@@ -137,12 +137,12 @@ func (d *Driver) AvailableCapacity(nodeUsage typesv2.Resources, req typesv2.Labe
 		nodeUsage.CpuOverbook = req.Resources.CpuOverbook
 		nodeUsage.RamOverbook = req.Resources.RamOverbook
 	}
-	if nodeUsage.Multitenancy && req.Resources.Multitenancy {
+	if nodeUsage.Multitenancy != nil && *nodeUsage.Multitenancy && req.Resources.Multitenancy != nil && *req.Resources.Multitenancy {
 		// Ok we can run more tenants, let's calculate how much
-		if nodeUsage.CpuOverbook && req.Resources.CpuOverbook {
+		if nodeUsage.CpuOverbook != nil && *nodeUsage.CpuOverbook && req.Resources.CpuOverbook != nil && *req.Resources.CpuOverbook {
 			totalCPU += d.cfg.CPUOverbook
 		}
-		if nodeUsage.RamOverbook && req.Resources.RamOverbook {
+		if nodeUsage.RamOverbook != nil && *nodeUsage.RamOverbook && req.Resources.RamOverbook != nil && *req.Resources.RamOverbook {
 			totalRAM += d.cfg.RAMOverbook
 		}
 	}

@@ -30,6 +30,14 @@ func (d *Database) UnsubscribeUser(ctx context.Context, ch chan UserSubscription
 	d.unsubscribeUserImpl(ctx, ch)
 }
 
+func (d *Database) SubscribeUserGroup(ctx context.Context, ch chan UserGroupSubscriptionEvent) {
+	d.subscribeUserGroupImpl(ctx, ch)
+}
+
+func (d *Database) UnsubscribeUserGroup(ctx context.Context, ch chan UserGroupSubscriptionEvent) {
+	d.unsubscribeUserGroupImpl(ctx, ch)
+}
+
 func (d *Database) UserList(ctx context.Context) ([]typesv2.User, error) {
 	return d.userListImpl(ctx)
 }
@@ -56,4 +64,36 @@ func (d *Database) UserAuth(ctx context.Context, name string, password string) *
 
 func (d *Database) UserNew(ctx context.Context, name string, password string) (string, *typesv2.User, error) {
 	return d.userNewImpl(ctx, name, password)
+}
+
+func (d *Database) UserGroupList(ctx context.Context) ([]typesv2.UserGroup, error) {
+	return d.userGroupListImpl(ctx)
+}
+
+func (d *Database) UserGroupCreate(ctx context.Context, g *typesv2.UserGroup) error {
+	return d.userGroupCreateImpl(ctx, g)
+}
+
+func (d *Database) UserGroupSave(ctx context.Context, g *typesv2.UserGroup) error {
+	return d.userGroupSaveImpl(ctx, g)
+}
+
+func (d *Database) UserGroupGet(ctx context.Context, name string) (*typesv2.UserGroup, error) {
+	return d.userGroupGetImpl(ctx, name)
+}
+
+func (d *Database) UserGroupDelete(ctx context.Context, name string) error {
+	return d.userGroupDeleteImpl(ctx, name)
+}
+
+func (d *Database) UserGroupListByUser(ctx context.Context, userName string) ([]*typesv2.UserGroup, error) {
+	return d.userGroupListByUserImpl(ctx, userName)
+}
+
+func (d *Database) MergeUserConfigWithGroups(ctx context.Context, user *typesv2.User, groups []*typesv2.UserGroup) *typesv2.UserConfig {
+	return d.mergeUserConfigWithGroupsImpl(ctx, user, groups)
+}
+
+func (d *Database) EnrichUserWithGroupConfig(ctx context.Context, user *typesv2.User) {
+	d.enrichUserWithGroupConfigImpl(ctx, user)
 }

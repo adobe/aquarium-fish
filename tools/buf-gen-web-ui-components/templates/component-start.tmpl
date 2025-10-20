@@ -6,7 +6,9 @@ export const {{.Name}}Form: React.FC<{{.Name -}}FormProps> = ({
   mode,
   title,
   readonly,
-  nested = false
+  nested = false,
+  onRegister,
+  onFormChange
 }) => {
   const [formData, setFormData] = useState<{{.Name}}FormState>(default{{.Name}}State);
   const [yamlText, setYamlText] = useState('');
@@ -16,7 +18,13 @@ export const {{.Name}}Form: React.FC<{{.Name -}}FormProps> = ({
   const [autofillMode, setAutofillMode] = useState<Record<string, 'dropdown' | 'text'>>({});
   const [structFieldText, setStructFieldText] = useState<Record<string, string>>({});
   const [structFieldErrors, setStructFieldErrors] = useState<Record<string, string>>({});
+  const [hasChanges, setHasChanges] = useState(false);
   const { data } = useStreaming();
+
+  // Store references to nested component getData and validate functions
+  const nestedGetDataFns = useRef<Record<string, () => any>>({});
+  const nestedValidateFns = useRef<Record<string, () => boolean>>({});
+  const initialFormDataRef = useRef<{{.Name}}FormState>(default{{.Name}}State);
 
   // Initialize form data from initialData
   useEffect(() => {
@@ -34,11 +42,12 @@ export const {{.Name}}Form: React.FC<{{.Name -}}FormProps> = ({
 {{- else if .IsOptional }}
         {{.JSONName}}: initialData.{{.JSONName}} ?? {{.DefaultValue}},
 {{- else }}
-        {{.JSONName}}: initialData.{{.JSONName}} || {{.DefaultValue}},
+        {{.JSONName}}: initialData.{{.JSONName}} !== undefined && initialData.{{.JSONName}} !== null ? initialData.{{.JSONName}} : {{.DefaultValue}},
 {{- end }}
 {{- end }}
       };
       setFormData(newFormData);
+      initialFormDataRef.current = newFormData;
 
       // Initialize struct field text
       const newStructText: Record<string, string> = {};
@@ -51,33 +60,79 @@ export const {{.Name}}Form: React.FC<{{.Name -}}FormProps> = ({
     }
   }, [initialData]);
 
-  // Auto-save form data when nested and form data changes
+  // Track form changes
   useEffect(() => {
-    if (nested && onSubmit && formData !== default{{.Name}}State) {
-      // Debounce the auto-save to avoid too many calls
-      const timeoutId = setTimeout(() => {
-        try {
-          // Convert form data to protobuf message
-          const data = create({{.TypeName}}Schema, {
-{{- range .Fields }}
-{{- if .IsTimestamp }}
-            {{.JSONName}}: formData.{{.JSONName}} ? { seconds: BigInt(Math.floor(new Date(formData.{{.JSONName}}).getTime() / 1000)) } : undefined,
-{{- else if .IsStruct }}
-            {{.JSONName}}: formData.{{.JSONName}},
-{{- else if .IsOptional }}
-            {{.JSONName}}: formData.{{.JSONName}} || undefined,
-{{- else }}
-            {{.JSONName}}: formData.{{.JSONName}},
-{{- end }}
-{{- end }}
-          });
-          onSubmit(data);
-        } catch (error) {
-          // Silently ignore errors during auto-save
-        }
-      }, 500); // 500ms debounce
-
-      return () => clearTimeout(timeoutId);
+    if (mode === 'view' || readonly) {
+      setHasChanges(false);
+      return;
     }
-  }, [formData, nested, onSubmit]);
+
+    // Compare current form data with initial data
+    const dataChanged = JSON.stringify(formData) !== JSON.stringify(initialFormDataRef.current);
+    setHasChanges(dataChanged);
+
+    // Notify parent if callback provided
+    if (onFormChange) {
+      onFormChange(dataChanged);
+    }
+  }, [formData, mode, readonly, onFormChange]);
+
+  // Register getData and validate functions with parent if nested
+  useEffect(() => {
+    if (nested && onRegister) {
+      onRegister(getData, validateForm);
+    }
+  }, [nested, onRegister, formData]);
+
+  // Function to collect data from this component and all nested components
+  const getData = () => {
+    const currentFormData = { ...formData };
+
+    // Collect data from nested components
+    Object.keys(nestedGetDataFns.current).forEach(key => {
+      const nestedGetData = nestedGetDataFns.current[key];
+      if (nestedGetData) {
+        const nestedData = nestedGetData();
+
+        // Handle array items: key format is "fieldName[index]"
+        const arrayMatch = key.match(/^(.+?)\[(\d+)\]$/);
+        if (arrayMatch) {
+          const fieldName = arrayMatch[1];
+          const index = parseInt(arrayMatch[2], 10);
+          if (!Array.isArray(currentFormData[fieldName as keyof {{.Name}}FormState])) {
+            currentFormData[fieldName as keyof {{.Name}}FormState] = [] as any;
+          }
+          (currentFormData[fieldName as keyof {{.Name}}FormState] as any[])[index] = nestedData;
+        } else if (key.includes('.')) {
+          // Handle map items: key format is "fieldName.mapKey"
+          const dotIndex = key.indexOf('.');
+          const fieldName = key.substring(0, dotIndex);
+          const mapKey = key.substring(dotIndex + 1);
+          if (!currentFormData[fieldName as keyof {{.Name}}FormState] || typeof currentFormData[fieldName as keyof {{.Name}}FormState] !== 'object') {
+            currentFormData[fieldName as keyof {{.Name}}FormState] = {} as any;
+          }
+          (currentFormData[fieldName as keyof {{.Name}}FormState] as any)[mapKey] = nestedData;
+        } else {
+          // Regular nested field
+          currentFormData[key as keyof {{.Name}}FormState] = nestedData;
+        }
+      }
+    });
+
+    return currentFormData;
+  };
+
+  // Register a nested component's getData and validate functions
+  const registerNestedGetData = (fieldName: string, getDataFn: () => any, validateFn?: () => boolean) => {
+    nestedGetDataFns.current[fieldName] = getDataFn;
+    if (validateFn) {
+      nestedValidateFns.current[fieldName] = validateFn;
+    }
+  };
+
+  // Unregister a nested component's getData and validate functions
+  const unregisterNestedGetData = (fieldName: string) => {
+    delete nestedGetDataFns.current[fieldName];
+    delete nestedValidateFns.current[fieldName];
+  };
 {{end}}

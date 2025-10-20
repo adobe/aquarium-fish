@@ -38,6 +38,7 @@ type User struct {
 	Password  *string            `json:"password,omitempty"`
 	Roles     []string           `json:"roles,omitempty"`
 	UpdatedAt time.Time          `json:"updated_at,omitempty"`
+	groups    []string
 }
 
 // FromUser creates a User from User
@@ -132,5 +133,50 @@ func (u UserConfig) ToUserConfig() *pbTypes.UserConfig {
 	if u.StreamsLimit != nil {
 		result.StreamsLimit = u.StreamsLimit
 	}
+	return result
+}
+
+// UserGroup is a data for UserGroup without internal locks
+type UserGroup struct {
+	Config    *UserConfig `json:"config,omitempty"`
+	CreatedAt time.Time   `json:"created_at,omitempty"`
+	Name      string      `json:"name,omitempty"`
+	UpdatedAt time.Time   `json:"updated_at,omitempty"`
+	Users     []string    `json:"users,omitempty"`
+}
+
+// FromUserGroup creates a UserGroup from UserGroup
+func FromUserGroup(src *pbTypes.UserGroup) UserGroup {
+	if src == nil {
+		return UserGroup{}
+	}
+
+	result := UserGroup{}
+	if src.GetConfig() != nil {
+		data := FromUserConfig(src.GetConfig())
+		result.Config = &data
+	}
+	if src.GetCreatedAt() != nil {
+		result.CreatedAt = src.GetCreatedAt().AsTime()
+	}
+	result.Name = src.GetName()
+	if src.GetUpdatedAt() != nil {
+		result.UpdatedAt = src.GetUpdatedAt().AsTime()
+	}
+	result.Users = src.GetUsers()
+	return result
+}
+
+// ToUserGroup converts UserGroup to UserGroup
+func (u UserGroup) ToUserGroup() *pbTypes.UserGroup {
+	result := &pbTypes.UserGroup{}
+
+	if u.Config != nil {
+		result.Config = u.Config.ToUserConfig()
+	}
+	result.CreatedAt = timestamppb.New(u.CreatedAt)
+	result.Name = u.Name
+	result.UpdatedAt = timestamppb.New(u.UpdatedAt)
+	result.Users = u.Users
 	return result
 }

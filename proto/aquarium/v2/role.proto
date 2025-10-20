@@ -43,7 +43,7 @@ service RoleService {
 // Defines a role in the RBAC system with associated permissions.
 message Role {
   option (ui_config) = { generate_ui: true };
-  option (subscribe_config) = { permission_check: "RoleServiceGet" };
+  option (subscribe_config) = { permission_check: "Get" };
 
   // Unique name of the role
   string name = 1;

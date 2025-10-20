@@ -56,6 +56,16 @@ const (
 	UserServiceUpdateProcedure = "/aquarium.v2.UserService/Update"
 	// UserServiceRemoveProcedure is the fully-qualified name of the UserService's Remove RPC.
 	UserServiceRemoveProcedure = "/aquarium.v2.UserService/Remove"
+	// UserServiceListGroupProcedure is the fully-qualified name of the UserService's ListGroup RPC.
+	UserServiceListGroupProcedure = "/aquarium.v2.UserService/ListGroup"
+	// UserServiceGetGroupProcedure is the fully-qualified name of the UserService's GetGroup RPC.
+	UserServiceGetGroupProcedure = "/aquarium.v2.UserService/GetGroup"
+	// UserServiceCreateGroupProcedure is the fully-qualified name of the UserService's CreateGroup RPC.
+	UserServiceCreateGroupProcedure = "/aquarium.v2.UserService/CreateGroup"
+	// UserServiceUpdateGroupProcedure is the fully-qualified name of the UserService's UpdateGroup RPC.
+	UserServiceUpdateGroupProcedure = "/aquarium.v2.UserService/UpdateGroup"
+	// UserServiceRemoveGroupProcedure is the fully-qualified name of the UserService's RemoveGroup RPC.
+	UserServiceRemoveGroupProcedure = "/aquarium.v2.UserService/RemoveGroup"
 )
 
 // UserServiceClient is a client for the aquarium.v2.UserService service.
@@ -72,6 +82,16 @@ type UserServiceClient interface {
 	Update(context.Context, *connect.Request[v2.UserServiceUpdateRequest]) (*connect.Response[v2.UserServiceUpdateResponse], error)
 	// Remove user
 	Remove(context.Context, *connect.Request[v2.UserServiceRemoveRequest]) (*connect.Response[v2.UserServiceRemoveResponse], error)
+	// Get list of user groups
+	ListGroup(context.Context, *connect.Request[v2.UserServiceListGroupRequest]) (*connect.Response[v2.UserServiceListGroupResponse], error)
+	// Get user group by name
+	GetGroup(context.Context, *connect.Request[v2.UserServiceGetGroupRequest]) (*connect.Response[v2.UserServiceGetGroupResponse], error)
+	// Create new user group
+	CreateGroup(context.Context, *connect.Request[v2.UserServiceCreateGroupRequest]) (*connect.Response[v2.UserServiceCreateGroupResponse], error)
+	// Update existing user group
+	UpdateGroup(context.Context, *connect.Request[v2.UserServiceUpdateGroupRequest]) (*connect.Response[v2.UserServiceUpdateGroupResponse], error)
+	// Remove user group
+	RemoveGroup(context.Context, *connect.Request[v2.UserServiceRemoveGroupRequest]) (*connect.Response[v2.UserServiceRemoveGroupResponse], error)
 }
 
 // NewUserServiceClient constructs a client for the aquarium.v2.UserService service. By default, it
@@ -121,17 +141,52 @@ func NewUserServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(userServiceMethods.ByName("Remove")),
 			connect.WithClientOptions(opts...),
 		),
+		listGroup: connect.NewClient[v2.UserServiceListGroupRequest, v2.UserServiceListGroupResponse](
+			httpClient,
+			baseURL+UserServiceListGroupProcedure,
+			connect.WithSchema(userServiceMethods.ByName("ListGroup")),
+			connect.WithClientOptions(opts...),
+		),
+		getGroup: connect.NewClient[v2.UserServiceGetGroupRequest, v2.UserServiceGetGroupResponse](
+			httpClient,
+			baseURL+UserServiceGetGroupProcedure,
+			connect.WithSchema(userServiceMethods.ByName("GetGroup")),
+			connect.WithClientOptions(opts...),
+		),
+		createGroup: connect.NewClient[v2.UserServiceCreateGroupRequest, v2.UserServiceCreateGroupResponse](
+			httpClient,
+			baseURL+UserServiceCreateGroupProcedure,
+			connect.WithSchema(userServiceMethods.ByName("CreateGroup")),
+			connect.WithClientOptions(opts...),
+		),
+		updateGroup: connect.NewClient[v2.UserServiceUpdateGroupRequest, v2.UserServiceUpdateGroupResponse](
+			httpClient,
+			baseURL+UserServiceUpdateGroupProcedure,
+			connect.WithSchema(userServiceMethods.ByName("UpdateGroup")),
+			connect.WithClientOptions(opts...),
+		),
+		removeGroup: connect.NewClient[v2.UserServiceRemoveGroupRequest, v2.UserServiceRemoveGroupResponse](
+			httpClient,
+			baseURL+UserServiceRemoveGroupProcedure,
+			connect.WithSchema(userServiceMethods.ByName("RemoveGroup")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // userServiceClient implements UserServiceClient.
 type userServiceClient struct {
-	getMe  *connect.Client[v2.UserServiceGetMeRequest, v2.UserServiceGetMeResponse]
-	list   *connect.Client[v2.UserServiceListRequest, v2.UserServiceListResponse]
-	get    *connect.Client[v2.UserServiceGetRequest, v2.UserServiceGetResponse]
-	create *connect.Client[v2.UserServiceCreateRequest, v2.UserServiceCreateResponse]
-	update *connect.Client[v2.UserServiceUpdateRequest, v2.UserServiceUpdateResponse]
-	remove *connect.Client[v2.UserServiceRemoveRequest, v2.UserServiceRemoveResponse]
+	getMe       *connect.Client[v2.UserServiceGetMeRequest, v2.UserServiceGetMeResponse]
+	list        *connect.Client[v2.UserServiceListRequest, v2.UserServiceListResponse]
+	get         *connect.Client[v2.UserServiceGetRequest, v2.UserServiceGetResponse]
+	create      *connect.Client[v2.UserServiceCreateRequest, v2.UserServiceCreateResponse]
+	update      *connect.Client[v2.UserServiceUpdateRequest, v2.UserServiceUpdateResponse]
+	remove      *connect.Client[v2.UserServiceRemoveRequest, v2.UserServiceRemoveResponse]
+	listGroup   *connect.Client[v2.UserServiceListGroupRequest, v2.UserServiceListGroupResponse]
+	getGroup    *connect.Client[v2.UserServiceGetGroupRequest, v2.UserServiceGetGroupResponse]
+	createGroup *connect.Client[v2.UserServiceCreateGroupRequest, v2.UserServiceCreateGroupResponse]
+	updateGroup *connect.Client[v2.UserServiceUpdateGroupRequest, v2.UserServiceUpdateGroupResponse]
+	removeGroup *connect.Client[v2.UserServiceRemoveGroupRequest, v2.UserServiceRemoveGroupResponse]
 }
 
 // GetMe calls aquarium.v2.UserService.GetMe.
@@ -164,6 +219,31 @@ func (c *userServiceClient) Remove(ctx context.Context, req *connect.Request[v2.
 	return c.remove.CallUnary(ctx, req)
 }
 
+// ListGroup calls aquarium.v2.UserService.ListGroup.
+func (c *userServiceClient) ListGroup(ctx context.Context, req *connect.Request[v2.UserServiceListGroupRequest]) (*connect.Response[v2.UserServiceListGroupResponse], error) {
+	return c.listGroup.CallUnary(ctx, req)
+}
+
+// GetGroup calls aquarium.v2.UserService.GetGroup.
+func (c *userServiceClient) GetGroup(ctx context.Context, req *connect.Request[v2.UserServiceGetGroupRequest]) (*connect.Response[v2.UserServiceGetGroupResponse], error) {
+	return c.getGroup.CallUnary(ctx, req)
+}
+
+// CreateGroup calls aquarium.v2.UserService.CreateGroup.
+func (c *userServiceClient) CreateGroup(ctx context.Context, req *connect.Request[v2.UserServiceCreateGroupRequest]) (*connect.Response[v2.UserServiceCreateGroupResponse], error) {
+	return c.createGroup.CallUnary(ctx, req)
+}
+
+// UpdateGroup calls aquarium.v2.UserService.UpdateGroup.
+func (c *userServiceClient) UpdateGroup(ctx context.Context, req *connect.Request[v2.UserServiceUpdateGroupRequest]) (*connect.Response[v2.UserServiceUpdateGroupResponse], error) {
+	return c.updateGroup.CallUnary(ctx, req)
+}
+
+// RemoveGroup calls aquarium.v2.UserService.RemoveGroup.
+func (c *userServiceClient) RemoveGroup(ctx context.Context, req *connect.Request[v2.UserServiceRemoveGroupRequest]) (*connect.Response[v2.UserServiceRemoveGroupResponse], error) {
+	return c.removeGroup.CallUnary(ctx, req)
+}
+
 // UserServiceHandler is an implementation of the aquarium.v2.UserService service.
 type UserServiceHandler interface {
 	// Get current user information
@@ -178,6 +258,16 @@ type UserServiceHandler interface {
 	Update(context.Context, *connect.Request[v2.UserServiceUpdateRequest]) (*connect.Response[v2.UserServiceUpdateResponse], error)
 	// Remove user
 	Remove(context.Context, *connect.Request[v2.UserServiceRemoveRequest]) (*connect.Response[v2.UserServiceRemoveResponse], error)
+	// Get list of user groups
+	ListGroup(context.Context, *connect.Request[v2.UserServiceListGroupRequest]) (*connect.Response[v2.UserServiceListGroupResponse], error)
+	// Get user group by name
+	GetGroup(context.Context, *connect.Request[v2.UserServiceGetGroupRequest]) (*connect.Response[v2.UserServiceGetGroupResponse], error)
+	// Create new user group
+	CreateGroup(context.Context, *connect.Request[v2.UserServiceCreateGroupRequest]) (*connect.Response[v2.UserServiceCreateGroupResponse], error)
+	// Update existing user group
+	UpdateGroup(context.Context, *connect.Request[v2.UserServiceUpdateGroupRequest]) (*connect.Response[v2.UserServiceUpdateGroupResponse], error)
+	// Remove user group
+	RemoveGroup(context.Context, *connect.Request[v2.UserServiceRemoveGroupRequest]) (*connect.Response[v2.UserServiceRemoveGroupResponse], error)
 }
 
 // NewUserServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -223,6 +313,36 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(userServiceMethods.ByName("Remove")),
 		connect.WithHandlerOptions(opts...),
 	)
+	userServiceListGroupHandler := connect.NewUnaryHandler(
+		UserServiceListGroupProcedure,
+		svc.ListGroup,
+		connect.WithSchema(userServiceMethods.ByName("ListGroup")),
+		connect.WithHandlerOptions(opts...),
+	)
+	userServiceGetGroupHandler := connect.NewUnaryHandler(
+		UserServiceGetGroupProcedure,
+		svc.GetGroup,
+		connect.WithSchema(userServiceMethods.ByName("GetGroup")),
+		connect.WithHandlerOptions(opts...),
+	)
+	userServiceCreateGroupHandler := connect.NewUnaryHandler(
+		UserServiceCreateGroupProcedure,
+		svc.CreateGroup,
+		connect.WithSchema(userServiceMethods.ByName("CreateGroup")),
+		connect.WithHandlerOptions(opts...),
+	)
+	userServiceUpdateGroupHandler := connect.NewUnaryHandler(
+		UserServiceUpdateGroupProcedure,
+		svc.UpdateGroup,
+		connect.WithSchema(userServiceMethods.ByName("UpdateGroup")),
+		connect.WithHandlerOptions(opts...),
+	)
+	userServiceRemoveGroupHandler := connect.NewUnaryHandler(
+		UserServiceRemoveGroupProcedure,
+		svc.RemoveGroup,
+		connect.WithSchema(userServiceMethods.ByName("RemoveGroup")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/aquarium.v2.UserService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case UserServiceGetMeProcedure:
@@ -237,6 +357,16 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 			userServiceUpdateHandler.ServeHTTP(w, r)
 		case UserServiceRemoveProcedure:
 			userServiceRemoveHandler.ServeHTTP(w, r)
+		case UserServiceListGroupProcedure:
+			userServiceListGroupHandler.ServeHTTP(w, r)
+		case UserServiceGetGroupProcedure:
+			userServiceGetGroupHandler.ServeHTTP(w, r)
+		case UserServiceCreateGroupProcedure:
+			userServiceCreateGroupHandler.ServeHTTP(w, r)
+		case UserServiceUpdateGroupProcedure:
+			userServiceUpdateGroupHandler.ServeHTTP(w, r)
+		case UserServiceRemoveGroupProcedure:
+			userServiceRemoveGroupHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -268,4 +398,24 @@ func (UnimplementedUserServiceHandler) Update(context.Context, *connect.Request[
 
 func (UnimplementedUserServiceHandler) Remove(context.Context, *connect.Request[v2.UserServiceRemoveRequest]) (*connect.Response[v2.UserServiceRemoveResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.UserService.Remove is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) ListGroup(context.Context, *connect.Request[v2.UserServiceListGroupRequest]) (*connect.Response[v2.UserServiceListGroupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.UserService.ListGroup is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) GetGroup(context.Context, *connect.Request[v2.UserServiceGetGroupRequest]) (*connect.Response[v2.UserServiceGetGroupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.UserService.GetGroup is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) CreateGroup(context.Context, *connect.Request[v2.UserServiceCreateGroupRequest]) (*connect.Response[v2.UserServiceCreateGroupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.UserService.CreateGroup is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) UpdateGroup(context.Context, *connect.Request[v2.UserServiceUpdateGroupRequest]) (*connect.Response[v2.UserServiceUpdateGroupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.UserService.UpdateGroup is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) RemoveGroup(context.Context, *connect.Request[v2.UserServiceRemoveGroupRequest]) (*connect.Response[v2.UserServiceRemoveGroupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aquarium.v2.UserService.RemoveGroup is not implemented"))
 }

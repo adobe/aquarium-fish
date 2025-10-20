@@ -43,6 +43,8 @@ message FieldUiConfig {
   optional string name = 3;
   // Name of the message type to use for autofill dropdown
   optional string autofill = 4;
+  // If field need to be filled
+  optional bool required = 5;
 }
 
 extend google.protobuf.MessageOptions {

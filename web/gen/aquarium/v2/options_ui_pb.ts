@@ -33,7 +33,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file aquarium/v2/options_ui.proto.
  */
 export const file_aquarium_v2_options_ui: GenFile = /*@__PURE__*/
-  fileDesc("ChxhcXVhcml1bS92Mi9vcHRpb25zX3VpLnByb3RvEgthcXVhcml1bS52MiI0CghVaUNvbmZpZxIYCgtnZW5lcmF0ZV91aRgBIAEoCEgAiAEBQg4KDF9nZW5lcmF0ZV91aSKTAQoNRmllbGRVaUNvbmZpZxIVCghub2NyZWF0ZRgBIAEoCEgAiAEBEhMKBm5vZWRpdBgCIAEoCEgBiAEBEhEKBG5hbWUYAyABKAlIAogBARIVCghhdXRvZmlsbBgEIAEoCUgDiAEBQgsKCV9ub2NyZWF0ZUIJCgdfbm9lZGl0QgcKBV9uYW1lQgsKCV9hdXRvZmlsbDpYCgl1aV9jb25maWcSHy5nb29nbGUucHJvdG9idWYuTWVzc2FnZU9wdGlvbnMY0oYDIAEoCzIVLmFxdWFyaXVtLnYyLlVpQ29uZmlnUgh1aUNvbmZpZ4gBATpmCg9maWVsZF91aV9jb25maWcSHS5nb29nbGUucHJvdG9idWYuRmllbGRPcHRpb25zGNOGAyABKAsyGi5hcXVhcml1bS52Mi5GaWVsZFVpQ29uZmlnUg1maWVsZFVpQ29uZmlniAEBQkVaQ2dpdGh1Yi5jb20vYWRvYmUvYXF1YXJpdW0tZmlzaC9saWIvcnBjL3Byb3RvL2FxdWFyaXVtL3YyO2FxdWFyaXVtdjJiBnByb3RvMw", [file_google_protobuf_descriptor]);
+  fileDesc("ChxhcXVhcml1bS92Mi9vcHRpb25zX3VpLnByb3RvEgthcXVhcml1bS52MiI0CghVaUNvbmZpZxIYCgtnZW5lcmF0ZV91aRgBIAEoCEgAiAEBQg4KDF9nZW5lcmF0ZV91aSK3AQoNRmllbGRVaUNvbmZpZxIVCghub2NyZWF0ZRgBIAEoCEgAiAEBEhMKBm5vZWRpdBgCIAEoCEgBiAEBEhEKBG5hbWUYAyABKAlIAogBARIVCghhdXRvZmlsbBgEIAEoCUgDiAEBEhUKCHJlcXVpcmVkGAUgASgISASIAQFCCwoJX25vY3JlYXRlQgkKB19ub2VkaXRCBwoFX25hbWVCCwoJX2F1dG9maWxsQgsKCV9yZXF1aXJlZDpYCgl1aV9jb25maWcSHy5nb29nbGUucHJvdG9idWYuTWVzc2FnZU9wdGlvbnMY0oYDIAEoCzIVLmFxdWFyaXVtLnYyLlVpQ29uZmlnUgh1aUNvbmZpZ4gBATpmCg9maWVsZF91aV9jb25maWcSHS5nb29nbGUucHJvdG9idWYuRmllbGRPcHRpb25zGNOGAyABKAsyGi5hcXVhcml1bS52Mi5GaWVsZFVpQ29uZmlnUg1maWVsZFVpQ29uZmlniAEBQkVaQ2dpdGh1Yi5jb20vYWRvYmUvYXF1YXJpdW0tZmlzaC9saWIvcnBjL3Byb3RvL2FxdWFyaXVtL3YyO2FxdWFyaXVtdjJiBnByb3RvMw", [file_google_protobuf_descriptor]);
 
 /**
  * UiConfig defines UI configuration for a message
@@ -89,6 +89,13 @@ export type FieldUiConfig = Message<"aquarium.v2.FieldUiConfig"> & {
    * @generated from field: optional string autofill = 4;
    */
   autofill?: string;
+
+  /**
+   * If field need to be filled
+   *
+   * @generated from field: optional bool required = 5;
+   */
+  required?: boolean;
 };
 
 /**

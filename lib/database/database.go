@@ -59,6 +59,7 @@ type Database struct {
 	subsApplicationResource []chan ApplicationResourceSubscriptionEvent
 	subsLabel               []chan LabelSubscriptionEvent
 	subsUser                []chan UserSubscriptionEvent
+	subsUserGroup           []chan UserGroupSubscriptionEvent
 	subsRole                []chan RoleSubscriptionEvent
 	subsNode                []chan NodeSubscriptionEvent
 

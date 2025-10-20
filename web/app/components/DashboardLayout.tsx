@@ -143,7 +143,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
       {/* Mobile Overlay */}
       {isSidebarOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-gray-600 bg-opacity-75 z-40"
+          className="lg:hidden fixed inset-0 bg-gray-600/75 z-40"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}

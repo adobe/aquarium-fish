@@ -99,7 +99,9 @@ type FieldUiConfig struct {
 	// Custom name to display in UI instead of field name
 	Name *string `protobuf:"bytes,3,opt,name=name,proto3,oneof" json:"name,omitempty"`
 	// Name of the message type to use for autofill dropdown
-	Autofill      *string `protobuf:"bytes,4,opt,name=autofill,proto3,oneof" json:"autofill,omitempty"`
+	Autofill *string `protobuf:"bytes,4,opt,name=autofill,proto3,oneof" json:"autofill,omitempty"`
+	// If field need to be filled
+	Required      *bool `protobuf:"varint,5,opt,name=required,proto3,oneof" json:"required,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -162,6 +164,13 @@ func (x *FieldUiConfig) GetAutofill() string {
 	return ""
 }
 
+func (x *FieldUiConfig) GetRequired() bool {
+	if x != nil && x.Required != nil {
+		return *x.Required
+	}
+	return false
+}
+
 var file_aquarium_v2_options_ui_proto_extTypes = []protoimpl.ExtensionInfo{
 	{
 		ExtendedType:  (*descriptorpb.MessageOptions)(nil),
@@ -205,16 +214,18 @@ const file_aquarium_v2_options_ui_proto_rawDesc = "" +
 	"\bUiConfig\x12$\n" +
 	"\vgenerate_ui\x18\x01 \x01(\bH\x00R\n" +
 	"generateUi\x88\x01\x01B\x0e\n" +
-	"\f_generate_ui\"\xb5\x01\n" +
+	"\f_generate_ui\"\xe3\x01\n" +
 	"\rFieldUiConfig\x12\x1f\n" +
 	"\bnocreate\x18\x01 \x01(\bH\x00R\bnocreate\x88\x01\x01\x12\x1b\n" +
 	"\x06noedit\x18\x02 \x01(\bH\x01R\x06noedit\x88\x01\x01\x12\x17\n" +
 	"\x04name\x18\x03 \x01(\tH\x02R\x04name\x88\x01\x01\x12\x1f\n" +
-	"\bautofill\x18\x04 \x01(\tH\x03R\bautofill\x88\x01\x01B\v\n" +
+	"\bautofill\x18\x04 \x01(\tH\x03R\bautofill\x88\x01\x01\x12\x1f\n" +
+	"\brequired\x18\x05 \x01(\bH\x04R\brequired\x88\x01\x01B\v\n" +
 	"\t_nocreateB\t\n" +
 	"\a_noeditB\a\n" +
 	"\x05_nameB\v\n" +
-	"\t_autofill:X\n" +
+	"\t_autofillB\v\n" +
+	"\t_required:X\n" +
 	"\tui_config\x12\x1f.google.protobuf.MessageOptions\x18҆\x03 \x01(\v2\x15.aquarium.v2.UiConfigR\buiConfig\x88\x01\x01:f\n" +
 	"\x0ffield_ui_config\x12\x1d.google.protobuf.FieldOptions\x18ӆ\x03 \x01(\v2\x1a.aquarium.v2.FieldUiConfigR\rfieldUiConfig\x88\x01\x01BEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"
 

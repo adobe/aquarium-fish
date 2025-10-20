@@ -1079,7 +1079,7 @@ var File_aquarium_v2_node_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_node_proto_rawDesc = "" +
 	"\n" +
-	"\x16aquarium/v2/node.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a#aquarium/v2/options_streaming.proto\"\xc3\x02\n" +
+	"\x16aquarium/v2/node.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a#aquarium/v2/options_streaming.proto\"\xb8\x02\n" +
 	"\x04Node\x12\x10\n" +
 	"\x03uid\x18\x01 \x01(\tR\x03uid\x129\n" +
 	"\n" +
@@ -1092,8 +1092,8 @@ const file_aquarium_v2_node_proto_rawDesc = "" +
 	"definition\x12\x1a\n" +
 	"\blocation\x18\x06 \x01(\tR\blocation\x12\x18\n" +
 	"\aaddress\x18\a \x01(\tR\aaddress\x12\x16\n" +
-	"\x06pubkey\x18\b \x01(\fR\x06pubkey:\x14\x8a\xb5\x18\x10\n" +
-	"\x0eNodeServiceGet\"\xd7\x02\n" +
+	"\x06pubkey\x18\b \x01(\fR\x06pubkey:\t\x8a\xb5\x18\x05\n" +
+	"\x03Get\"\xd7\x02\n" +
 	"\x0eNodeDefinition\x12)\n" +
 	"\x04host\x18\x01 \x01(\v2\x15.aquarium.v2.HostInfoR\x04host\x12/\n" +
 	"\x06memory\x18\x02 \x01(\v2\x17.aquarium.v2.MemoryInfoR\x06memory\x12&\n" +

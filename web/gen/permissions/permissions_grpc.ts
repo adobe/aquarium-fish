@@ -64,9 +64,15 @@ export enum PermGateProxySSH {
 // LabelService service constants
 export enum PermLabel {
   Create = "Create",
+  CreateAll = "CreateAll",
   Get = "Get",
+  GetAll = "GetAll",
   List = "List",
+  ListAll = "ListAll",
   Remove = "Remove",
+  RemoveAll = "RemoveAll",
+  Update = "Update",
+  UpdateAll = "UpdateAll",
 }
 // NodeService service constants
 export enum PermNode {
@@ -92,11 +98,16 @@ export enum PermStreaming {
 export enum PermUser {
   GetMe = "GetMe",
   Create = "Create",
+  CreateGroup = "CreateGroup",
   Get = "Get",
+  GetGroup = "GetGroup",
   List = "List",
+  ListGroup = "ListGroup",
   Remove = "Remove",
+  RemoveGroup = "RemoveGroup",
   Update = "Update",
   UpdateAll = "UpdateAll",
+  UpdateGroup = "UpdateGroup",
   UpdatePassword = "UpdatePassword",
   UpdateRoles = "UpdateRoles",
 }

@@ -25,7 +25,7 @@ import type { LinksFunction } from "react-router";
 import "./app.css";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import { StreamingProvider } from "./contexts/StreamingContext";
+import { StreamingProvider } from "./contexts/StreamingContext/index";
 import { NotificationProvider } from './components/Notifications';
 
 export const links: LinksFunction = () => [

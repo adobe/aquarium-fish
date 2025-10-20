@@ -261,7 +261,7 @@ var File_aquarium_v2_gate_proxyssh_access_proto protoreflect.FileDescriptor
 
 const file_aquarium_v2_gate_proxyssh_access_proto_rawDesc = "" +
 	"\n" +
-	"&aquarium/v2/gate_proxyssh_access.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1eaquarium/v2/options_rbac.proto\"\x97\x02\n" +
+	"&aquarium/v2/gate_proxyssh_access.proto\x12\vaquarium.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1eaquarium/v2/options_rbac.proto\x1a#aquarium/v2/options_streaming.proto\"\x97\x02\n" +
 	"\x12GateProxySSHAccess\x12\x10\n" +
 	"\x03uid\x18\x01 \x01(\tR\x03uid\x129\n" +
 	"\n" +
@@ -279,9 +279,9 @@ const file_aquarium_v2_gate_proxyssh_access_proto_rawDesc = "" +
 	",GateProxySSHServiceGetResourceAccessResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\bR\x06status\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x123\n" +
-	"\x04data\x18\x03 \x01(\v2\x1f.aquarium.v2.GateProxySSHAccessR\x04data2\xc3\x01\n" +
+	"\x04data\x18\x03 \x01(\v2\x1f.aquarium.v2.GateProxySSHAccessR\x04data2\xc9\x01\n" +
 	"\x13GateProxySSHService\x12\xab\x01\n" +
-	"\x11GetResourceAccess\x128.aquarium.v2.GateProxySSHServiceGetResourceAccessRequest\x1a9.aquarium.v2.GateProxySSHServiceGetResourceAccessResponse\"!\x82\xb5\x18\x1d\x1a\x05Power\"\x14GetResourceAccessAllBEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"
+	"\x11GetResourceAccess\x128.aquarium.v2.GateProxySSHServiceGetResourceAccessRequest\x1a9.aquarium.v2.GateProxySSHServiceGetResourceAccessResponse\"!\x82\xb5\x18\x1d\x1a\x05Power\"\x14GetResourceAccessAll\x1a\x04\x90\xb5\x18\x01BEZCgithub.com/adobe/aquarium-fish/lib/rpc/proto/aquarium/v2;aquariumv2b\x06proto3"
 
 var (
 	file_aquarium_v2_gate_proxyssh_access_proto_rawDescOnce sync.Once
@@ -320,6 +320,7 @@ func file_aquarium_v2_gate_proxyssh_access_proto_init() {
 		return
 	}
 	file_aquarium_v2_options_rbac_proto_init()
+	file_aquarium_v2_options_streaming_proto_init()
 	file_aquarium_v2_gate_proxyssh_access_proto_msgTypes[1].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

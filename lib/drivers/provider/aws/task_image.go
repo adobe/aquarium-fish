@@ -174,7 +174,12 @@ func (t *TaskImage) Execute() (result []byte, err error) {
 	}
 
 	// Preparing the create image request
-	imageName := opts.Image + time.Now().UTC().Format("-060102.150405")
+	// Since instance is here - the images surely have first image, but just to be sure
+	if len(t.LabelDefinition.Images) < 1 {
+		logger.Error("No images defined in the LabelDefinition")
+		return []byte(`{"error":"internal: no images found in label definition"}`), fmt.Errorf("AWS: %s: No images defined in the LabelDefinition", t.driver.name)
+	}
+	imageName := t.LabelDefinition.Images[0].GetNameVersion("-") + time.Now().UTC().Format("-060102.150405")
 	if opts.TaskImageName != "" {
 		imageName = opts.TaskImageName + time.Now().UTC().Format("-060102.150405")
 	}
@@ -197,7 +202,7 @@ func (t *TaskImage) Execute() (result []byte, err error) {
 				},
 				{
 					Key:   aws.String("ParentImage"),
-					Value: aws.String(opts.Image),
+					Value: aws.String(t.LabelDefinition.Images[0].GetNameVersion("-")),
 				},
 			},
 		}},

@@ -107,7 +107,8 @@ func loadTemplates() (*template.Template, error) {
 	// Load all template files
 	pattern := filepath.Join(templatesDir, "*.tmpl")
 	tmpl := template.New("react_component").Funcs(template.FuncMap{
-		"lower": strings.ToLower,
+		"lower":      strings.ToLower,
+		"htmlEscape": template.HTMLEscapeString,
 	})
 
 	// Parse all template files
@@ -167,7 +168,7 @@ func getDefaultValue(field *protogen.Field) string {
 	case protoreflect.Int32Kind, protoreflect.Int64Kind, protoreflect.Uint32Kind, protoreflect.Uint64Kind,
 		protoreflect.Sint32Kind, protoreflect.Sint64Kind, protoreflect.Fixed32Kind, protoreflect.Fixed64Kind,
 		protoreflect.Sfixed32Kind, protoreflect.Sfixed64Kind, protoreflect.FloatKind, protoreflect.DoubleKind:
-		return "0"
+		return "''" // Empty string to allow user to enter 0 as valid value
 	case protoreflect.BoolKind:
 		return "false"
 	case protoreflect.BytesKind:
@@ -268,6 +269,9 @@ func processMessage(msg *protogen.Message) *TypeInfo {
 					}
 					if config.Autofill != nil && config.GetAutofill() != "" {
 						fieldInfo.AutofillType = config.GetAutofill()
+					}
+					if config.Required != nil {
+						fieldInfo.IsOptional = !config.GetRequired()
 					}
 				}
 			}

@@ -25,8 +25,12 @@ import (
 	"github.com/adobe/aquarium-fish/lib/util"
 )
 
-const DefaultDBCleanupInterval = 10 * time.Minute
-const DefaultDBCompactInterval = time.Hour
+const (
+	DefaultDBCleanupInterval = 10 * time.Minute
+	DefaultDBCompactInterval = time.Hour
+	DefaultLabelRemoveAtMin  = 30 * time.Second
+	DefaultLabelRemoveAtMax  = 3 * 24 * time.Hour
+)
 
 // MonitoringConfig is an alias for monitoring.Config
 type MonitoringConfig = monitoring.Config
@@ -52,13 +56,16 @@ type Config struct {
 
 	DefaultResourceLifetime util.Duration `json:"default_resource_lifetime"` // Sets the lifetime of the resource which will be used if label definition one is not set
 
+	LabelRemoveAtMin util.Duration `json:"label_remove_at_min"` // Minimum duration for temporary labels
+	LabelRemoveAtMax util.Duration `json:"label_remove_at_max"` // Maximum duration for temporary labels
+
 	AllocationRetry     uint  `json:"allocation_retry"`       // How many times to retry the allocation in case error happened, default: 3
 	ElectedRoundsToWait uint8 `json:"elected_rounds_to_wait"` // Preventive measure for Node failure on ELECTED state, recovers election after this amount of rounds, default: 10
 
 	DBCleanupInterval util.Duration `json:"db_cleanup_interval"` // Defines the database item cleanup interval when Application reached the end of life (by error or deallocated)
 	DBCompactInterval util.Duration `json:"db_compact_interval"` // Defines the database compaction interval to get rid of old data on disk periodically
 
-	DisableAuth bool `json:"disable_auth"` // WARNING! For performance testing only
+	DisableAuth bool `json:"disable_auth"` // WARNING! For performance testing only, do not use in prod!
 
 	// Configuration for the node drivers, if defined - only the listed ones will be available.
 	// Each configuration could instantinate the same driver multiple times by adding instance name
@@ -105,6 +112,8 @@ func (c *Config) initDefaults() {
 	c.NodeName, _ = os.Hostname()
 	c.AllocationRetry = 3
 	c.ElectedRoundsToWait = 10
+	c.LabelRemoveAtMin = util.Duration(DefaultLabelRemoveAtMin)
+	c.LabelRemoveAtMax = util.Duration(DefaultLabelRemoveAtMax)
 	c.DBCleanupInterval = util.Duration(DefaultDBCleanupInterval)
 	c.DBCompactInterval = util.Duration(DefaultDBCompactInterval)
 	c.Monitoring.InitDefaults()

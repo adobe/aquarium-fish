@@ -219,6 +219,33 @@ func (m *MockAWSServer) AddDedicatedHost(hostID, instanceType, zone, state strin
 	}
 }
 
+// AddImage adds a mock AMI image to the server
+func (m *MockAWSServer) AddImage(imageID, name, state string) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	m.images[imageID] = &mockImage{
+		ImageID:      imageID,
+		Name:         name,
+		State:        state,
+		CreationDate: time.Now().Format("2006-01-02T15:04:05.000Z"),
+		Architecture: "x86_64",
+		OwnerID:      m.account,
+	}
+}
+
+// GetImages returns a copy of the images map for testing
+func (m *MockAWSServer) GetImages() map[string]*mockImage { // revive:disable-line:unexported-return
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	images := make(map[string]*mockImage)
+	for k, v := range m.images {
+		images[k] = v
+	}
+	return images
+}
+
 // SetAllocateHostsError sets an error response for AllocateHosts requests
 func (m *MockAWSServer) SetAllocateHostsError(errorCode, _ string) {
 	m.mutex.Lock()
@@ -439,6 +466,10 @@ func (m *MockAWSServer) handleEC2(w http.ResponseWriter, r *http.Request, action
 		m.handleDescribeInstanceAttribute(w, r, body)
 	case "DescribeVolumes":
 		m.handleDescribeVolumes(w, r, body)
+	case "DeregisterImage":
+		m.handleDeregisterImage(w, r, body)
+	case "DeleteSnapshot":
+		m.handleDeleteSnapshot(w, r, body)
 	default:
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(fmt.Sprintf("Unsupported action: %s", action)))
@@ -749,6 +780,27 @@ func (m *MockAWSServer) handleDescribeImages(w http.ResponseWriter, _ *http.Requ
 		requestedImageIDs = append(requestedImageIDs, imageID)
 	}
 
+	// Parse filters
+	filters := make(map[string][]string)
+	for i := 1; ; i++ {
+		filterName := values.Get(fmt.Sprintf("Filter.%d.Name", i))
+		if filterName == "" {
+			break
+		}
+		// Parse filter values
+		var filterValues []string
+		for j := 1; ; j++ {
+			filterValue := values.Get(fmt.Sprintf("Filter.%d.Value.%d", i, j))
+			if filterValue == "" {
+				break
+			}
+			filterValues = append(filterValues, filterValue)
+		}
+		if len(filterValues) > 0 {
+			filters[filterName] = filterValues
+		}
+	}
+
 	imagesXML := ""
 	for _, image := range m.images {
 		// If specific image IDs are requested, only include those
@@ -763,6 +815,11 @@ func (m *MockAWSServer) handleDescribeImages(w http.ResponseWriter, _ *http.Requ
 			if !found {
 				continue
 			}
+		}
+
+		// Apply filters
+		if !matchImageFilters(image, filters) {
+			continue
 		}
 
 		imagesXML += fmt.Sprintf(`
@@ -804,6 +861,87 @@ func (m *MockAWSServer) handleDescribeImages(w http.ResponseWriter, _ *http.Requ
 	w.Header().Set("Content-Type", "text/xml")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(response))
+}
+
+// matchImageFilters checks if an image matches the provided filters
+func matchImageFilters(image *mockImage, filters map[string][]string) bool {
+	for filterName, filterValues := range filters {
+		switch filterName {
+		case "name":
+			// Check if image name matches any of the filter values
+			matched := false
+			for _, filterValue := range filterValues {
+				if image.Name == filterValue {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				return false
+			}
+		case "state", "image-state":
+			// Check if image state matches any of the filter values
+			matched := false
+			for _, filterValue := range filterValues {
+				if image.State == filterValue {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				return false
+			}
+		case "architecture":
+			// Check if architecture matches any of the filter values
+			matched := false
+			for _, filterValue := range filterValues {
+				if image.Architecture == filterValue {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				return false
+			}
+		case "owner-id":
+			// Check if owner ID matches any of the filter values
+			matched := false
+			for _, filterValue := range filterValues {
+				if image.OwnerID == filterValue {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				return false
+			}
+		case "is-public":
+			// For simplicity, treat all images as not public in mock
+			// This filter would match if filterValue is "false"
+			matched := false
+			for _, filterValue := range filterValues {
+				if filterValue == "false" {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				return false
+			}
+		case "owner-alias":
+			// Mock doesn't track owner-alias, so skip this filter
+			// In a real implementation, you'd check against owner aliases
+			continue
+		case "creation-date":
+			// For date filters, we could implement wildcard matching
+			// For now, skip to keep it simple - can be extended later
+			continue
+		default:
+			// Unknown filter - skip it
+			continue
+		}
+	}
+	return true
 }
 
 func (m *MockAWSServer) handleDescribeSubnets(w http.ResponseWriter, _ *http.Request, _ /*body*/ string) {
@@ -1532,6 +1670,90 @@ func (*MockAWSServer) handleDescribeVolumes(w http.ResponseWriter, _ *http.Reque
 		uuid.New().String(),
 		volumesXML,
 	)
+
+	w.Header().Set("Content-Type", "text/xml")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(response))
+}
+
+func (m *MockAWSServer) handleDeregisterImage(w http.ResponseWriter, _ *http.Request, body string) {
+	values, _ := url.ParseQuery(body)
+	imageID := values.Get("ImageId")
+
+	// Check if the image exists
+	image, exists := m.images[imageID]
+	if !exists {
+		errorResponse := `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Errors>
+        <Error>
+            <Code>InvalidAMIID.NotFound</Code>
+            <Message>The image ID '` + imageID + `' does not exist</Message>
+        </Error>
+    </Errors>
+    <RequestID>` + uuid.New().String() + `</RequestID>
+</Response>`
+		w.Header().Set("Content-Type", "text/xml")
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(errorResponse))
+		return
+	}
+
+	// Mark the image as deregistered (remove from map)
+	delete(m.images, imageID)
+
+	response := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<DeregisterImageResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
+    <requestId>%s</requestId>
+    <return>true</return>
+</DeregisterImageResponse>`,
+		uuid.New().String(),
+	)
+
+	// Log the deregistration
+	fmt.Printf("Mock AWS server: Deregistered image %s (name: %s)\n", imageID, image.Name)
+
+	w.Header().Set("Content-Type", "text/xml")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(response))
+}
+
+func (m *MockAWSServer) handleDeleteSnapshot(w http.ResponseWriter, _ *http.Request, body string) {
+	values, _ := url.ParseQuery(body)
+	snapshotID := values.Get("SnapshotId")
+
+	// Check if the snapshot exists
+	_, exists := m.snapshots[snapshotID]
+	if !exists {
+		errorResponse := `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Errors>
+        <Error>
+            <Code>InvalidSnapshot.NotFound</Code>
+            <Message>The snapshot ID '` + snapshotID + `' does not exist</Message>
+        </Error>
+    </Errors>
+    <RequestID>` + uuid.New().String() + `</RequestID>
+</Response>`
+		w.Header().Set("Content-Type", "text/xml")
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(errorResponse))
+		return
+	}
+
+	// Delete the snapshot
+	delete(m.snapshots, snapshotID)
+
+	response := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<DeleteSnapshotResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
+    <requestId>%s</requestId>
+    <return>true</return>
+</DeleteSnapshotResponse>`,
+		uuid.New().String(),
+	)
+
+	// Log the deletion
+	fmt.Printf("Mock AWS server: Deleted snapshot %s\n", snapshotID)
 
 	w.Header().Set("Content-Type", "text/xml")
 	w.WriteHeader(http.StatusOK)

@@ -49,10 +49,16 @@ var rolePermissions = map[string][]typesv2.Permission{
 		{Resource: GateProxySSHService, Action: GateProxySSHServiceGetResourceAccessAll}, // gRPC additional
 
 		// LabelService
-		{Resource: LabelService, Action: LabelServiceCreate}, // gRPC
-		{Resource: LabelService, Action: LabelServiceGet},    // gRPC
-		{Resource: LabelService, Action: LabelServiceList},   // gRPC
-		{Resource: LabelService, Action: LabelServiceRemove}, // gRPC
+		{Resource: LabelService, Action: LabelServiceCreate},    // gRPC
+		{Resource: LabelService, Action: LabelServiceCreateAll}, // gRPC additional
+		{Resource: LabelService, Action: LabelServiceGet},       // gRPC
+		{Resource: LabelService, Action: LabelServiceGetAll},    // gRPC additional
+		{Resource: LabelService, Action: LabelServiceList},      // gRPC
+		{Resource: LabelService, Action: LabelServiceListAll},   // gRPC additional
+		{Resource: LabelService, Action: LabelServiceRemove},    // gRPC
+		{Resource: LabelService, Action: LabelServiceRemoveAll}, // gRPC additional
+		{Resource: LabelService, Action: LabelServiceUpdate},    // gRPC
+		{Resource: LabelService, Action: LabelServiceUpdateAll}, // gRPC additional
 
 		// NodeService
 		{Resource: NodeService, Action: NodeServiceGet},            // gRPC
@@ -73,11 +79,16 @@ var rolePermissions = map[string][]typesv2.Permission{
 
 		// UserService
 		{Resource: UserService, Action: UserServiceCreate},         // gRPC
+		{Resource: UserService, Action: UserServiceCreateGroup},    // gRPC
 		{Resource: UserService, Action: UserServiceGet},            // gRPC
+		{Resource: UserService, Action: UserServiceGetGroup},       // gRPC
 		{Resource: UserService, Action: UserServiceList},           // gRPC
+		{Resource: UserService, Action: UserServiceListGroup},      // gRPC
 		{Resource: UserService, Action: UserServiceRemove},         // gRPC
+		{Resource: UserService, Action: UserServiceRemoveGroup},    // gRPC
 		{Resource: UserService, Action: UserServiceUpdate},         // gRPC
 		{Resource: UserService, Action: UserServiceUpdateAll},      // gRPC additional
+		{Resource: UserService, Action: UserServiceUpdateGroup},    // gRPC
 		{Resource: UserService, Action: UserServiceUpdatePassword}, // gRPC additional
 		{Resource: UserService, Action: UserServiceUpdateRoles},    // gRPC additional
 	},
@@ -102,7 +113,11 @@ var rolePermissions = map[string][]typesv2.Permission{
 		{Resource: ApplicationService, Action: ApplicationServiceListState},    // gRPC
 
 		// LabelService
-		{Resource: LabelService, Action: LabelServiceList}, // gRPC
+		{Resource: LabelService, Action: LabelServiceCreate}, // gRPC
+		{Resource: LabelService, Action: LabelServiceGet},    // gRPC
+		{Resource: LabelService, Action: LabelServiceList},   // gRPC
+		{Resource: LabelService, Action: LabelServiceRemove}, // gRPC
+		{Resource: LabelService, Action: LabelServiceUpdate}, // gRPC
 
 		// StreamingService
 		{Resource: StreamingService, Action: StreamingServiceConnect},   // gRPC
