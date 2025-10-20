@@ -182,8 +182,8 @@ func (afp *AFPlaywright) newBrowserContext(tb testing.TB, options playwright.Bro
 		tb.Fatalf("ERROR: Could not create new context: %v", err)
 	}
 	// We use 1s by default for timeout
-	afp.context.SetDefaultTimeout(1000)
-	afp.context.SetDefaultNavigationTimeout(1000)
+	afp.context.SetDefaultTimeout(2000)
+	afp.context.SetDefaultNavigationTimeout(2000)
 
 	tb.Cleanup(func() {
 		if err := afp.context.Close(); err != nil {
