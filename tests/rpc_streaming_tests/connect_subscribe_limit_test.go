@@ -65,13 +65,13 @@ drivers:
 			RequestType: "KeepAliveRequest",
 		})
 		if err != nil {
-			t.Fatal("Failed to send keep-alive on first connection:", err)
+			t.Fatal("FATAL: Failed to send keep-alive on first connection:", err)
 		}
 
 		// Receive confirmation
 		resp1, err := firstStream.Receive()
 		if err != nil {
-			t.Fatal("Failed to receive from first connection:", err)
+			t.Fatal("FATAL: Failed to receive from first connection:", err)
 		}
 		if resp1.RequestId != "keepalive-1" && resp1.RequestId != "keep-alive" {
 			t.Log("Received response for first connection:", resp1.RequestId)
@@ -80,7 +80,7 @@ drivers:
 		// Create second connection - this should terminate the first one
 		secondStream := streamingClient.Connect(ctx)
 		if err != nil {
-			t.Fatal("Failed to create second connection:", err)
+			t.Fatal("FATAL: Failed to create second connection:", err)
 		}
 		defer secondStream.CloseRequest()
 
@@ -90,7 +90,7 @@ drivers:
 			RequestType: "KeepAliveRequest",
 		})
 		if err != nil {
-			t.Fatal("Failed to send keep-alive on second connection:", err)
+			t.Fatal("FATAL: Failed to send keep-alive on second connection:", err)
 		}
 
 		// The first connection should receive a termination message
@@ -114,13 +114,13 @@ drivers:
 		}
 
 		if !terminationReceived {
-			t.Error("First connection was not terminated as expected")
+			t.Error("ERROR: First connection was not terminated as expected")
 		}
 
 		// Second connection should still work
 		resp2, err := secondStream.Receive()
 		if err != nil {
-			t.Fatal("Second connection failed:", err)
+			t.Fatal("FATAL: Second connection failed:", err)
 		}
 		if resp2.RequestId != "keepalive-2" && resp2.RequestId != "keep-alive" {
 			t.Log("Received response for second connection:", resp2.RequestId)
@@ -139,7 +139,7 @@ drivers:
 			SubscriptionTypes: subscriptionTypes,
 		}))
 		if err != nil {
-			t.Fatal("Failed to create first subscription:", err)
+			t.Fatal("FATAL: Failed to create first subscription:", err)
 		}
 		defer firstSub.Close()
 
@@ -147,7 +147,7 @@ drivers:
 		firstSub.Receive()
 		resp1 := firstSub.Msg()
 		if resp1.ChangeType != aquariumv2.ChangeType_CHANGE_TYPE_CREATED {
-			t.Error("Expected subscription creation confirmation")
+			t.Error("ERROR: Expected subscription creation confirmation")
 		}
 
 		// Create second subscription - this should terminate the first one
@@ -155,7 +155,7 @@ drivers:
 			SubscriptionTypes: subscriptionTypes,
 		}))
 		if err != nil {
-			t.Fatal("Failed to create second subscription:", err)
+			t.Fatal("FATAL: Failed to create second subscription:", err)
 		}
 		defer secondSub.Close()
 
@@ -172,17 +172,17 @@ drivers:
 		}
 
 		if !terminationReceived {
-			t.Error("First subscription was not terminated as expected")
+			t.Error("ERROR: First subscription was not terminated as expected")
 		}
 
 		// Second subscription should receive confirmation
 		secondSub.Receive()
 		resp2 := secondSub.Msg()
 		if err != nil {
-			t.Fatal("Second subscription failed:", err)
+			t.Fatal("FATAL: Second subscription failed:", err)
 		}
 		if resp2.ChangeType != aquariumv2.ChangeType_CHANGE_TYPE_CREATED {
-			t.Error("Expected second subscription creation confirmation")
+			t.Error("ERROR: Expected second subscription creation confirmation")
 		}
 
 		t.Log("Subscribe stream limit test passed - old subscription was terminated")
@@ -233,7 +233,7 @@ drivers:
 
 		userResp, err := userClient.Create(ctx, connect.NewRequest(createReq))
 		if err != nil {
-			t.Fatal("Failed to create unlimited user:", err)
+			t.Fatal("FATAL: Failed to create unlimited user:", err)
 		}
 
 		// Create client for the unlimited user
@@ -256,7 +256,7 @@ drivers:
 				RequestType: "KeepAliveRequest",
 			})
 			if err != nil {
-				t.Fatalf("Failed to send keep-alive on connection %d: %v", i+1, err)
+				t.Fatalf("FATAL: Failed to send keep-alive on connection %d: %v", i+1, err)
 			}
 		}
 
@@ -264,7 +264,7 @@ drivers:
 		for i, conn := range connections {
 			_, err := conn.Receive()
 			if err != nil {
-				t.Fatalf("Connection %d failed: %v", i+1, err)
+				t.Fatalf("FATAL: Connection %d failed: %v", i+1, err)
 			}
 		}
 
@@ -292,7 +292,7 @@ drivers:
 
 		userResp, err := userClient.Create(ctx, connect.NewRequest(createReq))
 		if err != nil {
-			t.Fatal("Failed to create no-stream user:", err)
+			t.Fatal("FATAL: Failed to create no-stream user:", err)
 		}
 
 		// Create client for the no-stream user
@@ -320,7 +320,7 @@ drivers:
 		if err != nil {
 			t.Logf("No-stream test passed - connection was rejected as expected: %v", err)
 		} else {
-			t.Error("Expected connection to fail for no-stream user, but it succeeded")
+			t.Error("ERROR: Expected connection to fail for no-stream user, but it succeeded")
 		}
 
 		// Try to create subscription - should also fail
@@ -333,7 +333,7 @@ drivers:
 		b := subs.Receive()
 		err = subs.Err()
 		if b != false || err == nil {
-			t.Errorf("Expected subscription to fail for no-stream user, but it succeeded: %v, %v", b, err)
+			t.Errorf("ERROR: Expected subscription to fail for no-stream user, but it succeeded: %v, %v", b, err)
 		} else {
 			t.Logf("No-stream test passed - subscribe was rejected as expected: %v", err)
 		}
@@ -355,7 +355,7 @@ drivers:
 
 		userResp, err := userClient.Create(ctx, connect.NewRequest(createReq))
 		if err != nil {
-			t.Fatal("Failed to create limit-2 user:", err)
+			t.Fatal("FATAL: Failed to create limit-2 user:", err)
 		}
 
 		// Create client for the limit-2 user
@@ -379,7 +379,7 @@ drivers:
 			RequestType: "KeepAliveRequest",
 		})
 		if err != nil {
-			t.Fatal("Failed to send keep-alive on first connection:", err)
+			t.Fatal("FATAL: Failed to send keep-alive on first connection:", err)
 		}
 
 		err = conn2.Send(&aquariumv2.StreamingServiceConnectRequest{
@@ -387,19 +387,21 @@ drivers:
 			RequestType: "KeepAliveRequest",
 		})
 		if err != nil {
-			t.Fatal("Failed to send keep-alive on second connection:", err)
+			t.Fatal("FATAL: Failed to send keep-alive on second connection:", err)
 		}
 
 		// Both should work
 		_, err = conn1.Receive()
 		if err != nil {
-			t.Error("First connection failed:", err)
+			t.Error("ERROR: First connection failed:", err)
 		}
 
 		_, err = conn2.Receive()
 		if err != nil {
-			t.Error("Second connection failed:", err)
+			t.Error("ERROR: Second connection failed:", err)
 		}
+
+		t.Log("Two first connections are fine, creating third one")
 
 		// Create third connection - should terminate the first one
 		conn3 := limit2StreamingClient.Connect(ctx)
@@ -410,8 +412,10 @@ drivers:
 			RequestType: "KeepAliveRequest",
 		})
 		if err != nil {
-			t.Fatal("Failed to send keep-alive on third connection:", err)
+			t.Fatal("FATAL: Failed to send keep-alive on third connection:", err)
 		}
+
+		t.Log("Created third connection")
 
 		// First connection should be terminated
 		terminationReceived := false
@@ -427,7 +431,7 @@ drivers:
 		}
 
 		if !terminationReceived {
-			t.Error("First connection was not terminated when limit was exceeded")
+			t.Error("ERROR: First connection was not terminated when limit was exceeded")
 		}
 
 		// Second and third connections should still work
@@ -436,7 +440,7 @@ drivers:
 			RequestType: "KeepAliveRequest",
 		})
 		if err != nil {
-			t.Error("Second connection failed after third was created:", err)
+			t.Error("ERROR: Second connection failed after third was created:", err)
 		}
 
 		err = conn3.Send(&aquariumv2.StreamingServiceConnectRequest{
@@ -444,18 +448,18 @@ drivers:
 			RequestType: "KeepAliveRequest",
 		})
 		if err != nil {
-			t.Error("Third connection failed:", err)
+			t.Error("ERROR: Third connection failed:", err)
 		}
 
 		// Both should work
 		_, err = conn2.Receive()
 		if err != nil {
-			t.Error("First connection failed:", err)
+			t.Error("ERROR: First connection failed:", err)
 		}
 
 		_, err = conn3.Receive()
 		if err != nil {
-			t.Error("Second connection failed:", err)
+			t.Error("ERROR: Second connection failed:", err)
 		}
 
 		t.Log("Custom limit test passed - oldest connection was terminated when limit exceeded")
@@ -503,7 +507,7 @@ drivers:
 			},
 		}))
 		if err != nil {
-			t.Fatal("Failed to create user group:", err)
+			t.Fatal("FATAL: Failed to create user group:", err)
 		}
 	})
 
@@ -523,7 +527,7 @@ drivers:
 
 		_, err := userClient.Create(ctx, connect.NewRequest(createReq))
 		if err != nil {
-			t.Fatal("Failed to create test user:", err)
+			t.Fatal("FATAL: Failed to create test user:", err)
 		}
 	})
 
@@ -537,7 +541,7 @@ drivers:
 			},
 		}))
 		if err != nil {
-			t.Fatal("Failed to update user group:", err)
+			t.Fatal("FATAL: Failed to update user group:", err)
 		}
 	})
 
@@ -563,7 +567,7 @@ drivers:
 			RequestType: "KeepAliveRequest",
 		})
 		if err != nil {
-			t.Fatal("Failed to send keep-alive on first connection:", err)
+			t.Fatal("FATAL: Failed to send keep-alive on first connection:", err)
 		}
 
 		err = conn2.Send(&aquariumv2.StreamingServiceConnectRequest{
@@ -571,18 +575,18 @@ drivers:
 			RequestType: "KeepAliveRequest",
 		})
 		if err != nil {
-			t.Fatal("Failed to send keep-alive on second connection:", err)
+			t.Fatal("FATAL: Failed to send keep-alive on second connection:", err)
 		}
 
 		// Both should work
 		_, err = conn1.Receive()
 		if err != nil {
-			t.Error("First connection failed:", err)
+			t.Error("ERROR: First connection failed:", err)
 		}
 
 		_, err = conn2.Receive()
 		if err != nil {
-			t.Error("Second connection failed:", err)
+			t.Error("ERROR: Second connection failed:", err)
 		}
 
 		// Create third connection - should terminate the first one
@@ -594,7 +598,7 @@ drivers:
 			RequestType: "KeepAliveRequest",
 		})
 		if err != nil {
-			t.Fatal("Failed to send keep-alive on third connection:", err)
+			t.Fatal("FATAL: Failed to send keep-alive on third connection:", err)
 		}
 
 		// First connection should be terminated
@@ -609,7 +613,7 @@ drivers:
 		}
 
 		if !terminationReceived {
-			t.Error("First connection was not terminated when group limit was exceeded")
+			t.Error("ERROR: First connection was not terminated when group limit was exceeded")
 		}
 
 		t.Log("User successfully inherited stream limit from group")
@@ -655,7 +659,7 @@ drivers:
 			},
 		}))
 		if err != nil {
-			t.Fatal("Failed to create user group:", err)
+			t.Fatal("FATAL: Failed to create user group:", err)
 		}
 	})
 
@@ -674,7 +678,7 @@ drivers:
 
 	userResp, err := userClient.Create(ctx, connect.NewRequest(createReq))
 	if err != nil {
-		t.Fatal("Failed to create test user:", err)
+		t.Fatal("FATAL: Failed to create test user:", err)
 	}
 	testPassword := userResp.Msg.GetData().GetPassword()
 
@@ -688,7 +692,7 @@ drivers:
 			},
 		}))
 		if err != nil {
-			t.Fatal("Failed to update user group:", err)
+			t.Fatal("FATAL: Failed to update user group:", err)
 		}
 	})
 
@@ -713,7 +717,7 @@ drivers:
 				RequestType: "KeepAliveRequest",
 			})
 			if err != nil {
-				t.Fatalf("Failed to send keep-alive on connection %d: %v", i+1, err)
+				t.Fatalf("FATAL: Failed to send keep-alive on connection %d: %v", i+1, err)
 			}
 		}
 
@@ -721,7 +725,7 @@ drivers:
 		for i, conn := range connections {
 			_, err := conn.Receive()
 			if err != nil {
-				t.Fatalf("Connection %d failed: %v", i+1, err)
+				t.Fatalf("FATAL: Connection %d failed: %v", i+1, err)
 			}
 		}
 
@@ -776,7 +780,7 @@ drivers:
 			},
 		}))
 		if err != nil {
-			t.Fatal("Failed to create first user group:", err)
+			t.Fatal("FATAL: Failed to create first user group:", err)
 		}
 	})
 
@@ -789,7 +793,7 @@ drivers:
 			},
 		}))
 		if err != nil {
-			t.Fatal("Failed to create second user group:", err)
+			t.Fatal("FATAL: Failed to create second user group:", err)
 		}
 	})
 
@@ -805,7 +809,7 @@ drivers:
 
 	userResp, err := userClient.Create(ctx, connect.NewRequest(createReq))
 	if err != nil {
-		t.Fatal("Failed to create test user:", err)
+		t.Fatal("FATAL: Failed to create test user:", err)
 	}
 	testPassword := userResp.Msg.GetData().GetPassword()
 
@@ -819,7 +823,7 @@ drivers:
 			},
 		}))
 		if err != nil {
-			t.Fatal("Failed to update first user group:", err)
+			t.Fatal("FATAL: Failed to update first user group:", err)
 		}
 	})
 
@@ -832,7 +836,7 @@ drivers:
 			},
 		}))
 		if err != nil {
-			t.Fatal("Failed to update second user group:", err)
+			t.Fatal("FATAL: Failed to update second user group:", err)
 		}
 	})
 
@@ -857,7 +861,7 @@ drivers:
 				RequestType: "KeepAliveRequest",
 			})
 			if err != nil {
-				t.Fatalf("Failed to send keep-alive on connection %d: %v", i+1, err)
+				t.Fatalf("FATAL: Failed to send keep-alive on connection %d: %v", i+1, err)
 			}
 		}
 
@@ -865,7 +869,7 @@ drivers:
 		for i, conn := range connections {
 			_, err := conn.Receive()
 			if err != nil {
-				t.Fatalf("Connection %d failed: %v", i+1, err)
+				t.Fatalf("FATAL: Connection %d failed: %v", i+1, err)
 			}
 		}
 

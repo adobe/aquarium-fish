@@ -165,7 +165,8 @@ type subscription struct {
 	ctx           context.Context //nolint:containedctx // Is used for sending stop for goroutines
 	cancel        context.CancelFunc
 	channels      *subChannels
-	closed        bool // Indicates if the subscription has been closed
+	closed        bool      // Indicates if the subscription has been closed
+	createdAt     time.Time // Timestamp when subscription was created
 
 	// Goroutine coordination
 	relayWg          sync.WaitGroup // WaitGroup to coordinate relay goroutine shutdown
@@ -179,7 +180,8 @@ type bidirectionalConnection struct {
 	userName    string
 	ctx         context.Context //nolint:containedctx // Is used for sending stop for goroutines
 	cancel      context.CancelFunc
-	closed      bool // Indicates if the connection has been closed
+	closed      bool      // Indicates if the connection has been closed
+	createdAt   time.Time // Timestamp when connection was created
 }
 
 // safeSend safely sends a response through the bidirectional stream with proper synchronization
@@ -321,20 +323,21 @@ func (s *StreamingService) enforceStreamLimit(user *typesv2.User, connectionType
 		s.connectionsMutex.Lock()
 		var oldestConnID string
 		var oldestConn *bidirectionalConnection
+		var oldestTime time.Time
 
 		// Find the oldest connection for this user (excluding the new one)
 		for connID, conn := range s.connections {
 			if conn.userName == user.Name && connID != newConnectionID {
-				if oldestConnID == "" {
+				if oldestConnID == "" || conn.createdAt.Before(oldestTime) {
 					oldestConnID = connID
 					oldestConn = conn
-					break
+					oldestTime = conn.createdAt
 				}
 			}
 		}
 
 		if oldestConn != nil {
-			logger.Debug("Terminating oldest bidirectional connection", "conn_id", oldestConnID)
+			logger.Debug("Terminating oldest bidirectional connection", "conn_id", oldestConnID, "created_at", oldestTime)
 			// Send termination message to client
 			terminationMsg := &aquariumv2.StreamingServiceConnectResponse{
 				RequestId:    "stream-limit-exceeded",
@@ -355,20 +358,21 @@ func (s *StreamingService) enforceStreamLimit(user *typesv2.User, connectionType
 		s.subscriptionsMutex.Lock()
 		var oldestSubID string
 		var oldestSub *subscription
+		var oldestTime time.Time
 
 		// Find the oldest subscription for this user
 		for subID, sub := range s.subscriptions {
 			if sub.userName == user.Name {
-				if oldestSubID == "" {
+				if oldestSubID == "" || sub.createdAt.Before(oldestTime) {
 					oldestSubID = subID
 					oldestSub = sub
-					break
+					oldestTime = sub.createdAt
 				}
 			}
 		}
 
 		if oldestSub != nil {
-			logger.Debug("Terminating oldest subscription", "sub_id", oldestSubID)
+			logger.Debug("Terminating oldest subscription", "sub_id", oldestSubID, "created_at", oldestTime)
 			// Send termination message to client using the safe method
 			s.sendSubscriptionResponse(oldestSub,
 				aquariumv2.SubscriptionType_SUBSCRIPTION_TYPE_UNSPECIFIED,
@@ -417,10 +421,11 @@ func (s *StreamingService) Connect(ctx context.Context, stream *connect.BidiStre
 
 	// Create and register connection
 	conn := &bidirectionalConnection{
-		stream:   stream,
-		userName: user.Name,
-		ctx:      connCtx,
-		cancel:   cancel,
+		stream:    stream,
+		userName:  user.Name,
+		ctx:       connCtx,
+		cancel:    cancel,
+		createdAt: time.Now(),
 	}
 
 	s.connectionsMutex.Lock()
@@ -684,6 +689,7 @@ func (s *StreamingService) Subscribe(ctx context.Context, req *connect.Request[a
 		ctx:           subCtx,
 		cancel:        cancel,
 		channels:      s.setupChannels(),
+		createdAt:     time.Now(),
 	}
 
 	// Register subscription

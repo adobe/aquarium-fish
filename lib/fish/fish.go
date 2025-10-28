@@ -573,11 +573,15 @@ func (f *Fish) CleanupDB(ctx context.Context) {
 	}
 }
 
-func (f *Fish) isNodeAvailableForDefinitions(defs []typesv2.LabelDefinition) int {
+func (f *Fish) isNodeAvailableForDefinitions(defs []typesv2.LabelDefinition, defsStart uint) int {
 	available := -1 // Set "nope" answer by default in case all the definitions are not fit
-	for i, def := range defs {
-		if f.isNodeAvailableForDefinition(def) {
-			available = i
+
+	// Iterating through list with offset from defsStart
+	defsAmount := uint(len(defs))
+	for i := range defsAmount {
+		pos := (i + defsStart) % defsAmount
+		if f.isNodeAvailableForDefinition(defs[pos]) {
+			available = int(pos)
 			break
 		}
 	}

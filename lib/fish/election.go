@@ -163,7 +163,9 @@ func (f *Fish) electionProcess(appUID typesv2.ApplicationUID) error {
 			logger.Error("Active vote was removed during process")
 			return fmt.Errorf("Fish: Election %s: Active vote was removed during process", appUID)
 		}
-		activeVote.Available = int32(f.isNodeAvailableForDefinitions(label.Definitions))
+		// Getting the retry count to offset the starting position for definitions check
+		amountOfRetries := f.db.ApplicationStateNewCount(ctx, app.Uid) - 1
+		activeVote.Available = int32(f.isNodeAvailableForDefinitions(label.Definitions, amountOfRetries))
 		myvote = activeVote
 		f.activeVotesMutex.Unlock()
 
