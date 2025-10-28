@@ -432,7 +432,7 @@ func (d *Driver) Allocate(def typesv2.LabelDefinition, metadata map[string]any) 
 		}
 
 		var hostID string
-		if hostID, netZone = p.ReserveAllocateHost(opts.InstanceType); hostID == "" {
+		if hostID, netZone = p.ReserveAllocateHost(opts.InstanceType, opts.PoolZones); hostID == "" {
 			return nil, fmt.Errorf("AWS: %s: Unable to reserve host in dedicated pool %q", iName, opts.Pool)
 		}
 		input.Placement = &ec2types.Placement{

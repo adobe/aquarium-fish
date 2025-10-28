@@ -111,10 +111,10 @@ func (w *dedicatedPoolWorker) AvailableCapacity(instanceType string) int64 {
 }
 
 // Internally reserves the existing dedicated host if possible till the next list update
-func (w *dedicatedPoolWorker) ReserveHost(instanceType string) (string, string) {
-	logger := log.WithFunc("aws", "ReserveHost").With("provider.name", w.driver.name, "dedicated", w.name)
+func (w *dedicatedPoolWorker) ReserveHost(instanceType string, zones []string) (string, string) {
+	logger := log.WithFunc("aws", "ReserveHost").With("provider.name", w.driver.name, "dedicated", w.name, "type", instanceType, "zones", zones)
 	if instanceType != w.record.Type {
-		logger.Warn("Incorrect pool type requested", "type", instanceType)
+		logger.Warn("Incorrect pool type requested")
 		return "", ""
 	}
 
@@ -124,9 +124,20 @@ func (w *dedicatedPoolWorker) ReserveHost(instanceType string) (string, string) 
 
 	var availableHosts []string
 
+	// Ensure provided zones are within the available range
+	for _, z := range zones {
+		if !slices.Contains(w.record.Zones, z) {
+			logger.Error("Dedicated pool does not support zone", "zones_available", w.record.Zones, "zone", z)
+			return "", ""
+		}
+	}
+	if len(zones) == 0 {
+		zones = w.record.Zones
+	}
+
 	// Look for the hosts with capacity
 	for hostID, host := range w.activeHosts {
-		if getHostCapacity(&host) > 0 {
+		if getHostCapacity(&host) > 0 && slices.Contains(zones, aws.ToString(host.AvailabilityZone)) {
 			availableHosts = append(availableHosts, hostID)
 		}
 	}
@@ -145,10 +156,10 @@ func (w *dedicatedPoolWorker) ReserveHost(instanceType string) (string, string) 
 }
 
 // Allocates the new dedicated host if possible
-func (w *dedicatedPoolWorker) AllocateHost(instanceType string) (string, string) {
-	logger := log.WithFunc("aws", "AllocateHost").With("provider.name", w.driver.name, "dedicated", w.name)
+func (w *dedicatedPoolWorker) AllocateHost(instanceType string, zones []string) (string, string) {
+	logger := log.WithFunc("aws", "AllocateHost").With("provider.name", w.driver.name, "dedicated", w.name, "type", instanceType, "zones", zones)
 	if instanceType != w.record.Type {
-		logger.Warn("Incorrect pool type requested", "type", instanceType)
+		logger.Warn("Incorrect pool type requested")
 		return "", ""
 	}
 
@@ -158,7 +169,7 @@ func (w *dedicatedPoolWorker) AllocateHost(instanceType string) (string, string)
 		return "", ""
 	}
 
-	host, zone, err := w.allocateDedicatedHost()
+	host, zone, err := w.allocateDedicatedHost(zones)
 	if err != nil || host == "" {
 		logger.Error("Failed to allocate the new host", "err", err)
 		return "", ""
@@ -168,18 +179,18 @@ func (w *dedicatedPoolWorker) AllocateHost(instanceType string) (string, string)
 }
 
 // Will reserve existing or allocate the new host
-func (w *dedicatedPoolWorker) ReserveAllocateHost(instanceType string) (string, string) {
+func (w *dedicatedPoolWorker) ReserveAllocateHost(instanceType string, zones []string) (string, string) {
 	if instanceType != w.record.Type {
 		logger := log.WithFunc("aws", "ReserveAllocateHost").With("provider.name", w.driver.name, "dedicated", w.name)
 		logger.Warn("Incorrect pool type requested", "type", instanceType)
 		return "", ""
 	}
 
-	host, zone := w.ReserveHost(instanceType)
+	host, zone := w.ReserveHost(instanceType, zones)
 	if host != "" {
 		return host, zone
 	}
-	return w.AllocateHost(instanceType)
+	return w.AllocateHost(instanceType, zones)
 }
 
 func (w *dedicatedPoolWorker) fetchInstancesPerHost() {
@@ -572,15 +583,26 @@ func (w *dedicatedPoolWorker) updateDedicatedHosts() error {
 	return nil
 }
 
-func (w *dedicatedPoolWorker) allocateDedicatedHost() (string, string, error) {
-	logger := log.WithFunc("aws", "allocateDedicatedHost").With("provider.name", w.driver.name, "dedicated", w.name)
-	logger.Info("Allocating dedicated host of type", "type", w.record.Type)
+func (w *dedicatedPoolWorker) allocateDedicatedHost(zones []string) (string, string, error) {
+	logger := log.WithFunc("aws", "allocateDedicatedHost").With("provider.name", w.driver.name, "dedicated", w.name, "type", w.record.Type, "zones", zones)
+	logger.Info("Allocating dedicated host of type")
 
 	// Storing happened issues to later show in log as error
 	errors := []string{}
 	conn := w.driver.newEC2Conn()
 
-	for _, zone := range w.record.Zones {
+	// Ensure provided zones are within the available range
+	for _, z := range zones {
+		if !slices.Contains(w.record.Zones, z) {
+			logger.Error("Dedicated pool does not support zone", "zones_available", w.record.Zones, "zone", z)
+			return "", "", fmt.Errorf("AWS: %s: dedicated %q: Zone is not defined in the record: %v", w.driver.name, w.name, z)
+		}
+	}
+	if len(zones) == 0 {
+		zones = w.record.Zones
+	}
+
+	for _, zone := range zones {
 		input := ec2.AllocateHostsInput{
 			AvailabilityZone: aws.String(zone),
 			AutoPlacement:    ec2types.AutoPlacementOff, // Managed hosts are for targeted workload
@@ -618,8 +640,8 @@ func (w *dedicatedPoolWorker) allocateDedicatedHost() (string, string, error) {
 		return resp.HostIds[0], zone, nil
 	}
 
-	logger.Error("Unable to allocate dedicated hosts in zones", "zones", w.record.Zones, "errs", errors)
-	return "", "", fmt.Errorf("AWS: %s: dedicated %q: Unable to allocate dedicated hosts in zones %s: %v", w.driver.name, w.name, w.record.Zones, errors)
+	logger.Error("Unable to allocate dedicated hosts in zones", "errs", errors)
+	return "", "", fmt.Errorf("AWS: %s: dedicated %q: Unable to allocate dedicated hosts in zones %s: %v", w.driver.name, w.name, zones, errors)
 }
 
 // Will request a release for a bunch of hosts and return unsuccessful id's or error
