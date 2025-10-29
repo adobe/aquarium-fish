@@ -83,21 +83,12 @@ func (d *Database) applicationStateGetImpl(_ context.Context, uid typesv2.Applic
 }
 
 // applicationStateDeleteImpl removes the ApplicationState
-func (d *Database) applicationStateDeleteImpl(ctx context.Context, uid typesv2.ApplicationStateUID) (err error) {
-	// Get the object before deleting it for notification
-	as, getErr := d.ApplicationStateGet(ctx, uid)
-	if getErr != nil {
-		return getErr
-	}
-
+func (d *Database) applicationStateDeleteImpl(_ context.Context, uid typesv2.ApplicationStateUID) (err error) {
 	d.beMu.RLock()
 	err = d.be.Collection(ObjectApplicationState).Delete(uid.String())
 	d.beMu.RUnlock()
 
-	if err == nil && as != nil {
-		// Notify subscribers about the removed ApplicationState
-		notifySubscribersHelper(d, &d.subsApplicationState, NewRemoveEvent(as), ObjectApplicationState)
-	}
+	// NOTE: ApplicationState matters only on creation, remove happens on CleanupDB, so skipping notification
 
 	return err
 }

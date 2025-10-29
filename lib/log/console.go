@@ -251,6 +251,8 @@ func (h *ConsoleHandler) appendAttr(buf *strings.Builder, attr slog.Attr) {
 			switch v := attr.Value.Any().(type) {
 			case fmt.Stringer:
 				buf.WriteString(v.String())
+			case error:
+				buf.WriteString(v.Error())
 			default:
 				buf.WriteString(fmt.Sprintf("%#v", v))
 			}

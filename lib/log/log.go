@@ -137,7 +137,7 @@ func Initialize(config *Config) error {
 	if config.Format == "console" {
 		consoleHandler := NewConsoleHandler(output, opts)
 		// Color for now is set automatically depends on the stdout is PTY or not
-		//consoleHandler.SetUseColor(config.UseColor)
+		// consoleHandler.SetUseColor(config.UseColor)
 		handler = consoleHandler
 	} else {
 		handler = slog.NewJSONHandler(output, opts)
